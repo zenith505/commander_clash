@@ -251,6 +251,9 @@ const checkableMay = (e: Effect) =>
   // Moonveil Regent).
   (e.type === "discard" && e.who.ref === "you" && e.hand && !e.filter) ||
   (e.type === "draw" && e.who.ref === "you") ||
+  // "You may have target opponent draw a card. If you do, copy that spell." (Alania): done if that player is still a legal
+  // target with a card to draw.
+  (e.type === "draw" && e.who.ref === "target" && !("n" in e.who && e.who.n) && e.n === 1) ||
   // "You may have that player lose 2 life. If you do, you gain 2 life." (Bloodchief Ascension): one player, who can lose
   // life now (CR 119.8).
   (e.type === "loseLife" && (e.who.ref === "eventPlayer" || (e.who.ref === "target" && !("n" in e.who && e.who.n))) && typeof e.n === "number" && e.n > 0) ||
@@ -3943,7 +3946,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."; Firebender
       // Ascension: "Then if it has four or more quest counters on it, you may copy that ability. ..."
-      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : undefined;
+      // Alania: "You may have target opponent draw a card. If you do, copy that spell. You may choose new targets for the copy."
+      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : both.length === 1 && prev?.type === "if" && prev.cond.kind === "youDid" && !prev.otherwise ? both[0] : undefined;
       if (only?.type === "copySpell" && prev?.type === "if") {
         only.newTargets = true;
         continue;

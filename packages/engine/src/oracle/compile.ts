@@ -545,6 +545,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Nicol Bolas, Dragon-God: "~ has all loyalty abilities of all other planeswalkers on the battlefield": theirs as they
+    // have them now (CR 613.1f), not their static, triggered or other activated abilities; "~" in them is Bolas (rulings).
+    if (line === "~ has all loyalty abilities of all other planeswalkers on the battlefield." && !out.borrows) {
+      out.borrows = { filter: { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], text: "other planeswalkers" }, other: true, noMana: true, loyalty: true };
+      continue;
+    }
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
       continue;

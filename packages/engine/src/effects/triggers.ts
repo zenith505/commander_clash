@@ -1,4 +1,4 @@
-import { defMv, restingDef } from "../faces";
+import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
@@ -1426,6 +1426,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
+        // Alania: the first spell of one of these kinds its caster has cast this turn, this one (a copy wasn't cast).
+        if (t.cast.firstOfKinds) {
+          const mine = (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && !!s.cards[c.card]);
+          const name = characteristics(s, o).name;
+          const counts = (k: { spec: TargetSpec; notSelfName?: true }, d: CardDef) => printedMatches(k.spec, d) && !(k.notSelfName && sameName(d.name, name));
+          if (ev.copy || !t.cast.firstOfKinds.some((k) => counts(k, ev.card) && mine.filter((c) => counts(k, s.cards[c.card]!)).length === 1)) return false;
+        }
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
         // "Using mana produced by Tecutlan": this permanent's mana, as this object (CR 400.7).
         if (t.cast.manaFromSelf && !ev.manaSources?.includes(`${o.id}#${o.zoneChanges ?? 0}`)) return false;

@@ -1,7 +1,7 @@
 // Round 145: the most played cards, in popularity order, starting with Tezzeret, Betrayer of Flesh.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
+import { act, bear, card, forest, island, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
 import { abilitiesOf, activationCost, characteristics, compileCard, invalidateCharacteristics, isFullySupported, manaValue, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -318,5 +318,63 @@ describe("Nazgûl Battle-Mace", () => {
     s = resolveAll(s);
     if (s.pending?.kind === "payUnless") s = resolveAll(act(s, { type: "payUnless", player: opp, pay: false }));
     expect(s.objects[victim]!.zone).toBe("exile");
+  });
+});
+
+const alania = card("Alania, Divergent Storm", "Legendary Creature — Otter Wizard", "{3}{U}{R}", { power: "3", toughness: "5", oracleText: "Whenever you cast a spell, if it's the first instant spell, the first sorcery spell, or the first Otter spell other than Alania you've cast this turn, you may have target opponent draw a card. If you do, copy that spell. You may choose new targets for the copy." });
+const cantrip = card("Test Cantrip", "Instant", "{U}", { oracleText: "Draw a card." });
+const sorceryCantrip = card("Test Sorcery Cantrip", "Sorcery", "{U}", { oracleText: "Draw a card." });
+const otter = card("Test Otter", "Creature — Otter", "{1}{U}", { power: "1", toughness: "1" });
+
+describe("Alania, Divergent Storm", () => {
+  /** Cast `id`; answer Alania's trigger, if it asks, with `opp` and `yes`. Returns whether it asked. */
+  const castWith = (s0: GameState, ap: PlayerId, id: string, opp: PlayerId, yes = true) => {
+    let s = run(s0, planCast(s0, ap, id));
+    let asked = false;
+    for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseTargets") {
+        asked = true;
+        s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] });
+      } else if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes });
+      else if (s.pending?.kind === "copyTargets") s = act(s, { type: "copyTargets", player: ap, targets: [] });
+      else if (s.pending) throw new Error(`unexpected ${s.pending.kind}`);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    return { s, asked };
+  };
+
+  it("is fully supported; the first instant, the first sorcery and the first Otter spell each turn are copied if an opponent draws", () => {
+    supported(alania);
+    const { s: s0, ap, ids, opp } = setup([cantrip, cantrip, sorceryCantrip, otter]);
+    putOnBattlefield(s0, ap, alania);
+    putOnBattlefield(s0, ap, island);
+    putOnBattlefield(s0, ap, island);
+    const hand = s0.players[ap]!.hand.length;
+    const theirs = s0.players[opp]!.hand.length;
+    let { s, asked } = castWith(s0, ap, ids[0]!, opp);
+    expect(asked).toBe(true);
+    expect(s.players[opp]!.hand.length).toBe(theirs + 1);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 2); // the copy draws too
+    // The second instant this turn: no trigger.
+    ({ s, asked } = castWith(s, ap, ids[1]!, opp));
+    expect(asked).toBe(false);
+    // The first sorcery and the first Otter: each triggers.
+    ({ s, asked } = castWith(s, ap, ids[2]!, opp));
+    expect(asked).toBe(true);
+    ({ s, asked } = castWith(s, ap, ids[3]!, opp));
+    expect(asked).toBe(true);
+    // The copy of the Otter spell became a token.
+    expect(s.battlefield.filter((id) => characteristics(s, s.objects[id]!).name === "Test Otter")).toHaveLength(2);
+  });
+
+  it("if the opponent doesn't draw (you decline), nothing is copied; Alania cast earlier doesn't count as the first Otter", () => {
+    const { s: s0, ap, ids, opp } = setup([cantrip, otter]);
+    putOnBattlefield(s0, ap, alania);
+    s0.castThisTurn = [...(s0.castThisTurn ?? []), { player: ap, card: s0.objects[into(s0, ap, alania, "graveyard")]!.cardId }];
+    const hand = s0.players[ap]!.hand.length;
+    let { s } = castWith(s0, ap, ids[0]!, opp, false);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 1);
+    const r = castWith(s, ap, ids[1]!, opp);
+    expect(r.asked).toBe(true);
   });
 });

@@ -429,7 +429,7 @@ function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledC
   if (!byKey) borrowed.set(own, (byKey = new Map()));
   let hit = byKey.get(key);
   if (!hit) {
-    const usable = (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
+    const usable = own.borrows!.loyalty ? (a: CompiledCard["activated"][number]) => !a.zone && (a.loyalty !== undefined || !!a.loyaltyX) : (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
     hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l) => l.activated.filter(usable).map((a) => ({ ...a, borrowed: true as const })))] };
     byKey.set(key, hit);
   }

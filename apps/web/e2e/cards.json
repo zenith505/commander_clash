@@ -13375,6 +13375,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b981af39-4ee6-4fbc-9a89-618dcad9dfbf",
+  "name": "The Necrobloom",
+  "manaCost": "{1}{W}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Plant",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Plant"
+  ],
+  "oracleText": "Landfall — Whenever a land you control enters, create a 0/1 green Plant creature token. If you control seven or more lands with different names, create a 2/2 black Zombie creature token instead.\nLand cards in your graveyard have dredge 2. (You may return a land card from your graveyard to your hand and mill two cards instead of drawing a card.)",
+  "power": "2",
+  "toughness": "7",
+  "colors": [
+   "B",
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Mill",
+   "Landfall"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3aa83ed2-f48b-4ce6-a614-2c54ddf50538",
   "name": "The One Ring",
   "manaCost": "{4}",

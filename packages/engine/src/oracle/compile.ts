@@ -1359,6 +1359,18 @@ export function compile(d: CardDef): CompiledCard {
       (out.graveyardGrants ??= []).push({ filter: { ...f, text: "permanent cards" }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
+    // The Necrobloom: "Land cards in your graveyard have dredge 2." (CR 702.52a): those cards have the keyword while it
+    // applies, so they can replace their owner's draws.
+    const dredgeGrant = /^(.+?) cards? in your graveyard (?:has|have) dredge (\d+)\.$/.exec(line);
+    if (dredgeGrant) {
+      const filter = parseTargetPhrase(`${dredgeGrant[1]!} card from a graveyard`);
+      if (filter?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.dredgeGrants ??= []).push({ filter: f, n: Number(dredgeGrant[2]) });
+      }
+      continue;
+    }
     // Underworld Breach, The Master of Keys, Lier, Return the Past, Six, Deeproot Historian: escape, flashback or retrace
     // for the cards in your graveyard (CR 702.138a, 702.34a, 702.81a). Each grant's cost is the card's own mana cost.
     const grant =

@@ -110,7 +110,7 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     // Static abilities kept in fields of their own, each made conditional the same way.
     const { costMods, equipLess, fromTop, lookTop, playLinked, extraLands, countMods, graveyardGrants, ...others } = inner;
     if (rest(others as CompiledCard) !== rest(empty)) return false;
-    if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || fromTop?.some((t) => t.if) || graveyardGrants?.some((g) => g.if)) return false;
+    if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || graveyardGrants?.some((g) => g.if)) return false;
     // A counter or token replacement (Innkeeper's Talent's level 3): an ability it has while the condition holds (layer 6).
     if (countMods?.length) {
       if (inner.statics.length || inner.triggers.length || inner.activated.length || inner.mana.length) return false;
@@ -119,16 +119,17 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     }
     if (costMods) more.costMods.push(...costMods.map((m) => ({ ...m, if: cond })));
     if (equipLess) more.equipLess.push(...equipLess.map((m) => ({ ...m, if: cond })));
-    if (fromTop) more.fromTop.push(...fromTop.map((t) => ({ ...t, if: cond })));
+    // "As long as you've cast a spell this turn, you may play cards from the top of your library" (Fortune Teller's
+    // Talent's level 2): while both hold.
+    if (fromTop) more.fromTop.push(...fromTop.map((t) => ({ ...t, if: t.if ? { kind: "allOf" as const, conds: [cond, t.if] } : cond })));
     // Exploration Broodship's 8+: its once-each-turn graveyard permission.
     if (graveyardGrants) more.graveyardGrants.push(...graveyardGrants.map((g) => ({ ...g, if: cond })));
     if (lookTop) more.lookTop = true;
     if (playLinked) more.playLinked = true;
     for (let i = 0; i < (extraLands ?? 0); i++) more.extraLandsIf.push(cond);
-    for (const st of inner.statics) {
-      if (st.condition) return false;
-      statics.push({ ...st, condition: cond });
-    }
+    // "During your turn, equipped creatures you control have double strike and haste" (Blacksmith's Talent's level 3):
+    // while both hold.
+    for (const st of inner.statics) statics.push({ ...st, condition: st.condition ? { kind: "allOf", conds: [cond, st.condition] } : cond });
     for (const t of inner.triggers) {
       if (t.activeIf) return false;
       add.triggers.push({ ...t, activeIf: cond });

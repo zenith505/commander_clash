@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   asFace,
+  dredgeAmount,
   castableFaces,
   isType,
   landFaces,
@@ -4495,7 +4496,7 @@ function Controls({
           const d = cardOf(s, id);
           return (
             <button key={id} className="ghost" onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: { dredge: id } }])}>
-              Dredge {d.name} (mill {compileCard(d).dredge})
+              Dredge {d.name} (mill {dredgeAmount(s, HUMAN, id)})
             </button>
           );
         })}
@@ -4530,7 +4531,7 @@ function Controls({
           const d = cardOf(s, id);
           return (
             <button key={id} className="ghost" onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: { dredge: id } }])}>
-              Dredge {d.name} (mill {compileCard(d).dredge})
+              Dredge {d.name} (mill {dredgeAmount(s, HUMAN, id)})
             </button>
           );
         })}
@@ -4577,7 +4578,7 @@ function Controls({
           const d = cardOf(s, id);
           return (
             <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "dredge", player: HUMAN, objectId: id }])}>
-              Dredge {d.name} (mill {compileCard(d).dredge})
+              Dredge {d.name} (mill {dredgeAmount(s, HUMAN, id)})
             </button>
           );
         })}

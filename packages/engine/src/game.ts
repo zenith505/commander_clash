@@ -2214,9 +2214,27 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
   const p = player(s, pid);
   if (p.lost) return [];
   return p.graveyard.filter((id) => {
-    const n = compileCard(defOf(s, obj(s, id))).dredge;
+    const n = dredgeAmount(s, pid, id);
     return n !== undefined && p.library.length >= n;
   });
+}
+
+/**
+ * A card's dredge N in `pid`'s graveyard: its own, else one a permanent they control gives it ("Land cards in your
+ * graveyard have dredge 2", The Necrobloom). Every such grant says dredge 2 and no land card has dredge of its own, so
+ * there's never a choice between two Ns.
+ */
+export function dredgeAmount(s: GameState, pid: PlayerId, id: ObjectId): number | undefined {
+  const d = defOf(s, obj(s, id));
+  const own = compileCard(d).dredge;
+  if (own !== undefined) return own;
+  for (const pid2 of s.battlefield) {
+    const p = obj(s, pid2);
+    if (controllerOf(s, p) !== pid) continue;
+    const g = abilitiesOf(s, p).dredgeGrants?.find((x) => printedMatches(x.filter, d));
+    if (g) return g.n;
+  }
+  return undefined;
 }
 
 /**
@@ -2224,7 +2242,7 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
  * rest of the draws, and whatever was drawing carries on.
  */
 function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
-  const n = millCount(s, p.id, compileCard(defOf(s, obj(s, id))).dredge!);
+  const n = millCount(s, p.id, dredgeAmount(s, p.id, id)!);
   const milled = p.library.slice(0, n);
   for (const c of milled) moveObject(s, c, "graveyard", { milled: true });
   moveObject(s, id, "hand");
@@ -4203,6 +4221,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.turn === "notCasters" ? s.activePlayer === pid : m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && !m.fromZones && o.zone !== "graveyard") continue;
       if (m.fromZones && !m.fromZones.includes(o.zone as "graveyard" | "exile")) continue;
+      if (m.notFromHand && o.zone === "hand") continue;
       // "From your graveyard": a card cast from another player's graveyard isn't (a card is in its owner's, CR 404.2).
       if (m.fromGraveyard && o.zone === "graveyard" && o.owner !== pid) continue;
       if (m.notOwned && o.owner === pid) continue;

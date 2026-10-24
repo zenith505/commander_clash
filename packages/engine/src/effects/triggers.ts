@@ -951,7 +951,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "permanentCountersPut" && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+      add(w, ctrl, (e, t) => e === "permanentCountersPut" && !t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+      // "Whenever a -1/-1 counter is put on a creature" (Flourishing Defenses): once for each counter.
+      for (let i = 0; i < ev.amount; i++) add(w, ctrl, (e, t) => e === "permanentCountersPut" && !!t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, { amount: 1 });
     }
   } else if (ev.type === "playerCountersPut") {
     // "Whenever you put one or more counters on a permanent or player" (All Will Be One): "that much" is how many.

@@ -18,6 +18,7 @@ import {
   abilityProblem,
   faceUpWays,
   faceUpManaCost,
+  dredgeAmount,
   assistedRemaining,
   returnCandidates,
   attackablePermanentProblem,
@@ -996,12 +997,28 @@ function faceUpX(s: GameState, pid: PlayerId, o: GameObject, way: number): numbe
   if (body.targets.some((t) => t.many === "x")) return (chooseTargets(s, pid, body, false, o.id, most) ?? []).filter((t) => t.kind !== "none").length;
   const shrinks = body.effects.some((e) => e.type === "continuous" && e.what.ref === "each" && e.mods.some((m) => m.kind === "modifyPT" && typeof m.toughness === "object" && !!m.toughness.negate));
   if (!shrinks) return most;
-  // Its own toughness once it's face up: the card's, with what else applies to it now.
-  const tough = (c: GameObject) => (c.id === o.id ? toughness(s, c) - 2 + Number(card.toughness ?? 0) : toughness(s, c));
-  const creatures = s.battlefield.map((id) => obj(s, id)).filter((c) => objIsType(s, c, "Creature") || c.id === o.id);
-  const score = (x: number) => creatures.reduce((n, c) => (tough(c) > x ? n : n + (controllerOf(s, c) === pid ? -1.5 : 1) * worth(s, pid, c)), 0);
+  // "All creatures get -X/-X" (Bane of the Living): each X tried on a copy of the game, turned face up and its trigger
+  // resolved with everyone passing, so what else applies (indestructible, toughness boosts, regeneration, dies triggers)
+  // counts. What leaves the battlefield is scored by its worth now (Bane's face up): an opponent's for us, ours 1.5 times against.
+  const before = s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") || id === o.id).map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0, v: (controllerOf(s, obj(s, id)) === pid ? -1.5 : 1) * (id === o.id ? Math.max(1, Number(card.power ?? 0) + Number(card.toughness ?? 0)) + 1 : worth(s, pid, obj(s, id))) }));
+  const score = (x: number): number | null => {
+    const plan = planTurnFaceUp(s, pid, o.id, way, x);
+    if (!plan) return null;
+    const u = cloneState(s);
+    try {
+      for (const a of plan) applyInPlace(u, a);
+      for (let k = 0; k < 20 && (u.stack.length || u.triggerQueue.length) && !u.pending; k++) applyInPlace(u, { type: "passPriority", player: waitingOn(u)! });
+    } catch {
+      return null;
+    }
+    return before.reduce((n, b) => (u.objects[b.id]?.zone === "battlefield" && (u.objects[b.id]!.zoneChanges ?? 0) === b.zc ? n : n + b.v), 0);
+  };
   let best = 0;
-  for (let x = 1; x <= most; x++) if (score(x) > score(best)) best = x;
+  let bestScore = score(0) ?? 0;
+  for (let x = 1; x <= most; x++) {
+    const v = score(x);
+    if (v !== null && v > bestScore) [best, bestScore] = [x, v];
+  }
   return best;
 }
 
@@ -2051,12 +2068,19 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
 
 /**
  * Dredge instead of drawing (CR 702.52a) when the library can spare the cards: the most expensive card we could get
- * back, if it's worth more than a random draw (mana value 3 or more, or a creature).
+ * back, if it's worth more than a random draw (mana value 3 or more, or a creature). A land card (The Necrobloom's
+ * dredge 2) while we have no land in hand and fewer than seven lands out.
  */
 function chooseDredge(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId | undefined {
-  const lib = player(s, pid).library.length;
-  const ok = options.filter((id) => lib - (compileCard(defOf(s, obj(s, id))).dredge ?? 0) >= 20 && (mv(s, id) >= 3 || isType(defOf(s, obj(s, id)), "Creature")));
-  return ok.sort((a, b) => mv(s, b) - mv(s, a))[0];
+  const me = player(s, pid);
+  const lib = me.library.length;
+  const spare = options.filter((id) => lib - (dredgeAmount(s, pid, id) ?? 0) >= 20);
+  const ok = spare.filter((id) => mv(s, id) >= 3 || isType(defOf(s, obj(s, id)), "Creature"));
+  const best = ok.sort((a, b) => mv(s, b) - mv(s, a))[0];
+  if (best) return best;
+  const landsOut = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+  if (landsOut >= 7 || me.hand.some((id) => isType(defOf(s, obj(s, id)), "Land"))) return undefined;
+  return spare.find((id) => isType(defOf(s, obj(s, id)), "Land"));
 }
 
 /** Cipher (CR 702.99a): an evasive creature first, then the strongest; always encode, the card is otherwise lost to the graveyard. */

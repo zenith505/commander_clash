@@ -35,7 +35,11 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Cc]reate (.+)$/.exec(s))) {
     // Triplicate Titan: "a ... token with flying, a ... token with vigilance, and a ... token with trample".
     // Farmer Cotton: "X 1/1 white Halfling creature tokens and X Food tokens": a predefined token after one.
-    const parts = /"/.test(m[1]!) ? [] : m[1]!.split(/,? and (?=(?:an?|one|two|three|four|five|X) (?:\d+\/\d+ |[A-Z][a-z]+ tokens?$))|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
+    // Reckoner Bankbuster: "a Treasure token and a 1/1 colorless Pilot creature token with "..."": only split before the
+    // quoted ability, the last token's.
+    const q = m[1]!.indexOf('"');
+    const parts = (q < 0 ? m[1]! : m[1]!.slice(0, q)).split(/,? and (?=(?:an?|one|two|three|four|five|X) (?:\d+\/\d+ |[A-Z][a-z]+ tokens?$))|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
+    if (q >= 0) parts[parts.length - 1] += m[1]!.slice(q);
     if (parts.length >= 2 && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
       const fx = parts.map((x) => parseSentence(`Create ${x}`, ctx));
       if (fx.some((x) => x?.length !== 1 || x[0]!.type !== "createToken" || x[0]!.attacking || x[0]!.attackingEach || x[0]!.attachTo)) return null;
@@ -102,15 +106,24 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // with "{T}: Add one mana of any color."" (Replicating Ring, CR 111.4).
   // Roxanne, Starfall Savant: "create a tapped colorless artifact token named Meteorite with "When this token enters, it
   // deals 2 damage to any target" and "{T}: Add one mana of any color."": two abilities, entering tapped.
-  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (tapped )?colorless (snow )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?$`).exec(s))) {
-    const texts = [m[5]!, ...(m[6] ? [m[6]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
-    const token: TokenSpec = { name: m[4]!, named: true, colors: [], types: ["Artifact"], subtypes: [], keywords: [], abilities: texts.join("\n"), ...(m[3] ? { snow: true as const } : {}) };
+  // Blacksmith's Talent: "create a colorless Equipment artifact token named Sword with "Equipped creature gets +1/+1" and
+  // equip {2}": an Equipment with the keyword too (CR 702.6a).
+  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (tapped )?colorless (snow )?(Equipment )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?(?: and equip (\\{\\d+\\}))?$`).exec(s))) {
+    const texts = [m[6]!, ...(m[7] ? [m[7]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
+    if (m[8] && !m[4]) return null;
+    const token: TokenSpec = { name: m[5]!, named: true, colors: [], types: ["Artifact"], subtypes: m[4] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[8] ? [`Equip ${m[8]}`] : [])].join("\n"), ...(m[3] ? { snow: true as const } : {}) };
     return texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...(m[2] ? { tapped: true as const } : {}) }] : null;
   }
   // Overlord of the Hauntwoods: "create a tapped colorless land token named Everywhere that is every basic land type": a
   // Plains, Island, Swamp, Mountain and Forest, with each one's mana ability (CR 305.6), but not basic (rulings).
   if ((m = /^(?:You )?[Cc]reate a (tapped )?colorless land token named ([A-Z][\w'-]*) that is every basic land type$/.exec(s))) {
     const token: TokenSpec = { name: m[2]!, named: true, colors: [], types: ["Land"], subtypes: [...BASIC_TYPES], keywords: [] };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token, ...(m[1] ? { tapped: true } : {}) }];
+  }
+  // Mutable Explorer: "create a tapped Mutavault token": a copy of the card Mutavault (rulings), a land with its two
+  // abilities and no mana cost (CR 111.4, 707.2).
+  if ((m = /^(?:You )?[Cc]reate a (tapped )?Mutavault token$/.exec(s))) {
+    const token: TokenSpec = { name: "Mutavault", named: true, colors: [], types: ["Land"], subtypes: [], keywords: [], abilities: "{T}: Add {C}.\n{1}: This token becomes a 2/2 creature with all creature types until end of turn. It's still a land." };
     return [{ type: "createToken", who: { ref: "you" }, n: 1, token, ...(m[1] ? { tapped: true } : {}) }];
   }
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The

@@ -534,8 +534,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "selfCounter": // unleash (CR 702.98a)
       return (src.counters[cond.counter] ?? 0) > 0;
     case "selfCounters": {
-      // "*": counters of every kind together (Twenty-Toed Toad).
-      const n = cond.counter === "*" ? Object.values(src.counters).reduce((a, b) => a + (b ?? 0), 0) : (src.counters[cond.counter] ?? 0);
+      // "*": counters of every kind together (Twenty-Toed Toad). Once the object the ability is about has left its zone,
+      // the counters it last had there (CR 608.2h): Reckoner Bankbuster gone in response to its ability.
+      const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+      const counters = lk ? (lk.zc === sourceZc ? (lk.counters ?? {}) : {}) : src.counters;
+      const n = cond.counter === "*" ? Object.values(counters).reduce((a, b) => a + (b ?? 0), 0) : (counters[cond.counter] ?? 0);
       return n >= cond.min && (cond.max === undefined || n <= cond.max);
     }
     case "classLevel": {

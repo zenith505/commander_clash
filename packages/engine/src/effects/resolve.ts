@@ -421,7 +421,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "each") {
     const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
-    const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : undefined;
+    const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
     const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];

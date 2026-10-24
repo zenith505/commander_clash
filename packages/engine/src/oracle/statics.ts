@@ -327,6 +327,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // from your graveyard or from exile cost {2} less to cast" (Doc Aurlock): only your own graveyard.
   const zones = / from (graveyards or from exile|your graveyard or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
   if (zones) text = text.slice(0, zones.index) + text.slice(zones.index + zones[0].length);
+  // Fortune Teller's Talent: "Spells you cast from anywhere other than your hand cost {2} less to cast."
+  const notHand = !zones ? / from anywhere other than your hand(?= costs? \{)/.exec(text) : null;
+  if (notHand) text = text.slice(0, notHand.index) + text.slice(notHand.index + notHand[0].length);
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
@@ -338,7 +341,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
-  if ((m[5] && who !== "you") || (zones && (m[5] || !m[3]))) return "fail";
+  if ((m[5] && who !== "you") || (zones && (m[5] || !m[3])) || (notHand && (m[5] || who !== "you"))) return "fail";
   const n = Number(/\d+/.exec(m[6]!)![0]) * (m[7] === "less" ? -1 : 1);
   return {
     costMod: {
@@ -349,6 +352,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
       ...(m[5] ? { fromGraveyard: true } : {}),
       ...(zones ? { fromZones: zones[1] === "exile" ? ["exile" as const] : zones[1] === "graveyards" ? ["graveyard" as const] : ["graveyard" as const, "exile" as const] } : {}),
       ...(zones?.[1] === "your graveyard or from exile" ? { fromGraveyard: true } : {}),
+      ...(notHand ? { notFromHand: true as const } : {}),
       text: line,
     },
   };
@@ -536,6 +540,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
+  // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
+  if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
   if ((m = /^you've cast an? ((?!other\b|another\b)[a-z]+) spell this turn$/.exec(text))) {
     const filter = parseSearchFilter(`${m[1]!} card`);
     return filter ? { kind: "castCount", n: 1, filter } : null;
@@ -1316,6 +1322,14 @@ function parseStaticLine(line: string): StaticAbility | null {
     // Rukarumel: Slivers, and nontoken creatures (CR 205.3m: a Sliver is a creature type, so a Sliver permanent here is a creature).
     const spec: TargetSpec | undefined = typing[1]!.startsWith("Slivers") ? { kind: "object", anyOf: [{ kind: "object", subtypes: ["Sliver"], text: "Sliver" }, { kind: "object", token: false, text: "nontoken creature" }], text: "Sliver or nontoken creature" } : undefined;
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", ...(spec ? { spec } : {}) }, mods: [mod], text: line, ...(typing[4] ? { offField: true as const } : {}) };
+  }
+  // Laughing Jasper Flint: "Creatures you control but don't own are Mercenaries in addition to their other types" (layer 4,
+  // CR 613.1d; who controls them is settled in layer 2 first).
+  const notOwned = /^Creatures you control but don't own are ([A-Z][a-z]+) in addition to their other types$/.exec(text);
+  if (notOwned) {
+    const type = singular(notOwned[1]!);
+    if (!CREATURE_TYPES.has(type)) return null;
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], owner: "opponent", text: "creature you control but don't own" } }, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
   }
   // Ashaya: "Nontoken creatures you control are Forest lands in addition to their other types" (layer 4, CR 613.1d): a
   // Forest has "{T}: Add {G}" (CR 305.6), still affected by summoning sickness (CR 302.6). Toph: "Nontoken artifacts you

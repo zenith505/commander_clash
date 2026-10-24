@@ -1,7 +1,7 @@
 # Roadmap
 
-23,727 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,564 of 4,988 (91%).
+23,744 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,579 of 4,988 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,15 +22,17 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 137, most played first: The Necrobloom ("land cards in
-   your graveyard have dredge 2"), Court of Ardenvale, Reckoner Bankbuster, Mutable Explorer, Blacksmith's Talent,
-   Laughing Jasper Flint, Martial Impetus, Fortune Teller's Talent, Tifa, Martial Artist, Rikku, Resourceful Guardian,
-   Yes Man, Personal Securitron, Baldin, Century Herdmaster, Legion's Landing; Wildfire Devils and Arcane Proxy too.
-   Karazikar's "whenever an opponent attacks another one of your opponents" has no rulings on planeswalkers and battles,
-   so it stays out. Smaller gaps from round 137: bots never give Victory Chimes' {C} to another player; bots turn
-   Bane of the Living face up with the X that kills the most worth of opponents' creatures (their own counted 1.5
-   times), and Aurelia's Vindicator with X the number of targets they'd pick; in join forces an opponent's bot keeps
-   the mana for its dearest instant or flash card, and bots pay no more than what finds them cards (draws, their own
+00. Most played first (`npm run popular`). Out after round 138, most played first: Rikku, Resourceful Guardian, Yes Man,
+   Personal Securitron, Baldin, Century Herdmaster ("up to one hundred target creatures"), Broodcaller Scourge,
+   Bucknard's Everfull Purse, Ghostly Dancers, Sorcerer Class, Jegantha, the Wellspring, Heirloom Blade ("a creature card
+   that shares a creature type with it", the equipped creature that died), Illusionist's Gambit, Maddening Hex, Gadrak,
+   Hakbal of the Surging Soul; Wildfire Devils and Arcane Proxy too. Karazikar's "whenever an opponent attacks another
+   one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Smaller gaps from round 138:
+   bots dredge a land card (The Necrobloom) only with no land in hand and fewer than seven lands out; bots keep Victory
+   Chimes' {C} for themselves (another player's mana never helps a bot, there are no teams); bots choose Bane of the
+   Living's X by trying each X on a copy of the game, but join forces amounts and Aurelia's Vindicator's X are still
+   rules of thumb. Smaller gaps from round 137: bots turn Aurelia's Vindicator face up with X the number of targets
+   they'd pick; in join forces an opponent's bot keeps the mana for its dearest instant or flash card, and bots pay no more than what finds them cards (draws, their own
    mills, basic lands), all they can for Liege of the Hollows; Mnemonic Deluge's copies are cast one after another;
    bots flicker with Another Round only their own nontoken, noncommander creatures with an enters trigger (or face
    down, or entering with counters) that have no counters or Auras on them. Smaller gaps from round 136: bots exile

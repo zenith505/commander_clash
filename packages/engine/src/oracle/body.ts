@@ -706,6 +706,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
   // of the Bridge): the same X, counted again (nothing between them changes it).
   text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
+  // Nibelheim Aflame: "Choose target creature you control. It deals damage equal to its power to each other creature.": the
+  // target deals it (rulings), the same as "Target creature you control deals ...".
+  text = text.replace(/(^|\. )Choose (target creature(?: you control)?)\. It deals damage equal to its power to /, (_, a: string, who: string) => `${a}${capital(who)} deals damage equal to its power to `);
+  // Might of the Meek: "It also gets +1/+0 until end of turn if you control a Mouse": the condition read first, as it
+  // resolves (CR 608.2c).
+  text = text.replace(/(^|\. )(It|That creature) also gets ([^.]+?) until end of turn if (you control an? [A-Z][a-z]+)\./, (_, a: string, who: string, pt: string, cond: string) => `${a}If ${cond}, ${who.toLowerCase()} also gets ${pt} until end of turn.`);
   // Court of Vantress: "If you're the monarch, you may create a token that's a copy of it. If you're not the monarch, you
   // may have ~ become a copy of it": both "it"s are the chosen target, not the token (only one branch happens).
   text = text.replace(/(If you're the monarch, you may create a token that's a copy of it\. If you're not the monarch, you may have ~ become a copy of) it\b/, "$1 the chosen permanent");
@@ -2023,6 +2029,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si++;
         continue;
       }
+    }
+    // Laughing Jasper Flint: "exile the top X cards of target opponent's library, where X is ... Until end of turn, you may
+    // cast spells from among those cards, and mana of any type can be spent to cast those spells." Face up (CR 406.3), a
+    // spell only (no land), with mana of any type (CR 609.4b).
+    const exOpp = !exTop && !impulseIf ? new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of target opponent's library(?:, where X is ([^"]+))?$`).exec(s) : null;
+    if (exOpp && sentences[si + 1]?.replace(/\.$/, "") === `Until end of turn, you may cast spells from among ${exOpp[1] === "card" ? "that card" : "those cards"}, and mana of any type can be spent to cast those spells`) {
+      const who = parsePlayer("target opponent", ctx);
+      if (!who || (exOpp[2] === "X") !== !!exOpp[3]) return null;
+      // "Where X is the number of outlaws you control" (CR 107.3c), counted as it resolves.
+      const def = exOpp[3] ? parseCount(exOpp[3], ctx) : undefined;
+      if (exOpp[3] && !def) return null;
+      const fx: Effect = { type: "impulse", n: exOpp[1] === "card" ? 1 : amt(exOpp[2]!), until: "thisTurn", who, castOnly: true, anyType: true };
+      effects.push(...(def ? replaceX([fx], def) : [fx]));
+      si++;
+      continue;
     }
     // Court of Locthwain: "exile the top card of target opponent's library. You may play that card for as long as it
     // remains exiled, and mana of any type can be spent to cast it." Face up (CR 406.3), a land played as your land play,
@@ -4721,7 +4742,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Return target creature card from your graveyard to your hand. Return that card from your graveyard to the
       // battlefield instead if there are seven or more cards in your graveyard." (Stitch Together): the same card.
       const prevBack = previous.length === 1 && previous[0]!.type === "bounce" && previous[0]!.what.ref === "target" && ctx.targets[previous[0]!.what.index]?.kind === "card" ? previous[0]! : null;
-      const toField = /^(?:return|put) (?:that card|it)(?: from your graveyard)? (?:to|onto) the battlefield$/i.test(t);
+      const toField = /^(?:return|put) (?:that (?:permanent )?card|it)(?: from your graveyard)? (?:to|onto) the battlefield$/i.test(t);
       // "~ deals 2 damage to any target. If you're the monarch, it deals 7 damage instead." (Court of Ire): the same target.
       const moreDamage = /^(?:it|~) deals (\d+) damage$/i.exec(t);
       const prevDamage = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
@@ -4785,7 +4806,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw )(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -4913,10 +4934,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(s);
+    // Spinner of Souls: "you may reveal cards ... until you reveal a creature card. Put that card into your hand and the
+    // rest ...": the whole process, if you choose (CR 608.2d).
+    const mayUntil = /^[Yy]ou may (reveal cards from the top of your library until you reveal .+)$/.exec(s);
+    const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(mayUntil ? mayUntil[1]! : s);
     // Songbirds' Blessing: "... until you reveal an Aura card. You may put that card onto the battlefield. If you don't, put
     // it into your hand. Put the rest on the bottom of your library in a random order."
-    if (until && sentences[si + 1] === "You may put that card onto the battlefield" && sentences[si + 2] === "If you don't, put it into your hand" && /^Put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 3] ?? "") && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
+    if (until && !mayUntil && sentences[si + 1] === "You may put that card onto the battlefield" && sentences[si + 2] === "If you don't, put it into your hand" && /^Put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 3] ?? "") && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
       const filter = parseSearchFilter(until[1]!);
       // An Aura card (its host chosen as it enters, CR 303.4f), or a permanent card of a kind that needs no choice.
       const aura = !filter?.types?.length && filter?.subtypes?.length === 1 && filter.subtypes[0] === "Aura";
@@ -4935,7 +4959,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Planeswalker") && !filter.anyOf;
       const tribal = !filter.types?.length && !!filter.subtypes?.length && filter.subtypes.every((x) => CREATURE_TYPES.has(x));
       if (onto && !safe && !tribal) return null;
-      effects.push({ type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}) });
+      const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}) };
+      effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(until[1]!) ? "an" : "a"} ${until[1]!} is revealed` } : reveal);
       si++;
       continue;
     }

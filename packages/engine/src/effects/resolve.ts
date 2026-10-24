@@ -817,6 +817,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "chooseFromGraveyard":
     case "reorderGraveyard":
     case "returnAllFromGraveyard":
+    case "commandersOntoBattlefield":
     case "putFromHand":
     case "revealFromHand":
     case "exileHand":
@@ -936,6 +937,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "unlockDoor":
       return runPermanentsEffect(s, e, ctx, src);
     case "becomeCopy":
+    case "nextEntersAsCopy":
       return runCopiesEffect(s, e, ctx);
     case "together":
       // Each kind of token at the same time (CR 608.2f): entering together, each sees the others enter.

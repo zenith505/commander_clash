@@ -572,7 +572,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   // "For each opponent, ... up to one target ... that player controls": one target for each opponent it has as its
   // targets are chosen, in turn order from its controller (CR 601.2c, 102.2; players who left aren't, 800.4a).
   const i = s.turnOrder.indexOf(ctx.controller);
-  const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
+  // "For each player": its controller too, first (TargetSpec.perPlayer).
+  const every = body0.targets.some((t) => t.perPlayer);
+  const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...(every ? [ctx.controller] : []), ...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
   const castBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "castSpell";
   // "When you do, shuffle target nonland permanent ... with mana value X or less, where X is the number of creatures
   // tapped this way" (Teferi Akosa of Zhalfir): the number tapped, fixed before the reflexive trigger's targets are chosen.

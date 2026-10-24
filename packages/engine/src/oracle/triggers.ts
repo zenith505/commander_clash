@@ -2233,11 +2233,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a), "if its surge cost was paid" (702.117a),
       // "if its spectacle cost was paid" (702.137a).
       // "When Spiders-Man enters, if they were cast using web-slinging, ..." (CR 702.188a).
-      let ifAlt: "sneak" | "surge" | "spectacle" | "webSlinging" | undefined;
-      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle) cost was paid, (.+)$/i.exec(body0) ?? /^if (?:it|he|she|they) (?:was|were) cast using (web-slinging), (.+)$/i.exec(body0);
+      let ifAlt: "sneak" | "surge" | "spectacle" | "webSlinging" | "prowl" | undefined;
+      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle|prowl) cost was paid, (.+)$/i.exec(body0) ?? /^if (?:it|he|she|they) (?:was|were) cast using (web-slinging), (.+)$/i.exec(body0);
       if (altPaid) {
         if (event !== "selfEnters") return "fail" as const;
-        ifAlt = altPaid[1] === "web-slinging" ? "webSlinging" : (altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle");
+        ifAlt = altPaid[1] === "web-slinging" ? "webSlinging" : (altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle" | "prowl");
         body0 = altPaid[2]!;
       }
       // "If a source would deal damage ..., it deals that much damage plus 2 instead" (Rankle and Torbran): that "that much"

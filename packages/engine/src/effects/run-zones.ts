@@ -221,7 +221,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       // As it last existed, for a reflexive trigger: "When you do, ~ deals damage equal to that creature's power" (CR 608.2h).
       if (e.action === "sacrifice" && s.resolving) {
         const ch = characteristics(s, o);
-        (s.resolving.sacrificedThisWay ??= []).push({ id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types] });
+        (s.resolving.sacrificedThisWay ??= []).push({ id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types], ...(o.isCommander ? { commander: true as const } : {}) });
       }
       if (e.action === "bounce" && s.resolving) (s.resolving.bouncedThisWay ??= []).push({ id, subtypes: [...characteristics(s, o).subtypes] });
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
@@ -2021,6 +2021,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (sc.ordered) return;
       sc.ordered = true;
       return askWholeGraveyardOrder(s, p.id, src) ? "paused" : undefined;
+    }
+    case "commandersOntoBattlefield": {
+      // Tevesh Szat: each commander card in a command zone that's a permanent card (CR 110.4b), all at once, under your
+      // control; their owners stay who they were (CR 108.3).
+      const sc = (s.resolving!.scratch ??= {});
+      sc.found ??= apnap(s, s.turnOrder.filter((pid) => !player(s, pid).lost)).flatMap((pid) => player(s, pid).command.filter((id) => obj(s, id).isCommander && isPermanentCard(defOf(s, obj(s, id)))));
+      const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "command");
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: ctx.controller })), src);
+      if (hosts === "paused") return "paused";
+      const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
+      if (ids.length) log(s, `${src} puts ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield under ${player(s, ctx.controller).name}'s control.`);
+      enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller, ...hosts.get(id) })));
+      return;
     }
     case "returnAllFromGraveyard": {
       if (e.toHand) {

@@ -1100,10 +1100,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
     {
       if (player(s, pid).lost) return;
       const p = player(s, pid);
+      // "Of that player's library" (Orochi Soul-Reaver): their cards, `pid` getting them.
+      const from = e.library ? players(s, e.library, ctx)[0] : pid;
+      if (from === undefined || player(s, from).lost) return;
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.looked) {
-        sc.looked = p.library.slice(0, amountNow(s, e.n, ctx));
+        sc.looked = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
         if (!sc.looked.length) return;
         // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or an amount counted now
         // (TargetSpec.bound: Hatchery Spider's "where X is the number of creature cards in your graveyard").
@@ -1116,7 +1119,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const count = e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.count;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
-        log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.

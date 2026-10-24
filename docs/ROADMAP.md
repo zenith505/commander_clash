@@ -1,7 +1,7 @@
 # Roadmap
 
-23,787 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,610 of 4,988 (92%).
+23,807 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,621 of 4,988 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,13 +22,18 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 140, most played first: Hunting Velociraptor (prowl, not
-   in the engine yet, granted to Dinosaur spells), Tevesh Szat, Metalworker ("reveal any number of artifact cards" in a
-   mana ability), Nils, Discipline Enforcer (an attack tax per creature, X its counters), Conformer Shuriken, Orochi
-   Soul-Reaver, Mystic Reflection, Cactus Preserve, The Irencrag, Vivien, Champion of the Wilds, Aboleth Spawn, Karmic
-   Justice, Reins of Power, Apex of Power, Neheb, Dreadhorde Champion; Wildfire Devils, Arcane Proxy and Lilypad Village
-   too. Karazikar's "whenever an opponent attacks another one of your opponents" has no rulings on planeswalkers and
-   battles, so it stays out. Smaller gaps from round 140: Jegantha's and the Wellspring's mana that can't pay generic
+00. Most played first (`npm run popular`). Out after round 141, most played first: Cactus Preserve ("the greatest
+   mana value among your commanders"), The Irencrag, Vivien, Champion of the Wilds, Aboleth Spawn, Karmic Justice, Reins
+   of Power, Apex of Power, Neheb, Dreadhorde Champion, Solemnity, Unsettled Mariner, Elementalist's Palette, Slippery
+   Bogbonder; Wildfire Devils, Arcane Proxy and Lilypad Village too. Karazikar's "whenever an opponent attacks another
+   one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Prowl cards still out for other
+   lines: Earwig Squad (search an opponent's library for three cards), Knowledge Exploitation, Noggin Whack, Notorious
+   Throng (the damage dealt to your opponents this turn), Stinkdrinker Bandit, Auntie's Snitch. Smaller gaps from round
+   141: Metalworker's buttons reveal the first artifact cards in your hand (you choose how many, not which: the mana is
+   the same); with two Mystic Reflections waiting, they apply in the order they resolved rather than the entering
+   creature's controller choosing (CR 616.1); bots cast a spell for its prowl cost whenever they can and it's cheaper,
+   and cast Mystic Reflection only as an ordinary targeted spell; proliferate (now also "X times", Tromell) still
+   gives every counter it can without asking. Smaller gaps from round 140: Jegantha's and the Wellspring's mana that can't pay generic
    costs pays only colored symbols of its own color (with Chromatic Orrery-style "spend as any color" it still doesn't
    pay a symbol of another color), and with two hybrid symbols the payment picks them greedily, one at a time; the
    autopay's rainbow and "hopes" heuristics ignore that restriction; bots answer Ghostly Dancers' choice with the first

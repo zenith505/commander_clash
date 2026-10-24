@@ -16,6 +16,12 @@ const DURATIONS: Record<string, Extract<Effect, { type: "becomeCopy" }>["duratio
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // Mystic Reflection: "The next time one or more creatures or planeswalkers enter this turn, they enter as copies of
+  // target nonlegendary creature" (its "Choose target ..." sentence folded in, body.ts).
+  if ((m = /^The next time one or more creatures or planeswalkers enter this turn, they enter as copies of (target .+)$/.exec(s))) {
+    const of = parseObject(m[1]!, ctx);
+    return of?.ref === "target" && !isGroup(of) ? [{ type: "nextEntersAsCopy", of }] : null;
+  }
   // "Choose target creature you control. Each other creature becomes a copy of that creature": the first sentence
   // only chooses the target the second refers to.
   // "Choose any number of target creatures. Each of those creatures gains persist until end of turn." too.

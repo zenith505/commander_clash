@@ -403,7 +403,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "Discard three cards at the beginning of the next end step" (Ideas Unbound), "create a 4/4 red Bird creature token
     // with flying at the beginning of the next end step" (Rukh Egg), "you lose the game" (Glorious End): about no object,
     // only its controller.
-    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame"].includes(y.type)))
+    // "Untap up to two lands" (Teferi, Hero of Dominaria): chosen then (rulings).
+    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame", "untapUpTo"].includes(y.type)))
       return [{ type: "delayed", when, effects: inner, text: m[1]! }];
     if (!players || refs.size !== 1) return null;
     const [ref] = refs;

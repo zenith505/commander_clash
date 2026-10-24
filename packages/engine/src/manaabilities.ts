@@ -94,6 +94,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   // A combination is picked by its number (`combo`); these are the types it could make (CR 106.7).
   if (p.kind === "combos") return [...new Set(p.options.flat())];
   if (p.kind === "removeX") return p.colors;
+  if (p.kind === "revealX") return [...new Set(p.per)];
   if (p.kind === "anyColors") return [...(p.colors ?? COLORS)];
   if (p.kind === "colorsAmong") return colorsAmong(s, o, p);
   // "For each color among permanents you control": all of them at once, whichever is named (none with no color).
@@ -140,6 +141,16 @@ export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "re
   return out;
 }
 
+/** Metalworker's (ManaProduce "revealX"): each number of matching cards in its controller's hand to reveal, from none. */
+export function revealXCombos(s: GameState, o: GameObject, p: Extract<ManaProduce, { kind: "revealX" }>): ManaType[][] {
+  const n = revealable(s, o, p).length;
+  return Array.from({ length: n + 1 }, (_, k) => Array.from({ length: k }, () => p.per).flat());
+}
+
+/** The cards in `o`'s controller's hand that "revealX" may reveal, as they are in hand. */
+export const revealable = (s: GameState, o: GameObject, p: Extract<ManaProduce, { kind: "revealX" }>): ObjectId[] =>
+  player(s, controllerOf(s, o)).hand.filter((id) => printedMatches(p.filter, defOf(s, obj(s, id))));
+
 /** Every combination of `n` mana of any colors (each multiset once, in WUBRG order): ManaProduce "anyColors". */
 export function colorCombos(n: number, colors: readonly Color[] = COLORS): ManaType[][] {
   const among = COLORS.filter((x) => colors.includes(x));
@@ -156,7 +167,7 @@ export function anyColorsCount(s: GameState, o: GameObject, p: Extract<ManaProdu
 /** The combinations an ability is activated with (ManaOption.combo), or null if it has none to choose from. */
 export function manaCombos(s: GameState, o: GameObject, ab: ManaAbility): ManaType[][] | null {
   const p = ab.produces;
-  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p), p.colors) : p.kind === "doublePool" ? doublePoolPayments(s, o, ab) : null;
+  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "revealX" ? revealXCombos(s, o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p), p.colors) : p.kind === "doublePool" ? doublePoolPayments(s, o, ab) : null;
 }
 
 /**
@@ -212,6 +223,7 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   // Jeweled Amulet: no mana if no type was noted (rulings).
   if (p.kind === "noted") return o.notedMana ? [o.notedMana] : [];
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
+  if (p.kind === "revealX") return revealXCombos(s, o, p)[combo ?? -1] ?? [];
   if (p.kind === "doublePool") {
     // As much again of each type as is left in the pool once that payment is made.
     const paid = doublePoolPayments(s, o, ab)[combo ?? -1];

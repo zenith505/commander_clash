@@ -710,6 +710,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
   // of the Bridge): the same X, counted again (nothing between them changes it).
   text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
+  // Tevesh Szat: "If you do, draw two cards, then draw another card if the sacrificed permanent was a commander."
+  text = text.replace(/(^|\. )(If you do, draw (?:a card|two cards)), then draw another card if the sacrificed permanent was a commander\./, "$1$2. If the sacrificed permanent was a commander, draw a card.");
+  // Mystic Reflection: "Choose target nonlegendary creature. The next time ..., they enter as copies of the chosen creature."
+  text = text.replace(/(^|\. )Choose (target [^.]+?)\. (The next time one or more creatures or planeswalkers enter this turn, they enter as copies of) the chosen creature\./, "$1$3 $2.");
   // Nibelheim Aflame: "Choose target creature you control. It deals damage equal to its power to each other creature.": the
   // target deals it (rulings), the same as "Target creature you control deals ...".
   text = text.replace(/(^|\. )Choose (target creature(?: you control)?)\. It deals damage equal to its power to /, (_, a: string, who: string) => `${a}${capital(who)} deals damage equal to its power to `);
@@ -1563,6 +1567,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // Tevesh Szat: "You may sacrifice another creature or planeswalker. If you do, draw two cards. If the sacrificed
+    // permanent was a commander, draw a card." (its "then ... if" made a sentence of its own above): as it last existed.
+    const sacCmd = /^If the sacrificed permanent was a commander, (.+)$/.exec(s);
+    const [mayPrev, didPrev] = [effects[effects.length - 2], effects[effects.length - 1]];
+    if (sacCmd && didPrev?.type === "if" && didPrev.cond.kind === "youDid" && mayPrev?.type === "may" && mayPrev.effects.length === 1 && mayPrev.effects[0]!.type === "pick" && mayPrev.effects[0]!.action === "sacrifice" && mayPrev.effects[0]!.who.ref === "you") {
+      const inner = parseOne(capital(sacCmd[1]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay", commander: true }, effects: inner });
+      continue;
+    }
     // Starfall Invocation: "Destroy all creatures. If the gift was promised, return a creature card put into your graveyard
     // this way to the battlefield under your control." One of the cards that died to it, chosen as it resolves (rulings).
     const starfall = /^(If the gift was promised, )?[Rr]eturn a creature card put into your graveyard this way to the battlefield under your control$/.exec(s);
@@ -1726,6 +1740,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // opponent who does, you gain protection from that player until your next turn" (Noble Heritage). Each decides in
     // turn order, then it happens for each who accepted, then the rest for each opponent who did (rulings).
     // Only with "For each ... who does": a plain "each player may" (Will of the Jeskai's wheel) is parsed elsewhere.
+    // Heartwood Storyteller: "each of that player's opponents may draw a card": every other player (no teams), each deciding.
+    if (ctx.eventPlayer && /^[Ee]ach of that player's opponents may draw a card$/.test(s)) {
+      effects.push({ type: "eachMay", who: { ref: "otherPlayers" }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "draw a card", each: true });
+      ctx.eachChose = true;
+      continue;
+    }
     const offer = /^(?:Then )?[Ee]ach (opponent|player) may (.+)$/.exec(s);
     const does = offer && /^For each (opponent|player) who does, (.+)$/.exec(sentences[si + 1] ?? "");
     const offerFx = offer && does && !/\b(?:that player|it|its|them|this way|instead)\b/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
@@ -2932,7 +2952,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's
     // control. If it's a Spirit, put a +1/+1 counter on it.": checked once it has returned (rulings).
     const fluxIf = /^If it's an? ([A-Z][a-z]+), put a \+1\/\+1 counter on it$/.exec(s);
-    if (fluxIf) {
+    if (fluxIf && effects[effects.length - 1]?.type === "flicker") {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "flicker" || prev.at || prev.counter || prev.transformed) return null;
       const filter = parseTargetPhrase(fluxIf[1]!);
@@ -2955,13 +2975,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "flickeredIs", filter: { ...typed, text: ifBack[1]! } }, effects: fx });
       continue;
     }
-    const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?), (.+)$/.exec(s);
-    if (ifIts) {
+    // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
+    const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
+    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (CREATURE_TYPES.has(ifIts[2]!) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];
       const typed = parseTargetPhrase(ifIts[2]!);
-      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text"].includes(k));
+      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text", ...(/^[A-Z]/.test(ifIts[2]!) ? ["subtypes"] : [])].includes(k));
       const types = typed?.kind === "object" ? [...(typed.types ?? []), ...(typed.allTypes ?? [])] : [];
       // Anything else is left to the readings below (Carbonize's "If it's a creature, it can't be regenerated ...").
       if (t?.kind === "object" && !t.optional && !t.many && known && prev && ["untap", "tap", "counters", "continuous"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(ifIts[3]!)) {
@@ -5383,6 +5404,7 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "the (?:\\{[^}]+\\})+ cost was paid", cond: { kind: "altPaid", alt: "alternative" }, spellOnly: true },
   { re: "~'s madness cost was paid", cond: { kind: "altPaid", alt: "madness" }, spellOnly: true },
   { re: "~'s spectacle cost was paid", cond: { kind: "altPaid", alt: "spectacle" } },
+  { re: "~'s prowl cost was paid", cond: { kind: "altPaid", alt: "prowl" } },
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
   { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },
@@ -5803,7 +5825,9 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   // "For any number of opponents, destroy target nonland permanent that player controls" (Windgrace's Judgment): a target
   // for each opponent chosen, the same as up to one for each opponent (CR 601.2c).
   const s = s0.replace(/^For any number of opponents, (\w+) target (.+? that player controls)$/, "For each opponent, $1 up to one target $2");
-  const m = /^[Ff]or each opponent, (.+)$/.exec(s);
+  // "For each player, put a +1/+1 counter on up to one target creature that player controls" (Nils): you too.
+  const every = /^[Ff]or each player, (.+)$/.exec(s);
+  const m = every ?? /^[Ff]or each opponent, (.+)$/.exec(s);
   if (!m || ctx.targets.some((t) => t.many || t.perOpponent)) return null;
   const who = / up to one target (.+?) (?:that player|that opponent|they) controls?\b/;
   // "Up to one target creature card from that player's graveyard" (Sepulchral Primordial): owned by that opponent.
@@ -5811,7 +5835,8 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const t = who.exec(` ${m[1]!}`) ?? yard.exec(` ${m[1]!}`);
   if (!t) return null;
   const card = !who.test(` ${m[1]!}`);
-  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from an opponent's graveyard`).trim() : ` ${m[1]!}`.replace(who, ` target ${t[1]} an opponent controls`).trim();
+  if (every && card) return null;
+  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from an opponent's graveyard`).trim() : ` ${m[1]!}`.replace(who, every ? ` target ${t[1]}` : ` target ${t[1]} an opponent controls`).trim();
   if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
   const before = ctx.targets.length;
   // "For each opponent, you may put ...": a choice for each of them, as it resolves.
@@ -5826,9 +5851,9 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const fx = one && may && !castWhat ? [{ type: "may" as const, effects: one, text: may[1]!, eachTarget: true as const }] : one;
   if (!fx || ctx.targets.length !== before + 1) return null;
   const spec = ctx.targets[before]!;
-  if (card ? spec.kind !== "card" || spec.owner !== "opponent" || spec.linkedExile : spec.kind !== "object" || spec.controller !== "opponent") return null;
+  if (card ? spec.kind !== "card" || spec.owner !== "opponent" || spec.linkedExile : spec.kind !== "object" || spec.controller !== (every ? undefined : "opponent")) return null;
   if (spec.optional || spec.distinctFrom || spec.notSource) return null;
-  ctx.targets[before] = { ...spec, perOpponent: true, text: card ? `target ${t[1]} from that player's graveyard` : `target ${t[1]} that player controls` };
+  ctx.targets[before] = { ...spec, perOpponent: true, ...(every ? { perPlayer: true as const } : {}), text: card ? `target ${t[1]} from that player's graveyard` : `target ${t[1]} that player controls` };
   ctx.lastObjectTarget = undefined;
   ctx.lastTargets = { index: before, n: 2 };
   return fx;
@@ -6062,7 +6087,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

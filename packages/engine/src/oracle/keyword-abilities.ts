@@ -314,6 +314,10 @@ export function parseCostKeyword(
     return m[1] === "Surge" ? { alt: { kind: "surge", mana: m[2]!, if: { kind: "castAnother" } } } : { alt: { kind: "spectacle", mana: m[2]!, if: { kind: "opponentLostLife" } } };
   }
   if (/^(Surge|Spectacle)\b/.test(line)) return "fail";
+  // Prowl [cost] (CR 702.76a): if a player was dealt combat damage this turn by a source you controlled that had any of
+  // this spell's creature types (checked as it's cast, the damage as it was dealt).
+  if ((m = /^Prowl ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) ? { alt: { kind: "prowl", mana: m[1]!, if: { kind: "prowl" } } } : "fail";
+  if (/^Prowl\b/.test(line)) return "fail";
   // Cleave [cost] (CR 702.148a): an alternative cost for an instant or sorcery; cast for it, the words in square brackets
   // are gone from its text (compile checks that text too).
   if ((m = /^Cleave ((?:\{[^}]+\})+)$/.exec(line))) {

@@ -1886,6 +1886,14 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveImprovise ??= []).push({ filter: f, text: line });
       continue;
     }
+    // "Dinosaur spells you cast have prowl {2}{R}" (Hunting Velociraptor), CR 702.76a: an alternative cost for those spells.
+    const giveProwl = /^([A-Z][a-z]+) spells you cast have prowl ((?:\{[^}]+\})+)\.$/.exec(line);
+    if (giveProwl) {
+      const f = parseTargetPhrase(`${giveProwl[1]!.toLowerCase()} spell`);
+      if (f?.kind !== "spell" || /\{X\}/.test(giveProwl[2]!)) out.unsupported.push(raw);
+      else (out.spellsHaveProwl ??= []).push({ filter: f, mana: giveProwl[2]!, text: line });
+      continue;
+    }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you
     // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
     // Zhulodok, Void Gorger: '... have "Cascade, cascade."': two cascade abilities, each triggering (CR 702.85c).
@@ -3226,7 +3234,7 @@ function checkCastingLinks(out: CompiledCard) {
   const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
   // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
   if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
-  for (const alt of ["surge", "spectacle", "alternative", "madness"] as const) {
+  for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
     const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alts.length > 0;

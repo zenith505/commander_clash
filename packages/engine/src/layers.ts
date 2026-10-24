@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, IDENTITY_PROTECTION, subtypeSet } from "./keywords";
+import { bindChosenKeywords, CREATURE_TYPES, IDENTITY_PROTECTION, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -133,6 +133,9 @@ export interface Characteristics {
   /** Other mana symbols per creature attacking its controller, and its controller's planeswalkers ("{W/P}", Norn's Annex). */
   attackTaxMana: string[];
   attackTaxManaPlaneswalkers: string[];
+  /** Nils, Discipline Enforcer: how many times each attacker with counters on it pays {X}, X its counters; and for planeswalkers. */
+  attackTaxCounters: number;
+  attackTaxCountersPlaneswalkers: number;
   /** Generic mana per creature blocking, whoever controls it (Archangel of Tithes, CR 509.1d). */
   blockTax: number;
   /** Players it has to attack if able (encore). */
@@ -258,6 +261,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackTaxPlaneswalkers: 0,
     attackTaxMana: [],
     attackTaxManaPlaneswalkers: [],
+    attackTaxCounters: 0,
+    attackTaxCountersPlaneswalkers: 0,
     blockTax: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
@@ -690,6 +695,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const combat = ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
       const now = cond.phase === "combat" ? combat : s.step === "main1" || s.step === "main2";
       return now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1);
+    }
+    case "prowl": {
+      // CR 702.76a: the spell's creature types as it's cast (a changeling has all of them, CR 702.73a), against the
+      // sources `you` controlled that dealt combat damage to a player this turn.
+      const d = defOf(s, src);
+      const all = everyCreatureType(d);
+      const mine = d.subtypes.filter((t) => CREATURE_TYPES.has(t));
+      const dealt = s.turnLog?.combatDamageTypesBy?.[you] ?? [];
+      return dealt.some((t) => (t === "*" ? all || mine.length > 0 : all ? CREATURE_TYPES.has(t) : mine.includes(t)));
     }
     case "castAnother": // checked before the spell counts itself (CR 601.2f, 601.2i)
       return (s.castThisTurn ?? []).some((c) => c.player === you);
@@ -1199,6 +1213,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.blockTax += m.n;
       return;
     case "attackTax": {
+      if (m.perCounter) {
+        c.attackTaxCounters++;
+        if (m.planeswalkers) c.attackTaxCountersPlaneswalkers++;
+        return;
+      }
       const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;
       c.attackTax += n;
       if (m.planeswalkers) c.attackTaxPlaneswalkers += n;

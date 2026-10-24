@@ -176,6 +176,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "dig", n, count: n, upTo: false, required: true, into, rest: "graveyard", reveal: false, ...(who ? { who } : {}) }];
   }
 
+  // Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control."
+  if (/^Put all commanders from the command zone onto the battlefield under your control$/.test(s)) return [{ type: "commandersOntoBattlefield" }];
+  // "Manifest the top card of that player's library" (Orochi Soul-Reaver): their card, onto the battlefield face down under
+  // your control (CR 701.40a); its owner is still that player.
+  if ((m = /^Manifest the top card of (that player's) library$/i.exec(s))) {
+    const library = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
+    return library && library.ref !== "you" ? [{ type: "dig", n: 1, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, library }] : null;
+  }
   // "Up to two target players each manifest two cards from their hands" (Kozilek, the Broken Reality): each chooses that
   // many cards from their hand (all of them with fewer, rulings), and they're put onto the battlefield face down
   // (CR 701.40a). "For each card manifested this way" counts them.

@@ -2229,6 +2229,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8c411f4e-a091-447c-9450-d895b10b4985",
+  "name": "Carnage Tyrant",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "This spell can't be countered.\nTrample, hexproof",
+  "power": "7",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Hexproof",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-09-15",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "27c2b8ce-17b9-4f6c-8444-3bdc636dd413",
   "name": "Cavalier of Night",
   "manaCost": "{2}{B}{B}{B}",
@@ -6668,6 +6701,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bca33fb6-cd37-4259-8c0b-7a4675754a00",
+  "name": "Hunting Velociraptor",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "First strike\nDinosaur spells you cast have prowl {2}{R}. (You may cast a spell for its prowl cost if you dealt combat damage to a player this turn with a creature with any of its creature types.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "rex",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f6bd2902-7f8b-419e-bbc7-bcab0c1b7e01",
   "name": "Impulse",
   "manaCost": "{1}{U}",
@@ -8792,6 +8857,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9ed9accb-9f0c-40fa-aeea-2d1e1c9d1bd1",
+  "name": "Metalworker",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "{T}: Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "uds",
+  "releasedAt": "1999-06-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3e7bd846-7295-4590-a419-c97cd2526bc1",
   "name": "Meteor Swarm",
   "manaCost": "{X}{R}{R}{R}",
@@ -9682,6 +9777,39 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ff6b52b7-ae3c-465b-b10e-901160e5230e",
+  "name": "Nils, Discipline Enforcer",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Cleric",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "At the beginning of your end step, for each player, put a +1/+1 counter on up to one target creature that player controls.\nEach creature with one or more counters on it can't attack you or planeswalkers you control unless its controller pays {X}, where X is the number of counters on that creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

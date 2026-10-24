@@ -18,6 +18,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|~)$/, "$2's $1");
+  // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
+  // modified creatures you control".
+  p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
   let m: RegExpExecArray | null;
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).

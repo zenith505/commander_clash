@@ -383,6 +383,15 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
 }
 
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Elesh Norn: "Whenever a source an opponent controls deals damage to you or a permanent you control, that source's
+  // controller ...": the source's controller is "that player".
+  const yours = /^Whenever a source an opponent controls deals damage to you or a permanent you control, (.+)$/.exec(line);
+  if (yours) {
+    const text = yours[1]!.replace(/\bthat source's controller\b/g, "that player");
+    if (/\b(it|its|that source|that creature|that permanent)\b/.test(text)) return "fail";
+    const body = parseBody(text, { eventPlayer: true });
+    return body ? { event: "opponentSourceDamagesYouOrYours", body: { ...body, text: yours[1]! } } : "fail";
+  }
   const m = /^Whenever (an?) (.+?) deals (combat )?damage to you, (.+)$/.exec(line);
   if (!m) return null;
   const who = /^source(?: (an opponent|you) controls?)?$/.exec(m[2]!);

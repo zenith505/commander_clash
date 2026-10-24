@@ -1267,6 +1267,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): its
     // controller's permanents, once for each source and recipient (rulings); the permanent is the subject.
     const hit = ev.id ? s.objects[ev.id] : undefined;
+    // Elesh Norn: "a source an opponent controls deals damage to you or a permanent you control": the damaged player's, or
+    // the damaged permanent's controller's, once for each source and recipient (rulings).
+    const hurt = ev.player ?? (hit ? controllerOf(s, hit) : undefined);
+    if (hurt !== undefined && ev.by !== hurt && opponents(s, hurt).includes(ev.by))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) === hurt) add(w, hurt, (e) => e === "opponentSourceDamagesYouOrYours", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
+      }
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== ev.by) continue;

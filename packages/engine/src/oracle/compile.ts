@@ -2683,6 +2683,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;
       else if ("targetLifeTax" in cost) out.targetLifeTax = (out.targetLifeTax ?? 0) + cost.targetLifeTax;
+      else if ("opponentsTargetTax" in cost) out.opponentsTargetTax = [...(out.opponentsTargetTax ?? []), cost.opponentsTargetTax];
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }

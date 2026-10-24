@@ -3612,6 +3612,8 @@ export type TriggerEvent =
   | "groupDealsDamageToPlayers"
   /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
   | "creaturesDealCombatDamageToYou"
+  /** "Whenever a source an opponent controls deals damage to you or a permanent you control" (Elesh Norn): once for each source and each of them dealt damage (rulings); the source's controller is "that player". */
+  | "opponentSourceDamagesYouOrYours"
   /** "Whenever one or more creatures an opponent controls deal combat damage to you" (Norn's Decree): once for each such opponent, who is "that opponent". */
   | "opponentCreaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
@@ -5257,6 +5259,8 @@ export interface CompiledCard {
   castTargetLess?: { n: number; filter: TargetSpec }[];
   /** "Spells your opponents cast that target one or more commanders you control cost {3} more to cast" (Esior): once per spell. */
   commanderTargetTax?: number;
+  /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */
+  opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true }[];
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */
   targetLifeTax?: number;
   /**

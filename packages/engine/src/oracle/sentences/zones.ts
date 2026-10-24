@@ -107,7 +107,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents" (Whelming Wave),
   // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
   // every one that has none of those subtypes or card types.
-  if ((m = /^([Rr]eturn all (?:creatures|permanents) to their owners' hands|[Dd]estroy all (?:creatures|permanents)) except for (.+)$/.exec(s))) {
+  // "Destroy all other permanents except for artifacts, lands, and Phyrexians" (The Argent Etchings): other than ~ too.
+  if ((m = /^([Rr]eturn all (?:creatures|permanents) to their owners' hands|[Dd]estroy all (?:other )?(?:creatures|permanents)) except for (.+)$/.exec(s))) {
     const names = m[2]!.split(/,? and |, /).map((w) => (/^(Octopus|Platypus)es$/.test(w) ? w.slice(0, -2) : singularWord(w)));
     const types = names.filter((w) => PERMANENT_TYPES.includes(capital(w) as never)).map(capital);
     const subtypes = names.filter((w) => CREATURE_TYPES.has(w));

@@ -4236,8 +4236,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     for (const id of s.battlefield) {
       const src = obj(s, id);
       const ab = abilitiesOf(s, src);
-      if (!ab.castTargetLess && !ab.commanderTargetTax) continue;
+      if (!ab.castTargetLess && !ab.commanderTargetTax && !ab.opponentsTargetTax) continue;
       const by = controllerOf(s, src);
+      // Kopala, Warden of Waves: a permanent its controller controls (CR 601.2f).
+      if (by !== pid && opponents(s, by).includes(pid)) for (const c of ab.opponentsTargetTax ?? []) if (!c.abilities && targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false))) mods.more += c.n;
       if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
       if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
     }
@@ -6179,7 +6181,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = ab.mana ? 0 : activationTax(s, o);
+  const more = ab.mana ? 0 : activationTax(s, o) + opponentsTargetTax(s, pid, targets);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -6233,6 +6235,25 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
  */
 function powerUpAgain(s: GameState, pid: PlayerId): number {
   return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).powerUpAgain).length;
+}
+
+/**
+ * Kopala, Warden of Waves: "Abilities your opponents activate that target a Merfolk you control cost {2} more to activate",
+ * once for each such permanent's ability however many it targets (rulings), with the targets chosen first (CR 602.2b).
+ */
+function opponentsTargetTax(s: GameState, pid: PlayerId, targets?: TargetChoice[]): number {
+  const targeted = [...new Set((targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))].map((id) => s.objects[id]).filter((t): t is GameObject => t?.zone === "battlefield");
+  if (!targeted.length) return 0;
+  let n = 0;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    const taxes = abilitiesOf(s, src).opponentsTargetTax;
+    if (!taxes) continue;
+    const by = controllerOf(s, src);
+    if (by === pid || !opponents(s, by).includes(pid)) continue;
+    for (const c of taxes) if (c.abilities && targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false))) n += c.n;
+  }
+  return n;
 }
 
 /** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */

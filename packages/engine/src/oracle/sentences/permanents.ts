@@ -120,6 +120,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "transform", what }] : null;
   }
+  // "Transform all Incubator tokens you control" (The Argent Etchings): each of them, as it resolves (CR 701.27a).
+  if ((m = /^[Tt]ransform (all .+)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "each" ? [{ type: "transform", what }] : null;
+  }
   // "Convert ~" (CR 701.28a): turned so its other face is up, just as transforming does (701.28a, rulings); "convert it"
   // in a trigger about itself.
   if (/^[Cc]onvert ~$/.test(s) || (ctx.selfIt && /^[Cc]onvert it$/.test(s))) return [{ type: "transform", what: { ref: "self" }, convert: true }];

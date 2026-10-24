@@ -663,6 +663,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       return mine > -Infinity && mine >= all;
     }
+    case "attackedPlayerPoisoned":
+      return s.players.some((p) => !p.lost && (p.poison ?? 0) > 0 && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent));
     case "eventPlayerMoreThanAnotherOpponent":
       // Breena: that opponent against each of your other opponents still in the game (rulings: the attacking player may be one).
       return eventPlayer !== undefined && !s.players[eventPlayer]!.lost && s.turnOrder.some((p) => p !== you && p !== eventPlayer && !s.players[p]!.lost && s.players[p]!.life < s.players[eventPlayer]!.life);

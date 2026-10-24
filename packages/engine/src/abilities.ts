@@ -325,7 +325,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1300,6 +1300,8 @@ export type StaticCondition =
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
   /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
+  /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
+  | { kind: "attackedPlayerPoisoned" }
   /** "You control the creature with the greatest power or tied for the greatest power" (Triumph of Ferocity), "the artifact with the greatest mana value ..." (Padeem): among all on the battlefield. */
   | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
@@ -2157,7 +2159,7 @@ export type Effect =
      * `onlySelf`: an intervening "if that spell targets only ~" (CR 603.4), checked again as it resolves.
      */
     eachOther?: { among: TargetSpec; self?: true; caster?: true; onlySelf?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept }
-  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   /**
    * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
@@ -3610,6 +3612,8 @@ export type TriggerEvent =
   | "groupDealsDamageToPlayers"
   /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
   | "creaturesDealCombatDamageToYou"
+  /** "Whenever one or more creatures an opponent controls deal combat damage to you" (Norn's Decree): once for each such opponent, who is "that opponent". */
+  | "opponentCreaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
   | "spellYouControlDealsDamage"
   /**
@@ -4817,6 +4821,11 @@ export interface CompiledCard {
    * that player skips that draw and you draw a card" (a replacement effect, CR 614.1a, 614.10).
    */
   stealsDraws?: true;
+  /**
+   * Alms Collector: "If an opponent would draw two or more cards, instead you and that player each draw a card" (CR
+   * 614.1a), applied to the instruction as a whole before any single draw (CR 121.2a, 616.1g; rulings).
+   */
+  splitsBigDraws?: true;
   /**
    * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
    * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,

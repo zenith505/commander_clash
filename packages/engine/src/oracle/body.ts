@@ -278,6 +278,9 @@ const checkableMay = (e: Effect) =>
   e.type === "removeExiledCounter" ||
   // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
   (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
+  // "You may mill that many cards. If you do, you may put a creature card from among them into your hand" (Barrowgoyf):
+  // choosing to mill is doing it (with nothing milled, nothing is among them anyway).
+  (e.type === "mill" && e.who.ref === "you") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
   (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
   // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
@@ -296,6 +299,8 @@ const checkableMay = (e: Effect) =>
   // "You may have target creature you control get +2/+0 and gain haste until end of turn. If you do, ..." (Hazoret's
   // Favor), "you may have it get +4/+0 until end of turn" (Attack-in-the-Box): done if that permanent is still there.
   (e.type === "continuous" && (e.what.ref === "self" || (e.what.ref === "target" && !e.what.n)) && e.duration === "endOfTurn") ||
+  // "You may have that player gain control of equipped creature until end of turn. If you do, untap it." (Assault Suit).
+  (e.type === "continuous" && e.what.ref === "attached" && e.giveTo?.ref === "eventPlayer" && e.duration === "endOfTurn") ||
   // "You may have ~ become a copy of another target creature you control until end of turn ... If you do, ..." (Gogo,
   // Mysterious Mime): done if it and that target are both still there.
   (e.type === "becomeCopy" && e.what.ref === "self" && e.of.ref === "target" && !e.of.n && e.duration === "endOfTurn");
@@ -775,6 +780,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Momentous Fall: "You draw cards equal to the sacrificed creature's power, then you gain life equal to its toughness":
   // "its" is the sacrificed creature, as it last existed (CR 608.2h).
   text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
+  // Dawn of a New Age: "Then if ~ has no hope counters on it, sacrifice it and you gain 4 life": ~, as it resolves.
+  text = text.replace(/\b[Tt]hen if ~ has no ([a-z]+) counters on it, sacrifice it\b/, "If there are no $1 counters on ~, sacrifice ~");
+  // Amalia Benavides Aguirre: "~ explores. Then destroy all other creatures if its power is exactly 20": ~ is the only
+  // object named, checked once as the ability resolves, after the explore (rulings).
+  text = text.replace(/^(~ explores\. Then [^.~]+ if )its (power|toughness)\b/, "$1~'s $2");
   // Level Up: "Then if it has power 10 or greater, draw a card": the same as "if its power is 10 or greater".
   text = text.replace(/\b([Ii]f) (it|~) has (power|toughness) (\w+) or (greater|less),/g, (_, i: string, w: string, st: string, n: string, c: string) => `${i} ${w === "~" ? "~'s" : "its"} ${st} is ${n} or ${c},`);
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
@@ -3129,8 +3139,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text", ...(/^[A-Z]/.test(ifIts[2]!) ? ["subtypes"] : [])].includes(k));
       const types = typed?.kind === "object" ? [...(typed.types ?? []), ...(typed.allTypes ?? [])] : [];
       // Anything else is left to the readings below (Carbonize's "If it's a creature, it can't be regenerated ...").
-      if (t?.kind === "object" && !t.optional && !t.many && known && prev && ["untap", "tap", "counters", "continuous"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(ifIts[3]!)) {
-        const fx = parseOne(ifIts[3]!.charAt(0).toUpperCase() + ifIts[3]!.slice(1), ctx);
+      // "Up to one target ... loses all abilities until your next turn. If it's a creature, it also has base power and
+      // toughness 2/2 until your next turn" (Azure Beastbinder): with no target chosen, the condition is false.
+      const then = ifIts[3]!.replace(/^it also /, "it ");
+      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && ["untap", "tap", "counters", "continuous"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
+        const fx = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
         if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
         const filter: TargetSpec = ifIts[1] ? { kind: "object", types: [], notTypes: types, notColors: [], text: `not ${ifIts[2]}` } : { ...typed, text: ifIts[2]! };
         effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
@@ -4776,6 +4789,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         prev.otherwise = inner;
         continue;
       }
+      // "You may mill that many cards. If you do, you may put a creature card from among them into your hand" (Barrowgoyf):
+      // part of milling, one of the cards milled if any matches.
+      const milledPick = ifDid[1] === "do" && prev?.type === "may" && !prev.pay && prev.effects.length === 1 && prev.effects[0]!.type === "mill" && prev.effects[0]!.who.ref === "you" ? /^you may put (an? .+?) from among them into your hand$/.exec(ifDid[2]!) : null;
+      if (milledPick) {
+        const filter = parseSearchFilter(milledPick[1]!.replace(/^an? /, ""));
+        if (filter === null) return null;
+        (prev as Extract<Effect, { type: "may" }>).effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
+        continue;
+      }
+      // "Discard a card. If you do, draw a card." (Shadow of the Goblin): not optional; done if a card was discarded (with
+      // an empty hand, none is, CR 701.9b).
+      if (ifDid[1] === "do" && prev?.type === "discard" && prev.who.ref === "you" && prev.n === 1 && !prev.upTo && !prev.filter && !prev.hand && !prev.downToFewest && !prev.exile) {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "card" } }, effects: inner });
+        continue;
+      }
+      // "Remove a hope counter from ~. If you do, draw a card." (Dawn of a New Age): not optional, and done only if that
+      // many counters were removed (CR 608.2c).
+      if (ifDid[1] === "do" && prev?.type === "removeCounters" && prev.what.ref === "self" && typeof prev.n === "number" && !ctx.spell) {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        prev.setsDid = true;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
+        continue;
+      }
       // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent
       // controls" (Masked Vandal): whether a card was exiled.
       if (!mustSac && (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay))) return null;
@@ -4856,14 +4895,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: subjPT[2] as "power" | "toughness", ...(subjPT[4] === "less" ? { max: n } : { min: n }) } }, effects: inner });
       continue;
     }
-    const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is ${NUM} or (greater|less)$`).exec(s) : null;
+    // "Then destroy all other creatures if its power is exactly 20" (Amalia Benavides Aguirre): both bounds.
+    const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is (?:${NUM} or (greater|less)|exactly ${NUM})$`).exec(s) : null;
     const leadPT = !ctx.spell && !ctx.subjectIt && !trailPT ? new RegExp(`^If (~'s|its) (power|toughness) is ${NUM} or (greater|less), (.+)$`).exec(s) : null;
-    const selfPTIf = trailPT ? { then: trailPT[1]!, whose: trailPT[2]!, stat: trailPT[3]!, n: trailPT[4]!, cmp: trailPT[5]! } : leadPT ? { then: leadPT[5]!, whose: leadPT[1]!, stat: leadPT[2]!, n: leadPT[3]!, cmp: leadPT[4]! } : null;
+    const selfPTIf = trailPT ? { then: trailPT[1]!, whose: trailPT[2]!, stat: trailPT[3]!, n: trailPT[4] ?? trailPT[6]!, cmp: trailPT[5] ?? "exactly" } : leadPT ? { then: leadPT[5]!, whose: leadPT[1]!, stat: leadPT[2]!, n: leadPT[3]!, cmp: leadPT[4]! } : null;
     if (selfPTIf && (selfPTIf.whose === "~'s" || ctx.selfIt) && !/\binstead$/.test(selfPTIf.then)) {
       const inner = parseOne(capital(selfPTIf.then), ctx);
       if (!inner) return null;
       const n = num(selfPTIf.n);
-      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfPT", stat: selfPTIf.stat as "power" | "toughness", ...(selfPTIf.cmp === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfPT", stat: selfPTIf.stat as "power" | "toughness", ...(selfPTIf.cmp === "less" ? { max: n } : selfPTIf.cmp === "exactly" ? { min: n, max: n } : { min: n }) } }, effects: inner });
       continue;
     }
     // Twenty-Toed Toad: "you win the game if there are twenty or more counters on it or you have twenty or more cards in
@@ -6208,6 +6248,12 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
       if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd))) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
+    }
+    // "For each flip you won, create a token that's a copy of that creature" (Mirror March): that many, at once.
+    case "createTokenCopy": {
+      if (e.each || e.attackingEach) return null;
+      const n = sc(e.n);
+      return n === null ? null : { ...e, n };
     }
     case "continuous": {
       if (e.mods.length !== 1 || e.mods[0]!.kind !== "modifyPT") return null;

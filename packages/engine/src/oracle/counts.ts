@@ -218,6 +218,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
   }
+  // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
+  if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });

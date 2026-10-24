@@ -2886,7 +2886,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   // Slicer, Hired Muscle: "you may have that player gain control of ~ until end of turn. If you do, ... goad it": only
   // while there's another opponent for it to attack (goaded, it attacks a player other than us if able, CR 701.15b).
-  if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "self" && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
+  // Assault Suit: "... gain control of equipped creature until end of turn": the same, the creature it equips can't attack us.
+  if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && (e.effects[0]!.what.ref === "self" || e.effects[0]!.what.ref === "attached") && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
     return opponents(s, pid).filter((p) => p !== r.item.event?.player).length > 0;
   // Scavenger's Talent: "you may sacrifice three other nonland permanents. If you do, return a creature card from your
   // graveyard to the battlefield": only when the best creature card there is worth more than the cheapest ones we'd give.

@@ -194,7 +194,7 @@ export type TriggerSourceEvent =
   /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
   | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; /** Dealt to this battle, `player` its protector (CR 310). */ battle?: ObjectId }
   /** Creatures dealt combat damage to this player in one combat damage step, whoever controls them (Witch-king of Angmar). */
-  | { type: "creaturesDamagedPlayer"; player: PlayerId; ids: ObjectId[] }
+  | { type: "creaturesDamagedPlayer"; player: PlayerId; ids: ObjectId[]; controllers: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
@@ -1078,7 +1078,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever one or more creatures deal combat damage to you": once for the step's combat damage (CR 510.2, 603.2c).
     for (const id of s.battlefield) {
       const o = obj(s, id);
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou");
+      if (controllerOf(s, o) !== ev.player) continue;
+      add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou");
+      // Norn's Decree: once for each opponent whose creatures dealt it (CR 603.2c), that opponent being "that opponent".
+      for (const c of ev.controllers) if (c !== ev.player) add(o, ev.player, (e) => e === "opponentCreaturesDealCombatDamageToYou", undefined, undefined, undefined, undefined, undefined, undefined, { player: c });
     }
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
@@ -1102,7 +1105,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // controller, as they were declared (rulings on Firemane Commando).
         const watcher = controllerOf(s, o);
         // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
-        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length, group } : undefined;
+        // Any player's attack (Norn's Decree): "the attacking player".
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length, group } : anyone ? { player: ev.controller } : undefined;
         // "Whenever one or more creatures attack one of your opponents" (Frontier Warmonger): once for each of the
         // watcher's opponents attacked, about the creatures attacking them (CR 508.3e).
         if (t.attacksOpponent) {

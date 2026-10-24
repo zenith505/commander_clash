@@ -993,6 +993,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
     return first && grants && more ? [...first, ...grants, more] : null;
   }
+  // Assault Suit: "gets +2/+2, has haste, can't attack you or planeswalkers you control, and can't be sacrificed".
+  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) ([^,]+), (can't [^,]+),? and (can't [^,]+)$`).exec(rest))) {
+    const grants = parseGrants(m[3]!);
+    const [a, b] = [parseStaticMods(m[4]!), parseStaticMods(m[5]!)];
+    return grants && a && b ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...a, ...b] : null;
+  }
   // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler), "... and can't attack you or
   // planeswalkers you control" (the Vows).
   if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control|is goaded)$`).exec(rest))) {

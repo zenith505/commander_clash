@@ -374,6 +374,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
+      if (c.combatDamaged) return s.players.filter((p) => !(c.opponents && p.id === ctx.controller) && p.combatDamagedTurn === s.turn).length;
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
       // Aclazotz: an opponent with no card to discard (CR 701.9b) didn't discard one.
@@ -695,7 +696,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
     case "tokensCreatedThisTurn":

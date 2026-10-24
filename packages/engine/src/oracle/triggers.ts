@@ -1073,6 +1073,11 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!draw) return "fail";
     const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
     return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
+  } else if ((m = /^Whenever a player attacks, if one or more players being attacked are poisoned, (the attacking player draws a card)\.?$/.exec(line))) {
+    // Norn's Decree: any player's attack (CR 508.3d), checked as it triggers and as it resolves (CR 603.4).
+    const draw = parseBody("That player draws a card.", { eventPlayer: true });
+    if (!draw) return "fail";
+    return { event: "creaturesYouControlAttack", body: { ...draw, text: m[1]! }, anyoneAttacks: true, ifCond: { kind: "attackedPlayerPoisoned" } };
   } else if ((m = /^Whenever one or more creatures attack one of your opponents( or a planeswalker they control)?, (.+)$/.exec(line))) {
     // Frontier Warmonger, Frenzied Gorespawn: any player's creatures (rulings), once for each of your opponents they attack
     // (with their planeswalkers, when it says so; not battles), as for "whenever you attack a player" (CR 508.3e). "Those
@@ -1500,6 +1505,12 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(hurt[1]!);
     return body ? { event: "creaturesDealCombatDamageToYou", body } : "fail";
   }
+  // Norn's Decree: "Whenever one or more creatures an opponent controls deal combat damage to you, that opponent ...".
+  const hurtBy = /^Whenever one or more creatures an opponent controls deal combat damage to you, (.+)$/.exec(line);
+  if (hurtBy) {
+    const body = parseBody(hurtBy[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    return body ? { event: "opponentCreaturesDealCombatDamageToYou", body: { ...body, text: hurtBy[1]! } } : "fail";
+  }
   const attacks = /^Whenever a creature attacks enchanted player, (.+)$/.exec(line);
   if (attacks) {
     const body = parseBody(attacks[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });
@@ -1920,7 +1931,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : oppStep[1] === "combat" ? "eachBeginCombat" : "eachEndStep";
     // "They lose 2 life", "~ deals 2 damage to them": that player.
     // Slicer, Hired Muscle: "... gain control of ~ until end of turn. If you do, ... If you don't, convert it": ~.
-    const text = oppStep[2]!.replace(/^(you may have that player gain control of ~ until end of turn\. If you do, untap ~, goad it, and it can't be sacrificed this turn\. If you don't, convert) it\.$/, "$1 ~.");
+    // Assault Suit: "... gain control of equipped creature until end of turn. If you do, untap it": that creature.
+    const text = oppStep[2]!.replace(/^(you may have that player gain control of ~ until end of turn\. If you do, untap ~, goad it, and it can't be sacrificed this turn\. If you don't, convert) it\.$/, "$1 ~.").replace(/^(you may have that player gain control of equipped creature until end of turn\. If you do, untap) it\.$/, "$1 equipped creature.");
     const body = parseBody(text.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
   }

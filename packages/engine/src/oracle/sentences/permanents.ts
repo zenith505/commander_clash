@@ -630,6 +630,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];
   // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
+  // Assault Suit: "that player gains control of equipped creature until end of turn": the creature it's attached to as
+  // this resolves (CR 611.2c), until the cleanup step (514.2).
+  if (/^[Tt]hat player gains control of equipped creature until end of turn$/.test(s) && ctx.eventPlayer && !ctx.spell)
+    return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "endOfTurn", giveTo: { ref: "eventPlayer" } }];
   // Slicer, Hired Muscle: "untap ~, goad it, and it can't be sacrificed this turn". Goaded by the ability's controller
   // (CR 701.15a), even while another player controls it; "can't be sacrificed" (CR 701.21) until the cleanup step.
   if (/^Untap ~, goad it, and it can't be sacrificed this turn$/.test(s))
@@ -809,9 +813,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Gain control of target artifact. Untap it. It gains haste." (Momo's Heist), "Create a token that's a copy of target
   // artifact. That token gains haste." (Cogwork Assembler), "Populate. The token created this way gains haste." (Determined
-  // Iteration): keywords with no duration last for as long as it stays on
+  // Iteration), "Those tokens gain haste" (Mirror March): keywords with no duration last for as long as it stays on
   // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
-  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|The token created this way) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
+  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).

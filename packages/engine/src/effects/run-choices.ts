@@ -17,6 +17,7 @@ import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
 import { voteWins } from "./run-votes";
 import { defMv } from "../faces";
+import { putCounters } from "../counters";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -381,9 +382,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const o = objects(s, { ref: "self" }, ctx)[0];
       if (sc.n === undefined) {
         if (!o) return;
-        o.counters.age = (o.counters.age ?? 0) + 1;
-        sc.n = o.counters.age;
-        log(s, `${src} gets an age counter (${sc.n}).`);
+        // Through the replacement effects on counters (Doubling Season); with Solemnity none is put, and what's paid is
+        // for the age counters already on it, {0} for none (rulings).
+        const put = putCounters(s, o, "age", 1);
+        sc.n = o.counters.age ?? 0;
+        log(s, put ? `${src} gets ${put === 1 ? "an age counter" : `${put} age counters`} (${sc.n}).` : `${src} gets no age counter (${sc.n}).`);
       }
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).

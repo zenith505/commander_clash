@@ -313,6 +313,9 @@ export type Count =
   | { kind: "commanderCasts" }
   /** The mana value of the commander Effect "chooseOwnCommander" chose in this resolution (0 if none). */
   | { kind: "chosenCommanderMv" }
+  /** "The greatest mana value among your commanders" (Cactus Preserve): the commanders you own wherever they are, with
+   * their current characteristics (CR 903.3; rulings); 0 with none. */
+  | { kind: "commandersMv" }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
@@ -1681,7 +1684,7 @@ export type Effect =
    * long as it remains exiled, and mana of any type can be spent to cast that spell": `from` that player's library, and
    * `castAnyType` the permission (CR 609.4b).
    */
-  | { type: "hideaway"; n: number; from?: PlayerRef; castAnyType?: true; /** "Then put the rest into their graveyard" (Thief of Sanity), not on the bottom. */ restToGraveyard?: true }
+  | { type: "hideaway"; n: number; from?: PlayerRef; castAnyType?: true; /** "Then put the rest into their graveyard" (Thief of Sanity), not on the bottom. */ restToGraveyard?: true; /** Vivien, Champion of the Wilds: "for as long as it remains exiled, you may cast it if it's a creature spell"; the rest go on the bottom in the order looked at ("in any order"). */ castCreature?: true }
   /**
    * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
    * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).
@@ -2132,6 +2135,11 @@ export type Effect =
    * (Resourceful Defense): `n` is ignored, up to all of them, each removed and put on that one (CR 122.5).
    */
   | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef }
+  /**
+   * Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature." Chosen
+   * one at a time as it resolves, any kinds, from any of them but `onto` itself (rulings), then moved together (CR 122.5).
+   */
+  | { type: "gatherCounters"; onto: ObjRef; from: TargetSpec }
   /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
   | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
@@ -2252,6 +2260,12 @@ export type Effect =
    * player controls comes under its owner's control, an effect of that owner's (layer 2) for as long as it stays (CR 613.1b).
    */
   | { type: "ownersGainControl"; filter: TargetSpec }
+  /**
+   * Reins of Power: "Untap all creatures you control and all creatures target opponent controls. You and that opponent
+   * each gain control of all creatures the other controls until end of turn. Those creatures gain haste until end of
+   * turn." Both groups are the creatures each controls as it resolves, exchanged at once (CR 701.12b, 611.2c).
+   */
+  | { type: "swapCreatures"; who: PlayerRef }
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
@@ -3353,6 +3367,8 @@ export type TriggerEvent =
   | "permanentEnters"
   /** "Whenever another creature dies", "a creature you control", "equipped creature": see TriggeredAbility.dies. */
   | "permanentDies"
+  /** "Whenever a spell or ability an opponent controls destroys a noncreature permanent you control" (Karmic Justice): see TriggeredAbility.destroyed. */
+  | "permanentDestroyed"
   /** "Whenever ~ becomes unattached from a permanent" (it leaving too, CR 603.10a): the subject is that permanent. */
   | "selfBecomesUnattached"
   | "selfBecomesTarget" // "When this becomes the target of a spell or ability" (see TriggeredAbility.targeted)
@@ -3471,6 +3487,8 @@ export type TriggerEvent =
   | "abilityActivated"
   /** "Whenever a creature you control attacking causes a triggered ability of that creature to trigger" (Firebender Ascension). */
   | "attackCausesTrigger"
+  /** "Whenever a creature entering under an opponent's control causes a triggered ability of that creature to trigger" (Aboleth Spawn). */
+  | "opponentEntersCausesTrigger"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
   /** "Whenever you expend 4" (CR 700.14): see TriggeredAbility.expend. */
@@ -3593,7 +3611,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean };
+  targeted?: { spell?: true; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -3741,6 +3759,12 @@ export interface TriggeredAbility {
   /** `by`: "whenever a player sacrifices" (any), "whenever an opponent sacrifices" (opponent); otherwise "whenever you sacrifice". */
   /** `self`: "When you sacrifice ~" (Heaped Harvest), only ~ itself. */
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; self?: true; by?: "any" | "opponent" };
+  /**
+   * For "permanentDestroyed": a permanent a spell or ability destroyed (CR 701.8a), as it last existed on the battlefield
+   * (CR 603.10a), this one too; `by` "opponent": the spell's or ability's controller is an opponent, the event player.
+   * Not a sacrifice, nor lethal damage destroyed by a state-based action (rulings on Karmic Justice).
+   */
+  destroyed?: { filter: TargetSpec; by: "opponent" };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
@@ -4201,6 +4225,11 @@ export interface ManaSpend {
   classLevel?: true;
   /** "This mana can't be spent to pay generic mana costs" (Jegantha): spent on anything, but only on colored, hybrid or Phyrexian symbols' colored mana. */
   notGeneric?: true;
+  /**
+   * "Spend this mana only on costs that contain {X}" (Elementalist's Palette): on any part of a spell's mana cost or an
+   * ability's activation cost with {X} in it (rulings); with the other fields unset.
+   */
+  xCosts?: true;
   text: string;
 }
 
@@ -4681,6 +4710,10 @@ export interface CompiledCard {
   opponentsCountersStay?: CounterKind;
   /** "Players can't activate planeswalkers' loyalty abilities." (The Immortal Sun): while it's on the battlefield. */
   noLoyaltyAbilities?: true;
+  /** Solemnity: "Players can't get counters." (counters.ts playerCountersBanned). */
+  noPlayerCounters?: true;
+  /** Solemnity: "Counters can't be put on artifacts, creatures, enchantments, or lands." Permanents with any of these card types (counters.ts countersBanned). */
+  noCountersOn?: string[];
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
   boastTwice?: true;
   /**

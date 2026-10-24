@@ -1,7 +1,7 @@
 # Roadmap
 
-23,807 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,621 of 4,988 (92%).
+23,821 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,632 of 4,988 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,10 +22,16 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 141, most played first: Cactus Preserve ("the greatest
-   mana value among your commanders"), The Irencrag, Vivien, Champion of the Wilds, Aboleth Spawn, Karmic Justice, Reins
-   of Power, Apex of Power, Neheb, Dreadhorde Champion, Solemnity, Unsettled Mariner, Elementalist's Palette, Slippery
-   Bogbonder; Wildfire Devils, Arcane Proxy and Lilypad Village too. Karazikar's "whenever an opponent attacks another
+00. Most played first (`npm run popular`). Out after round 142, most played first: The Irencrag (becomes a named
+   legendary Equipment that loses its other abilities), Unable to Scream, Kefka, Dancing Mad, Elder Brain, Search for
+   Azcanta, Vesuvan Duplimancy, Clown Car, Scavenger's Talent, Encroaching Mycosynth, Minsc & Boo, Virtue of Courage,
+   Scion of Draco, Palace Jailer, Oubliette, Hushbringer, Scavenged Brawler; Wildfire Devils, Arcane Proxy and Lilypad
+   Village too. Smaller gaps from round 142: mana spent only on costs that contain {X} (Elementalist's Palette,
+   Rosheen Meanderer, Nexos) can't pay a cost with {X} asked for as a spell or ability resolves (Condescend's "unless
+   its controller pays {X}") or a special action's; Unsettled Mariner doesn't trigger when a spell's target is changed
+   to you or your permanent; Vivien's −2 puts the rest on the bottom in the order they were looked at; bots cast Reins
+   of Power only in their own first main phase, at the opponent with the strongest army, and Slippery Bogbonder's bot
+   moves only harmful counters (onto an opponent's creature). Karazikar's "whenever an opponent attacks another
    one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Prowl cards still out for other
    lines: Earwig Squad (search an opponent's library for three cards), Knowledge Exploitation, Noggin Whack, Notorious
    Throng (the damage dealt to your opponents this turn), Stinkdrinker Bandit, Auntie's Snitch. Smaller gaps from round

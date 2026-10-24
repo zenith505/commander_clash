@@ -364,6 +364,8 @@ export interface GameObject {
     exileAfter?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
     castOnly?: true;
+    /** "You may cast it if it's a creature spell" (Vivien, Champion of the Wilds): only as a creature spell (CR 601.3e). */
+    creatureOnly?: true;
     /** Airbend's "by paying {2} rather than paying its mana cost" (CR 701.65a): an alternative cost, the only way. */
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
@@ -2064,6 +2066,8 @@ export interface Resolving {
     /** "Remove up to three counters" (Glissa Sunslayer): how many of each kind are chosen so far, and whether that's all. */
     countersPicked?: Record<string, number>;
     countersDone?: true;
+    /** Slippery Bogbonder: the counters picked so far, by "objectId:kind" (Effect "gatherCounters"). */
+    gathered?: Record<string, number>;
     payOrTop?: { idx: number; answer?: string }; // Sylvan Library: the chosen card being handled, and pay or put back
 
     tapOrUntap?: string; // "tap", "untap" or "neither", for "tap or untap target permanent"

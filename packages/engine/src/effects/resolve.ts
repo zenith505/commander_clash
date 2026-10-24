@@ -905,6 +905,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "removeCounters":
     case "noteManaSpent":
     case "removeAnyCounters":
+    case "gatherCounters":
     case "battleDefense":
     case "removeAllCounters":
     case "moveAllCounters":
@@ -920,6 +921,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "continuous":
     case "groupRules":
     case "ownersGainControl":
+    case "swapCreatures":
     case "exchangeControl":
     case "playerGains":
     case "attackBanNextTurn":

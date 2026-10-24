@@ -2402,6 +2402,15 @@ export function compile(d: CardDef): CompiledCard {
       out.noLoyaltyAbilities = true;
       continue;
     }
+    // Solemnity (CR 122.1): the counters already there stay (rulings); see counters.ts.
+    if (line === "Players can't get counters.") {
+      out.noPlayerCounters = true;
+      continue;
+    }
+    if (line === "Counters can't be put on artifacts, creatures, enchantments, or lands.") {
+      out.noCountersOn = ["Artifact", "Creature", "Enchantment", "Land"];
+      continue;
+    }
     {
       const stay = /^([A-Z][a-z]+) counters can't be removed from permanents your opponents control\.$/.exec(line);
       if (stay) {

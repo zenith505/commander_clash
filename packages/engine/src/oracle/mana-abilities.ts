@@ -355,9 +355,10 @@ function parseManaProduced(text: string): ManaProduce | null {
 /**
  * "Spend this mana only to cast a creature spell.", "... to cast instant and sorcery spells.", "... to activate
  * abilities.", "... to cast artifact spells or activate abilities of artifacts." (CR 106.6). Null for anything else
- * ("of the chosen type", "on costs that contain {X}", "and that spell can't be countered", "... source").
+ * ("of the chosen type", "and that spell can't be countered", "... source").
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
+  if (sentence === "Spend this mana only on costs that contain {X}.") return { xCosts: true, text: sentence };
   // Jegantha, the Wellspring: on any cost, but never on generic mana (rulings: a hybrid {2/W} only as its {W}).
   if (sentence === "This mana can't be spent to pay generic mana costs.") return { spells: { kind: "spell", text: "spells" }, abilities: "any", other: true, notGeneric: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).

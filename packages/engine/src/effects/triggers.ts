@@ -138,7 +138,7 @@ export type TriggerSourceEvent =
   | { type: "unattached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -433,11 +433,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Not delayed triggered abilities (CR 603.2d).
         const again = !fromYard && !floating ? triggersAgain(s, o, controller, causedBy) : 0;
         attackCaused(queued);
+        entersCaused(queued);
         for (let n = again; n > 0; n--) {
           const more: PendingTrigger = { ...queued };
           delete more.tag;
           s.triggerQueue.push(more);
           attackCaused(more);
+          entersCaused(more);
         }
       }
     });
@@ -457,6 +459,29 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (wc !== q.controller || locked?.(wc)) continue;
       abilitiesOf(s, w).triggers.forEach((t, index) => {
         if (t.event !== "attackCausesTrigger" || (t.activeIf && !staticConditionNow(s, t.activeIf, id, wc))) return;
+        q.tag ??= `t${s.nextId++}`;
+        const printed = compileCard(defOf(s, w)).triggers;
+        s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(w), controller: wc, index, sourceZc: w.zoneChanges ?? 0, causeTag: q.tag, ...(printed[index] !== t ? { body: t.body } : {}) });
+      });
+    }
+  };
+  /**
+   * Aboleth Spawn: "Whenever a creature entering under an opponent's control causes a triggered ability of that creature
+   * to trigger": an ability of the entering creature itself (not of another permanent, nor a delayed one; rulings), for
+   * each opponent of that creature's controller with such a watcher. Its trigger goes on the stack just above that
+   * ability (rulings), which becomes its `cause` once it's there.
+   */
+  const entersCaused = (q: PendingTrigger) => {
+    if (fromYard || floating || hosting || causedBy?.event !== "enters" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
+    const creature = s.objects[q.sourceId];
+    if (creature?.zone !== "battlefield" || !objIsType(s, creature, "Creature")) return;
+    const owner = controllerOf(s, creature);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      if (!opponents(s, owner).includes(wc) || locked?.(wc)) continue;
+      abilitiesOf(s, w).triggers.forEach((t, index) => {
+        if (t.event !== "opponentEntersCausesTrigger" || (t.activeIf && !staticConditionNow(s, t.activeIf, id, wc))) return;
         q.tag ??= `t${s.nextId++}`;
         const printed = compileCard(defOf(s, w)).triggers;
         s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(w), controller: wc, index, sourceZc: w.zoneChanges ?? 0, causeTag: q.tag, ...(printed[index] !== t ? { body: t.body } : {}) });
@@ -700,6 +725,22 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       fromGraveyards((src, owner) => {
         if (src.id !== ev.id && !s.leftTogether?.some((l) => l.id === src.id)) consider(src, owner, undefined);
       });
+    }
+    // "Whenever a spell or ability an opponent controls destroys a noncreature permanent you control" (Karmic Justice): the
+    // permanents on the battlefield and the ones destroyed at the same time (this one too), as they last existed (CR
+    // 603.10a); "that opponent" is the destroying spell's or ability's controller.
+    if (ev.destroyedBy !== undefined && ev.snapshot && ev.chars) {
+      const by = ev.destroyedBy;
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const destroyed = { o: ev.snapshot, c: ev.chars };
+      const consider = (src: GameObject, ctrl: PlayerId, triggers?: TriggeredAbility[]) =>
+        add(src, ctrl, (e, t) => e === "permanentDestroyed" && !!t.destroyed && opponents(s, ctrl).includes(by) && diesMatches(s, t.destroyed, src.id, undefined, destroyed, ctrl), triggers, undefined, o, lki, undefined, undefined, { player: by });
+      for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
+      for (const left of s.leftTogether ?? []) {
+        const src = s.objects[left.id];
+        if (!src || src.zone === "battlefield") continue;
+        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+      }
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
     causedBy = null;
@@ -1463,6 +1504,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
       }
     }
+    // "Whenever you or a permanent you control becomes the target of ..." (Unsettled Mariner): a player the item targets,
+    // once however many of its targets name them (rulings).
+    const players = new Set<PlayerId>();
+    for (const t of item?.targets ?? []) if (t.kind === "player" && !ev.only) players.add(t.id);
+    for (const pid of players) {
+      const by = item!.controller;
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        if (wc !== pid) continue;
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orYou && (!tr.targeted.spell || item!.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
+      }
+    }
   } else if (ev.type === "exploits") {
     const lki = { power: ev.chars.power, toughness: ev.chars.toughness };
     for (const w of ev.watchers) {
@@ -1693,6 +1747,16 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     return i < 0 ? 99 : i;
   };
   s.triggerQueue = s.triggerQueue.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t.controller) - rank(b.t.controller) || a.i - b.i).map((x) => x.t);
+  // Firebender Ascension's and Aboleth Spawn's triggers go on the stack just above the ability that caused them (rulings),
+  // whoever controls them.
+  for (const t of s.triggerQueue.filter((x) => x.causeTag)) {
+    const at = s.triggerQueue.findIndex((x) => x.tag === t.causeTag);
+    if (at < 0) continue;
+    s.triggerQueue = s.triggerQueue.filter((x) => x !== t);
+    let k = s.triggerQueue.findIndex((x) => x.tag === t.causeTag) + 1;
+    while (k < s.triggerQueue.length && s.triggerQueue[k]!.causeTag === t.causeTag) k++;
+    s.triggerQueue.splice(k, 0, t);
+  }
   let added = false;
   while (s.triggerQueue.length) {
     const t = s.triggerQueue[0]!;

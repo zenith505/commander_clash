@@ -560,6 +560,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
     return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;
   }
+  // Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature" (see Effect
+  // "gatherCounters").
+  if (/^(?:Then )?[Mm]ove any number of counters from among creatures you control onto that creature$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object")
+    return [{ type: "gatherCounters", onto: { ref: "target", index: ctx.lastObjectTarget }, from: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" } }];
   // Forgotten Ancient: "you may move any number of +1/+1 counters from ~ onto other creatures". Chosen as it resolves, not
   // targeted (rulings); any creatures but ~, whoever controls them.
   if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto other creatures$`).exec(s)))

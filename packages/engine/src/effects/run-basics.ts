@@ -725,6 +725,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       // Fighting: each creature deals damage at the same time, so each is one event per source.
       const b = bs[0]!;
+      // "Whenever one or more creatures you control fight" (Neyith): the creatures as they fight, whoever dies from it.
+      const fighters = [a, b].map((x) => ({ id: x.id, controller: controllerOf(s, x) }));
       const pa = power(s, a);
       const pb = power(s, b);
       // The excess damage each is dealt (The Last Agni Kai, Rhino's Rampage), beyond what was lethal just before (CR 120.10).
@@ -738,6 +740,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
       if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
+      fireEvent(s, { type: "fought", ids: fighters.map((f) => f.id), controllers: fighters.map((f) => f.controller) });
       return;
     }
   }

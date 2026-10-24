@@ -244,7 +244,7 @@ const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorde
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
-const checkableMay = (e: Effect) =>
+const checkableMay = (e: Effect): boolean =>
   e.type === "collectEvidence" ||
   // "You may exile all cards from your hand face down. If you do, ..." (Duplicity): even an empty hand (rulings on
   // exiling or discarding your hand, Herigast).
@@ -265,6 +265,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "handToTop" && e.n === 1) ||
   // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there.
   (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
+  // "You may discard a card or sacrifice a land. If you do, ..." (Highway Robbery): one of them, only one that can be done.
+  (e.type === "either" && !!e.onlyDoable && e.options.every((o) => o.length === 1 && checkableMay(o[0]!))) ||
   // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
   (e.type === "createToken" && e.who.ref === "you" && typeof e.n === "number" && e.n > 0 && !e.attachTo) ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -618,6 +620,16 @@ const LIM_DULS_VAULT =
 
 /** One ability's text to its targets and effects, or null if any of it can't be compiled. */
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
+  // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
+  // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
+  const instead = /^(Counter target spell unless its controller pays \{\d+\})\. If (you control [^,.]+), counter that spell unless its controller pays (\{\d+\}) instead\.$/.exec(text.trim());
+  if (instead) {
+    const base = parseBodyText(`${instead[1]}.`, opts);
+    const cond = parseBodyText(`If ${instead[2]}, draw a card.`, opts)?.effects[0];
+    const counter = base?.effects.length === 1 ? base.effects[0] : undefined;
+    if (counter?.type !== "counterSpell" || !counter.unless || cond?.type !== "if" || cond.effects.length !== 1 || cond.otherwise) return null;
+    return { targets: base!.targets, effects: [{ type: "if", cond: cond.cond, effects: [{ ...counter, unless: { cost: instead[3]! } }], otherwise: [counter] }], text };
+  }
   const body = parseBodyText(text, opts);
   // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
   if (body && text.includes("each of that creature's colors") && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
@@ -700,6 +712,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
+  // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
+  text = text.replace(/^[Cc]hoose (up to one )?target ([a-z]+) spell or ([a-z]+) spell\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1target $2 or $3 spell puts it on their choice of the top or bottom of their library.");
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
   text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
@@ -2250,6 +2265,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences.splice(si + 2, 1);
       continue;
     }
+    // Unstable Amulet, Furious Rise: "Exile the top card of your library. You may play it until you exile another card
+    // with ~." For as long as it stays exiled, until this object exiles another card (rulings).
+    if (exTop && !exTop[1] && !exEqual && !impulseIf && !ctx.spell && /^You may play (?:it|that card) until you exile another card with ~$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", untilAnother: true });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
     // Neyali, Suns' Vanguard: "During any turn you attacked with a token, you may play that card." For as long as it stays
     // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
@@ -2276,6 +2299,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (castAmongKind) {
       if (!castFilter) return null;
       effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, free: true, castFilter });
+      si++;
+      continue;
+    }
+    // Chandra, Hope's Beacon: "Exile the top five cards of your library. Until the end of your next turn, you may cast an
+    // instant or sorcery spell from among those exiled cards." One spell, of that kind (the face cast counting, rulings),
+    // with its normal timing, paying its costs.
+    const castOneAmong = exTop && exTop[1] && !exEqual && !impulseIf ? /^(Until the end of your next turn|Until end of turn), you may cast an? ((?:instant|sorcery|creature|artifact|enchantment)(?: or (?:instant|sorcery|creature|artifact|enchantment))?) spell from among (?:those exiled cards|them|the exiled cards)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (castOneAmong) {
+      const spellFilter = parseSearchFilter(`${castOneAmong[2]!} card`);
+      if (!spellFilter) return null;
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: /next turn/.test(castOneAmong[1]!) ? "nextTurn" : "thisTurn", castOnly: true, oneOf: true, spellFilter });
       si++;
       continue;
     }
@@ -2876,6 +2910,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseSentence(capital(thatCombat[1]!), ctx);
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "addPhases", phases: second ? ["combat", "main"] : ["combat"], ...(second ? { after: "secondMain" as const } : {}), thatCombat: { effects: inner, text: `${capital(thatCombat[1]!)}.` } });
+      si++;
+      continue;
+    }
+    // Consuming Tide: "Each player chooses a nonland permanent they control. Return all nonland permanents not chosen this
+    // way to their owners' hands." In turn order, each knowing the choices before theirs, then the rest at once (rulings).
+    const eachChooses = /^Each player chooses an? ((?:non)?[a-z]+) permanent they control$/.exec(s);
+    if (eachChooses && sentences[si + 1]?.replace(/\.$/, "") === `Return all ${eachChooses[1]} permanents not chosen this way to their owners' hands`) {
+      const filter = pickFilter(`${eachChooses[1]} permanent`);
+      if (filter?.kind !== "object") return null;
+      effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, bounce: true });
       si++;
       continue;
     }
@@ -5148,6 +5192,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // don't control": ~ does it, if you choose.
       const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `)
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able")
+        // "You may gain life equal to the power of target creature you control" (Wall of Reverence).
+        .replace(/^Gain life equal to /, "You gain life equal to ")
         // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
         // you choose (the choice is yours, CR 608.2d).
         .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `)
@@ -6101,6 +6147,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
       // permanent the card became (CR 400.7; no Role if it didn't return as a creature, rulings).
       (put?.type === "putOntoBattlefield" && put.what.ref === "selfCard" && !put.attachToSubject && put.attachToTarget === undefined) ||
       (put?.type === "putFromHand" && !put.any) ||
+      // "Put a land card from their graveyard onto the battlefield tapped under your control. It gains ..." (Realmbreaker).
+      (put?.type === "chooseFromGraveyard" && put.dest === "battlefield" && put.youChoose === true && put.n === 1 && !put.upTo && put.who?.ref !== "eachPlayer") ||
       // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     // "Put a +1/+1 counter on a creature you control. It gains vigilance and trample until end of turn" (Season of
@@ -6416,7 +6464,9 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  // "You create a 2/2 green Wolf creature token and that player mills ten cards" (Sword of Body and Mind): "that player"
+  // after a part about you.
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

@@ -122,7 +122,9 @@ export function parseDamageMod(line: string): StaticAbility | null {
     .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage")
     // Collective Inferno: "Double all damage that sources you control of the chosen type would deal" is the same, for each
     // source (CR 614.1a).
-    .replace(/^Double all damage that sources you control of the chosen type would deal$/, "If a source of the chosen type you control would deal damage, it deals double that damage instead");
+    .replace(/^Double all damage that sources you control of the chosen type would deal$/, "If a source of the chosen type you control would deal damage, it deals double that damage instead")
+    // Mjölnir, Hammer of Thor: "Double all damage equipped creature would deal" (CR 614.1a), to anything.
+    .replace(/^Double all damage (equipped|enchanted) creature would deal$/, "If $1 creature would deal damage, it deals double that damage instead");
   // Ojer Axonil: "If a red source you control would deal an amount of noncombat damage less than ~'s power to an opponent,
   // that source deals damage equal to ~'s power instead."
   const raise = /^If (.+?) would deal an amount of (combat |noncombat )?damage less than (.+?) to (.+?), that source deals damage equal to \3 instead$/.exec(text);

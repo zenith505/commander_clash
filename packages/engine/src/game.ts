@@ -736,8 +736,10 @@ export function moveObject(
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard (${exileReturn.source}).`);
   }
-  // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
+  // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a). Realmbreaker's land:
+  // the same, from an ability it has.
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
+  if (fromZone === "battlefield" && to !== "exile" && abilitiesOf(s, o).exileIfLeavesSelf) to = "exile";
   o.exileIfLeaves = undefined;
   if (o.exileIfToGraveyard && fromZone === "stack" && to === "graveyard") {
     to = "exile";
@@ -2742,7 +2744,10 @@ function startNextTurn(s: GameState, skipping = false) {
   s.turnLog = undefined;
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
-  s.oneOfUsed = undefined;
+  // "Until the end of your next turn, you may cast an instant or sorcery spell from among those exiled cards" (Chandra,
+  // Hope's Beacon): a group whose permission lasts past this turn stays used up.
+  s.oneOfUsed = s.oneOfUsed?.filter((g) => Object.values(s.objects).some((o) => o.zone === "exile" && o.mayPlay?.oneOf === g && o.mayPlay.until !== "thisTurn"));
+  if (!s.oneOfUsed?.length) s.oneOfUsed = undefined;
   s.linkedFreeCasts = undefined;
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
@@ -3487,11 +3492,17 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
   if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
+  // Chandra, Hope's Beacon: only a card with a face that is a spell of this kind.
+  if (m.castFilter && !castFilterFits(s, o, m.castFilter)) return false;
   // "For each nonland card type, ... a spell of that type" (Aminatou's Augury): a type still free for it.
   if (m.byType && !byTypeFits(s.byTypeCast?.[m.byType] ?? [], nonlandTypes(defOf(s, o)))) return false;
   // A warped or plotted card: only on a later turn (CR 702.185a, 702.170d), and only cast, not played as a land.
   return !castOnlyFromExile(o) || (s.turn > o.mayPlay.turn && !isType(defOf(s, o), "Land"));
 }
+
+/** Is this card, or a face it may be cast as (an Adventure, CR 715.3a), a spell like this? */
+const castFilterFits = (s: GameState, o: GameObject, f: TargetSpec): boolean =>
+  printedMatches(f, defOf(s, o)) || castableFaces(s, o).some((face) => asFace(s, o, face, () => printedMatches(f, defOf(s, o))));
 
 /** A warped or plotted card in exile, which its owner may cast on a later turn (CR 702.185a, 702.170d). */
 const castOnlyFromExile = (o: GameObject) => o.mayPlay?.until === "warp" || o.mayPlay?.until === "plot" || o.mayPlay?.until === "foretell";
@@ -3982,6 +3993,10 @@ export function castProblem(
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o, pid).length ? `choose how to cast ${d.name} from ${o.owner === pid ? "your" : "a"} graveyard` : "you can only cast spells from your hand or your commander";
+  // "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): the face cast must
+  // be one, unless something else lets it be cast (rulings).
+  if (!free && !via && o.zone === "exile" && o.mayPlay?.castFilter && ownExilePermission(s, o, pid) && !printedMatches(o.mayPlay.castFilter, d) && !linkedPlayPermission(s, o, pid))
+    return `only ${/^[aeiou]/i.test(o.mayPlay.castFilter.text) ? "an" : "a"} ${o.mayPlay.castFilter.text.replace(/ card$/, "")} spell can be cast this way`;
   // Court of Locthwain's card with no other permission: only without paying its mana cost.
   if (!free && !via && o.zone === "exile" && choices?.alt !== "linkedFree" && !mayPlayExiledOtherwise(s, o, pid) && linkedFreeGrant(s, o, pid) >= 0) return `${d.name} can only be cast without paying its mana cost`;
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;

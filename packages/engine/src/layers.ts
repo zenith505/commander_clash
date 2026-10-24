@@ -1243,6 +1243,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "blocksOnlyFlyers":
       c.blocksOnlyFlyers = true;
       return;
+    case "mustBeBlocked":
+      if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
+      c.mustBeBlocked = true;
+      return;
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
@@ -1315,7 +1319,6 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackSamePlayer":
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
-    case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":
       c[m.kind] = true;

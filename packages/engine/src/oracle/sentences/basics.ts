@@ -494,6 +494,22 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const exile: Effect = { type: "exile", what: { ref: "graveyardEnd", who: { ref: "you" }, ...(filter ? { filter } : {}) } };
     return [{ type: "may", effects: [exile], otherwise: [sacrificeSelf], keep: true, text: `Exile the top ${m[2]} of your graveyard to keep ~` }];
   }
+  // Bandit's Talent: "each opponent discards two cards unless they discard a nonland card", Compulsive Research's "that
+  // player discards two cards unless they discard a land card": each chooses in APNAP order, then all discard at once
+  // (a punisher). With no card of that kind, two cards; they may discard two of that kind too (rulings).
+  if ((m = new RegExp(`^(.+?) discards? (two|three) cards unless (?:they|that player) discards? (an? .+? card)$`).exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseSearchFilter(m[3]!.replace(/^an? /, ""));
+    if (!who || who.ref === "you" || !filter) return null;
+    return [{ type: "punisher", who, options: [{ discard: 1, filter }], effects: [{ type: "discard", who: { ref: "punished" }, n: num(m[2]!) }] }];
+  }
+  // Highway Robbery: "You may discard a card or sacrifice a land. If you do, ...": one or the other, as it resolves, only
+  // one that can be done (rulings).
+  if ((m = /^[Dd]iscard a card or sacrifice an? ([a-z]+)$/.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    if (filter?.kind !== "object") return null;
+    return [{ type: "either", options: [[{ type: "discard", who: { ref: "you" }, n: 1 }], [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice" }]], labels: ["Discard a card", `Sacrifice ${/^[aeiou]/.test(m[1]!) ? "an" : "a"} ${m[1]}`], onlyDoable: true }];
+  }
   // "Then discard two cards unless you discard a creature card" (Mystic Meditation, Thirst for Knowledge): a card of
   // that kind, or two cards. With none of that kind, two cards (rulings).
   if ((m = new RegExp(`^(?:[Tt]hen )?[Dd]iscard (two|three|\\d+) cards unless you discard (an? .+? card)$`).exec(s))) {
@@ -523,6 +539,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter || / or |,/.test(m[2]!)) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: 1, action: "sacrifice" }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice ${m[2]} to keep ~` }];
   }
+  // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
+  if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);
   // "Draw two additional cards" (Sarkhan, the Dragonspeaker's emblem, in your draw step): two more draws.

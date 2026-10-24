@@ -766,6 +766,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
+    // "You may discard a card or sacrifice a land" (Highway Robbery): only with one of them possible (rulings).
+    if (e.type === "either" && e.onlyDoable && !e.options.some((o) => canDoNow(s, o, ctx))) return false;
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
     if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
@@ -793,7 +795,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
 
 /** What a punisher's option reads as on its button: "Discard a card", "Sacrifice a nonland permanent", "Pay {2}". */
 export function punisherLabel(o: PunisherOption): string {
-  if ("discard" in o) return o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
+  if ("discard" in o) return o.filter ? `Discard ${o.discard === 1 ? (/^[aeiou]/i.test(o.filter.text) ? "an" : "a") : o.discard} ${o.filter.text}` : o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
   if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${/^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
   if ("damage" in o) return `Be dealt ${o.damage} damage`;
   if (!o.pay.cost && o.pay.generic === undefined && o.pay.life) return `Pay ${o.pay.life} life`;
@@ -810,7 +812,8 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
     return n + (o && "sacrifice" in o ? (o.n ?? 1) : 0);
   }, 0);
   // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
-  return e.options.flatMap((o, i) => (("discard" in o && p.hand.length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) ? [] : [i]));
+  // "Unless they discard a nonland card": only with one in hand.
+  return e.options.flatMap((o, i) => (("discard" in o && (o.filter ? p.hand.filter((id) => printedMatches(o.filter!, defOf(s, obj(s, id)))) : p.hand).length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) ? [] : [i]));
 }
 
 /**
@@ -875,13 +878,16 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
         const o = e.options[Number(m)];
         return n + (o && "discard" in o ? o.discard : 0);
       }, 0);
+      // A card of a kind ("a nonland card", one option only, see the parser): only those can be picked.
+      const discardFilter = made.map((m) => e.options[Number(m)]).find((o): o is Extract<PunisherOption, { discard: number }> => !!o && "discard" in o && !!o.filter)?.filter;
+      const discardable = discardFilter ? p.hand.filter((id) => printedMatches(discardFilter, defOf(s, obj(s, id)))) : p.hand;
       if (discards && !mine.discard) {
         if (sc.chosen?.[pid] && sc.queue?.length === 0) mine.discard = sc.chosen[pid]!;
-        else if (p.hand.length <= discards) mine.discard = [...p.hand];
+        else if (discardable.length <= discards) mine.discard = [...discardable];
         else {
           sc.chosen = {};
           sc.queue = [pid];
-          s.pending = { kind: "discard", player: pid, count: discards, source: src };
+          s.pending = { kind: "discard", player: pid, count: discards, source: src, ...(discardFilter ? { filter: discardFilter } : {}) };
           return "paused";
         }
         sc.chosen = undefined;
@@ -972,12 +978,13 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
 const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
-function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number } {
+function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number } {
   const [f] = e.effects;
   if (e.effects.length !== 1 || !f) return {};
   if (f.type === "loseLife" && typeof f.n === "number") return { lose: f.n };
   if (f.type === "damage" && typeof f.amount === "number") return { lose: f.amount };
   if (f.type === "createToken") return { tokens: 1 };
+  if (f.type === "discard" && typeof f.n === "number" && f.who.ref === "punished" && !f.filter) return { discards: f.n };
   return {};
 }
 
@@ -985,7 +992,9 @@ function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number
 function describePenalty(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: ResolveCtx): string {
   if (e.thenText) return `${player(s, ctx.controller).name} ${e.thenText}`;
   const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
-  return typeof lose === "number" ? `Lose ${lose} life` : "Take the penalty";
+  if (typeof lose === "number") return `Lose ${lose} life`;
+  const d = punisherHarm(e).discards;
+  return d ? `Discard ${d} cards` : "Take the penalty";
 }
 
 /**

@@ -141,6 +141,8 @@ export type TriggerSourceEvent =
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; /** A spell or ability this player controls destroyed it (CR 701.8a). */ destroyedBy?: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
+  /** Creatures fought (CR 701.14a): "whenever one or more creatures you control fight". */
+  | { type: "fought"; ids: ObjectId[]; /** Their controllers as they fought. */ controllers: PlayerId[] }
   /** A player gained life (one life-gain event, CR 119.9). */
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** The active player's permanents untapped by their untap step's turn-based action (CR 502.3), how many. */
@@ -776,6 +778,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const event = o.blocking ? "creatureBlocks" : o.attacking !== undefined && o.blockedBy?.length ? "creatureBecomesBlocked" : undefined;
       if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
     }
+    // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked (rulings).
+    for (const w of watchers) {
+      const you = controllerOf(s, w);
+      if (s.battlefield.some((id) => obj(s, id).attacking !== undefined && !!obj(s, id).blockedBy?.length && controllerOf(s, obj(s, id)) === you)) add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
+    }
     // "Whenever one or more creatures an opponent controls attack you and aren't blocked" (Coveted Jewel): for each such
     // opponent (rulings), whoever controls the watcher now.
     for (const w of watchers) {
@@ -815,6 +822,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (bl && bearer) ringTrigger(s, you, 1, bl);
         }
       }
+    }
+  } else if (ev.type === "fought") {
+    // Neyith of the Dire Hunt: once for the fight, however many of the creatures are its controller's (rulings).
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const you = controllerOf(s, w);
+      if (ev.controllers.includes(you)) add(w, you, (e) => e === "yourCreaturesFightOrBlocked");
     }
   } else if (ev.type === "untapStepUntapped") {
     for (const id of s.battlefield) {

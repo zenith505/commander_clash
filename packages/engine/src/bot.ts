@@ -2111,17 +2111,18 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   // much as a card, and not once another player has already settled it.
   const controller = s.resolving?.item.controller;
   const settled = mode && Object.entries(pu.made).some(([q, m]) => Number(q) !== pid && m.some((x) => x !== "none"));
-  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : 4;
-  const handCost = (n: number) => {
-    const cards = chooseDiscards(s, pid, takenDiscards + n).slice(takenDiscards);
-    if (cards.length < n) return Infinity;
+  const handCost = (n: number, filter?: TargetSpec, all = false) => {
+    const cards = chooseDiscards(s, pid, takenDiscards + n, undefined, filter).slice(takenDiscards);
+    if (cards.length < n && !all) return Infinity;
     return cards.reduce((t, id) => t + (isType(defOf(s, obj(s, id)), "Land") ? (lands(s, pid) >= 6 ? 1.5 : 5) : 4 + Math.min(3, mv(s, id) / 2)), 0);
   };
+  // "Discards two cards unless ...": the two cards it would cost (as many as there are).
+  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];
     if (!w) return Infinity;
-    if ("discard" in w) return handCost(w.discard);
+    if ("discard" in w) return handCost(w.discard, w.filter);
     if ("sacrifice" in w) {
       const worths = pickOptions(s, { filter: w.sacrifice }, pid)
         .map((id) => obj(s, id))

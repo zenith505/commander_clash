@@ -66,6 +66,7 @@ import {
   castDef,
   casualtyCandidates,
   bargainCandidates,
+  offeringCandidates,
   autoEvidence,
   evidenceProblem,
   altCostsFor,
@@ -190,6 +191,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
     // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
     if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
+    // Dance with Calamity: another card while there's room for one of about average mana value under the limit.
+    const luck = pend.kind === "chooseMay" ? /^exile the top card of your library \(total mana value so far: (\d+); (\d+) or less/.exec(pend.prompt) : null;
+    if (luck) return [{ type: "chooseMay", player: pid, yes: Number(luck[2]) - Number(luck[1]) >= 4 }];
     if (pend.kind === "chooseMay" && pend.vault) {
       const paid = s.resolving?.scratch?.vaultPaid ?? 0;
       const good = pend.vault.filter((id) => wantOnTop(s, pid, id)).length;
@@ -271,6 +275,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Free from the hand: the most expensive card is the best deal.
     // From an opponent's revealed hand: take their most expensive card.
     // Memoricide's search: every card with the name it can take; from the hand last, which may give that player cards back.
+    // Benthic Anomaly: the creature most worth copying (its power and toughness will be the totals anyway).
+    if (pend.kind === "searchLibrary" && pend.what === "one of those creatures to copy") return [{ type: "searchLibrary", player: pid, found: [[...pend.cards].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))[0]!] }];
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => rank(a) - rank(b)).slice(0, pend.max) }];
@@ -650,6 +656,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       };
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => cost(b) - cost(a))[0]! }];
     }
+    // Turnabout: untap our own permanents, tap anyone else's.
+    if (pend.kind === "chooseOption" && pend.what === "either" && pend.labels?.[0] === TURNABOUT_TAP) {
+      const t = s.resolving?.item.targets?.[0];
+      return [{ type: "chooseOption", player: pid, choice: t?.kind === "player" && t.id === pid ? "1" : "0" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -827,7 +838,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const p = player(s, pid);
     // With The Great Work, any graveyard's instants and sorceries.
     const anyYard = s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === pid && g.turn === s.turn);
-    const fromYard = (anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard).filter((id) => graveyardWays(s, obj(s, id), pid).length);
+    // Locke, Treasure Hunter: the cards it milled, in anyone's graveyard.
+    const milled = (s.graveGrants ?? []).flatMap((g) => (g.cards && g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key) ? g.cards.map((c) => c.id) : []));
+    const fromYard = [...new Set([...(anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard), ...milled.filter((id) => s.objects[id]?.zone === "graveyard")])].filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
@@ -2399,15 +2412,24 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const buybacks = bb.buyback !== undefined && !via && (!bb.buybackCosts || bbCosts) ? [true, false] : [false];
   // Splice (CR 702.47a): the cards in hand worth adding, with their own targets after the spell's; then without.
   const spliced = chooseSplices(s, pid, id, x ?? 0);
-  for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
-    for (const buyback of buybacks)
-      for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
-        const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
-        const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}) });
-        // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
-        if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
-        if (plan) return plan;
-      }
+  // Offering (CR 702.48a): only when it can't be cast otherwise (not now, or not with our mana), for the cheapest
+  // permanent we can spare.
+  const offering = free
+    ? undefined
+    : offeringCandidates(s, pid, id)
+        .map((o) => obj(s, o))
+        .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && extra.casualty !== o.id && extra.bargain !== o.id && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && (o.isToken || worth(s, pid, o) <= 3))
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+  for (const offer of offering ? [undefined, offering.id] : [undefined])
+    for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
+      for (const buyback of buybacks)
+        for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
+          const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
+          if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
+          if (plan) return plan;
+        }
   return null;
 }
 
@@ -3136,6 +3158,9 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
   return String(best);
 }
 
+/** Turnabout's first option (oracle/body.ts). */
+const TURNABOUT_TAP = "Tap all its untapped permanents of the chosen type";
+
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
@@ -3148,6 +3173,16 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     const top = [...s.stack].reverse().find((x) => x.controller !== pid && x.objectId && s.objects[x.objectId]);
     const ty = top ? defOf(s, obj(s, top.objectId!)).types.find((x) => options.includes(x)) : undefined;
     return ty ?? (options.includes("Creature") ? "Creature" : options[0]!);
+  }
+  // Turnabout: an opponent's untapped permanents to tap, or our own tapped ones to untap, the type with the most worth.
+  const turnabout = s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "either" && e.labels[0] === TURNABOUT_TAP);
+  const tp = s.resolving?.item.targets?.[0];
+  if (what === "cardType" && turnabout && tp?.kind === "player") {
+    const score = (ty: string) => s.battlefield.reduce((n, id) => {
+      const o = obj(s, id);
+      return controllerOf(s, o) === tp.id && characteristics(s, o).types.includes(ty) && !!o.tapped === (tp.id === pid) ? n + Math.max(1, worth(s, pid, o)) : n;
+    }, 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.

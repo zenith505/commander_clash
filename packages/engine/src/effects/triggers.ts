@@ -143,6 +143,8 @@ export type TriggerSourceEvent =
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.9). */
   | { type: "lifeGained"; player: PlayerId; amount: number }
+  /** The active player's permanents untapped by their untap step's turn-based action (CR 502.3), how many. */
+  | { type: "untapStepUntapped"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
   | { type: "lifeLost"; player: PlayerId; amount: number; /** The player's first life loss this turn. */ first?: boolean; /** Life lost at the same time by several players shares this number ("one or more opponents lose life"). */ batch?: number }
   /** `player` created a token (CR 111.2), `id` (it may have left already: "whenever you create a token" still triggers). */
@@ -626,7 +628,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Landfall. The land itself sees itself enter too (CR 603.6a).
     if (objIsType(s, entering, "Land")) {
-      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "landYouControlEnters");
+      // Faldorn: "Whenever you cast a spell from exile or a land you control enters from exile".
+      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "landYouControlEnters" || (e === "castSpell" && !!t.cast?.orLandEntersFromExile && !!entering.enteredFromExile));
       fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
       fromEmblems((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
     }
@@ -812,6 +815,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (bl && bearer) ringTrigger(s, you, 1, bl);
         }
       }
+    }
+  } else if (ev.type === "untapStepUntapped") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youUntapInUntapStep", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
   } else if (ev.type === "lifeGained") {
     for (const id of s.battlefield) {

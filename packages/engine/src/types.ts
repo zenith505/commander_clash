@@ -468,6 +468,8 @@ export interface GameObject {
   enteredFromGraveyard?: true;
   /** On the battlefield: it entered from its owner's hand, cast or not (Thousand-Faced Shadow's "enters from your hand"). */
   enteredFromHand?: true;
+  /** It entered the battlefield from exile (Faldorn's "a land you control enters from exile", CR 603.6a). */
+  enteredFromExile?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
@@ -1041,6 +1043,8 @@ export interface CostChoices {
   asType?: string;
   /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
   bargain?: ObjectId;
+  /** The permanent sacrificed for offering (CR 702.48a), if any. */
+  offering?: ObjectId;
   /** "As an additional cost to cast this spell, you may collect evidence N": the cards exiled for it, if it's paid (CR 701.59a). */
   evidence?: ObjectId[];
   /** "Collect evidence N" as a cost (an ability's, Conspiracy Unraveler's): the cards exiled from your graveyard for it. */
@@ -1557,7 +1561,7 @@ export interface GameState {
   flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
-  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider }[];
+  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider; /** Locke: only these cards (as they were then), in any player's graveyard. */ cards?: { id: ObjectId; zc: number }[] }[];
   /**
    * "You may cast spells from your graveyard this turn", "until end of turn, you may play lands ... from your graveyard",
    * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
@@ -2119,12 +2123,16 @@ export interface Resolving {
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
     linkedCopyPick?: true;
+    /** Benthic Anomaly: the creatures chosen so far (one for each opponent), and whether the one to copy is being asked. */
+    perOpponent?: { picked: ObjectId[]; copyPick?: true };
     /** Lim-Dûl's Vault: where it is (asking, the cards going to the bottom, being put back on top) and the cards looked at. */
     vault?: { stage: "ask" | "bottom" | "top"; looked: ObjectId[] };
     /** Lim-Dûl's Vault: how many times life was paid this resolution (bots stop after a few). */
     vaultPaid?: number;
     /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
     impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
+    /** Dance with Calamity (castFromAmong `pushLuck`): the cards exiled so far, whether it was just asked, and done asking. */
+    pushLuck?: { ids: { id: ObjectId; zc: number }[]; asked?: true; stop?: true };
     castAmong?: { ids: { id: ObjectId; zc: number }[]; /** Kefka: each spell cast this way, its owner and mana value on the stack. */ castSpells?: { owner: PlayerId; mv: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** With `copyTimes`: how many copies of each card have been made. */ copied?: Record<ObjectId, number>; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */

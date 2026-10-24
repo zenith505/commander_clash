@@ -266,10 +266,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${player(s, ctx.controller).name} may look at the top card of their library any time and play cards from the top of their library this turn${e.top.payLife ? ", paying life rather than mana costs for spells" : ""} (${src}).`);
       return;
     }
-    case "graveyardCastThisTurn":
-      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src, ...(e.rider ? { rider: e.rider } : {}) });
-      log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
+    case "graveyardCastThisTurn": {
+      // Locke: the cards milled, as they are now (CR 400.7).
+      const cards = e.milled ? [...(s.resolving?.milled ?? [])] : undefined;
+      if (cards && !cards.length) return;
+      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src, ...(e.rider ? { rider: e.rider } : {}), ...(cards ? { cards } : {}) });
+      if (cards) log(s, `${player(s, ctx.controller).name} may cast a spell from among ${cards.map((c) => defOf(s, obj(s, c.id)).name).join(", ")} this turn (${src}).`);
+      else log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
       return;
+    }
     case "noLifeGain":
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
       log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);

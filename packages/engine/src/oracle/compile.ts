@@ -2043,6 +2043,10 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColorAll = true;
       continue;
     }
+    if (line === "You can spend mana of any type to cast creature spells.") {
+      out.spendAnyTypeCreatureSpells = true;
+      continue;
+    }
     if (line === "You may spend mana as though it were mana of any color to activate abilities of creatures you control.") {
       out.spendAnyColorCreatureAbilities = true;
       continue;
@@ -2244,6 +2248,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Bargain") {
       out.bargain = true; // CR 702.166a
+      continue;
+    }
+    // "Artifact offering", "Goblin offering" (CR 702.48a): a card type or a creature type, the permanent sacrificed.
+    const offering = /^(\w+) offering$/.exec(line);
+    if (offering && !out.offering && (offering[1] === "Artifact" || CREATURE_TYPES.has(offering[1]!))) {
+      out.offering = offering[1] === "Artifact" ? { kind: "object", types: ["Artifact"], text: "artifact" } : { kind: "object", subtypes: [offering[1]!], text: offering[1]! };
       continue;
     }
     const cheaper = /^~ costs \{(\d+)\} less to cast if it's bargained\.$/.exec(line);

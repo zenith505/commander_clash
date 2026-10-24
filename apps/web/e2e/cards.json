@@ -1441,6 +1441,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c12e2563-4ad4-4637-b9ae-72f23cca31d8",
+  "name": "Benthic Anomaly",
+  "manaCost": "{6}{U}",
+  "cmc": 7,
+  "typeLine": "Creature — Eldrazi Serpent",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Serpent"
+  ],
+  "oracleText": "Devoid (This card has no color.)\nWhen you cast this spell, for each opponent, choose a creature that player controls. Create a token that's a copy of one of those creatures, except its power is equal to the total power of those creatures, its toughness is equal to the total toughness of those creatures, and it's a colorless Eldrazi creature.",
+  "power": "7",
+  "toughness": "8",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Devoid"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8f351961-69e3-4637-b010-d13f19daca39",
   "name": "Bigger on the Inside",
   "manaCost": "{3}{R}{G}",
@@ -1570,6 +1601,40 @@
   "commanderLegal": "legal",
   "set": "ss2",
   "releasedAt": "2019-06-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c13079d5-6749-43e5-a8ee-ef3af31ff679",
+  "name": "Blast-Furnace Hellkite",
+  "manaCost": "{7}{R}{R}",
+  "cmc": 9,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Artifact offering (You may cast this spell as though it had flash by sacrificing an artifact and paying the difference in mana costs between this and the sacrificed artifact. Mana cost includes color.)\nFlying, double strike\nCreatures attacking your opponents have double strike.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Offering",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "brc",
+  "releasedAt": "2022-11-18",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -3523,6 +3588,32 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "615b4189-e800-408b-99e0-71ae7089b937",
+  "name": "Dance with Calamity",
+  "manaCost": "{7}{R}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Shuffle your library. As many times as you choose, you may exile the top card of your library. If the total mana value of the cards exiled this way is 13 or less, you may cast any number of spells from among those cards without paying their mana costs.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "moc",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8799,6 +8890,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a800bec4-bacc-43f9-a773-dd795959935b",
+  "name": "Locke, Treasure Hunter",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Rogue"
+  ],
+  "oracleText": "Locke can't be blocked by creatures with greater power.\nMug — Whenever Locke attacks, each player mills a card. If a land card was milled this way, create a Treasure token. Until end of turn, you may cast a spell from among those cards.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Treasure",
+   "Mill",
+   "Mug"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df5a66d1-61f6-44d9-b464-3ee739e78dce",
   "name": "Manifest Dread",
   "manaCost": "{1}{G}",
@@ -10640,6 +10770,40 @@
   "commanderLegal": "legal",
   "set": "dbl",
   "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38dd86a2-652c-42b7-9b21-2fad059cc706",
+  "name": "Patron of the Akki",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Spirit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Goblin offering (You may cast this spell any time you could cast an instant by sacrificing a Goblin and paying the difference in mana costs between this and the sacrificed Goblin. Mana cost includes color.)\nWhenever Patron of the Akki attacks, creatures you control get +2/+0 until end of turn.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Offering"
+  ],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14684,6 +14848,32 @@
   "set": "c13",
   "releasedAt": "2013-11-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "715d0777-4d36-463b-9102-6bb6bb00b7e9",
+  "name": "Turnabout",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose artifact, creature, or land. Tap all untapped permanents of the chosen type target player controls, or untap all tapped permanents of that type that player controls.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

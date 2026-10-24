@@ -48,9 +48,11 @@ describe("granted abilities", () => {
     supported(study, rite, rebirth, end, kitesail, slinger);
     // The granting card's own name in the quote is that card (CR 201.5a), not the creature: not modeled.
     unsupported(card("Dagger Test", "Artifact — Equipment", "{1}", { oracleText: 'Equipped creature has "Whenever this creature attacks, you may sacrifice Dagger Test."\nEquip {1}' }));
-    // A static ability given away that changes abilities would have to come out of the same layer calculation that grants
-    // it (layer 6); ones whose effects come in later layers work (background-grants.test.ts).
-    unsupported(aura("Static Test", 'Enchanted creature has "Other creatures you control have flying."'));
+    // A static ability given away that takes abilities away would have to come out of the same layer calculation that
+    // grants it (layer 6); ones that give keywords join layer 6 once granted (round148.test.ts), and ones whose effects
+    // come in later layers work (background-grants.test.ts).
+    unsupported(aura("Static Test", 'Enchanted creature has "Other creatures you control lose all abilities."'));
+    supported(aura("Static Test 3", 'Enchanted creature has "Other creatures you control have flying."'));
     supported(aura("Static Test 2", 'Enchanted creature has "This creature can\'t block."'));
   });
 

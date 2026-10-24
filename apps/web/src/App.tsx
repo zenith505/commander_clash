@@ -102,6 +102,7 @@ import {
   splicedBodies,
   withSplices,
   bargainCandidates,
+  offeringCandidates,
   autoEvidence,
   evidenceCandidates,
   evidenceValue,
@@ -360,6 +361,8 @@ type CastDraft = {
   casualty?: string[];
   /** The artifact, enchantment, or token sacrificed for bargain, or none (CR 702.166a). */
   bargain?: string[];
+  /** The permanent sacrificed for offering, or none (CR 702.48a). */
+  offering?: string[];
   /** Assist (CR 702.132a): the player asked to help pay its generic mana. */
   assist?: PlayerId;
   /** Cards revealed from your hand for a cost ("reveal a Pirate card from your hand"). */
@@ -411,7 +414,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
@@ -421,6 +424,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
   oneOf?: TargetSpec;
   /** "Untap a tapped creature you control": the permanents picked are untapped, not tapped. */
   untap?: true;
+  /** Offering when it can't be cast now without it: no skipping. */
+  required?: true;
   what: string;
   n: number;
   candidates: string[];
@@ -839,8 +844,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}) };
+    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}), ...(d.offering?.length ? { offering: d.offering[0]! } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
+    // Offering: the permanent to sacrifice is chosen as the spell is announced (CR 702.48b), and sets its cost and when
+    // it can be cast. Skipping isn't offered when it couldn't be cast now without it.
+    if (d.offering === undefined && compiled.offering && !free) {
+      const candidates = offeringCandidates(s, HUMAN, d.objectId);
+      if (candidates.length) {
+        const needed = /sorcery speed/.test(castProblem(s, HUMAN, d.objectId, undefined, undefined, undefined, undefined, undefined, {}) ?? "");
+        return setCostPick({ draft: d, kind: "offering", label: card.name, what: `${compiled.offering.text} offering: ${needed ? "" : "you may "}sacrifice ${/^[aeiou]/i.test(compiled.offering.text) ? "an" : "a"} ${compiled.offering.text}; it costs that permanent's mana cost less${needed ? "" : " and can be cast any time you could cast an instant"}`, n: 1, candidates, chosen: [], ...(needed ? { required: true as const } : {}) });
+      }
+    }
     // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
     if (d.via === "harmonize" && d.harmonize === undefined) {
       if (!convokers(s).length) return continueCast({ ...d, harmonize: null });
@@ -999,6 +1013,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...kicks,
       ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
       ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
+      ...(d.offering?.length ? { offering: d.offering[0]! } : {}),
       ...(d.evidence?.length ? { evidence: d.evidence } : {}),
       ...(d.collect ? { collect: d.collect } : {}),
       ...(d.conspire?.length ? { conspire: d.conspire } : {}),
@@ -1741,11 +1756,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "tap" || costPick.kind === "conspire") && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "offering" || costPick.kind === "tap" || costPick.kind === "conspire") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
-              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
+              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" || (costPick.kind === "offering" && !costPick.required) ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -1813,7 +1828,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSkip={() => dispatch([{ type: "collectEvidence", player: HUMAN, ids: [] }])}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "conspire" && costPick.kind !== "tap" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "offering" && costPick.kind !== "conspire" && costPick.kind !== "tap" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -1995,8 +2010,8 @@ function exileOptions(s: GameState, id: string): boolean {
   return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind))) || canUseFace(s, id);
 }
 
-/** You may cast spells from other players' graveyards this turn (The Great Work). */
-const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn);
+/** You may cast spells from other players' graveyards this turn (The Great Work; Locke, Treasure Hunter's milled cards). */
+const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn) || !!s.graveGrants?.some((g) => g.cards && g.player === HUMAN && g.turn === s.turn);
 
 /** Does this card in your graveyard (or another's, with The Great Work) have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {
@@ -2038,6 +2053,8 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?
     const pool = reducingSacrifices(s, id);
     for (let n = 1; n <= pool.length; n++) if (planCast(s, HUMAN, id, undefined, undefined, "auto", n, { sacrifice: pool.slice(0, n) }) !== null) return true;
   }
+  // Offering (CR 702.48a): castable now, or cheap enough, with one of the permanents it could sacrifice.
+  if (!convoke && c?.offering && offeringCandidates(s, HUMAN, id).some((x) => planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { offering: x }) !== null)) return true;
   // Cheaper if you collect evidence as you cast it (Bite Down on Crime): with the cards it would pick (CR 701.59a).
   if (!convoke && c?.evidence !== undefined && c.evidenceReduction) {
     const ev = autoEvidence(s, HUMAN, c.evidence, id);

@@ -304,7 +304,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (m[3] === "more" && colored.length) return "fail";
     return { lessIf: { n: m[3] === "more" ? -n : n, cond: { kind: "yourTurn", ...(m[1] === "your turn" ? {} : { not: true as const }) }, ...(colored.length ? { colored } : {}) } };
   }
-  if ((m = /^~ costs \{(\d+)\} less to cast if (.+)$/.exec(text)) || (m = /^If (.+), ~ costs \{(\d+)\} less to cast$/.exec(text))) {
+  // "As long as" reads the same as "if" here (Drag to the Roots): checked as the cost is determined (CR 601.2f).
+  if ((m = /^~ costs \{(\d+)\} less to cast (?:if|as long as) (.+)$/.exec(text)) || (m = /^If (.+), ~ costs \{(\d+)\} less to cast$/.exec(text))) {
     const [n, condText] = /^~/.test(text) ? [m[1]!, m[2]!] : [m[2]!, m[1]!];
     const cond = parseStaticCondition(condText, self);
     return cond ? { lessIf: { n: Number(n), cond } } : "fail";
@@ -808,8 +809,9 @@ export function parseAffected(subject: string): Affects | null {
   }
   if (/^(Enchanted|Equipped) (creature|permanent|artifact|land)$/.test(x)) return { kind: "attached" };
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
-  // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a).
-  if (/^(?:Each creature that's|Creatures) attacking one of your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
+  // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a). Blast-Furnace Hellkite's
+  // "Creatures attacking your opponents", the same (rulings).
+  if (/^(?:Each creature that's|Creatures) attacking (?:one of )?your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
   // "Creatures named Lightning Rager can't attack you ..." (Rite of the Raging Storm): any player's, by their name.
   const named = /^Creatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
   if (named) return { kind: "filter", types: ["Creature"], spec: { kind: "object", named: named[1]!, text: `creature named ${named[1]}` } };

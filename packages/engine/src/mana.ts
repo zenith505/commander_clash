@@ -345,6 +345,17 @@ export const snowSpent = (spent: ManaSpent | undefined): number => Object.values
  * is 0 (107.3b). Generic reductions apply last and only to generic mana (118.7a).
  */
 export function reduceByManaCost(cost: ParsedCost, by: ParsedCost): ParsedCost {
+  const { cost: rest, generic } = reduceSymbolsByManaCost(cost, by);
+  const g = splitGeneric(rest, 0);
+  const left = Math.max(0, g.extra - generic);
+  return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...g.cost.symbols] };
+}
+
+/**
+ * `reduceByManaCost`'s symbols part: the cost with the symbols `by` takes off removed, and how much generic mana is
+ * still to come off (offering, CR 702.48c, takes it off after the cost's increases, 601.2f).
+ */
+export function reduceSymbolsByManaCost(cost: ParsedCost, by: ParsedCost): { cost: ParsedCost; generic: number } {
   const symbols = [...cost.symbols];
   let generic = 0;
   // The symbol of the cost a mana of one of `colors` can stand for: one of exactly that type first.
@@ -362,7 +373,5 @@ export function reduceByManaCost(cost: ParsedCost, by: ParsedCost): ParsedCost {
     else if (sym.kind === "twoHybrid") generic += 2;
     else if (sym.kind === "snow") generic += 1;
   }
-  const g = splitGeneric({ ...cost, symbols }, 0);
-  const left = Math.max(0, g.extra - generic);
-  return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...g.cost.symbols] };
+  return { cost: { ...cost, symbols }, generic };
 }

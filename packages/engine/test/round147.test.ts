@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, characteristics, gainLife, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
+import { abilitiesOf, activationCost, characteristics, gainLife, manaValue, spellCost, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
 import { nextRandom } from "../src/rng";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -463,5 +463,176 @@ describe("Norn's Decree", () => {
     expect(t.players[ap]!.hand.length).toBe(hand);
     s = resolveAll(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: next(s, ap, 2) }] }));
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+const raiju = card("Thundering Raiju", "Creature — Spirit", "{2}{R}{R}", { power: "3", toughness: "3", keywords: ["Haste"], oracleText: "Haste\nWhenever this creature attacks, put a +1/+1 counter on target creature you control. Then this creature deals X damage to each opponent, where X is the number of modified creatures you control other than this creature. (Equipment, Auras you control, and counters are modifications.)" });
+
+describe("Thundering Raiju", () => {
+  it("is fully supported; X counts modified creatures you control other than the Raiju, counting the new counter", () => {
+    supported(raiju);
+    const { s: s0, ap } = setup([]);
+    const r = putOnBattlefield(s0, ap, raiju);
+    const a = putOnBattlefield(s0, ap, bear({ name: "Bear A" }));
+    const b = putOnBattlefield(s0, ap, bear({ name: "Bear B" }));
+    s0.objects[b]!.counters["+1/+1"] = 1;
+    putOnBattlefield(s0, ap, bear({ name: "Bear C" }));
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: r, defender: next(s, ap) }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [obj(a)] }));
+    // Bear A (new counter) and Bear B (already modified); Bear C and the Raiju don't count.
+    for (const p of [1, 2, 3]) expect(s.players[next(s, ap, p)]!.life).toBe(38);
+  });
+
+  it("a counter on the Raiju itself doesn't count", () => {
+    const { s: s0, ap } = setup([]);
+    const r = putOnBattlefield(s0, ap, raiju);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: r, defender: next(s, ap) }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets" && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [obj(r)] });
+    s = resolveAll(s);
+    expect(s.objects[r]!.counters["+1/+1"]).toBe(1);
+    for (const p of [1, 2, 3]) expect(s.players[next(s, ap, p)]!.life).toBe(40);
+  });
+});
+
+const kopala = card("Kopala, Warden of Waves", "Legendary Creature — Merfolk Wizard", "{1}{U}{U}", { power: "2", toughness: "2", oracleText: "Spells your opponents cast that target a Merfolk you control cost {2} more to cast.\nAbilities your opponents activate that target a Merfolk you control cost {2} more to activate." });
+
+describe("Kopala, Warden of Waves", () => {
+  const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+  const twin = card("Test Twin Shock", "Instant", "{1}{R}", { oracleText: "Test Twin Shock deals 1 damage to each of up to two target creatures." });
+  const pinger = card("Test Pinger", "Creature — Human Wizard", "{R}", { power: "1", toughness: "1", oracleText: "{1}, {T}: Test Pinger deals 1 damage to any target." });
+  const merfolkDef = card("Test Merfolk", "Creature — Merfolk", "{U}", { power: "1", toughness: "1" });
+  const total = (c: { cost: Parameters<typeof manaValue>[0]; extra: number }) => manaValue(c.cost) + c.extra;
+
+  it("is fully supported; an opponent's spell targeting your Merfolk costs {2} more, once, and nothing else does", () => {
+    supported(kopala);
+    const { s: s0, ap } = setup([]);
+    const owner = next(s0, ap);
+    const k = putOnBattlefield(s0, owner, kopala);
+    const merfolk = putOnBattlefield(s0, owner, merfolkDef);
+    const notMerfolk = putOnBattlefield(s0, owner, bear({ name: "Test Bear" }));
+    const mine = putOnBattlefield(s0, ap, card("Test My Merfolk", "Creature — Merfolk", "{U}", { power: "1", toughness: "1" }));
+    const sh = into(s0, ap, shock, "hand");
+    const tw = into(s0, ap, twin, "hand");
+    const cost = (pid: PlayerId, id: string, targets: TargetChoice[]) => total(spellCost(s0, pid, s0.objects[id]!, 0, [], { targets }));
+    expect(cost(ap, sh, [obj(merfolk)])).toBe(3);
+    expect(cost(ap, sh, [obj(k)])).toBe(3);
+    expect(cost(ap, sh, [obj(notMerfolk)])).toBe(1);
+    expect(cost(ap, sh, [obj(mine)])).toBe(1);
+    expect(cost(ap, tw, [obj(merfolk), obj(k)])).toBe(4);
+    // Kopala's controller's own spells aren't taxed.
+    const own = into(s0, owner, shock, "hand");
+    expect(cost(owner, own, [obj(merfolk)])).toBe(1);
+  });
+
+  it("an opponent's activated ability targeting your Merfolk costs {2} more", () => {
+    const { s: s0, ap } = setup([]);
+    const owner = next(s0, ap);
+    putOnBattlefield(s0, owner, kopala);
+    const merfolk = putOnBattlefield(s0, owner, merfolkDef);
+    const notMerfolk = putOnBattlefield(s0, owner, bear({ name: "Test Bear" }));
+    const p = putOnBattlefield(s0, ap, pinger);
+    const ab = abilitiesOf(s0, s0.objects[p]!).activated[0]!;
+    expect(manaValue(activationCost(s0, ap, s0.objects[p]!, ab, [obj(merfolk)]))).toBe(3);
+    expect(manaValue(activationCost(s0, ap, s0.objects[p]!, ab, [obj(notMerfolk)]))).toBe(1);
+    const theirs = putOnBattlefield(s0, owner, pinger);
+    expect(manaValue(activationCost(s0, owner, s0.objects[theirs]!, abilitiesOf(s0, s0.objects[theirs]!).activated[0]!, [obj(merfolk)]))).toBe(1);
+  });
+});
+
+const norn = scry("transform", [
+  { name: "Elesh Norn", mana_cost: "{2}{W}{W}", type_line: "Legendary Creature — Phyrexian Praetor", power: "3", toughness: "5", oracle_text: "Vigilance\nWhenever a source an opponent controls deals damage to you or a permanent you control, that source's controller loses 2 life unless they pay {1}.\n{2}{W}, Sacrifice three other creatures: Exile Elesh Norn, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery." },
+  { name: "The Argent Etchings", type_line: "Enchantment — Saga", oracle_text: "(As this Saga enters and after your draw step, add a lore counter.)\nI — Incubate 2 five times, then transform all Incubator tokens you control.\nII — Creatures you control get +1/+1 and gain double strike until end of turn.\nIII — Destroy all other permanents except for artifacts, lands, and Phyrexians. Exile this Saga, then return it to the battlefield (front face up)." },
+], { keywords: ["Incubate", "Vigilance", "Transform"] });
+
+describe("Elesh Norn // The Argent Etchings", () => {
+  const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+  const quake = card("Test Quake", "Sorcery", "{1}{R}", { oracleText: "Test Quake deals 1 damage to each creature and each player." });
+
+  it("is fully supported; triggers once for each damaged permanent you control and once for you; unpaid, 2 life each", () => {
+    supported(norn);
+    const { s: s0, ap } = setup([]);
+    const owner = next(s0, ap);
+    putOnBattlefield(s0, owner, norn);
+    putOnBattlefield(s0, owner, bear({ name: "Test Bear" }));
+    const q = into(s0, ap, quake, "hand");
+    s0.players[ap]!.manaPool.R = 2;
+    let s = run(s0, planCast(s0, ap, q));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    let asked = 0;
+    for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      if (s.pending?.kind === "payUnless") {
+        expect(s.pending.player).toBe(ap);
+        asked++;
+        s = act(s, { type: "payUnless", player: ap, pay: false });
+      } else if (s.pending) throw new Error(s.pending.kind);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    // Elesh Norn, the Bear and Norn's controller: three triggers (rulings). The other players were hurt too, but control no Norn.
+    expect(s.players[ap]!.life).toBe(40 - 1 - 3 * 2);
+    expect(asked).toBeLessThanOrEqual(3);
+    expect(s.players[next(s, ap, 2)]!.life).toBe(39);
+  });
+
+  it("paying {1} keeps the life; damage from your own sources doesn't trigger", () => {
+    const { s: s0, ap } = setup([]);
+    const owner = next(s0, ap);
+    putOnBattlefield(s0, owner, norn);
+    s0.players[ap]!.manaPool.R = 1;
+    const q = into(s0, ap, shock, "hand");
+    s0.players[ap]!.manaPool.C = 1;
+    let s = run(s0, planCast(s0, ap, q, [{ kind: "player", id: owner }]));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap, cost: "{1}" });
+    s = resolveAll(act(s, { type: "payUnless", player: ap, pay: true }));
+    expect(s.players[ap]!.life).toBe(40);
+    expect(s.players[owner]!.life).toBe(38);
+    // Its controller's own Shock at their own face: no trigger.
+    const own = into(s, owner, shock, "hand");
+    s.players[owner]!.manaPool.R = 1;
+    s = act(s, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(owner);
+    const t = resolveAll(run(s, planCast(s, owner, own, [{ kind: "player", id: owner }])));
+    expect(t.pending).toBeFalsy();
+    expect(t.players[owner]!.life).toBe(36);
+  });
+
+  it("The Argent Etchings: chapter I makes five 2/2 Phyrexians; chapter III wipes the rest and returns Elesh Norn", () => {
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, norn);
+    s0.objects[n]!.face = 1;
+    const other = next(s0, ap);
+    const theirs = putOnBattlefield(s0, other, bear({ name: "Their Bear" }));
+    const relicA = putOnBattlefield(s0, other, card("Test Relic", "Artifact", "{1}"));
+    const phyrexian = putOnBattlefield(s0, other, card("Test Phyrexian", "Creature — Phyrexian Horror", "{B}", { power: "1", toughness: "1" }));
+    const ench = putOnBattlefield(s0, other, card("Test Charm", "Enchantment", "{1}"));
+    invalidateCharacteristics(s0);
+    let s = advance(advance(s0, "main1", next(s0, ap, 3)), "main1", ap);
+    expect(s.objects[n]!.counters.lore).toBe(1);
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken);
+    expect(tokens).toHaveLength(5);
+    for (const id of tokens) {
+      const c = characteristics(s, s.objects[id]!);
+      expect(c.types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+      expect(c.subtypes).toEqual(["Phyrexian"]);
+      expect(pt(s, id)).toBe("2/2");
+    }
+    // Chapter III on a later turn.
+    s.objects[n]!.counters.lore = 2;
+    s = advance(advance(s, "main1", next(s, ap, 3)), "main1", ap);
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.objects[ench]!.zone).toBe("graveyard");
+    expect(s.objects[relicA]!.zone).toBe("battlefield");
+    expect(s.objects[phyrexian]!.zone).toBe("battlefield");
+    for (const id of tokens) expect(s.battlefield).toContain(id);
+    const back = s.battlefield.find((id) => s.objects[id]!.cardId === s.objects[n]!.cardId)!;
+    expect(back).toBeDefined();
+    expect(s.objects[back]!.face ?? 0).toBe(0);
+    expect(characteristics(s, s.objects[back]!).types).toContain("Creature");
   });
 });

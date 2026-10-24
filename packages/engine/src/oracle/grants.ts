@@ -227,6 +227,7 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
   "yourEndCombat", "eachEndCombat", "yourFirstMain", "eachFirstMain", "yourPostcombatMain", "eachPostcombatMain",
   "castSpell", "permanentEnters", "anotherCreatureYouControlEnters", "landYouControlEnters", "permanentDies", "youGainLife",
   "playerDraws", "creatureYouControlAttacks", "creatureYouControlDealsCombatDamageToPlayer", "permanentBecomesTapped",
+  "creaturesYouControlDealCombatDamageToPlayer",
 ]);
 
 /**
@@ -246,7 +247,7 @@ export function emblemAbilityOk(text: string): boolean {
   // owner's graveyard, read from emblems as well as permanents (game.ts).
   if (graveyardGrants?.some((g) => g.way.kind !== "permission" || g.once || g.yourTurn || g.if)) return false;
   if (noMaxHandSize === "all") return false;
-  if (!triggers.every((t) => EMBLEM_EVENTS.has(t.event) && !t.host && !t.zone && !t.activeIf && !t.ifCond && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
+  if (!triggers.every((t) => EMBLEM_EVENTS.has(t.event) && !t.host && !t.zone && !t.activeIf && (!t.ifCond || t.ifCond.kind === "eventPlayerLifeLost") && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
   // A damage replacement about you and what you control (Ajani Steadfast's), not about the emblem itself.
   const damageMod = (st: (typeof statics)[number]) => st.affects.kind === "self" && !st.condition && st.mods.every((m) => m.kind === "damageMod" && !m.mod.by?.self && !m.mod.by?.other && !m.mod.to?.self && !m.mod.to?.other);
   if (!statics.every((st) => damageMod(st) || (st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted"))) return false;

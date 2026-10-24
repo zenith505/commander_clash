@@ -640,6 +640,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Jeweled Amulet: "Note the type of mana spent to pay this activation cost."
   if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];
   // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
+  if (/^That player gains control of ~$/.test(s) && ctx.chosenOpponent && !ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
   // Assault Suit: "that player gains control of equipped creature until end of turn": the creature it's attached to as
   // this resolves (CR 611.2c), until the cleanup step (514.2).
@@ -844,6 +845,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^(target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
+    return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // Depthshaker Titan: "Any number of target noncreature artifacts you control become 3/3 artifact creatures": each of
+  // them, as with one target (no duration: for as long as each stays on the battlefield, CR 611.2a).
+  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five)) target .+?) become (\d+\/\d+) ((?:[a-z]+ )*)creatures$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" && parseChanges(`becomes a ${m[2]} ${m[3]}creature`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
   // Oko, Thief of Crowns: "Exchange control of target artifact or creature you control and target creature an opponent

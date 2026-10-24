@@ -502,6 +502,17 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     /^Then that player puts the exiled cards that weren't cast this way on the bottom of their library in a random order\.?$/.test(sentences[at + 2] ?? "")
   )
     return { effect: { type: "exileUntilNonland", who: { ref: "eventPlayer" }, then: "castFree", restBottom: true, untilTypes: ["Instant", "Sorcery"] }, next: at + 3 };
+  // Chaos Wand: "Target opponent exiles cards ... until they exile an instant or sorcery card. You may cast that card
+  // without paying its mana cost. Then put the exiled cards that weren't cast this way on the bottom of that library in
+  // a random order." The same as Gríma's, the target opponent's library (rulings).
+  if (
+    /^Target opponent exiles cards from the top of their library until they exile an instant or sorcery card$/.test(sentences[at]!) &&
+    sentences[at + 1] === "You may cast that card without paying its mana cost" &&
+    /^Then put the exiled cards that weren't cast this way on the bottom of that library in a random order\.?$/.test(sentences[at + 2] ?? "")
+  ) {
+    const who = parsePlayer("Target opponent", ctx);
+    return who ? { effect: { type: "exileUntilNonland", who, then: "castFree", restBottom: true, untilTypes: ["Instant", "Sorcery"] }, next: at + 3 } : "fail";
+  }
   // Jodah, the Unifier: cascade that only stops at a legendary card, measured against the spell that triggered it.
   if (
     /^[Ee]xile cards from the top of your library until you exile a legendary nonland card with lesser mana value$/.test(sentences[at]!) &&
@@ -642,6 +653,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
+  // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted
+  // (rulings), the same as "Choose an opponent. That player gains control of ~."
+  if (opts.selfIt || !/\bit\b/.test(text)) text = text.replace(/^[Aa]n opponent gains control of (?:~|it)\.$/, "Choose an opponent. That player gains control of ~.");
+  // Liliana's Triumph: "Each opponent sacrifices a creature of their choice. If you control a Liliana planeswalker, each
+  // opponent also discards a card.": "also" says only that it's in addition to the sacrifice.
+  text = text.replace(/(\. If you control an? [A-Z][a-z]+ planeswalker, each opponent) also (discards a card\.)$/, "$1 $2");
   // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
   // sacrificing player chooses anyway, CR 701.21a).
   text = text.replace(/\b(sacrifices a creature) of their choice (that dealt combat damage to you this turn)\b/, "$1 $2");
@@ -3529,6 +3546,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       payFirst = { pay: { mana: "{X}" }, text: `pay any amount of {${payAny[1]}}`, payX: { color: payAny[1] as "W" | "U" | "B" | "R" | "G" } };
       continue;
     }
+    // Necrodominance: "You may pay any amount of life. If you do, draw that many cards": X life, chosen as it resolves.
+    if (/^[Yy]ou may pay any amount of life$/.test(s) && /^If you do, draw that many cards\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length) {
+      effects.push({ type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: { count: { kind: "x" } } }], pay: {}, payX: { life: true }, text: "pay any amount of life. If you do, draw that many cards" });
+      si++;
+      continue;
+    }
     // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
     const payLifeX = /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
     if (payLifeX) {
@@ -5053,6 +5076,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
+      continue;
+    }
+    // Fevered Visions: "If the player is your opponent and has four or more cards in hand, ~ deals 2 damage to that
+    // player": the trigger's player, counted as it resolves (CR 608.2c), after the draw before it.
+    const oppHand = ctx.eventPlayer ? new RegExp(`^If (?:the|that) player is your opponent and has ${NUM} or more cards in hand, (.+)$`).exec(s) : null;
+    if (oppHand) {
+      const inner = parseOne(oppHand[2]!.charAt(0).toUpperCase() + oppHand[2]!.slice(1), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "allOf", conds: [{ kind: "eventPlayerOpponent" }, { kind: "eventPlayerHand", min: num(oppHand[1]!) }] } }, effects: inner });
       continue;
     }
     // "Then if that player has no cards in hand, flip ~" (Nezumi Shortfang), after its target opponent discarded; "If no

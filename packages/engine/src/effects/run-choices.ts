@@ -36,6 +36,19 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
+      // "You may pay any amount of life" (Necrodominance): the amount first, at most their life total (0 when it's 0 or
+      // less, or when they can't lose life, CR 119.4, 119.8); paying 0 is paying (CR 107.1b). Paid at once.
+      if (e.payX?.life && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          const most = Math.max(0, payableLife(s, ctx.controller));
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payLife", options: ["0"], numberRange: { min: 0, max: most }, prompt: `${e.text.replace(/~/g, src)}: how much life?` };
+          return "paused";
+        }
+        const n = Number(sc.payX);
+        loseLife(s, ctx.controller, n);
+        log(s, `${player(s, ctx.controller).name} pays ${n} life for ${src}.`);
+        sc.may = true;
+      }
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
       if (e.payX && e.pay?.mana && sc.may === undefined) {
         if (sc.payX === undefined) {

@@ -632,6 +632,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "eventPlayerHand":
       if (eventPlayer === undefined) return false;
       return (cond.max === undefined || s.players[eventPlayer]!.hand.length <= cond.max) && (cond.min === undefined || s.players[eventPlayer]!.hand.length >= cond.min);
+    case "eventPlayerOpponent":
+      return eventPlayer !== undefined && eventPlayer !== you;
+    case "eventPlayerLifeLost":
+      return eventPlayer !== undefined && (s.turnLog?.lifeLost?.[eventPlayer] ?? 0) <= cond.max;
     case "defenderMostLife": {
       // The player it attacked: from the trigger event, or the one it's attacking as it triggers.
       const that = eventPlayer ?? src.attacking;
@@ -1011,6 +1015,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.controller === "enchanted" && c.controller !== s.objects[e.sourceId!]?.attachedToPlayer) continue;
     if (a.ownedCommanders && !(s.objects[id]!.isCommander && s.objects[id]!.owner === you)) continue;
     if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
+    if (a.lesserPowerThanSource && !(c.power < (chars.get(e.sourceId!)?.power ?? -Infinity))) continue;
     out.push(id);
   }
   return out;

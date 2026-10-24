@@ -1797,6 +1797,16 @@ export function compile(d: CardDef): CompiledCard {
       else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
       continue;
     }
+    // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
+    const handGrant = /^Each ([a-z]+) card in your hand has (ninjutsu (?:\{[^}]+\})+)\.$/.exec(line);
+    if (handGrant) {
+      // The card's kind read as a graveyard card's, without the graveyard.
+      const f = parseTargetPhrase(`${handGrant[1]} card from a graveyard`);
+      const kw = keywordAbilities(handGrant[2]!, d);
+      if (f?.kind !== "card" || kw?.activated.length !== 1 || kw.triggers.length || kw.statics.length) out.unsupported.push(raw);
+      else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in your hand` }, activated: kw.activated });
+      continue;
+    }
     const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
     if (ninjutsuLess) {
       out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);

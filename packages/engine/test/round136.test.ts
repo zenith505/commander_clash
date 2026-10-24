@@ -2,8 +2,8 @@
 // Outbreak), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, pt, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
+import { abilitiesOf, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -14,6 +14,15 @@ const run = (s: GameState, plan: Action[] | null) => {
 /** Everyone passes until the stack is empty or something asks a player to choose. */
 const resolveAll = (s: GameState) => {
   for (let i = 0; i < 40 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+/** `attackers` attack `defender`; nobody blocks; the active player has priority in the declare blockers step. */
+const attackUnblocked = (s: GameState, ap: PlayerId, attackers: string[], defender: PlayerId) => {
+  s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: attackers.map((attacker) => ({ attacker, defender })) });
+  for (let i = 0; i < 40 && !(s.step === "declareBlockers" && !s.pending && waitingOn(s) === ap && !s.stack.length); i++) {
+    const pid = waitingOn(s)!;
+    s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : act(s, { type: "passPriority", player: pid });
+  }
   return s;
 };
 const nextOf = (s: GameState, pid: PlayerId) => s.turnOrder[(s.turnOrder.indexOf(pid) + 1) % 4]!;
@@ -157,5 +166,78 @@ describe("Phyresis Outbreak: -1/-1 for each poison counter each creature's contr
   it("isn't read where nothing is affected", () => {
     const bad = card("Test Poison Bolt", "Instant", "{R}", { oracleText: "Test Poison Bolt deals 1 damage to any target for each poison counter its controller has." });
     expect(isFullySupported(bad)).toBe(false);
+  });
+});
+
+describe("The Wise Mothman's kin: Mirelurk Queen and Screeching Scorchbeast", () => {
+  const queen = card("Mirelurk Queen", "Creature — Crab Mutant", "{4}{U}", { power: "3", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance\nWhen this creature enters, target player gets two rad counters.\nWhenever one or more nonland cards are milled, draw a card, then put a +1/+1 counter on this creature. This ability triggers only once each turn." });
+  const beast = card("Screeching Scorchbeast", "Creature — Bat Mutant", "{4}{B}{B}", { power: "3", toughness: "3", keywords: ["Flying", "Menace"], oracleText: "Flying, menace\nWhenever this creature attacks, each player gets two rad counters.\nWhenever one or more nonland cards are milled, you may create that many 2/2 black Zombie Mutant creature tokens. Do this only once each turn." });
+  const millAll = card("Test Mill All", "Sorcery", "{U}", { oracleText: "Each player mills two cards." });
+
+  it("once for the whole event; that many is the nonland cards", () => {
+    supported(queen, beast);
+    const { s: s0, ap, ids } = setup([millAll]);
+    const q = putOnBattlefield(s0, ap, queen);
+    putOnBattlefield(s0, ap, beast);
+    for (const pid of s0.turnOrder) onTop(s0, pid, [bear({ name: `Test Milled ${pid}` }), card("Forest", "Basic Land — Forest")]);
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 10 && s.pending; i++) s = resolveAll(act(s, s.pending.kind === "chooseMay" ? { type: "chooseMay", player: s.pending.player, yes: true } : { type: "passPriority", player: waitingOn(s)! }));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(pt(s, q)).toBe("4/5");
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken).length).toBe(4);
+  });
+});
+
+describe("Satoru Umezawa: creature cards in your hand have ninjutsu, and ninjutsu digs", () => {
+  const satoru = card("Satoru Umezawa", "Legendary Creature — Human Ninja", "{1}{U}{B}", {
+    power: "2",
+    toughness: "4",
+    oracleText: "Whenever you activate a ninjutsu ability, look at the top three cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order. This ability triggers only once each turn.\nEach creature card in your hand has ninjutsu {2}{U}{B}.",
+  });
+  const giant = card("Test Giant", "Creature — Giant", "{6}{G}{G}", { power: "8", toughness: "8" });
+  const sorcery = card("Test Sorcery", "Sorcery", "{1}", { oracleText: "Draw a card." });
+
+  it("is fully supported", () => supported(satoru));
+
+  it("a creature card in hand has the ninjutsu, a sorcery doesn't, and not without Satoru", () => {
+    const { s, ap, ids } = setup([giant, sorcery]);
+    expect(abilitiesOf(s, s.objects[ids[0]!]!).activated.some((a) => a.keyword === "Ninjutsu")).toBe(false);
+    putOnBattlefield(s, ap, satoru);
+    expect(abilitiesOf(s, s.objects[ids[0]!]!).activated.find((a) => a.keyword === "Ninjutsu")?.manaCost).toBe("{2}{U}{B}");
+    expect(abilitiesOf(s, s.objects[ids[1]!]!).activated.some((a) => a.keyword === "Ninjutsu")).toBe(false);
+    // Another player's Satoru doesn't give it to our cards.
+    const t = setup([giant], 7);
+    putOnBattlefield(t.s, t.opp, satoru);
+    expect(abilitiesOf(t.s, t.s.objects[t.ids[0]!]!).activated.some((a) => a.keyword === "Ninjutsu")).toBe(false);
+  });
+
+  it("ninjutsu swaps in the giant, and Satoru's trigger looks at three first", () => {
+    const { s: s0, ap, opp, ids } = setup([giant]);
+    putOnBattlefield(s0, ap, satoru);
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = attackUnblocked(s0, ap, [b], opp);
+    const i = abilitiesOf(s, s.objects[ids[0]!]!).activated.findIndex((a) => a.keyword === "Ninjutsu");
+    s = run(s, planActivate(s, ap, ids[0]!, i, undefined, undefined, undefined, undefined, { returnToHand: [b] }));
+    // Satoru's trigger is on top of the ninjutsu ability (rulings).
+    expect(s.stack.length).toBe(2);
+    s = resolveAll(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    const pend = s.pending as Extract<GameState["pending"], { kind: "searchLibrary" }>;
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [pend.cards[0]!] }));
+    for (let k = 0; k < 5 && s.pending; k++) s = resolveAll(act(s, botActions(s, s.pending!.player)[0]!));
+    const g = s.objects[ids[0]!]!;
+    expect(g.zone).toBe("battlefield");
+    expect(g.attacking).toBe(opp);
+    expect(s.objects[b]!.zone).toBe("hand");
+  });
+
+  it("a bot uses the granted ninjutsu for a creature card worth more than its unblocked attacker", () => {
+    const { s: s0, ap, opp, ids } = setup([giant]);
+    putOnBattlefield(s0, ap, satoru);
+    const b = putOnBattlefield(s0, ap, bear());
+    const s = attackUnblocked(s0, ap, [b], opp);
+    const acts = botActions(s, ap);
+    expect(acts.find((a) => a.type === "activateAbility" && a.objectId === ids[0])).toBeTruthy();
   });
 });

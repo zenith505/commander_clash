@@ -1249,6 +1249,12 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(equipped[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "any", equipped: true }, body } : "fail";
   }
+  // Satoru Umezawa: "Whenever you activate a ninjutsu ability" (commander ninjutsu is one too, CR 702.49d).
+  const ninja = /^Whenever you activate a ninjutsu ability, (.+)$/.exec(line);
+  if (ninja) {
+    const body = parseBody(ninja[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", ninjutsu: true }, body } : "fail";
+  }
   // "An ability with {X} in its activation cost" (Glava, Unbound Flourishing as compile.ts splits it).
   const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?| with \{X\} in its activation cost)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;

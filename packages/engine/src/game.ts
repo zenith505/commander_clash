@@ -9051,6 +9051,7 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   if (!o || o.zone !== "battlefield" || !o.faceDown) return "that isn't a face-down permanent";
   if (controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (s.priority !== pid || s.pending) return "you don't have priority";
+  if (characteristics(s, o).cantTurnFaceUp) return "it can't be turned face up"; // Unable to Scream
   const ways = faceUpWays(s, o);
   if (!ways.length) return o.faceDown === "manifest" || o.faceDown === "cloak" ? "it isn't a creature card with a mana cost" : "it has no morph or disguise cost"; // CR 702.37e, 701.40b
   const fd = ways[way];

@@ -977,6 +977,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
   }
+  // "You may sacrifice three other nonland permanents" (Scavenger's Talent): others than the source (a permanent's ability).
+  if ((m = new RegExp(`^[Ss]acrifice ${NUM} other ([a-z][^,]*?)$`).exec(s)) && !ctx.spell && num(m[1]!) > 1) {
+    const filter = pickFilter(m[2]!);
+    return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: num(m[1]!), action: "sacrifice" }] : null;
+  }
   // Teferi, Temporal Pilgrim: "Target opponent chooses a permanent they control and returns it to its owner's hand": theirs,
   // chosen as it resolves, not targeted.
   if ((m = /^(.+?) chooses (?:a|an) (.+?) they control and returns it to its owner's hand$/.exec(s))) {

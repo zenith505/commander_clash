@@ -2861,6 +2861,18 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // while there's another opponent for it to attack (goaded, it attacks a player other than us if able, CR 701.15b).
   if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "self" && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
     return opponents(s, pid).filter((p) => p !== r.item.event?.player).length > 0;
+  // Scavenger's Talent: "you may sacrifice three other nonland permanents. If you do, return a creature card from your
+  // graveyard to the battlefield": only when the best creature card there is worth more than the cheapest ones we'd give.
+  const sacN = e.effects.length === 1 && e.effects[0]!.type === "pick" && e.effects[0]!.action === "sacrifice" && typeof e.effects[0]!.n === "number" && e.effects[0]!.n > 1 ? e.effects[0]! : undefined;
+  const back = r.body.effects[r.next + 1];
+  const reanimate = back?.type === "if" && back.cond.kind === "youDid" ? back.effects.find((x) => x.type === "chooseFromGraveyard" && x.dest === "battlefield") : undefined;
+  if (sacN?.type === "pick" && reanimate) {
+    const n = sacN.n as number;
+    const given = pickOptions(s, sacN, pid, r.item.sourceId).map((id) => worth(s, pid, obj(s, id)) + (obj(s, id).isCommander ? 20 : 0)).sort((a, b) => a - b).slice(0, n);
+    const size = (x: string | undefined) => (x !== undefined && /^\d+$/.test(x) ? Number(x) : 0);
+    const best = Math.max(0, ...player(s, pid).graveyard.map((id) => defOf(s, obj(s, id))).filter((d) => d.types.includes("Creature")).map((d) => Math.max(1, size(d.power) + size(d.toughness), defMv(d)) + 1));
+    return given.length === n && best > given.reduce((a, b) => a + b, 0);
+  }
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
   let v = 0;

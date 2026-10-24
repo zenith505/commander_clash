@@ -1944,6 +1944,8 @@ export interface Resolving {
     forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
+    /** Elder Brain: the hand was exiled (a draw after it that stopped for dredge is finished by the answer). */
+    handExiled?: true;
     digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     /** Library of Leng: the discarded cards each player put on top of their library instead, the first ending on top. */
@@ -2099,7 +2101,7 @@ export interface Resolving {
     vaultPaid?: number;
     /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
     impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** With `copyTimes`: how many copies of each card have been made. */ copied?: Record<ObjectId, number>; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; /** Kefka: each spell cast this way, its owner and mana value on the stack. */ castSpells?: { owner: PlayerId; mv: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** With `copyTimes`: how many copies of each card have been made. */ copied?: Record<ObjectId, number>; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

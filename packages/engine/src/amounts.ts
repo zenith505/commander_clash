@@ -356,6 +356,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.rolled?.result ?? s.resolving?.item.rolled ?? ctx.event?.amount ?? 0;
     case "rollOther":
       return s.resolving?.rolled?.other ?? 0;
+    case "rollParity":
+      return (s.resolving?.rolled?.naturals ?? []).filter((v) => (Math.abs(v) % 2 === 1) === c.odd).length;
     case "flipsWon":
       return s.resolving?.flipped?.wins ?? 0;
     case "milledThisWay":
@@ -776,6 +778,8 @@ function describeCount(c: Count): string {
       return "the result";
     case "rollOther":
       return "the other result";
+    case "rollParity":
+      return c.odd ? "#odd results" : "#even results";
     case "drawnThisWay":
       return "#cards drawn this way";
     case "milledThisWay":

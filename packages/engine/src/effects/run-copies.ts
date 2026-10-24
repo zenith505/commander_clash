@@ -35,6 +35,11 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
   }
   const o = objects(s, ref, ctx)[0];
   if (o) return copiableDef(s, o);
+  // A subject that left the battlefield since: as it last existed there (rulings on Vesuvan Duplimancy, CR 608.2h).
+  if (ref.ref === "subject" && ctx.subject) {
+    const lk = s.lastKnown?.[ctx.subject.id];
+    if (lk && lk.zc === ctx.subject.zc && s.objects[ctx.subject.id]?.zone !== "battlefield") return key(lk.copyKey);
+  }
   return ref.ref === "self" ? ctx.sourceDef : undefined;
 }
 

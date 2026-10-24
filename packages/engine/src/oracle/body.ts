@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
+import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -279,6 +279,9 @@ const checkableMay = (e: Effect) =>
   // sacrifice a Zombie. If you do, ..." (Wilhelt): only with one to sacrifice.
   // "You may choose a token you control. If you do, ..." (Brudiclad): only with one to choose.
   (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice" || e.action === "choose") && e.n === 1 && !e.unless) ||
+  // "You may sacrifice three other nonland permanents. If you do, ..." (Scavenger's Talent): only with that many to
+  // sacrifice; all of them is doing it.
+  (e.type === "pick" && e.who.ref === "you" && e.action === "sacrifice" && typeof e.n === "number" && e.n > 1 && !e.unless && !e.anyNumber) ||
   // "You may tap five untapped artifacts and/or creatures you control. If you do, ..." (Thousand Moons Smithy): only with
   // that many untapped.
   (e.type === "pick" && e.who.ref === "you" && e.action === "tap" && typeof e.n === "number" && !e.unless && !e.anyNumber) ||
@@ -1245,6 +1248,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // The Irencrag: "you may have ~ become a legendary Equipment artifact named Everflame, Heroes' Legacy. If you do, it
+    // gains equip {3} and "Equipped creature gets +3/+3" and loses all other abilities." With no duration, for as long
+    // as it stays on the battlefield (CR 611.2a, rulings). Its new card type and subtype replace its others (CR 205.1a),
+    // it keeps being legendary (CR 205.4b), its name changes (layer 3, CR 613.1c), and in layer 6 it loses its other
+    // abilities before it gains the two (CR 613.7, as one effect in the order written).
+    const becomeNamed = !ctx.spell && /^[Yy]ou may have ~ become a legendary Equipment artifact named ([A-Z][^.]+)$/.exec(s);
+    const namedGains = becomeNamed && /^If you do, it gains equip (\{\d+\}) and "(Equipped creature gets \+\d+\/\+\d+)" and loses all other abilities$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (becomeNamed && namedGains) {
+      const mods: Modification[] = [
+        { kind: "setTypes", types: ["Artifact"], subtypes: ["Equipment"], supertypes: ["Legendary"] },
+        { kind: "setName", name: becomeNamed[1]! },
+        { kind: "loseAllAbilities" },
+        { kind: "addAbility", text: `Equip ${namedGains[1]}` },
+        { kind: "addAbility", text: `${namedGains[2]}.` },
+      ];
+      effects.push({ type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods, duration: "game" }], text: `have ~ become ${becomeNamed[1]}` });
+      si++;
+      continue;
+    }
     // Haunting Voyage: "Choose a creature type. Return up to two creature cards of that type ...": the type chosen.
     if (/ cards? of that type\b/.test(s) && effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/( cards?) of that type\b/g, "$1 of the chosen type");
     // Lae'zel's Acrobatics: "Exile all nontoken creatures you control, then roll a d20. 1—9 | Return those cards to the
@@ -2100,6 +2122,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Elder Brain: "exile all cards from that player's hand, then they draw that many cards. You may play lands and cast
+    // spells from among the exiled cards for as long as they remain exiled. If you cast a spell this way, you may spend
+    // mana as though it were mana of any color to cast it." Face up (rulings, CR 406.3); a land played as your land play;
+    // mana of any type for a spell (CR 609.4b); each card's permission its own (CR 400.7).
+    if (
+      /^[Ee]xile all cards from that player's hand$/.test(s) &&
+      sentences[si + 1]?.replace(/\.$/, "") === "They draw that many cards" &&
+      sentences[si + 2]?.replace(/\.$/, "") === "You may play lands and cast spells from among the exiled cards for as long as they remain exiled" &&
+      sentences[si + 3]?.replace(/\.$/, "") === "If you cast a spell this way, you may spend mana as though it were mana of any color to cast it"
+    ) {
+      // "Whenever ~ attacks a player": that player is the defending one.
+      const who = ctx.defending ? parsePlayer("defending player", ctx) : null;
+      if (!who || who.ref === "you") return null;
+      effects.push({ type: "impulse", n: 0, until: "exiled", who, hand: true, anyType: true });
+      si += 3;
+      continue;
+    }
     // Cunning Rhetoric: "exile the top card of that player's library. You may play that card for as long as it remains
     // exiled, and you may spend mana as though it were mana of any color to cast it." Face up (CR 406.3), a land played
     // as your land play (rulings), mana of any type for a spell (CR 609.4b).
@@ -2341,6 +2380,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ) {
       const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, randomLinked: true } });
+      si += 2;
+      continue;
+    }
+    // Kefka, Dancing Mad: "exile a card at random from each opponent's graveyard. You may cast any number of spells from
+    // among cards exiled this way without paying their mana costs. Then each player who owns a spell you cast this way
+    // loses life equal to its mana value." Cast as this resolves, or never (rulings, CR 608.2g); X is 0 (CR 107.3b).
+    if (
+      /^[Ee]xile a card at random from each opponent's graveyard$/.test(s) &&
+      sentences[si + 1]?.replace(/\.$/, "") === "You may cast any number of spells from among cards exiled this way without paying their mana costs" &&
+      sentences[si + 2]?.replace(/\.$/, "").replace(/^Then e/, "E") === "Each player who owns a spell you cast this way loses life equal to its mana value"
+    ) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, fromYard: { randomEachOpponent: true }, ownersLoseLife: true });
       si += 2;
       continue;
     }

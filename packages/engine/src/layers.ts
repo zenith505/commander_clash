@@ -189,6 +189,8 @@ export interface Characteristics {
   cantAttackOwnerWalkers?: boolean;
   /** "Can't be sacrificed" (CR 701.21). */
   cantBeSacrificed: boolean;
+  /** "Can't be turned face up" (Unable to Scream). */
+  cantTurnFaceUp: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   mustBeBlocked: boolean;
@@ -281,6 +283,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttackSamePlayer: false,
     cantAttackOwner: false,
     cantBeSacrificed: false,
+    cantTurnFaceUp: false,
     cantAttackPlayers: [],
     mustBeBlocked: false,
     allMustBlock: false,
@@ -1295,6 +1298,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBlockAlone":
     case "cantAttackSamePlayer":
     case "cantBeSacrificed":
+    case "cantTurnFaceUp":
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":

@@ -1,12 +1,12 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { freeCastable, canPlayLandNow, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches } from "./targeting";
+import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -1008,6 +1008,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
       }
+      if (!sc.castAmong && e.fromYard?.randomEachOpponent) {
+        // Kefka, Dancing Mad: one card at random from each opponent's graveyard, in turn order (any card, lands too).
+        const gone: ObjectId[] = [];
+        for (const pid of apnap(s, opponents(s, you.id))) {
+          const yard = player(s, pid).graveyard;
+          if (!yard.length) continue;
+          const id = yard[Math.floor(nextRandom(s) * yard.length)]!;
+          moveObject(s, id, "exile");
+          if (obj(s, id).zone === "exile") gone.push(id);
+        }
+        log(s, gone.length ? `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, obj(s, id).owner).name}'s)`).join(", ")}, chosen at random from each opponent's graveyard.` : "No opponent has a card in their graveyard.");
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.fromYard) {
         // Mizzix's Mastery: the target card if it's still legal, or (overloaded) each one in your graveyard, all exiled.
         const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
@@ -1054,6 +1067,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
       const finish = (): "paused" | undefined => {
         st.done = true;
+        // Kefka: after all the casting, each owner loses life for each of their spells cast this way, its mana value on
+        // the stack (X is 0, CR 107.3b).
+        if (e.ownersLoseLife)
+          for (const { owner, mv } of st.castSpells ?? []) {
+            if (mv <= 0 || !livingPlayers(s).includes(owner)) continue;
+            log(s, `${player(s, owner).name} loses ${mv} life (${src}).`);
+            loseLife(s, owner, mv);
+          }
         let left = st.ids.map((x) => x.id).filter(exiled);
         if (e.hitToHand) {
           // "Put one of them into your hand": the one not cast; if neither was, the one you pick, and the other stays
@@ -1105,6 +1126,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         else {
           if (st.budget !== undefined) st.budget -= mvOf(st.casting);
           st.cast = (st.cast ?? 0) + 1;
+          if (e.ownersLoseLife) {
+            const item = s.stack.find((x) => x.objectId === st.casting);
+            if (item) (st.castSpells ??= []).push({ owner: obj(s, st.casting).owner, mv: spellManaValue(s, item) });
+          }
           // "Do this only once each turn": done (CR 603.2h).
           const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
           if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);
@@ -2510,6 +2535,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
       if (from === undefined) return;
+      if (e.hand) {
+        // Elder Brain: the whole hand, then that player draws as many as were exiled.
+        const sc = (s.resolving!.scratch ??= {});
+        if (sc.handExiled) return;
+        sc.handExiled = true;
+        const ids = [...player(s, from).hand];
+        for (const id of ids) moveObject(s, id, "exile");
+        const gone = ids.filter((id) => obj(s, id).zone === "exile");
+        for (const id of gone) {
+          const o = obj(s, id);
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.anyType ? { anyType: true as const } : {}) };
+        }
+        if (s.resolving) (s.resolving.impulsed ??= []).push(...gone);
+        log(s, gone.length ? `${p.name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${player(s, from).name}'s hand and may play them, spending mana as though it were mana of any color.` : `${player(s, from).name} has no cards in hand.`);
+        if (gone.length && !draw(s, from, gone.length)) return "paused";
+        return;
+      }
       if (e.choose) {
         // Party Thrasher: the cards exiled (face up, CR 406.3), then one of them chosen as this resolves (CR 608.2d); only
         // that one may be played. The rest stay exiled.

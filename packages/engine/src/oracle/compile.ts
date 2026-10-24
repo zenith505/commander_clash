@@ -3073,6 +3073,15 @@ function linkExile(out: CompiledCard) {
     if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
+  // Unlicensed Hearse: "power and toughness are each equal to the number of cards exiled with it" counts what its one
+  // exile ability exiled (CR 607.2a).
+  if (out.statics.some((st) => JSON.stringify(st.mods).includes('"linkedExiled"')) && !bodies.some((b) => allEffects(b.effects).some((e) => e.type === "impulse"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
+  }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
   // Court of Locthwain: "cast a spell from among cards exiled with ~" too.
   const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked" || e.type === "castLinkedFree") || JSON.stringify(b).includes('"linkedExiled"');

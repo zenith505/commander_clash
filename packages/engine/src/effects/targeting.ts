@@ -111,7 +111,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.manaAbility && !(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
-  if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
+  if (spec.status && !hasStatus(s, o, c, spec.status, view, controller)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
   if (spec.notOnlyControllersColor) {
     const col = s.resolving?.chosen?.colorsBy?.[c.controller];
@@ -171,7 +171,7 @@ function untargetableBy(u: Untargetable & { of: PlayerId }, controller: PlayerId
  * Enchanted: an Aura is attached to it (CR 303.4b). Equipped: an Equipment is (301.5a). Modified: it has a counter on it,
  * it's equipped, or it's enchanted by an Aura its controller controls (700.9).
  */
-function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonNullable<TargetSpec["status"]>, view?: (o: GameObject) => Characteristics | undefined): boolean {
+function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonNullable<TargetSpec["status"]>, view?: (o: GameObject) => Characteristics | undefined, you?: PlayerId): boolean {
   if (status === "unenchanted") return !hasStatus(s, o, c, "enchanted", view);
   if (status === "goaded") return !!c.goaded; // not "as though it were goaded" (Kardur)
   if (status === "modified" && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return true;
@@ -181,6 +181,10 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
     if (!a || (!o.lastAttachments && a.attachedTo !== o.id)) continue;
     const ac = view && a.zone === "battlefield" ? view(a) : characteristics(s, a);
     if (!ac) continue;
+    if (status === "enchantedByYours") {
+      if (ac.subtypes.includes("Aura") && ac.controller === you) return true;
+      continue;
+    }
     if (status !== "enchanted" && ac.subtypes.includes("Equipment")) return true;
     if ((status === "enchanted" || status === "enchantedOrEquipped") && ac.subtypes.includes("Aura")) return true;
     if (status === "modified" && ac.subtypes.includes("Aura") && ac.controller === c.controller) return true;

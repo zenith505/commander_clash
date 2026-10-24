@@ -757,6 +757,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
       return cond.not ? !cast : cast;
     }
+    case "subjectWasCast": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.wasCast;
+      return cond.not ? !cast : cast;
+    }
     case "subjectPutBySelf": {
       const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
       const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;
@@ -1206,6 +1211,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "attacksIfAble":
       if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
+      if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       c.attacksIfAble = true;
       return;
     case "mustAttackPlayer":
@@ -1259,6 +1265,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       } else c.cantBeBlockedByLesserPower = true;
       return;
     case "cantAttackYou": {
+      if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       const you = controllerOfInst(e, chars);
       if (!c.cantAttackPlayers.includes(you)) c.cantAttackPlayers.push(you);
       return;

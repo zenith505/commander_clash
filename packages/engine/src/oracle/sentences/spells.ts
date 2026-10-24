@@ -357,7 +357,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // the copy's copiable values aren't legendary, nor is the token it becomes (CR 608.3f).
   // Resonance Technician: "Copy target instant or sorcery spell you control with mana value X", the X of the ability's
   // "Tap X untapped artifacts you control" (CR 107.3a, TargetSpec.xRange).
-  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value X)?)(, except it isn't legendary if the spell is legendary)?$/i.exec(s))) {
+  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less))?)(, except it isn't legendary if the spell is legendary)?$/i.exec(s))) {
     if (/ X$/.test(m[1]!) && !ctx.activated) return null;
     const spec = parseTargetPhrase(m[1]!, { x: true });
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true } } : {}) }] : null;

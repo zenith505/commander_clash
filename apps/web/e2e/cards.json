@@ -5508,6 +5508,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c53d958a-f660-4d2e-87cd-87702f973b3a",
+  "name": "Ghostly Dancers",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, return an enchantment card from your graveyard to your hand or unlock a locked door of a Room you control.\nEerie — Whenever an enchantment you control enters and whenever you fully unlock a Room, create a 3/1 white Spirit creature token with flying.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Eerie"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
   "name": "Giant Growth",
   "manaCost": "{G}",
@@ -6109,6 +6142,43 @@
   "set": "all",
   "releasedAt": "1996-06-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "687e772a-cdfe-41fd-a066-6cb3aee04193",
+  "name": "Hakbal of the Surging Soul",
+  "manaCost": "{2}{G}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Merfolk Scout",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Scout"
+  ],
+  "oracleText": "At the beginning of combat on your turn, each Merfolk creature you control explores. (Reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on the exploring creature, then put the card back or put it into your graveyard.)\nWhenever Hakbal attacks, you may put a land card from your hand onto the battlefield. If you don't, draw a card.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Explore"
+  ],
+  "commanderLegal": "legal",
+  "set": "lcc",
+  "releasedAt": "2023-11-17",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8656,6 +8726,37 @@
   "commanderLegal": "legal",
   "set": "acr",
   "releasedAt": "2024-07-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "67362406-b1ca-49e2-800d-9050bfe8742a",
+  "name": "Merfolk Looter",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Merfolk Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Rogue"
+  ],
+  "oracleText": "{T}: Draw a card, then discard a card.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

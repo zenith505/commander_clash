@@ -1,4 +1,4 @@
-import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type TargetSpec } from "../abilities";
+import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type StaticCondition, type TargetSpec } from "../abilities";
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
@@ -11,6 +11,7 @@ import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, g
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
+import { lockedDoors } from "./run-permanents";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
@@ -197,8 +198,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // The controller picks one as it resolves (CR 608.2d), and only that one happens.
       const sc = (s.resolving!.scratch ??= {});
       if (sc.either === undefined) {
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: e.labels.map((_, i) => String(i)), labels: e.labels, prompt: "choose one" };
-        return "paused";
+        // "Return an enchantment card ... or unlock a locked door": an option that can't be done can't be chosen (CR 608.2d).
+        const can = e.labels.map((_, i) => i).filter((i) => !e.onlyDoable || canDoNow(s, e.options[i]!, ctx));
+        if (!can.length) return;
+        if (can.length === 1 && e.onlyDoable) sc.either = can[0]!;
+        else {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: can.map(String), labels: can.map((i) => e.labels[i]!), prompt: "choose one" };
+          return "paused";
+        }
       }
       for (const inner of e.options[sc.either] ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
@@ -577,7 +584,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "suspected"
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"
-            ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, ctx.event?.player, undefined, ctx.sourceId ? ctx.sourceZc : undefined, ctx.subject?.id, ctx.subject?.zc)
+            ? ((sub) => staticConditionNow(s, (e.cond as { cond: StaticCondition }).cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, ctx.event?.player, undefined, ctx.sourceId ? ctx.sourceZc : undefined, sub?.id, sub?.zc))(e.cond.subject ? objects(s, e.cond.subject, ctx).map((o) => ({ id: o.id, zc: o.zoneChanges ?? 0 }))[0] : ctx.subject)
             : e.cond.kind === "voteWins"
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
             : e.cond.kind === "allChose"
@@ -753,7 +760,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
-    if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
+    if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
+    if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;
@@ -840,8 +848,9 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           }
         }
         const o = pu.picked[pid] === "none" ? undefined : e.options[Number(pu.picked[pid])];
-        if (o && "pay" in o && e.mode && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
-          // "Any player may pay 5 life" (Dash Hopes): chosen on the prompt above, so paid now (CR 119.4).
+        if (o && "pay" in o && (e.mode || e.options.length > 1) && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
+          // "Any player may pay 5 life" (Dash Hopes), "sacrifices a creature or pays 3 life" (Indulgent Tormentor):
+          // chosen on the prompt above, so paid now, not asked again (CR 119.4).
           loseLife(s, pid, o.pay.life);
           log(s, `${p.name} pays ${o.pay.life} life.`);
         } else if (o && "pay" in o) {

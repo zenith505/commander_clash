@@ -914,6 +914,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "monstrosity":
     case "evolve":
     case "explore":
+    case "exploreEach":
     case "doublePT":
     case "continuous":
     case "groupRules":
@@ -927,10 +928,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "doubleX":
     case "removeExiledCounter":
     case "attachElsewhere":
+    case "attachToRandomOpponent":
     case "attachToChosen":
     case "unattach":
     case "unattachSelf":
     case "transformSelf":
+    case "unlockDoor":
       return runPermanentsEffect(s, e, ctx, src);
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);

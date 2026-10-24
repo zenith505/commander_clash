@@ -27,6 +27,27 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   let m: RegExpExecArray | null;
 
+  // Maddening Hex: "Then attach ~ to another one of your opponents chosen at random."
+  if (/^(?:[Tt]hen )?[Aa]ttach ~ to another one of your opponents chosen at random$/.test(s)) return [{ type: "attachToRandomOpponent" }];
+  // "Unlock a locked door of a Room you control" (CR 709.5f), "... of up to one target Room you control" (Ghostly
+  // Keybearer): its controller chooses which locked door.
+  if (/^[Uu]nlock a locked door of a Room you control$/.test(s)) return [{ type: "unlockDoor" }];
+  if (/^[Uu]nlock a locked door of up to one target Room you control$/.test(s)) {
+    // A Room is an enchantment subtype (CR 709.5j, 205.3h).
+    const what = parseObject("up to one target enchantment you control", ctx);
+    if (what?.ref !== "target") return null;
+    const t = ctx.targets[what.index]!;
+    ctx.targets[what.index] = { ...t, subtypes: ["Room"], text: "target Room you control" };
+    return [{ type: "unlockDoor", what }];
+  }
+  // "Return an enchantment card from your graveyard to your hand or unlock a locked door of a Room you control" (Ghostly
+  // Dancers): one or the other, chosen as it resolves, never one that can't be done (CR 608.2d).
+  if ((m = /^[Rr](eturn an? [^,]+? card from your graveyard to your hand) or (unlock a locked door of a Room you control)$/.exec(s))) {
+    const first = parseSentence(`R${m[1]!}`, ctx);
+    if (first?.length !== 1 || first[0]!.type !== "chooseFromGraveyard") return null;
+    return [{ type: "either", options: [first, [{ type: "unlockDoor" }]], labels: [`R${m[1]!.replace(/ from your graveyard to your hand$/, "")}`, "Unlock a locked door"], onlyDoable: true }];
+  }
+
   // "Double the power of each creature you control until end of turn" (Double Trouble), "double the power and toughness
   // of each creature you control", "double the toughness of each creature you control" (CR 701.10b-c): each gets +X/+0
   // (+X/+Y, +0/+Y), X its own power and Y its own toughness as this resolves.
@@ -131,6 +152,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && !isGroup(what) ? [{ type: "reselectAttack", what }] : null;
   }
   if (/^[Ff]or each attacking creature, you may reselect which player or permanent that creature is attacking$/.test(s)) return [{ type: "reselectAttack", what: { ref: "allCreatures", attacking: true }, each: true }];
+  // Illusionist's Gambit: "Remove all attacking creatures from combat and untap them" (CR 506.4): "them" are those removed.
+  if (/^[Rr]emove all attacking creatures from combat and untap them$/.test(s)) {
+    const what = parseObject("each attacking creature", ctx);
+    return what && isGroup(what) ? [{ type: "removeFromCombat", what, remember: true }, { type: "untap", what: { ref: "created" } }] : null;
+  }
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
@@ -765,9 +791,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
   }
   // "Gain control of target artifact. Untap it. It gains haste." (Momo's Heist), "Create a token that's a copy of target
-  // artifact. That token gains haste." (Cogwork Assembler): keywords with no duration last for as long as it stays on
+  // artifact. That token gains haste." (Cogwork Assembler), "Populate. The token created this way gains haste." (Determined
+  // Iteration): keywords with no duration last for as long as it stays on
   // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
-  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
+  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|The token created this way) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).

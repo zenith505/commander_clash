@@ -34,6 +34,8 @@ interface Option {
   activated?: true;
   /** The part of its mana that's snow mana and can pay {S} (CR 107.4h): from a snow source. */
   snow?: ManaType[];
+  /** Its mana "can't be spent to pay generic mana costs" (Jegantha): only colored symbols. */
+  colorOnly?: true;
 }
 
 interface Source {
@@ -70,7 +72,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
+          return { id: o.id, ...x, cost: ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
       if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
@@ -164,9 +166,11 @@ function scarcity(sources: Source[], used: Set<ObjectId>, demand: Map<ManaType, 
  * from a snow source, each colored symbol from the least flexible source that makes it, then hybrid, then generic,
  * keeping sources that make the colors in `avoid` for last. `wantSnow`: snow sources first where there's a choice.
  */
-function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>(), demand = new Map<ManaType, number>(), harm: Partial<Record<Color, number>> = {}, snow0: ManaPool = emptyPool(), wantSnow = false) {
+function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>(), demand = new Map<ManaType, number>(), harm: Partial<Record<Color, number>> = {}, snow0: ManaPool = emptyPool(), wantSnow = false, colorOnly0: ManaPool = emptyPool()) {
   const pool = { ...pool0 };
   const snow = { ...snow0 };
+  // Mana that can't pay generic costs (Jegantha), part of `pool`: for colored symbols only.
+  const colorOnly = { ...colorOnly0 };
   const used = new Set(used0);
   const chosen: Option[] = [];
   const reserved = { ...pool };
@@ -180,6 +184,7 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
     for (const m of x.adds) {
       pool[m]++;
       reserved[m]++;
+      if (x.colorOnly) colorOnly[m]++;
     }
     // Snow mana, restricted or not: restricted mana is an option only if it can be spent on this (CR 106.6).
     for (const m of x.snow ?? []) {
@@ -187,7 +192,7 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
       snowReserved[m]++;
     }
   };
-  const pays = () => payFromPool(cost, pool, extraGeneric, life, { snow, wantSnow });
+  const pays = () => payFromPool(cost, pool, extraGeneric, life, { snow, wantSnow, colorOnly });
   // Colored mana the cost names: of two ways to use one source (Fertile Ground's "GW" and "GU"), the one adding more of it.
   const named = namedColors(cost);
   const useful = (x: Option) => x.adds.filter((m) => named.has(m)).length;
@@ -239,7 +244,8 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
     const loss = scarcity(sources, used, demand);
     const best = sources
       .filter((src) => !used.has(src.id))
-      .flatMap((src, order) => src.options.filter((x) => !x.cost && tapsFor(x, used)).map((x) => ({ x, order, src })))
+      // Mana that can't pay generic costs is no help here: the colored symbols were seen to above.
+      .flatMap((src, order) => src.options.filter((x) => !x.cost && !x.colorOnly && tapsFor(x, used)).map((x) => ({ x, order, src })))
       .sort(
         (a, b) =>
           a.x.penalty - b.x.penalty ||
@@ -255,7 +261,7 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
     if (!best) return null;
     take(best);
   }
-  return pays() ? { chosen, pool, used, snow } : null;
+  return pays() ? { chosen, pool, used, snow, colorOnly } : null;
 }
 
 /**
@@ -692,7 +698,8 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
   // on anything else, such as a Signet's cost. `snow`: how much of it is snow mana (CR 107.4h).
   const start = poolFor(s, pid, use);
   if (bonus) for (const m of Object.keys(bonus) as ManaType[]) start.pool[m] += bonus[m];
-  if (payFromPool(cost0, start.pool, extraGeneric, life, { snow: start.snow, wantSnow })) return [];
+  const colorOnly = start.colorOnly ?? emptyPool();
+  if (payFromPool(cost0, start.pool, extraGeneric, life, { snow: start.snow, wantSnow, colorOnly })) return [];
   // K'rrik's "you may pay 2 life rather than pay that mana" for {B}: mana from the player's sources first, life once
   // they can't make it (planFree).
   const cost = payableCost(s, pid, cost0, use);
@@ -706,12 +713,12 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
   let used = new Set<ObjectId>();
   const taps: Action[] = [];
   for (let round = 0; round < 8; round++) {
-    const plan = planFree(cost, extraGeneric, life, pool, sources, used, undefined, demand, harm, snow, wantSnow);
+    const plan = planFree(cost, extraGeneric, life, pool, sources, used, undefined, demand, harm, snow, wantSnow, colorOnly);
     if (plan) return [...taps, ...plan.chosen.map((x) => toAction(pid, x))];
     // Add one mana ability that costs mana: one making a color the cost names first, then the biggest net gain.
     const costed = sources
       .filter((src) => !used.has(src.id))
-      .flatMap((src) => src.options.filter((x) => x.cost && !x.tapCost))
+      .flatMap((src) => src.options.filter((x) => x.cost && !x.tapCost && !x.colorOnly))
       .map((x) => ({ x, net: x.adds.length - manaValue(x.cost!), color: x.adds.some((m) => needColors.has(m) && pool[m] === 0) }))
       .filter((c) => c.color || c.net > 0)
       .sort((a, b) => Number(b.color) - Number(a.color) || b.net - a.net || a.x.penalty - b.x.penalty);
@@ -736,7 +743,7 @@ function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGener
         if (x.restricted) nextRestricted[m]++;
       }
       const option = { actions: [...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x)], pool: next, snow: nextSnow, restricted: nextRestricted, used: new Set([...pay.used, x.id]) };
-      const done = !!planFree(cost, extraGeneric, life, next, sources, option.used, undefined, demand, harm, nextSnow, wantSnow);
+      const done = !!planFree(cost, extraGeneric, life, next, sources, option.used, undefined, demand, harm, nextSnow, wantSnow, colorOnly);
       if (!pick || done) pick = option;
       if (done) break;
     }

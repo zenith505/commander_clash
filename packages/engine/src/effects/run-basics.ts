@@ -91,11 +91,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "addPhases": {
       // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
       // Moraug: not the turn's regular combat).
-      const key = e.thatCombat || e.onlyAttack ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
+      const key = e.thatCombat || e.onlyAttack || e.thoseAttack ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
       const item = s.resolving?.item;
       const me = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const added = addPhases(s, e.phases, e.after, key);
       if (added && e.onlyAttack && key !== undefined) (s.combatAttackOnly ??= {})[key] = e.onlyAttack;
+      // Illusionist's Gambit: those creatures must attack in that combat, not you or your planeswalkers (CR 508.1c-d).
+      const those = added && e.thoseAttack && key !== undefined ? objects(s, { ref: "created" }, ctx).map((o) => o.id) : [];
+      if (those.length) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "endOfTurn", affected: those, mods: [{ kind: "attacksIfAble", combatKey: key }, { kind: "cantAttackYou", combatKey: key }] });
+        invalidateCharacteristics(s);
+      }
       if (added && e.thatCombat && me) {
         addDelayed(s, "thatCombat", ctx.controller, me, { targets: [], effects: e.thatCombat.effects, text: e.thatCombat.text });
         s.delayed![s.delayed!.length - 1]!.combat = key;
@@ -133,7 +139,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
       const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
-      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
+      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -763,6 +769,18 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
 function targetSource(s: GameState, ctx: ResolveCtx, index: number): DamageSource | undefined {
   const o = ctx.legal[index] ? objects(s, { ref: "target", index }, ctx)[0] : undefined;
   return o?.zone === "battlefield" ? objectSource(s, o) : undefined;
+}
+
+/**
+ * The spell whose casting triggered this ability ("that spell deals ...", Sorcerer Class): as it is on the stack, or as
+ * it last existed there once it has left (rulings, CR 608.2h), with its controller and colors as it was cast.
+ */
+function castSpellSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {
+  const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  if (!item || !o) return undefined;
+  const d = defOf(s, o);
+  return { ...cardSource(d, item.controller, { object: o.id, zc: o.zone === "stack" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0) }), spell: true, colors: item.castColors ?? d.colors, ...(item.castMv !== undefined ? { manaValue: item.castMv } : {}) };
 }
 
 function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {

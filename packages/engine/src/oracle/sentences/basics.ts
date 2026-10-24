@@ -766,6 +766,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const half = roundOf(m[2], ctx);
     return to && half ? [{ type: "damage", amount: { count: { kind: "life", who: { ref: "eachOne" } }, half }, to }] : null;
   }
+  // "Whenever you cast an instant or sorcery spell, that spell deals damage to each opponent equal to ..." (Sorcerer
+  // Class): the spell is the source, as it last existed if it has left the stack (rulings, CR 608.2h).
+  if (ctx.castSpell && (m = /^[Tt]hat spell (deals .+)$/.exec(s))) {
+    const fx = parseSentence(`~ ${m[1]}`, ctx);
+    const d = fx?.length === 1 ? fx[0] : undefined;
+    return d?.type === "damage" && !d.by && !d.divided && !d.evenly && !d.excessToController ? [{ ...d, by: "castSpell" }] : null;
+  }
   // Damage: "~ deals 3 damage to any target"; "it deals that much damage to each other opponent" after "Whenever a
   // commander you control deals combat damage to an opponent" (Kediss): that creature deals it.
   const bySubject = ctx.subjectIt && !ctx.selfIt ? new RegExp(`^(?:it|that creature) deals ${NUMX} damage to (.+)$`, "i").exec(s) : null;

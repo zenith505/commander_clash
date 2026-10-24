@@ -507,6 +507,10 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     return { effect: { type: "if", cond: { kind: "destroyedThisWay" }, effects: [inner] }, next: at + 1 };
   }
   if (reveal && !shuffleFirst && sentences[at + 1] === "Put all cards revealed this way into your hand") return { effect: { type: "exileUntilNonland", reveal: true, then: "hand" }, next: at + 2 };
+  // Breaching Dragonstorm: "You may cast it without paying its mana cost if that spell's mana value is 8 or less. If you
+  // don't, put that card into your hand." Any nonland card stops it; one with a greater mana value goes to the hand.
+  const upTo = exile && !they ? new RegExp(`^You may cast it without paying its mana cost if that spell's mana value is (${NUM}) or less$`).exec(sentences[at + 1] ?? "") : null;
+  if (upTo && sentences[at + 2] === "If you don't, put that card into your hand") return { effect: { type: "exileUntilNonland", then: "castFree", maxMv: num(upTo[1]!), orHand: true }, next: at + 3 };
   let next = (shuffleFirst ? at + 1 : at) + 1;
   if (reveal) {
     if (sentences[next] !== "Exile that card and put the rest on the bottom of your library in a random order") return null;
@@ -760,6 +764,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\bif you control an? ((?:white|blue|black|red|green) (?:permanent|creature)) other than ~\./g, "if you control another $1.");
   // Ral, Monsoon Mage: "If you win the flip, you may exile ~. If you do, return ~ to the battlefield transformed under ~'s
   // owner's control": one choice, exiling it and returning it (a blink, CR 712.14a); if it's gone by then, nothing happens.
+  // Sorin of House Markov: "exile ~, then return ~ to the battlefield transformed under ~'s owner's control" ("him").
+  text = text.replace(/\bexile ~, then return ~ to the battlefield transformed under ~'s owner's control\b/g, "exile ~, then return it to the battlefield transformed under its owner's control");
   text = text.replace(/If you win the flip, you may exile ~\. If you do, return ~ to the battlefield transformed under (?:its|~'s) owner's control\./, "If you win the flip, you may exile ~, then return it to the battlefield transformed under its owner's control.");
   // Deadbridge Chant: "choose a card at random in your graveyard. If it's a creature card, put it onto the battlefield.
   // Otherwise, put it into your hand."
@@ -1312,7 +1318,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const what = parseCardTarget(`${yardTarget[1]} from your graveyard`, ctx, "you");
       const t = ctx.targets[before];
       if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
-      effects.push({ type: "mayCastFromGraveyard", what });
+      // Vohar, Vodalian Desecrator: "... this turn. If that spell would be put into your graveyard, exile it instead."
+      const rider = sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead";
+      effects.push({ type: "mayCastFromGraveyard", what, ...(rider ? { exileAfter: true as const } : {}) });
+      if (rider) si++;
       continue;
     }
     // "You may cast spells from your graveyard this turn" (Forgotten Cellar), "you may cast Zombie spells ..." (Liliana,
@@ -3962,10 +3971,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
     // Handling): checked against the card this resolution's discard put into the graveyard (CR 701.9a).
-    const ifDiscarded = /^If an? (.+? card) was discarded this way, (.+)$/.exec(s);
+    // Vohar, Vodalian Desecrator: "Draw a card, then discard a card. If you discarded an instant or sorcery card this way, ...".
+    const ifDiscarded = /^If (?:an? (.+? card) was discarded|you discarded an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
     if (ifDiscarded) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "discard") return null;
+      if (prev?.type !== "discard" || (/^If you/.test(s) && prev.who.ref !== "you")) return null;
       const filter = parseSearchFilter(ifDiscarded[1]!);
       const then = ifDiscarded[2]!;
       const inner = filter && parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
@@ -4543,6 +4553,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Illusionist's Gambit: "After this phase, there is an additional combat phase. Each of those creatures attacks that
+    // combat if able. They can't attack you or planeswalkers you control that combat." Those it removed from combat.
+    if (/^After this phase, there is an additional combat phase$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Each of those creatures attacks that combat if able" && sentences[si + 2]?.replace(/\.$/, "") === "They can't attack you or planeswalkers you control that combat" && effects.some((e) => e.type === "removeFromCombat" && e.remember)) {
+      effects.push({ type: "addPhases", phases: ["combat"], thoseAttack: true });
+      si += 2;
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -4555,6 +4572,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const rest = parseOne(capital(energyThen[2]!), ctx);
         if (!rest) return null;
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "getEnergy", who: { ref: "you" }, n: energyThen[1]!.length / 3 }, ...rest] });
+        continue;
+      }
+      // "You may put a land card from your hand onto the battlefield. If you don't, draw a card." (Hakbal of the Surging
+      // Soul): whether a card was put.
+      if (ifDid[1] === "don't" && prev?.type === "putFromHand" && prev.may && !prev.who && !prev.any && prev.upTo === undefined && !prev.drawRepeat) {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
         continue;
       }
       // "You may ... If you do, X. If you don't, Y." (Slicer, Hired Muscle): Y is the other branch of the same check.
@@ -4618,6 +4643,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // creature an opponent controls gets -4/-4 until end of turn if you gained life this turn" (Poisoner's Apprentice):
     // the target is chosen either way, and the condition checked as it resolves (rulings). Only a
     // condition about the game (one the static parser reads), not about "it".
+    // Sorin, Ravenous Neonate: "Gain control of target creature. ... Put a lifelink counter on it if you control a white
+    // permanent other than that creature or ~": another white permanent you control, not counting the target either.
+    const otherThat = /^(Put .+ on it) if you control an? ((?:white|blue|black|red|green) permanent) other than that creature or ~$/.exec(s);
+    if (otherThat) {
+      const inner = parseOne(otherThat[1]!, ctx);
+      const what = inner?.length === 1 && "what" in inner[0]! ? (inner[0] as { what: ObjRef }).what : undefined;
+      const cond = parseStaticCondition(`you control another ${otherThat[2]}`, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!inner || what?.ref !== "target" || cond?.kind !== "control") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { ...cond, otherThanSubject: true }, subject: what }, effects: inner });
+      continue;
+    }
     const trailIf = !insteadIf ? /^((?:[Dd]raw|(?:[Yy]ou )?[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b(?! player (?:has|controls) more [a-z ]+ than each other player$)|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
@@ -5735,7 +5771,10 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // "You may choose a token you control. If you do, ... that token" (Brudiclad): the same, if one was.
     const pk = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
     const picked = pk?.type === "pick" && (pk.action === "counters" || pk.action === "choose") && pk.n === 1 && pk.who.ref === "you" && !pk.among;
-    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
+    // "Populate. The token created this way gains haste." (Determined Iteration): the token copy (or copies, with a
+    // token doubler) just made.
+    const populated = last?.type === "pick" && last.action === "populate" && last.n === 1 && last.who.ref === "you";
+    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked || populated;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
     ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).

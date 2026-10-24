@@ -176,7 +176,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       const body = studyX ? { targets: [], effects: [{ type: "scry" as const, n: { count: { kind: "castSpellCommanderCasts" as const } } }], text: `${effect}.` } : parseBody(`${effect}.`, {});
       if (!body || body.targets.length || !body.effects.length || allEffects(body.effects).some((e) => "what" in e)) return null;
       out.spentTrigger = { ...(commander ? { commander: true as const } : { spell: spell! }), body };
-    } else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
+    } else if ((/^Spend this mana only /.test(extra) || extra === "This mana can't be spent to pay generic mana costs.") && !out.spendOnly) {
       const only = parseManaSpend(extra);
       if (!only) return null;
       out.spendOnly = only;
@@ -348,6 +348,8 @@ function parseManaProduced(text: string): ManaProduce | null {
  * ("of the chosen type", "on costs that contain {X}", "and that spell can't be countered", "... source").
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
+  // Jegantha, the Wellspring: on any cost, but never on generic mana (rulings: a hybrid {2/W} only as its {W}).
+  if (sentence === "This mana can't be spent to pay generic mana costs.") return { spells: { kind: "spell", text: "spells" }, abilities: "any", other: true, notGeneric: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).
   const cant = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(sentence);
   if (cant) {
@@ -361,8 +363,11 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence.replace(/^Spend this mana only to cast an? (\w+) spell or an? (\w+) spell\.$/, "Spend this mana only to cast $1 or $2 spells."));
   if (!m) return null;
   const only: ManaSpend = { text: sentence, ...(m[2] ? { uncounterable: true as const } : {}) };
+  // "Only to cast an instant or sorcery spell or to gain a Class level" (Sorcerer Class): a Class's level ability too.
+  const level = /^(.+) or to gain a Class level$/.exec(m[1]!);
+  if (level) only.classLevel = true;
   // "Of the chosen type" (Unclaimed Territory): the type its source's controller chose for it (see spend.ts boundSpend).
-  for (const part of m[1]!.split(/,? or (?=activate |cast )/)) {
+  for (const part of (level ? level[1]! : m[1]!).split(/,? or (?=activate |cast )/)) {
     let x: RegExpExecArray | null;
     // "Cast a spell of the chosen type" (Eclipsed Realms): any spell with that creature type (CR 205.3m).
     if (/^cast (?:a spell|spells) of the chosen type$/.test(part) && !only.spells) only.spells = { kind: "spell", chosen: "type", text: "spells of the chosen type" };

@@ -269,6 +269,8 @@ export type Count =
   | { kind: "webSlungMv" }
   /** "The greatest number of creatures a player controls" (Investigator's Journal), `opponents`: "an opponent controls". */
   | { kind: "greatestControlled"; filter: TargetSpec; opponents?: true }
+  /** "The greatest number of creatures you control that have a creature type in common" (White Lotus Tile): the most of your creatures that share one creature type, a changeling counting for each. */
+  | { kind: "mostSharingCreatureType" }
   /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
   | { kind: "greatestDrawn" }
   /** "For each player being attacked" (Pack Attack): players a creature is attacking, not their planeswalkers (CR 506.2, 508.3b). */
@@ -536,7 +538,8 @@ export interface TargetSpec {
    * "creatures that aren't enchanted".
    */
   /** "Goaded creature" (Vengeful Ancestor): goaded by any player now (CR 701.15). */
-  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted" | "goaded";
+  /** "Enchanted by an Aura you control" (Eriette of the Charmed Apple): `enchantedByYours`. */
+  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted" | "goaded" | "enchantedByYours";
   /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
   attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
@@ -1076,7 +1079,7 @@ export type Modification =
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   /** "Attacks each combat if able" (an attack requirement, CR 508.1d). `combat`: "attacks this combat if able" (Legion
    * Warboss), only in that combat of the turn (`GameState.combatsThisTurn`); "this" until it resolves. */
-  | { kind: "attacksIfAble"; combat?: number | "this" }
+  | { kind: "attacksIfAble"; combat?: number | "this"; /** "Attacks that combat if able" (Illusionist's Gambit): only in the added combat phase with this key (GameState.thatCombat). */ combatKey?: number }
   /**
    * Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able.
    * `notGoaded`: the same requirements without goading it (Kardur, Doomscourge; Maximum Carnage rulings).
@@ -1130,7 +1133,7 @@ export type Modification =
   /** "Can't attack a player it has already attacked this turn" (Port Razer): attacking a planeswalker still can (rulings). */
   | { kind: "cantAttackSamePlayer" }
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
-  | { kind: "cantAttackYou" }
+  | { kind: "cantAttackYou"; /** "That combat" (Illusionist's Gambit): only in the added combat phase with this key. */ combatKey?: number }
   /** "Can't attack its owner" (Alexios): that player, not their planeswalkers or battles (rulings). */
   | { kind: "cantAttackOwner"; /** Xantcha: "or planeswalkers its owner controls" too. */ planeswalkers?: true }
   /** "Can't be sacrificed" (CR 701.21): an instruction to sacrifice it does nothing; it can't be chosen to be sacrificed, for a cost either (rulings on Alexios). */
@@ -1220,6 +1223,8 @@ export type StaticCondition =
   | { kind: "subjectPutBySelf"; not?: true }
   /** Chainer: "if you didn't cast it from your hand", about the entering permanent (GameObject.castFromHand). */
   | { kind: "subjectCastFromHand"; not?: true }
+  /** Preston, the Vanisher: "if it wasn't cast", about the entering permanent (GameObject.wasCast). */
+  | { kind: "subjectWasCast"; not?: true }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**
@@ -1518,7 +1523,8 @@ export type Effect =
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
       /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
-      by?: "subject" | "attached" | { target: number };
+      /** `castSpell`: "that spell deals ..." in a cast trigger (Sorcerer Class): the spell, as it last existed if it has left the stack (rulings, CR 608.2h). */
+      by?: "subject" | "attached" | "castSpell" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }
@@ -1757,7 +1763,7 @@ export type Effect =
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
-  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true }
+  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true }
   /**
    * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
    * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells
@@ -1787,7 +1793,7 @@ export type Effect =
    */
   | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
-  | { type: "removeFromCombat"; what: ObjRef }
+  | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true }
   /**
    * "Reselect which player or permanent target attacking creature is attacking" (Misleading Signpost): its controller's
    * choice as it resolves of another player, planeswalker or battle it could attack, ignoring requirements, restrictions
@@ -1989,6 +1995,8 @@ export type Effect =
   /** The source explores (CR 701.44a): a land on top goes to hand; otherwise a +1/+1 counter, and the card may be milled. */
   /** Explore (CR 701.44a): `what` explores ("target creature you control explores"), by default this permanent. */
   | { type: "explore"; what?: ObjRef }
+  /** "Each Merfolk creature you control explores" (Hakbal): one at a time, in the order its controller chooses (rulings). */
+  | { type: "exploreEach"; what: ObjRef }
   /** Renown N (CR 702.112a): if it isn't renowned, N +1/+1 counters and it becomes renowned. */
   | { type: "renown"; n: number }
   /** Adapt N (CR 701.46a): if this permanent has no +1/+1 counters on it, put N +1/+1 counters on it. */
@@ -2197,6 +2205,10 @@ export type Effect =
       restBottom?: true;
       /** "Until they exile an instant or sorcery card" (Gríma, Saruman's Footman): a card of one of these types, not a nonland card. */
       untilTypes?: string[];
+      /** With "castFree": "if that spell's mana value is 8 or less" (Breaching Dragonstorm), the spell as it's cast (CR 202.3). */
+      maxMv?: number;
+      /** "If you don't, put that card into your hand" (Breaching Dragonstorm): the card not cast. */
+      orHand?: true;
     }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
@@ -2257,6 +2269,11 @@ export type Effect =
   | { type: "attachLastKnown"; what: ObjRef }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
   | { type: "attachElsewhere"; source: ObjRef }
+  /**
+   * "Attach ~ to another one of your opponents chosen at random" (Maddening Hex): a Curse moves to one of its controller's
+   * opponents other than the player it enchants, at random; with no other one, it stays (rulings).
+   */
+  | { type: "attachToRandomOpponent" }
   /**
    * "Put it onto the battlefield, attach it to a creature you control" (Stonehewer Giant), "If an Equipment is put onto
    * the battlefield this way, you may attach it to a creature you control" (Armored Skyhunter): the creature is chosen as
@@ -2430,7 +2447,13 @@ export type Effect =
    * "Create a Food token or a Treasure token" (Tireless Provisioner): one of these, chosen by its controller as it
    * resolves (CR 608.2d). `labels` name each for the choice.
    */
-  | { type: "either"; options: Effect[][]; labels: string[] }
+  /** `onlyDoable`: only the options that can be done now are offered (CR 608.2d), and none happens if neither can (Ghostly Dancers). */
+  | { type: "either"; options: Effect[][]; labels: string[]; onlyDoable?: true }
+  /**
+   * "Unlock a locked door of a Room you control" (Ghostly Dancers), with `what` "... of up to one target Room you control"
+   * (Ghostly Keybearer): its controller chooses a locked door and the Room gets that unlocked designation (CR 709.5f).
+   */
+  | { type: "unlockDoor"; what?: ObjRef }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
   /**
@@ -2906,6 +2929,11 @@ export type Effect =
       thatCombat?: { effects: Effect[]; text: string };
       /** "Only land creatures can attack during that combat phase" (Bumi, Unleashed): the added combat phase only (rulings). */
       onlyAttack?: TargetSpec;
+      /**
+       * Illusionist's Gambit: "Each of those creatures attacks that combat if able. They can't attack you or planeswalkers
+       * you control that combat." Those are the creatures it removed from combat (ref "created"), in the added combat only.
+       */
+      thoseAttack?: true;
     }
   /** "You lose the game" (CR 104.3e). */
   | { type: "loseGame"; who: PlayerRef }
@@ -3149,7 +3177,7 @@ export type SpellCondition =
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
   | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
-  | { kind: "state"; cond: StaticCondition }
+  | { kind: "state"; cond: StaticCondition; /** "If you control a white permanent other than that creature or ~" (Sorin, Ravenous Neonate): the condition's subject (`otherThanSubject`) is this object, not the trigger's. */ subject?: ObjRef }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
   | { kind: "xAtLeast"; n: number }
   /**
@@ -4147,6 +4175,10 @@ export interface ManaSpend {
   other?: boolean;
   /** "..., and that spell can't be countered" (Cavern of Souls): a spell this mana is spent on, on any of its costs. */
   uncounterable?: true;
+  /** "Or to gain a Class level" (Sorcerer Class): a Class's level ability, which makes it gain a level (CR 716.2a). */
+  classLevel?: true;
+  /** "This mana can't be spent to pay generic mana costs" (Jegantha): spent on anything, but only on colored, hybrid or Phyrexian symbols' colored mana. */
+  notGeneric?: true;
   text: string;
 }
 

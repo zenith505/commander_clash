@@ -303,3 +303,57 @@ describe("The Second Doctor: each player may draw; opponents who do can't attack
     expect(botActions(s, b)[0]).toMatchObject({ type: "chooseMay", yes: false });
   });
 });
+
+describe("The Master, Multiplied: your triggered abilities can't sacrifice or exile your creature tokens", () => {
+  const master = card("The Master, Multiplied", "Legendary Creature — Time Lord Rogue", "{4}{B}{R}", {
+    power: "4",
+    toughness: "3",
+    keywords: ["Myriad"],
+    oracleText: "Myriad\nThe \"legend rule\" doesn't apply to creature tokens you control.\nTriggered abilities you control can't cause you to sacrifice or exile creature tokens you control.",
+  });
+  const sacUpkeep = card("Test Sac Upkeep", "Enchantment", "{1}", { oracleText: "At the beginning of your upkeep, sacrifice a creature." });
+  const bolt = card("Test Exile Ray", "Instant", "{W}", { oracleText: "Exile target creature." });
+
+  it("is fully supported", () => supported(master));
+
+  it("myriad's tokens aren't exiled at end of combat, and the legend rule leaves them", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const m = putOnBattlefield(s0, ap, master);
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: m, defender: opp }] });
+    for (let i = 0; i < 300 && s.step !== "main2"; i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes: true });
+      else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]!.name === "The Master, Multiplied");
+    expect(tokens).toHaveLength(2);
+    expect(s.log.some((l) => /isn't exiled \(The Master, Multiplied\)/.test(l.text))).toBe(true);
+  });
+
+  it("a trigger of yours can't sacrifice a creature token, but a spell can exile it", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, master);
+    putOnBattlefield(s0, ap, sacUpkeep);
+    const tok = putOnBattlefield(s0, ap, bear({ name: "Test Token Bear" }));
+    s0.objects[tok]!.isToken = true;
+    // Only the token and the Master to choose from: the Master is kept by choosing the token, which then isn't sacrificed.
+    let s = passUntil(passUntil(s0, "upkeep", nextOf(s0, ap)), "upkeep", ap);
+    for (let i = 0; i < 20 && (s.pending || s.stack.length || s.triggerQueue.length); i++) {
+      const p = s.pending;
+      if (p?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: p.player, ids: [tok] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[tok]!.zone).toBe("battlefield");
+    // An instant isn't a triggered ability.
+    const r = putOnBattlefield(s, ap, bolt);
+    s.battlefield.splice(s.battlefield.indexOf(r), 1);
+    s.objects[r]!.zone = "hand";
+    s.players[ap]!.hand.push(r);
+    s = passUntil(s, "main1", ap);
+    s = resolveAll(run(s, planCast(s, ap, r, [{ kind: "object", id: tok }])));
+    expect(s.objects[tok]?.zone ?? "gone").not.toBe("battlefield");
+  });
+});

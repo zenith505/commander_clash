@@ -4876,6 +4876,8 @@ export interface CompiledCard {
   ninjutsuLess?: number;
   /** "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): these abilities for its controller's cards in hand that match (CR 113.6, 702.49a). */
   handGrants?: { filter: TargetSpec; activated: ActivatedAbility[] }[];
+  /** The Master, Multiplied: "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control." */
+  ownTriggersSpareTokens?: true;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
   noLegendRule?: TargetSpec[];
   /**

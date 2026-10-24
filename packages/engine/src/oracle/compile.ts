@@ -1529,6 +1529,10 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    if (line === "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control.") {
+      out.ownTriggersSpareTokens = true;
+      continue;
+    }
     // "The "legend rule" doesn't apply to permanents you control" (Sakashima, Mirror Box), "... to Slivers you control",
     // "The "legend rule" doesn't apply." (Mirror Gallery): CR 704.5j skips those.
     const noLegend = /^The "legend rule" doesn't apply(?: to (.+?))?\.$/.exec(line);

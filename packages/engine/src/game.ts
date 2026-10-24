@@ -648,6 +648,15 @@ export function moveObject(
     log(s, `${defOf(s, o).name} can't be sacrificed.`);
     return;
   }
+  // The Master, Multiplied: a triggered ability its controller controls doesn't sacrifice or exile their creature tokens
+  // (the ability still resolves, rulings).
+  if ((opts.sacrificed || to === "exile") && fromZone === "battlefield" && o.isToken && s.resolving?.item.triggered && objIsType(s, o, "Creature")) {
+    const you = s.resolving.item.controller;
+    if (controllerOf(s, o) === you && s.battlefield.some((x) => controllerOf(s, obj(s, x)) === you && abilitiesOf(s, obj(s, x)).ownTriggersSpareTokens)) {
+      log(s, `${defOf(s, o).name} isn't ${opts.sacrificed ? "sacrificed" : "exiled"} (The Master, Multiplied).`);
+      return;
+    }
+  }
   // A creature tapped for a station ability that's still on the stack: its power as it last existed (rulings on station).
   if (fromZone === "battlefield")
     for (const item of s.stack) if (item.stationed?.id === id && item.stationed.zc === (o.zoneChanges ?? 0)) item.stationed.power = power(s, o);

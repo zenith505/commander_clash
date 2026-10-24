@@ -194,6 +194,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     if (!who || who.ref === "you") return null;
     return [{ type: "eachMay", who, effects: [{ type: "draw", who: { ref: "you" }, n: m[1] === "a card" ? 1 : num(m[1]!.replace(/ cards$/, "")) }], text: `draw ${m[1]}`, each: true }];
   }
+  // "You may draw a card and proliferate" (Tidus, Yuna's Guardian): the draw, then the proliferate, as one instruction
+  // (so "you may" is both or neither).
+  if (/^[Dd]raw a card and proliferate$/.test(s)) return [{ type: "draw", who: { ref: "you" }, n: 1 }, { type: "proliferate" }];
   // "Each opponent who does can't attack you or permanents you control during their next turn" (The Second Doctor): the
   // opponents who chose to.
   if (ctx.eachChose && /^[Ee]ach opponent who does can't attack you or permanents you control during their next turn$/.test(s)) return [{ type: "attackBanNextTurn", who: { ref: "choseThisWay", opponents: true } }];

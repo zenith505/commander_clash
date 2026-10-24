@@ -988,7 +988,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+) deal /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
@@ -1029,7 +1029,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
-    const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
+    // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
+    const counters = / with counters on them$/.exec(phrase);
+    const words = counters ? phrase.slice(0, counters.index) : phrase;
+    const spec = parseTargetPhrase(words.split(/\s+/).map(singularWord).join(" ") + (counters ? " with counters on it" : ""));
     if (!spec || spec.kind !== "object") return "fail";
     group = { ...spec, text: phrase };
   }

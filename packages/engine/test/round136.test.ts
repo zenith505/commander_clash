@@ -357,3 +357,53 @@ describe("The Master, Multiplied: your triggered abilities can't sacrifice or ex
     expect(s.objects[tok]?.zone ?? "gone").not.toBe("battlefield");
   });
 });
+
+describe("Tidus, Yuna's Guardian: move a counter at the beginning of combat; cheer when creatures with counters connect", () => {
+  const tidus = card("Tidus, Yuna's Guardian", "Legendary Creature — Human Warrior", "{G}{W}{U}", {
+    power: "3",
+    toughness: "3",
+    oracleText: "At the beginning of combat on your turn, you may move a counter from target creature you control onto a second target creature you control.\nCheer — Whenever one or more creatures you control with counters on them deal combat damage to a player, you may draw a card and proliferate. Do this only once each turn.",
+  });
+
+  it("is fully supported", () => supported(tidus));
+
+  it("the second target is another creature (a second target, not the first again)", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, tidus);
+    const a = putOnBattlefield(s0, ap, bear({ name: "Test Bear A" }));
+    const b = putOnBattlefield(s0, ap, bear({ name: "Test Bear B" }));
+    s0.objects[a]!.counters["+1/+1"] = 2;
+    let s = passUntil(s0, "beginCombat", ap);
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: a }, { kind: "object", id: a }] })).toThrow();
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: a }, { kind: "object", id: b }] }));
+    if (s.pending?.kind === "chooseMay") s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect([s.objects[a]!.counters["+1/+1"], s.objects[b]!.counters["+1/+1"]]).toEqual([1, 1]);
+  });
+
+  it("cheer: a creature with a counter connects; you may draw and proliferate", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, tidus);
+    const a = putOnBattlefield(s0, ap, bear({ name: "Test Bear A" }));
+    s0.objects[a]!.counters["+1/+1"] = 1;
+    // Through the beginning of combat (its move answered by the bot's choice) to the declaration.
+    let s = s0;
+    for (let i = 0; i < 60 && s.pending?.kind !== "declareAttackers"; i++)
+      s = s.pending ? act(s, botActions(s, s.pending.player)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    s.objects[a]!.counters = { "+1/+1": 1 };
+    const hand = s.players[ap]!.hand.length;
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
+    for (let i = 0; i < 60 && !(s.pending?.kind === "chooseMay"); i++) {
+      const p = s.pending;
+      if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    for (let i = 0; i < 10 && s.pending; i++) s = act(s, s.pending.kind === "pickPermanents" ? { type: "pickPermanents", player: ap, ids: [a] } : botActions(s, s.pending.player)[0]!);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(2);
+  });
+});

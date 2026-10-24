@@ -40,8 +40,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     return "more";
   }
   if (dig.into === undefined) {
-    if ((m = new RegExp(`^Put (one|two|three) of (?:them|those cards) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
-      Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand" });
+    // Stargaze: "Put X cards from among them into your hand", the X it was cast with.
+    if ((m = new RegExp(`^Put (one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
+      if (m[1] === "X" && !ctx?.spell) return null;
+      Object.assign(dig, m[1] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[1]!), upTo: false, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if ((m = /^You may (?:reveal (an? [^,]+? card) and\/or (an? [^,]+? card) from among them and put (?:them|the revealed cards)|put (an? [^,]+? card) and\/or (an? [^,]+? card) from among them) into your hand$/.exec(s))) {
       // "You may put a creature card and/or a land card from among them into your hand" (Kiora, Master of the Depths): up

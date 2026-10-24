@@ -772,6 +772,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Momentous Fall: "You draw cards equal to the sacrificed creature's power, then you gain life equal to its toughness":
   // "its" is the sacrificed creature, as it last existed (CR 608.2h).
   text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
+  // Level Up: "Then if it has power 10 or greater, draw a card": the same as "if its power is 10 or greater".
+  text = text.replace(/\b([Ii]f) (it|~) has (power|toughness) (\w+) or (greater|less),/g, (_, i: string, w: string, st: string, n: string, c: string) => `${i} ${w === "~" ? "~'s" : "its"} ${st} is ${n} or ${c},`);
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
   text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
@@ -3262,6 +3264,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const anyOf = specs as TargetSpec[];
       effects.push({ type: "dig", n: num(eachLook[1]!), reveal: false, count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${eachLook[2]!.replace(/^an? /, "")} and/or ${eachLook[3]!}` }, oneOfEach: anyOf, into: "hand", rest: "bottom", random: true, each: true });
       si++;
+      continue;
+    }
+    // Stargaze: "Look at twice X cards from the top of your library" (the X it was cast with).
+    if (!dig && ctx.spell && /^Look at twice X cards from the top of your library$/.test(s)) {
+      dig = { type: "dig", n: { ...X, times: 2 }, reveal: false };
       continue;
     }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);

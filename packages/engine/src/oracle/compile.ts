@@ -1862,6 +1862,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
       continue;
     }
+    // Firion's token copies: "This Equipment's equip abilities cost {2} less to activate" (its own only).
+    const ownEquipLess = /^~'s equip abilities cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (ownEquipLess) {
+      (out.equipLess ??= []).push({ n: Number(ownEquipLess[1]), self: true });
+      continue;
+    }
     // "Aura spells you cast that target enchanted creature cost {3} less to cast." (Strong Back)
     const auraLess = /^Aura spells you cast that target enchanted creature cost \{(\d+)\} less to cast\.$/.exec(line);
     if (auraLess) {

@@ -446,3 +446,120 @@ describe("Nicol Bolas, Dragon-God", () => {
     expect(s.players[ap]!.lost).toBe(false);
   });
 });
+
+const attack = (s: GameState, pid: PlayerId, attacks: { attacker: string; defender: PlayerId }[]) => act(passUntil(s, "declareAttackers", pid), { type: "declareAttackers", player: pid, attacks });
+
+const felothar = card("Felothar the Steadfast", "Legendary Creature — Human Warrior", "{1}{W}{B}{G}", { power: "0", toughness: "5", oracleText: "Each creature you control assigns combat damage equal to its toughness rather than its power.\nCreatures you control can attack as though they didn't have defender.\n{3}, {T}, Sacrifice another creature: Draw cards equal to the sacrificed creature's toughness, then discard cards equal to its power." });
+
+describe("Felothar the Steadfast", () => {
+  it("is fully supported; sacrificing a 2/4 draws four cards, then discards two, as it last existed (CR 608.2h)", () => {
+    supported(felothar);
+    const { s: s0, ap } = setup([]);
+    const f = putOnBattlefield(s0, ap, felothar);
+    const wall = putOnBattlefield(s0, ap, card("Test Wall", "Creature — Wall", "{2}", { power: "2", toughness: "4" }));
+    const hand = s0.players[ap]!.hand.length;
+    let s = resolveAll(run(s0, planActivate(s0, ap, f, 0, undefined, undefined, undefined, undefined, { sacrifice: [wall] })));
+    expect(s.objects[wall]!.zone).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap });
+    s = resolveAll(botActions(s, ap).reduce(act, s));
+    expect(s.players[ap]!.hand.length).toBe(hand + 4 - 2);
+  });
+});
+
+const levelUp = card("Level Up", "Enchantment — Aura", "{1}{G}", { oracleText: "Enchant creature\nWhen this Aura enters, put a +1/+1 counter on enchanted creature.\nEnchanted creature has \"Whenever this creature attacks, double the number of +1/+1 counters on it. Then if it has power 10 or greater, draw a card.\"" });
+
+describe("Level Up", () => {
+  it("is fully supported; attacking doubles the +1/+1 counters, then draws a card only at power 10 or greater", () => {
+    supported(levelUp);
+    const { s: s0, ap, opp } = setup([]);
+    const bear0 = putOnBattlefield(s0, ap, bear());
+    const aura = putOnBattlefield(s0, ap, levelUp);
+    s0.objects[aura]!.attachedTo = bear0;
+    s0.objects[bear0]!.counters["+1/+1"] = 3;
+    invalidateCharacteristics(s0);
+    const hand = s0.players[ap]!.hand.length;
+    let s = resolveAll(attack(s0, ap, [{ attacker: bear0, defender: opp }]));
+    expect(s.objects[bear0]!.counters["+1/+1"]).toBe(6);
+    expect(pt(s, bear0)).toBe("8/8");
+    expect(s.players[ap]!.hand.length).toBe(hand);
+    // 4 counters double to 8: a 10/10 draws.
+    const { s: s1 } = setup([]);
+    const bear1 = putOnBattlefield(s1, ap, bear());
+    const aura1 = putOnBattlefield(s1, ap, levelUp);
+    s1.objects[aura1]!.attachedTo = bear1;
+    s1.objects[bear1]!.counters["+1/+1"] = 4;
+    invalidateCharacteristics(s1);
+    const hand1 = s1.players[ap]!.hand.length;
+    s = resolveAll(attack(s1, ap, [{ attacker: bear1, defender: opp }]));
+    expect(pt(s, bear1)).toBe("10/10");
+    expect(s.players[ap]!.hand.length).toBe(hand1 + 1);
+  });
+});
+
+const stargaze = card("Stargaze", "Sorcery", "{X}{B}{B}", { oracleText: "Look at twice X cards from the top of your library. Put X cards from among them into your hand and the rest into your graveyard. You lose X life." });
+
+describe("Stargaze", () => {
+  it("is fully supported; X=3 looks at six, three go to your hand and three to your graveyard, and you lose 3 life", () => {
+    supported(stargaze);
+    const { s: s0, ap, ids } = setup([stargaze]);
+    const top = s0.players[ap]!.library.slice(0, 6);
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 3));
+    s = resolveAll(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 3, max: 3 });
+    s = resolveAll(botActions(s, ap).reduce(act, s));
+    expect(top.filter((id) => s.objects[id]!.zone === "hand")).toHaveLength(3);
+    expect(top.filter((id) => s.objects[id]!.zone === "graveyard")).toHaveLength(3);
+    expect(s.players[ap]!.life).toBe(37);
+  });
+
+  it("with fewer than X cards in the library, all of them go to your hand (rulings)", () => {
+    const { s: s0, ap, ids } = setup([stargaze]);
+    const lib = s0.players[ap]!.library;
+    for (const id of lib.splice(2)) s0.objects[id]!.zone = "exile";
+    const two = [...lib];
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 3)));
+    expect(s.pending).toBeFalsy();
+    expect(two.map((id) => s.objects[id]!.zone)).toEqual(["hand", "hand"]);
+    expect(s.players[ap]!.life).toBe(37);
+  });
+});
+
+const firion = card("Firion, Wild Rose Warrior", "Legendary Creature — Human Rebel Warrior", "{2}{R}", { power: "3", toughness: "3", oracleText: "Equipped creatures you control have haste.\nWhenever a nontoken Equipment you control enters, create a token that's a copy of it, except it has \"This Equipment's equip abilities cost {2} less to activate.\" Sacrifice that token at the beginning of the next upkeep." });
+const sword = card("Test Sword", "Artifact — Equipment", "{2}", { oracleText: "Equipped creature gets +2/+0.\nEquip {3}" });
+
+describe("Firion, Wild Rose Warrior", () => {
+  it("is fully supported; an Equipment entering makes a token copy whose equip costs {2} less, sacrificed at the next upkeep", () => {
+    supported(firion);
+    const { s: s0, ap, ids } = setup([sword]);
+    putOnBattlefield(s0, ap, firion);
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    const copy = s.battlefield.find((id) => s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]?.name === "Test Sword");
+    expect(copy).toBeDefined();
+    const equipOf = (st: GameState, id: string) => abilitiesOf(st, st.objects[id]!).activated.findIndex((a) => !!a.equip);
+    expect(mvOf(s, ap, copy!, equipOf(s, copy!))).toBe(1);
+    expect(mvOf(s, ap, ids[0]!, equipOf(s, ids[0]!))).toBe(3); // not the original's
+    // Gone at the next upkeep, the next player's.
+    const t = passUntil(s, "draw", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]);
+    expect(t.objects[copy!]?.zone === "battlefield").toBe(false);
+    expect(t.objects[ids[0]!]!.zone).toBe("battlefield");
+  });
+});
+
+const cloud = card("Cloud, Ex-SOLDIER", "Legendary Creature — Human Soldier Mercenary", "{2}{R}{G}{W}", { power: "4", toughness: "4", keywords: ["Haste"], oracleText: "Haste\nWhen Cloud enters, attach up to one target Equipment you control to it.\nWhenever Cloud attacks, draw a card for each equipped attacking creature you control. Then if Cloud has power 7 or greater, create two Treasure tokens." });
+
+describe("Cloud, Ex-SOLDIER (\"if ~ has power N or greater\", as Level Up's)", () => {
+  it("is fully supported; equipped and at power 7 or greater, attacking draws and makes two Treasures", () => {
+    supported(cloud);
+    const big = card("Test Big Sword", "Artifact — Equipment", "{2}", { oracleText: "Equipped creature gets +3/+0.\nEquip {3}" });
+    for (const [gear, treasures] of [[big, 2], [sword, 0]] as const) {
+      const { s: s0, ap, opp } = setup([]);
+      const c = putOnBattlefield(s0, ap, cloud);
+      s0.objects[putOnBattlefield(s0, ap, gear)]!.attachedTo = c;
+      invalidateCharacteristics(s0);
+      const hand = s0.players[ap]!.hand.length;
+      const s = resolveAll(attack(s0, ap, [{ attacker: c, defender: opp }]));
+      expect(s.players[ap]!.hand.length).toBe(hand + 1);
+      expect(s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Treasure"))).toHaveLength(treasures);
+    }
+  });
+});

@@ -6158,6 +6158,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
     if (!c.hasPrintedAbilities || c.controller !== pid) continue;
     for (const m of mods) {
       if (m.otherEquipment && src.id === o.id) continue;
+      if (m.self && src.id !== o.id) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, pid)) continue;
       // "That target ~": it's a creature you control, so it could be the target (CR 702.6a).
       if (m.targetSelf && (targets ? target !== src.id : !c.types.includes("Creature"))) continue;

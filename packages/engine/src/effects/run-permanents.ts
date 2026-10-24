@@ -540,7 +540,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;
     case "enterTappedUntil":
-      (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src });
+      (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src, ...(e.thisTurn ? { thisTurn: true as const } : {}) });
       return;
     case "counters": {
       // Distributed (CR 601.2d): each target gets its part; a part for an illegal target isn't put anywhere (CR 608.2b).

@@ -3056,6 +3056,8 @@ function finishCleanup(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
+  // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
+  if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.some((r) => !r.thisTurn) ? s.entersTappedUntil.filter((r) => !r.thisTurn) : undefined;
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");

@@ -2003,8 +2003,8 @@ export type Effect =
   | { type: "skipUntap"; what: ObjRef }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
   | { type: "noMaxHandSize"; /** "For as long as you control ~" (The Great Synthesis): see Player.noMaxHandSizeWhile. */ whileControlled?: true }
-  /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. */
-  | { type: "enterTappedUntil"; filter: TargetSpec }
+  /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. `thisTurn`: "Lands you control enter tapped this turn" (Nahiri's Lithoforming). */
+  | { type: "enterTappedUntil"; filter: TargetSpec; thisTurn?: true }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
   /**
@@ -2835,7 +2835,7 @@ export type Effect =
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
-  | { type: "extraLandThisTurn"; n: number }
+  | { type: "extraLandThisTurn"; n: Amount }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
   | { type: "becomeSaddled"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */

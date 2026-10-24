@@ -458,6 +458,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const fewest = [...opps].sort((a, b) => player(s, Number(a)).graveyard.length - player(s, Number(b)).graveyard.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: fewest }];
       }
+      // Sandstone Oracle: "If that player has more cards in hand than you, draw cards equal to the difference": the most.
+      if (next?.type === "if" && next.cond.kind === "amountsCompare" && opps.length && JSON.stringify(next.cond.a).includes('"chosenPlayer"') && next.effects.some((e) => e.type === "draw")) {
+        const most = [...opps].sort((a, b) => player(s, Number(b)).hand.length - player(s, Number(a)).hand.length)[0]!;
+        return [{ type: "chooseOption", player: pid, choice: most }];
+      }
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
@@ -1800,6 +1805,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (castExtraCosts(d, { via, alt }).some((c) => c.kind === "sacrifice" && c.optional)) xs.push(0);
     // Rottenmouth Viper: each one sacrificed makes it cheaper, so as few as we can cast it with.
     if (compileCard(d).sacrificedReduction && !via && !alt) xs = Array.from({ length: most + 1 }, (_, i) => i);
+  }
+  // Nahiri's Lithoforming: "Sacrifice X lands ... You may play X additional lands this turn": no more lands than we have
+  // in hand to play again.
+  if (cost.hasX && effects.some((e) => e.type === "pick" && e.action === "sacrifice" && e.filter.types?.includes("Land") && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "x")) {
+    const lands = player(s, pid).hand.filter((h) => h !== id && isType(defOf(s, obj(s, h)), "Land")).length;
+    xs = xs.filter((x) => x !== undefined && x >= 1 && x <= lands);
   }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);

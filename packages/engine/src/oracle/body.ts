@@ -1552,6 +1552,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Nahiri's Lithoforming: "Sacrifice X lands. For each land sacrificed this way, draw a card.": as many as it sacrificed
+    // (fewer than X with fewer lands, rulings).
+    const sacX = /^[Ss]acrifice X (lands|creatures|artifacts|permanents)$/.exec(s);
+    const perSac = sacX ? new RegExp(`^For each ${sacX[1]!.replace(/s$/, "")} sacrificed this way, draw a card$`).test(sentences[si + 1]?.replace(/\.$/, "") ?? "") : false;
+    if (sacX && perSac) {
+      const filter = pickFilter(sacX[1]!);
+      if (!filter) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: { count: { kind: "x" } }, action: "sacrifice" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "sacrificedThisWayCount" } } });
+      si++;
+      continue;
+    }
     // "Choose two target creature cards in your graveyard. Sacrifice a creature. If you do, return the chosen cards to the
     // battlefield tapped." (Victimize): the targets, chosen as it's cast (CR 601.2c); "the chosen cards" are them.
     const chooseCards = /^Choose ((?:two|three) target [a-z]+ cards) in your graveyard$/.exec(s);
@@ -5092,7 +5103,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "putFromHand", filter, may: true, any: true, upTo: { count: { kind: "votes", option: handVotes[2]! } } });
       continue;
     }
-    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

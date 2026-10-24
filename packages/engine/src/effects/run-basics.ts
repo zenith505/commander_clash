@@ -449,9 +449,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "extraLandThisTurn": {
       // Only this turn; on another player's turn it lets them play none (rulings on Explore).
+      // "You may play X additional lands this turn" (Nahiri's Lithoforming): X as it resolves.
       const p = player(s, ctx.controller);
-      p.extraLands = { turn: s.turn, n: (p.extraLands?.turn === s.turn ? p.extraLands.n : 0) + e.n };
-      log(s, `${p.name} may play ${e.n === 1 ? "an additional land" : `${e.n} additional lands`} this turn.`);
+      const n = amountNow(s, e.n, ctx);
+      if (!n) return;
+      p.extraLands = { turn: s.turn, n: (p.extraLands?.turn === s.turn ? p.extraLands.n : 0) + n };
+      log(s, `${p.name} may play ${n === 1 ? "an additional land" : `${n} additional lands`} this turn.`);
       return;
     }
     case "increaseSpeed": {

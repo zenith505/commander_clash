@@ -95,6 +95,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Mister Negative: "If you lost life this way, draw that many cards" (none if you didn't).
   if (ctx.exchanged && /^If you lost life this way, draw that many cards$/.test(s)) return [{ type: "draw", who: { ref: "you" }, n: { count: { kind: "lifeLostThisWay" } } }];
+  // Sandstone Oracle: "choose an opponent. If that player has more cards in hand than you, draw cards equal to the
+  // difference": both hands as it resolves (CR 608.2h).
+  if (ctx.chosenOpponent && /^If that player has more cards in hand than you, draw cards equal to the difference$/.test(s)) {
+    const theirs = { kind: "cardsInHand" as const, who: { ref: "chosenPlayer" as const } };
+    const mine = { kind: "cardsInHand" as const, who: { ref: "you" as const } };
+    return [{ type: "if", cond: { kind: "amountsCompare", a: { count: theirs }, atLeast: { count: mine, plus: 1 } }, effects: [{ type: "draw", who: { ref: "you" }, n: { count: { kind: "difference", of: [theirs, mine] } } }] }];
+  }
 
   // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
   // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
@@ -599,6 +606,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
   // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
   if ((m = new RegExp(`^You may play (?:an|up to ${NUM}) additional lands? this turn$`, "i").exec(s))) return [{ type: "extraLandThisTurn", n: m[1] ? num(m[1]) : 1 }];
+  // Nahiri's Lithoforming: "You may play X additional lands this turn", the spell's X.
+  if (/^You may play X additional lands this turn$/i.test(s)) return [{ type: "extraLandThisTurn", n: { count: { kind: "x" } } }];
   // The initiative (CR 726), which ventures into Undercity; and venturing into Undercity itself (CR 701.49d). Plain
   // "venture into the dungeon" lets its player pick a dungeon that isn't modeled yet (see oracle/dungeons.ts).
   if (/^(?:You )?take the initiative$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "takeInitiative", who: { ref: "you" } }] : null;

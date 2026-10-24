@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, activationCost, characteristics, gainLife, manaValue, spellCost, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
+import { abilitiesOf, activationCost, botActions, characteristics, gainLife, manaValue, spellCost, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
 import { nextRandom } from "../src/rng";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -634,5 +634,142 @@ describe("Elesh Norn // The Argent Etchings", () => {
     expect(back).toBeDefined();
     expect(s.objects[back]!.face ?? 0).toBe(0);
     expect(characteristics(s, s.objects[back]!).types).toContain("Creature");
+  });
+});
+
+/** Empties a player's hand (into exile) and gives them `n` fresh bears. */
+const handOf = (s: GameState, pid: PlayerId, n: number) => {
+  for (const id of [...s.players[pid]!.hand]) {
+    s.players[pid]!.hand.splice(s.players[pid]!.hand.indexOf(id), 1);
+    s.objects[id]!.zone = "exile";
+  }
+  for (let i = 0; i < n; i++) into(s, pid, bear({ name: `Hand Bear ${i}` }), "hand");
+};
+
+const sandstone = card("Sandstone Oracle", "Artifact Creature — Sphinx", "{7}", { power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, choose an opponent. If that player has more cards in hand than you, draw cards equal to the difference." });
+
+describe("Sandstone Oracle", () => {
+  const cast = () => {
+    const { s: s0, ap } = setup([]);
+    for (const p of s0.turnOrder) handOf(s0, p, 0);
+    handOf(s0, next(s0, ap), 5);
+    handOf(s0, next(s0, ap, 2), 1);
+    const o = into(s0, ap, sandstone, "hand");
+    into(s0, ap, bear({ name: "Kept Bear" }), "hand");
+    s0.players[ap]!.manaPool.C = 7;
+    let s = run(s0, planCast(s0, ap, o));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap };
+  };
+
+  it("is fully supported; choosing an opponent with more cards in hand draws the difference", () => {
+    supported(sandstone);
+    const { s: s0, ap } = cast();
+    expect(s0.pending).toMatchObject({ kind: "chooseOption", what: "opponent", player: ap });
+    const s = resolveAll(act(s0, { type: "chooseOption", player: ap, choice: String(next(s0, ap)) }));
+    expect(s.players[ap]!.hand).toHaveLength(5);
+  });
+
+  it("an opponent with no more cards than you: no card", () => {
+    const { s: s0, ap } = cast();
+    const s = resolveAll(act(s0, { type: "chooseOption", player: ap, choice: String(next(s0, ap, 2)) }));
+    expect(s.players[ap]!.hand).toHaveLength(1);
+  });
+
+  it("a bot chooses the opponent with the most cards in hand", () => {
+    const { s, ap } = cast();
+    expect(botActions(s, ap)[0]).toMatchObject({ type: "chooseOption", choice: String(next(s, ap)) });
+  });
+});
+
+const tailSwipe = card("Tail Swipe", "Instant", "{G}", { keywords: ["Fight"], oracleText: "Choose target creature you control and target creature you don't control. If you cast this spell during your main phase, the creature you control gets +1/+1 until end of turn. Then those creatures fight each other. (Each deals damage equal to its power to the other.)" });
+
+describe("Tail Swipe", () => {
+  const swipe = (inMain: boolean, gone = false) => {
+    const { s: s0, ap } = setup([]);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear" }));
+    const theirs = putOnBattlefield(s0, next(s0, ap), bear({ name: "Their Wall", power: "2", toughness: "3" }));
+    const t = into(s0, ap, tailSwipe, "hand");
+    let s = inMain ? s0 : passUntil(s0, "beginCombat", ap);
+    s.players[ap]!.manaPool.G = 1;
+    s = run(s, planCast(s, ap, t, [obj(mine), obj(theirs)]));
+    if (gone) {
+      s.battlefield.splice(s.battlefield.indexOf(theirs), 1);
+      s.objects[theirs]!.zone = "exile";
+      invalidateCharacteristics(s);
+    }
+    return { s: resolveAll(s), mine, theirs };
+  };
+
+  it("is fully supported; cast in your main phase, your creature gets +1/+1, then they fight", () => {
+    supported(tailSwipe);
+    const { s, mine, theirs } = swipe(true);
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+    expect(pt(s, mine)).toBe("3/3");
+  });
+
+  it("cast in combat, no +1/+1: your 2/2 loses the fight", () => {
+    const { s, mine, theirs } = swipe(false);
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+  });
+
+  it("with their creature gone, there's no fight (CR 701.14b)", () => {
+    const { s, mine } = swipe(true, true);
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+    expect(s.objects[mine]!.damage ?? 0).toBe(0);
+  });
+});
+
+const lithoforming = card("Nahiri's Lithoforming", "Sorcery", "{X}{R}{R}", { oracleText: "Sacrifice X lands. For each land sacrificed this way, draw a card. You may play X additional lands this turn. Lands you control enter tapped this turn." });
+
+describe("Nahiri's Lithoforming", () => {
+  const mountain = (i: number) => card(`Test Mountain ${i}`, "Basic Land — Mountain");
+
+  it("is fully supported; sacrifice X lands, draw that many, play X more lands this turn, entering tapped", () => {
+    supported(lithoforming);
+    const { s: s0, ap } = setup([]);
+    handOf(s0, ap, 0);
+    const lands = [0, 1, 2].map((i) => putOnBattlefield(s0, ap, mountain(i)));
+    const inHand = [3, 4, 5].map((i) => into(s0, ap, mountain(i), "hand"));
+    const l = into(s0, ap, lithoforming, "hand");
+    s0.players[ap]!.manaPool.R = 4;
+    let s = run(s0, planCast(s0, ap, l, undefined, undefined, "auto", 2));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "sacrifice", count: 2 });
+    s = resolveAll(act(s, { type: "pickPermanents", player: ap, ids: lands.slice(0, 2) }));
+    expect(lands.map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "graveyard", "battlefield"]);
+    expect(s.players[ap]!.hand).toHaveLength(5);
+    // Three land plays this turn, each entering tapped.
+    for (const id of inHand) {
+      s = act(s, { type: "playLand", player: ap, objectId: id });
+      expect(s.objects[id]!.zone).toBe("battlefield");
+      expect(s.objects[id]!.tapped).toBe(true);
+    }
+    // Next turn, lands enter untapped again.
+    const later = into(s, ap, mountain(6), "hand");
+    s = advance(advance(s, "main1", next(s, ap)), "main1", ap);
+    s = act(s, { type: "playLand", player: ap, objectId: later });
+    expect(s.objects[later]!.tapped).toBe(false);
+  });
+
+  it("with X greater than your lands, all are sacrificed and you draw fewer, but still play X more", () => {
+    const { s: s0, ap } = setup([]);
+    handOf(s0, ap, 0);
+    // Only one land.
+    for (const id of s0.battlefield.filter((b) => s0.objects[b]!.controller === ap)) {
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "exile";
+    }
+    const land = putOnBattlefield(s0, ap, mountain(0));
+    const l = into(s0, ap, lithoforming, "hand");
+    s0.players[ap]!.manaPool.R = 5;
+    let s = run(s0, planCast(s0, ap, l, undefined, undefined, "auto", 3));
+    s = resolveAll(s);
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[land]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand).toHaveLength(1);
+    expect(s.players[ap]!.extraLands).toMatchObject({ turn: s.turn, n: 3 });
   });
 });

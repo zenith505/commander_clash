@@ -25,6 +25,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const g = parseGroup(untilTapped[1]!, true);
     return g && !g.other ? [{ type: "enterTappedUntil", filter: g.filter }] : null;
   }
+  // "Lands you control enter tapped this turn" (Nahiri's Lithoforming): the same, ending in the cleanup step (CR 514.2).
+  const thisTurnTapped = /^([A-Z][^,]*?) enter tapped this turn$/.exec(s);
+  if (thisTurnTapped) {
+    const g = parseGroup(thisTurnTapped[1]!.charAt(0).toLowerCase() + thisTurnTapped[1]!.slice(1), true);
+    return g && !g.other ? [{ type: "enterTappedUntil", filter: g.filter, thisTurn: true }] : null;
+  }
   let m: RegExpExecArray | null;
 
   // Maddening Hex: "Then attach ~ to another one of your opponents chosen at random."

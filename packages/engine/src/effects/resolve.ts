@@ -105,7 +105,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
   // Together), "in that player's graveyard" (Goblin Welder).
   body.targets.forEach((spec, i) => {
-    if (legal[i] && (spec.differentControllerFrom?.length || spec.inGraveyardOfControllerOf?.length) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
   });
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -472,6 +472,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
     case "otherPlayers":
       return livingPlayers(s).filter((p) => p !== ctx.event?.player);
+    case "otherThanTargetController": {
+      // The target as it last existed if it has left (CR 608.2h); none if it's illegal, as nothing of the spell happens then.
+      const them = players(s, { ref: "targetController", index: ref.index }, ctx);
+      return them.length ? livingPlayers(s).filter((p) => !them.includes(p)) : [];
+    }
     case "enchantedPlayer": {
       // The player this Aura is attached to, or was as it last existed (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

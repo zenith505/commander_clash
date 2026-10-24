@@ -3822,7 +3822,7 @@ function LibrarySearch({
               : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `The rest ${dig.rest}.`
               : dig
-              ? `The rest go ${dig.rest}.`
+              ? `The rest go ${dig.rest}.${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}`
               : pending.firstTo
                 ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal

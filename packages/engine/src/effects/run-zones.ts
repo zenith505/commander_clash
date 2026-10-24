@@ -1407,7 +1407,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
           // Dire Fleet Daredevil: this turn only, with its usual timing (rulings).
-          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
+          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : "exiled", turn: s.turn, ...(e.youMay.play ? {} : { castOnly: true as const }), ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
         }
       }
       return;
@@ -2054,11 +2054,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // targeted; any permanent card matching, chosen as it resolves (CR 110.4b).
         const toField = e.dest === "battlefield";
         const fits = (id: ObjectId) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!toField || isPermanentCard(defOf(s, obj(s, id))));
-        const yards = () => livingPlayers(s).flatMap((pid) => player(s, pid).graveyard).filter(fits);
+        // "From among the milled cards" after "each player mills four cards" (Gyruda, Doom of Depths): only those, still the
+        // same objects (CR 400.7), the ones a replacement exiled instead too (rulings).
+        const same = (m: { id: ObjectId; zc: number }) => (obj(s, m.id).zoneChanges ?? 0) === m.zc;
+        const yards = () =>
+          e.milled
+            ? [...(s.resolving!.milled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "graveyard"), ...(s.resolving!.milledExiled ?? []).filter((m) => same(m) && obj(s, m.id).zone === "exile")].map((m) => m.id).filter(fits)
+            : livingPlayers(s).flatMap((pid) => player(s, pid).graveyard).filter(fits);
         if (!sc.found) {
           const cards = yards();
           if (!cards.length) return;
-          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: 1, max: 1, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true };
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: 1, max: 1, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true, ...(cards.some((id) => obj(s, id).zone === "exile") ? { exiled: true as const } : {}) };
           return "paused";
         }
         const found = sc.found.filter((id) => yards().includes(id));
@@ -2066,7 +2072,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of found) {
           const o = obj(s, id);
           if (toField) {
-            log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard onto the battlefield.`);
+            log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
             moveObject(s, id, "battlefield", { controller: ctx.controller });
             continue;
           }

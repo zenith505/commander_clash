@@ -85,6 +85,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or the X the look's "where X
       // is ..." defined (Hatchery Spider), counted as it resolves (TargetSpec.bound).
       let what = m[3]!.replace(/\bcards\b/, "card").replace(/ and\/or /, " or ");
+      // "Any number of nonland permanent cards with total mana value 4 or less" (Ao, the Dawn Sky): all the cards taken
+      // together, a card with {X} in its mana cost counting X as 0 (CR 202.3e).
+      const total = how === "any number of" ? / with total mana value (\d+) or less$/.exec(what) : null;
+      if (total) what = what.slice(0, total.index);
       const mvX = / with mana value X or less$/.exec(what);
       // "With mana value less than or equal to the number of lands you control" (Loot): counted as it resolves.
       const mvCount = / with mana value less than or equal to (.+)$/.exec(what);
@@ -101,7 +105,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(what);
       if (!filter) return null;
       if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
-      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
+      if (total) Object.assign(filter, { text: `${filter.text} with total mana value ${total[1]} or less` });
+      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
       // "Put any number of land cards from among them onto the battlefield tapped, then shuffle" (Famished Worldsire).
       else if (/, then shuffle$/.test(s)) Object.assign(dig, { rest: "shuffle" });
@@ -179,6 +184,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (remains) {
     const fx = parseWhileTapped(remains[1]!.replace(/^[Yy]ou g/, "G"), "controlled", ctx);
     return fx?.length === 1 && fx[0]!.type === "continuous" ? [{ ...fx[0]!, whileOnBattlefield: true }] : null;
+  }
+  // Kitesail Larcenist: "target ... becomes a Treasure artifact with "..." and loses all other card types and abilities for
+  // as long as ~ remains on the battlefield": whoever controls ~, ending when it leaves (CR 611.2b).
+  const remainsBecomes = !ctx.spell && /^(.+? becomes an? .+? and loses all other card types and abilities) for as long as ~ remains on the battlefield$/.exec(s);
+  if (remainsBecomes) {
+    const fx = parseSentence(remainsBecomes[1]!, ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "game" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
   }
   // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
   // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.

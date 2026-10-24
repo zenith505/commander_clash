@@ -364,7 +364,7 @@ export function stateHash(s: GameState): string {
     }
     return byId ? Object.fromEntries(Object.entries(out).sort(([p], [q]) => (p < q ? -1 : 1))) : out;
   };
-  return hash(JSON.stringify(walk({ ...s, turnLog: turnLogSummary(s.turnLog) })));
+  return hash(JSON.stringify(walk({ ...s, turnLog: turnLogSummary(s, s.turnLog) })));
 }
 
 /**
@@ -373,11 +373,15 @@ export function stateHash(s: GameState): string {
  */
 const TURN_LOG_CAP = 3;
 const LIFE_CAP = 5;
-function turnLogSummary(t: TurnLog | undefined) {
+function turnLogSummary(s: GameState, t: TurnLog | undefined) {
   if (!t) return undefined;
   const capped = (r: Record<number, number>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.min(v, TURN_LOG_CAP)]));
   const entered: Record<string, number> = {};
-  for (const e of t.entered ?? []) entered[JSON.stringify(e)] = Math.min((entered[JSON.stringify(e)] ?? 0) + 1, TURN_LOG_CAP);
+  // Which object entered matters only for "another" (Éowyn): whether it is that object as it is now, not its zone count.
+  for (const { id, zc, ...e } of t.entered ?? []) {
+    const k = JSON.stringify({ ...e, ...(id !== undefined && (s.objects[id]?.zoneChanges ?? 0) === zc ? { now: id } : {}) });
+    entered[k] = Math.min((entered[k] ?? 0) + 1, TURN_LOG_CAP);
+  }
   return {
     searched: t.searched,
     gainedLife: t.gainedLife,

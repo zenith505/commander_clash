@@ -67,7 +67,11 @@ export function withModes(body: AbilityBody, modes: number[] | undefined): Abili
     const offset = out.targets.length;
     // "Each mode must target a different player": not the same as any target of the modes before it.
     const earlier = body.modal.distinctTargets ? Array.from({ length: offset }, (_, j) => j) : [];
-    out.targets.push(...mode.targets.map((spec) => (spec.distinctFrom || earlier.length ? { ...spec, distinctFrom: [...earlier, ...(spec.distinctFrom ?? []).map((j) => j + offset)] } : spec)));
+    out.targets.push(...mode.targets.map((spec0) => {
+      // A target's relation to another of its mode's targets, moved with them.
+      const spec = spec0.inGraveyardOfTarget !== undefined ? { ...spec0, inGraveyardOfTarget: spec0.inGraveyardOfTarget + offset } : spec0;
+      return spec.distinctFrom || earlier.length ? { ...spec, distinctFrom: [...earlier, ...(spec.distinctFrom ?? []).map((j) => j + offset)] } : spec;
+    }));
     out.effects.push(...mode.effects.map((e) => shiftTargets(e, offset)));
     texts.push(mode.text);
   }
@@ -177,6 +181,7 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
     ...t,
     ...(t.distinctFrom ? { distinctFrom: t.distinctFrom.map(shift) } : {}),
     ...(t.sameGraveyardAs ? { sameGraveyardAs: t.sameGraveyardAs.map(shift) } : {}),
+    ...(t.inGraveyardOfTarget !== undefined ? { inGraveyardOfTarget: shift(t.inGraveyardOfTarget) } : {}),
     ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
     ...(t.differentNameFrom ? { differentNameFrom: t.differentNameFrom.map(shift) } : {}),
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),
@@ -211,6 +216,7 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[]): Abi
     ...t,
     ...(t.distinctFrom ? { distinctFrom: t.distinctFrom.map(shift) } : {}),
     ...(t.sameGraveyardAs ? { sameGraveyardAs: t.sameGraveyardAs.map(shift) } : {}),
+    ...(t.inGraveyardOfTarget !== undefined ? { inGraveyardOfTarget: shift(t.inGraveyardOfTarget) } : {}),
     ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
     ...(t.differentNameFrom ? { differentNameFrom: t.differentNameFrom.map(shift) } : {}),
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),

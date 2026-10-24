@@ -1583,9 +1583,12 @@ export function compile(d: CardDef): CompiledCard {
       // "Except it has ~'s other abilities" (Sakashima of a Thousand Faces): the text of its other lines (CR 707.9a), as
       // abilities of the copy, whose name "~" is then.
       const others = clone[3] === "it has ~'s other abilities" ? lines.filter((_, i) => i !== li).map((l) => l.trim()) : undefined;
-      const except = others ? { text: others } : clone[3] ? parseCopyExcept(clone[3]) : undefined;
+      // Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in
+      // addition to its other types": only for an embalmed token (CR 702.128b), as embalm's own exceptions (702.128a).
+      const ifEmbalmed = clone[3] === "if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" ? { noManaCost: true, colors: ["W" as const], addSubtypes: ["Zombie"] } : undefined;
+      const except = others ? { text: others } : ifEmbalmed ? undefined : clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(ifEmbalmed ? { ifEmbalmed } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
         continue;
       }
     }

@@ -420,7 +420,7 @@ export function parseCostKeyword(
         exileSelf: true,
         body: {
           targets: [],
-          effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, except, ofSource: true }],
+          effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, except, ofSource: true, ...(embalm ? { embalmed: true as const } : {}) }],
           text: `Create a token that's a copy of ~, except it's a ${embalm ? "white" : "4/4 black"} Zombie ${d.subtypes.join(" ")} with no mana cost.`,
         },
         text: `${m[1]} ${cost}`,

@@ -577,8 +577,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If you created a token this turn" (Bennie Bracks, Zoologist).
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you sacrificed a Food this turn" (Elanor Gardner).
-  if ((m = /^you(?:'ve)? sacrificed an? (Food|Clue|Treasure|Blood|artifact|creature|enchantment|land|permanent) this turn$/.exec(text)))
-    return { kind: "amount", amount: { count: { kind: "sacrificedThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { type: capital(m[1]!) }) } }, min: 1 };
+  // "As long as you've sacrificed a nontoken permanent this turn" (Evendo Brushrazer).
+  if ((m = /^you(?:'ve)? sacrificed an? (nontoken )?(Food|Clue|Treasure|Blood|artifact|creature|enchantment|land|permanent) this turn$/.exec(text)))
+    return { kind: "amount", amount: { count: { kind: "sacrificedThisTurn", ...(/^[A-Z]/.test(m[2]!) ? { subtype: m[2]! } : m[2] === "permanent" ? {} : { type: capital(m[2]!) }), ...(m[1] ? { nontoken: true as const } : {}) } }, min: 1 };
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
   if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
   // Betor, Kin to All: "creatures you control have total toughness 10 or greater".
@@ -735,7 +736,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
     // "Seven or more lands with different names" (Field of the Dead), "ten or more Gates with different names" (Maze's End): names counted once each.
-    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts|Gates) with (different names|the same name)$`).exec(m[2]!);
+    // "Four or more Demons with different names" (Liliana's Contract).
+    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts|Gates|Demons) with (different names|the same name)$`).exec(m[2]!);
     if (names && m[1] === "you") {
       const filter = pickFilter(names[2]!);
       return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), ...(names[3] === "the same name" ? { sameName: true as const } : { differentNames: true as const }) } : null;

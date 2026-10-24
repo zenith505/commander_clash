@@ -433,6 +433,8 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
+  /** Banefire: "If X is 5 or more, ... the damage can't be prevented": applied to the spell's damage once it's compiled. */
+  let unpreventableX: number | undefined;
   let awaken: { n: number; raw: string } | undefined;
   // "Choose one. If this spell was cast using teamwork, choose both instead." and "Choose one. If you control a commander
   // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
@@ -1478,6 +1480,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.playCountered = stash[1]!;
       continue;
     }
+    // Evendo Brushrazer: "During your turn, as long as you've sacrificed a nontoken permanent this turn, you may play cards
+    // exiled with ~."
+    const playWhile = /^During your turn, as long as (.+), you may play cards exiled with ~\.$/.exec(line);
+    if (playWhile) {
+      const cond = parseStaticCondition(playWhile[1]!, { affects: { kind: "self" }, mods: [], text: line });
+      if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else out.playLinkedWhile = { kind: "allOf", conds: [{ kind: "yourTurn" }, cond] };
+      continue;
+    }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
       if (out.playLinked) out.unsupported.push(raw);
       else out.playLinked = true;
@@ -2284,6 +2295,14 @@ export function compile(d: CardDef): CompiledCard {
       else out.castOnly = clauses.cond;
       continue;
     }
+    // Banefire: "If X is 5 or more, this spell can't be countered and the damage can't be prevented." Static abilities of
+    // the spell (CR 113.6, 101.2, 615.12) that apply while its X is 5 or more; X is locked in as it's cast (CR 601.2b).
+    const xUncounterable = /^If X is (\d+) or more, ~ can't be countered and the damage can't be prevented\.$/.exec(line);
+    if (xUncounterable && isSpell && unpreventableX === undefined) {
+      out.cantBeCounteredX = Number(xUncounterable[1]);
+      unpreventableX = Number(xUncounterable[1]);
+      continue;
+    }
     if (/^~ can't be countered\.$/.test(line)) {
       out.cantBeCountered = true;
       continue;
@@ -2744,6 +2763,16 @@ export function compile(d: CardDef): CompiledCard {
       for (const p of both) out.statics.push({ ...p!, text: line });
       continue;
     }
+    // Dion, Bahamut's Dominant: "During your turn, ~ and other Knights you control have flying": ~ whatever its types,
+    // and the other Knights; the same effect for each, read as two (CR 611.3). Yuna, Hope of Spira: "~ and enchantment
+    // creatures you control have trample, lifelink, and ward {2}": ~ once, even as an enchantment creature (one ward,
+    // CR 702.21b), and the others.
+    const selfAndOthers = /^(During your turn, )?~ and (?:other )?([A-Z][a-z]+|[a-z]+ creatures) you control (have|get) (.+)$/.exec(line);
+    const selfOthers = selfAndOthers && [`~ ${selfAndOthers[3] === "have" ? "has" : "gets"} ${selfAndOthers[4]}`, `${selfAndOthers[1] ? "other" : "Other"} ${selfAndOthers[2]} you control ${selfAndOthers[3]} ${selfAndOthers[4]}`].map((t) => (selfAndOthers[1] ? parseConditionalStatic(`${selfAndOthers[1]}${t}`) : parseStatic(t)));
+    if (selfOthers?.every((p) => p)) {
+      for (const p of selfOthers) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game."
@@ -2859,6 +2888,15 @@ export function compile(d: CardDef): CompiledCard {
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
+  }
+  if (unpreventableX !== undefined) {
+    // Only a spell whose own damage is one effect it deals, not modes or other sources' damage.
+    const dmg = out.spell?.effects.filter((e) => e.type === "damage") ?? [];
+    if (out.spell && !out.spell.modal && dmg.length === 1 && dmg[0]!.type === "damage" && !dmg[0]!.by) dmg[0]!.unpreventableX = unpreventableX;
+    else {
+      out.unsupported.push(`If X is ${unpreventableX} or more, ~ can't be countered and the damage can't be prevented.`);
+      delete out.cantBeCounteredX;
+    }
   }
   if (repeat) {
     const modal = out.spell?.modal;
@@ -3134,6 +3172,15 @@ function linkExile(out: CompiledCard) {
     const others = all.some((e) => e.type === "exileGraveyard" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length !== 1) out.unsupported.push("(counts cards exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
+  }
+  // Evendo Brushrazer: "play cards exiled with ~" is about the cards its one "exile the top card of your library" exiled
+  // (CR 607.2a).
+  if (out.playLinkedWhile) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const tops = all.filter((e): e is Extract<Effect, { type: "exileTop" }> => e.type === "exileTop" && e.who.ref === "you" && !e.putAll);
+    const others = all.some((e) => e.type === "exile" || e.type === "exileGraveyard" || e.type === "impulse" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || tops.length !== 1) out.unsupported.push("(plays cards exiled with it that it can't link to one exile ability)");
+    else tops[0]!.linked = true;
   }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
   // Court of Locthwain: "cast a spell from among cards exiled with ~" too.

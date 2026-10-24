@@ -302,7 +302,7 @@ export type Count =
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
   | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[] }
   /** "If you sacrificed a Food this turn" (Elanor Gardner): the permanents its controller sacrificed this turn, of that subtype or card type as they last existed. */
-  | { kind: "sacrificedThisTurn"; subtype?: string; type?: string }
+  | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
   /** "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride): each counted on its own, so a creature planeswalker counts twice. */
@@ -365,6 +365,8 @@ export interface TargetSpec {
   transformed?: true;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
   powerAboveBase?: true;
+  /** "With base power or toughness 1" (Sword of the Squeak): a creature whose base power or base toughness is this (see basePowerNow). */
+  basePtEither?: number;
   /** "With toughness greater than its power" (Fecund Greenshell): as it is now (as it enters, for an enters trigger). */
   toughnessAbovePower?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
@@ -1546,6 +1548,7 @@ export type Effect =
       divided?: true;
       evenly?: true;
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
+      /** Banefire: "If X is 5 or more, ... the damage can't be prevented": while the spell's X is at least this (CR 615.12). */ unpreventableX?: number;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
       /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
@@ -1958,6 +1961,12 @@ export type Effect =
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   /** `ifCreature`: "If it's a creature, ... if it would die this turn, exile it instead" (Carbonize, any target). */
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
+  /**
+   * Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
+   * instead. Return it to the battlefield under its owner's control at the beginning of the next end step." (CR 614.1a,
+   * 603.7): see GameState.exileReturnTurn.
+   */
+  | { type: "exileReturnThisTurn" }
   /** "If it would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a): while it's that permanent. */
   | { type: "exileIfLeaves"; what: ObjRef }
   /** "It can't be regenerated this turn" (CR 701.19c): its regeneration shields don't apply this turn. */
@@ -2403,7 +2412,7 @@ export type Effect =
    * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
    */
   | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
-  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -3032,7 +3041,7 @@ export type Effect =
    */
   /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
   /** `copyTimes` with `copies`: "Copy that card three times. You may cast the copies" (Mnemonic Deluge): that many copies of each. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; copyTimes?: number; /** With `reveal`: only looked at, not revealed (Planetarium of Wan Shi Tong). */ look?: true; /** "Do this only once each turn": casting one is doing it (CR 603.2h, rulings on Planetarium). */ once?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true; /** Kefka, Dancing Mad: "exile a card at random from each opponent's graveyard". */ randomEachOpponent?: true }; /** Kefka: "Then each player who owns a spell you cast this way loses life equal to its mana value." */ ownersLoseLife?: true; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true }
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; copyTimes?: number; /** With `reveal`: only looked at, not revealed (Planetarium of Wan Shi Tong). */ look?: true; /** "Do this only once each turn": casting one is doing it (CR 603.2h, rulings on Planetarium). */ once?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true; /** Kefka, Dancing Mad: "exile a card at random from each opponent's graveyard". */ randomEachOpponent?: true }; /** Kefka: "Then each player who owns a spell you cast this way loses life equal to its mana value." */ ownersLoseLife?: true; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true; /** Invoke Calamity: "from your graveyard and/or hand": the cards in your hand and graveyard, cast from where they are. */ handAndYard?: true; /** "If those spells would be put into your graveyard, exile them instead" (Invoke Calamity): the spells cast this way. */ exileCast?: true }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -4701,6 +4710,8 @@ export interface CompiledCard {
   keepsDamage?: true;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
+  /** Banefire: "If X is 5 or more, ~ can't be countered": while its X is at least this (CR 101.2). */
+  cantBeCounteredX?: number;
   /**
    * "Creature spells you control can't be countered", "Creature spells can't be countered", "Spells you control can't be
    * countered": spells matching `filter`, controlled by this permanent's controller unless `anyone` (CR 101.2).
@@ -5187,6 +5198,11 @@ export interface CompiledCard {
   playLinkedForLife?: true;
   /** The same, only while this holds (a Class level's, CR 716.2a). */
   playLinkedIf?: StaticCondition;
+  /**
+   * Evendo Brushrazer: "During your turn, as long as you've sacrificed a nontoken permanent this turn, you may play cards
+   * exiled with ~": while this holds, with the usual costs and timing (rulings), no other mana.
+   */
+  playLinkedWhile?: StaticCondition;
   /**
    * "During your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can
    * be spent to cast those spells" (Tinybones, Bauble Burglar): any such card, whoever exiled it (rulings), with the usual

@@ -924,6 +924,11 @@ export function parseTargetPhrase(
     extra.powerAboveBase = true;
     p = p.slice(0, m.index);
   }
+  // "Creature you control with base power or toughness 1" (Sword of the Squeak).
+  if ((m = / with base power or toughness (\d+)$/.exec(p))) {
+    extra.basePtEither = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
   if ((m = / with toughness greater than its power$/.exec(p))) {
     extra.toughnessAbovePower = true;
     p = p.slice(0, m.index);

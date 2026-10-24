@@ -297,6 +297,10 @@ function parseManaProduced(text: string): ManaProduce | null {
     const n = parseCount(amount[2]!, null);
     return n && { kind: "fixed", mana: [sym(amount[1]!)!], n };
   }
+  // "Two mana of different colors" (Interplanar Beacon, Lotus Field's artifacts): one of the ten pairs of two colors,
+  // chosen as it resolves (CR 605.3b), like a filter land's combinations.
+  if (text === "two mana of different colors")
+    return { kind: "combos", options: ALL_COLORS.flatMap((a, i) => ALL_COLORS.slice(i + 1).map((b) => [a, b] as ManaType[])) };
   // "Two mana in any combination of colors", "X mana in any combination of colors, where X is ..." (Selvala).
   const combo = new RegExp(`^(?:${NUM}|(X)) mana in any combination of colors(?:, where X is (.+))?$`).exec(text);
   if (combo && !!combo[2] === !!combo[3]) {

@@ -1149,7 +1149,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number } }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number }; /** "Instant and/or sorcery spells" (Invoke Calamity): the spell as it's cast is of one of these card types (rulings: a modal double-faced card's back face, either half of a split card). */ types?: string[] }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1279,7 +1279,7 @@ export interface TurnLog {
   /** Upkeep steps begun this turn (Paradox Haze's "first upkeep each turn"). */
   upkeeps?: number;
   /** Each permanent sacrificed this turn: who sacrificed it, and its card types and subtypes as it last existed (Elanor Gardner). */
-  sacrificed?: { player: PlayerId; types: string[]; subtypes: string[] }[];
+  sacrificed?: { player: PlayerId; types: string[]; subtypes: string[]; /** It was a token (Evendo Brushrazer's "a nontoken permanent"). */ token?: true }[];
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
@@ -1563,6 +1563,12 @@ export interface GameState {
    * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
    * Cellar): what `player` may do with their graveyard during `turn` (Effect graveyardTurn).
    */
+  /**
+   * Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
+   * instead. Return it to the battlefield under its owner's control at the beginning of the next end step." (Effect
+   * exileReturnThisTurn): for `player`'s permanents during `turn`, each with its own delayed trigger (rulings).
+   */
+  exileReturnTurn?: { player: PlayerId; turn: number; source: string; sourceCardId: string }[];
   graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; exileCast?: true; source: string }[];
   /**
    * "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of

@@ -193,13 +193,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Up to two target players each manifest two cards from their hands" (Kozilek, the Broken Reality): each chooses that
   // many cards from their hand (all of them with fewer, rulings), and they're put onto the battlefield face down
   // (CR 701.40a). "For each card manifested this way" counts them.
-  if ((m = new RegExp(`^(.+?) (?:each )?manifests? (a card|${NUM} cards) from (?:their|your) hands?$`, "i").exec(s))) {
-    const who = /^manifest$/i.test(m[1]!) ? undefined : parsePlayer(m[1]!, ctx);
-    if (!who) return null;
+  // "Manifest a card from your hand" (Scroll of Fate): you.
+  if ((m = new RegExp(`^(?:(.+?) (?:each )?manifests?|[Mm]anifest) (a card|${NUM} cards) from (their|your) hands?$`).exec(s))) {
+    if (!m[1] && m[4] !== "your") return null;
+    const who = m[1] ? parsePlayer(m[1], ctx) : undefined;
+    if (m[1] && !who) return null;
     const n = m[2] === "a card" ? 1 : num(m[3]!);
     if (!Number.isInteger(n) || n < 1) return null;
     ctx.manifested = true;
-    return [{ type: "putFromHand", who, may: false, manifest: n }];
+    return [{ type: "putFromHand", who: who ?? { ref: "you" }, may: false, manifest: n }];
   }
 
   // An instant or sorcery that exiles itself as it resolves, so it isn't put into the graveyard (CR 608.2n);

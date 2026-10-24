@@ -106,6 +106,13 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.transformed && !isTransformed(s, o)) return false;
   if (spec.powerAboveBase && !(c.types.includes("Creature") && power(s, o) > basePowerNow(s, o))) return false;
+  if (spec.basePtEither !== undefined) {
+    // Its base power and toughness (see basePowerNow), from the characteristics as they are, or as the layers have them
+    // so far when a static ability counts them (CR 613.4a-b come before 613.4c).
+    const set = [...c.pt].reverse().find((p) => p.kind === "set");
+    const [bp, bt] = set ? [set.power, set.toughness] : [c.printedPower, c.printedToughness];
+    if (!c.types.includes("Creature") || (bp !== spec.basePtEither && bt !== spec.basePtEither)) return false;
+  }
   if (spec.toughnessAbovePower && !(c.types.includes("Creature") && toughness(s, o) > power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length)) return false;
@@ -312,7 +319,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.powerAboveBase || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
+  if (spec.transformed || spec.powerAboveBase || spec.basePtEither !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
   return true;
 }
 

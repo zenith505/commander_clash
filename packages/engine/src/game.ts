@@ -728,6 +728,14 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of entering: ${fromZone === "stack" && !o.spellCopy ? "no mana was spent to cast it" : "it wasn't cast"}.`);
     to = "exile";
   }
+  // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
+  // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
+  // controller applies this one first (CR 616.1), the one that brings it back.
+  const exileReturn = fromZone === "battlefield" && to === "graveyard" ? s.exileReturnTurn?.find((x) => x.turn === s.turn && x.player === controllerOf(s, o)) : undefined;
+  if (exileReturn) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard (${exileReturn.source}).`);
+  }
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
@@ -829,7 +837,7 @@ export function moveObject(
   const lastCounters = { ...o.counters };
   const lastController = last.controller;
   // "If you sacrificed a Food this turn" (Elanor Gardner): as it last existed (CR 701.21a: its controller sacrifices it).
-  if (opts.sacrificed && fromZone === "battlefield") ((s.turnLog ??= {}).sacrificed ??= []).push({ player: lastController, types: [...last.types], subtypes: [...last.subtypes] });
+  if (opts.sacrificed && fromZone === "battlefield") ((s.turnLog ??= {}).sacrificed ??= []).push({ player: lastController, types: [...last.types], subtypes: [...last.subtypes], ...(o.isToken ? { token: true as const } : {}) });
   const wasCreature = last.types.includes("Creature");
   // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
@@ -1088,6 +1096,10 @@ export function moveObject(
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner));
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
   if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
+  // Cosmic Intervention: each card exiled this way gets its own delayed trigger (rulings); a token ceases to exist and
+  // won't return (CR 111.7, rulings).
+  if (exileReturn && o.zone === "exile" && !o.isToken)
+    addDelayed(s, "nextEndStep", exileReturn.player, o, { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, owner: true }], text: `Return ${last.name} to the battlefield under its owner's control.` }, exileReturn.sourceCardId || cardIdOf(o));
 }
 
 /** A card put into its owner's graveyard: its card types there, for "if a creature card was put into your graveyard". */
@@ -3297,9 +3309,9 @@ export function checkAscend(s: GameState) {
  * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
-function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "life" {
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "life" | "plain" {
   if (o.zone !== "exile") return false;
-  let how: false | "anyType" | "life" = false;
+  let how: false | "anyType" | "life" | "plain" = false;
   for (const id of s.battlefield) {
     const p = obj(s, id);
     if (controllerOf(s, p) !== pid) continue;
@@ -3309,10 +3321,13 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
     if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
-    if (!life && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
+    // Evendo Brushrazer's: while its condition holds, paying as usual.
+    const plain = !!a.playLinkedWhile && staticConditionNow(s, a.playLinkedWhile, id, pid);
+    if (!life && !plain && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
     if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
-    if (!life) return "anyType";
-    how = "life";
+    if (a.playLinked || (a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return "anyType";
+    if (life) how = "life";
+    else if (!how) how = "plain";
   }
   return how;
 }
@@ -3324,7 +3339,7 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
 function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "orPay" | "cost" | "more"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
-  return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : undefined;
+  return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : how === "plain" ? {} : undefined;
 }
 
 /**
@@ -3986,6 +4001,8 @@ export function castProblem(
     if (pendMv.exact !== undefined && spellMv !== pendMv.exact) return `the spell must have mana value ${pendMv.exact}`;
     if (pendMv.max !== undefined && spellMv > pendMv.max) return `the spell must have mana value ${pendMv.max} or less`;
   }
+  const pendTypes = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.types : undefined;
+  if (pendTypes && (choices?.faceDown || !pendTypes.some((t) => isType(d, t)))) return `the spell must be ${pendTypes.map((t) => `${/^[AEIOU]/.test(t) ? "an" : "a"} ${t.toLowerCase()}`).join(" or ")} spell`;
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));

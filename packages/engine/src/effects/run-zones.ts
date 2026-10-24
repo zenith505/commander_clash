@@ -441,7 +441,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       sc.queue = [chooser];
       sc.chosen = {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(e.bounce ? { bounce: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -467,6 +467,12 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
   if (e.counter && s.resolving) s.resolving.created = keptAll.filter((id) => s.objects[id]?.zone === "battlefield");
   if (e.destroy) {
     for (const id of gone) if (s.objects[id]?.zone === "battlefield") destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+    return;
+  }
+  // Consuming Tide: the rest return to their owners' hands at the same time (rulings).
+  if (e.bounce) {
+    if (gone.length) log(s, `${src} returns ${gone.map((id) => nameOf(s, id)).join(", ")} to ${gone.length === 1 ? "its owner's hand" : "their owners' hands"}.`);
+    for (const id of gone) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "hand");
     return;
   }
   if (gone.length) log(s, `${src}: ${gone.map((id) => nameOf(s, id)).join(", ")} ${gone.length === 1 ? "is" : "are"} sacrificed.`);

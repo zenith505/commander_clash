@@ -228,6 +228,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
   }
+  // Consuming Tide: "for each opponent who has more cards in their hand than you", counted as it resolves.
+  if (each && /^opponent who has more cards in (?:their )?hand than you$/i.test(p)) return count({ kind: "players", opponents: true, handMoreThanYou: true });
   // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.
   if (each && (m = /^opponent who has (one|two|three|zero|no) or fewer cards in hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtMost: m[1] === "no" ? 0 : num(m[1]!) });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).

@@ -1,8 +1,8 @@
 // Round 149: the most played cards, in popularity order, starting with Bandit's Talent.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, castProblem, characteristics, invalidateCharacteristics, compileCard, isFullySupported, mayPlayFromExile, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
+import { act, bear, card, forest, island, passUntil, pt, putOnBattlefield, setup } from "./helpers";
+import { abilitiesOf, castProblem, characteristics, controllerOf, invalidateCharacteristics, compileCard, isFullySupported, mayPlayFromExile, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type Step, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -367,7 +367,8 @@ describe("Unstable Amulet and Furious Rise: 'until you exile another card with ~
     const { s: s0, ap } = setup([]);
     const am = putOnBattlefield(s0, ap, amulet);
     s0.players[ap]!.energy = 4;
-    const [first, second] = [into(s0, ap, opt, "library"), into(s0, ap, shock, "library")].reverse();
+    const second = into(s0, ap, shock, "library");
+    const first = into(s0, ap, opt, "library");
     let s = resolveAll(run(s0, planActivate(s0, ap, am, 0)));
     expect(s.objects[first]!.zone).toBe("exile");
     expect(mayPlayFromExile(s, s.objects[first]!, ap)).toBe(true);
@@ -395,5 +396,138 @@ describe("Unstable Amulet and Furious Rise: 'until you exile another card with ~
     const life = s.players[next(s, ap)]!.life;
     s = resolveAll(run(s, planCast(s, ap, top)));
     expect(s.players[next(s, ap)]!.life).toBe(life - 1);
+  });
+});
+
+const kayasWrath = card("Kaya's Wrath", "Sorcery", "{W}{W}{B}{B}", { oracleText: "Destroy all creatures. You gain life equal to the number of creatures you controlled that were destroyed this way." });
+const reverence = card("Wall of Reverence", "Creature — Spirit Wall", "{3}{W}", { power: "1", toughness: "6", keywords: ["Flying", "Defender"], oracleText: "Defender, flying\nAt the beginning of your end step, you may gain life equal to the power of target creature you control." });
+const swordBM = card("Sword of Body and Mind", "Artifact — Equipment", "{3}", { keywords: ["Equip", "Mill"], oracleText: "Equipped creature gets +2/+2 and has protection from green and from blue.\nWhenever equipped creature deals combat damage to a player, you create a 2/2 green Wolf creature token and that player mills ten cards.\nEquip {2}" });
+const robbery = card("Highway Robbery", "Sorcery", "{1}{R}", { keywords: ["Plot"], oracleText: "You may discard a card or sacrifice a land. If you do, draw two cards.\nPlot {1}{R} (You may pay {1}{R} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)" });
+const denial = card("Dazzling Denial", "Instant", "{1}{U}", { oracleText: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless its controller pays {4} instead." });
+const tide = card("Consuming Tide", "Sorcery", "{2}{U}{U}", { oracleText: "Each player chooses a nonland permanent they control. Return all nonland permanents not chosen this way to their owners' hands. Then you draw a card for each opponent who has more cards in their hand than you." });
+const bird = card("Test Bird", "Creature — Bird", "{W}", { power: "1", toughness: "1" });
+const relic = card("Test Relic", "Artifact", "{1}");
+
+describe("Kaya's Wrath", () => {
+  it("gains life for the creatures you controlled that were destroyed, not the indestructible ones", () => {
+    supported(kayasWrath);
+    const { s: s0, ap, ids } = setup([kayasWrath]);
+    putOnBattlefield(s0, ap, bear());
+    putOnBattlefield(s0, ap, bear({ name: "Bear 2" }));
+    putOnBattlefield(s0, ap, bear({ name: "Tough Bear", keywords: ["Indestructible"], oracleText: "Indestructible" }));
+    putOnBattlefield(s0, next(s0, ap), bear({ name: "Their Bear" }));
+    const life = s0.players[ap]!.life;
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.players[ap]!.life).toBe(life + 2);
+    expect(s.battlefield.filter((id) => characteristics(s, s.objects[id]!).types.includes("Creature")).length).toBe(1);
+  });
+});
+
+describe("Wall of Reverence", () => {
+  it("at your end step, you may gain life equal to the target creature's power", () => {
+    supported(reverence);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, reverence);
+    const g = putOnBattlefield(s0, ap, giant);
+    let s = advance(s0, "main2", ap);
+    const life = s.players[ap]!.life;
+    for (let i = 0; i < 20 && !(s.pending?.kind === "chooseTargets"); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [obj(g)] });
+    s = resolveAll(s);
+    expect(s.players[ap]!.life).toBe(life + 3);
+  });
+});
+
+describe("Sword of Body and Mind", () => {
+  it("is fully supported; on combat damage to a player, you get a Wolf and that player mills ten", () => {
+    supported(swordBM);
+    const c = compileCard(swordBM);
+    const t = c.triggers[0]!;
+    expect(t.body.effects.map((e) => e.type)).toEqual(["createToken", "mill"]);
+    expect(t.body.effects[1]).toMatchObject({ who: { ref: "eventPlayer" } });
+  });
+});
+
+describe("Highway Robbery: you may discard a card or sacrifice a land; if you do, draw two", () => {
+  it("is fully supported; discarding draws two", () => {
+    supported(robbery);
+    const { s: s0, ap, ids } = setup([robbery]);
+    const [extra] = [into(s0, ap, ogre, "hand")];
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "either" });
+    const opts = (s.pending as { options: string[] }).options;
+    s = act(s, { type: "chooseOption", player: ap, choice: opts[0]! });
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap, count: 1 });
+    const before = s.players[ap]!.hand.length;
+    s = resolveAll(act(s, { type: "discard", player: ap, objectIds: [extra!] }));
+    expect(s.objects[extra!]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(before - 1 + 2);
+  });
+
+  it("with no card in hand, only the land can be sacrificed", () => {
+    const { s: s0, ap, ids } = setup([robbery]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    handOf(s, ap, []);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    const lands = s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === ap && characteristics(s, s.objects[id]!).types.includes("Land")).length;
+    if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: ap, choice: (s.pending as { options: string[] }).options.at(-1)! });
+    if (s.pending?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: ap, ids: [s.pending.options[0]!] });
+    s = resolveAll(s);
+    expect(s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === ap && characteristics(s, s.objects[id]!).types.includes("Land")).length).toBe(lands - 1);
+    expect(s.players[ap]!.hand.length).toBe(2);
+  });
+});
+
+describe("Dazzling Denial", () => {
+  it("is fully supported: pay {2}, or {4} if you control a Bird", () => {
+    supported(denial);
+    for (const withBird of [false, true]) {
+      const { s: s0, ap } = setup([]);
+      const b = next(s0, ap);
+      if (withBird) putOnBattlefield(s0, b, bird);
+      putOnBattlefield(s0, b, island);
+      putOnBattlefield(s0, b, island);
+      const [sh] = handOf(s0, ap, [shock]);
+      const [dd] = handOf(s0, b, [denial]);
+      let s = run(s0, planCast(s0, ap, sh!, [player(b)]));
+      s = act(s, { type: "passPriority", player: ap });
+      s = run(s, planCast(s, b, dd!, [{ kind: "stack", id: s.stack[0]!.id } as TargetChoice]));
+      for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(s.pending).toMatchObject({ kind: "payUnless", player: ap, cost: withBird ? "{4}" : "{2}" });
+    }
+  });
+});
+
+describe("Consuming Tide", () => {
+  it("is fully supported; each player keeps one nonland permanent, the rest return; then draws per opponent with more cards", () => {
+    supported(tide);
+    const { s: s0, ap, ids } = setup([tide]);
+    const b = next(s0, ap);
+    handOf(s0, ap, []);
+    const [castId] = [into(s0, ap, tide, "hand")];
+    void ids;
+    const mine = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, relic)];
+    const theirs = [putOnBattlefield(s0, b, bear({ name: "Their Bear" })), putOnBattlefield(s0, b, giant)];
+    handOf(s0, b, [forest, forest]);
+    handOf(s0, next(s0, ap, 2), []);
+    handOf(s0, next(s0, ap, 3), [forest, forest, forest]);
+    let s = run(s0, planCast(s0, ap, castId!));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "keep", bounce: true });
+    s = act(s, { type: "pickPermanents", player: ap, ids: [mine[1]!] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: b, action: "keep" });
+    s = act(s, { type: "pickPermanents", player: b, ids: [theirs[1]!] });
+    s = resolveAll(s);
+    expect(s.objects[mine[0]!]!.zone).toBe("hand");
+    expect(s.objects[mine[1]!]!.zone).toBe("battlefield");
+    expect(s.objects[theirs[0]!]!.zone).toBe("hand");
+    expect(s.objects[theirs[1]!]!.zone).toBe("battlefield");
+    // You have 1 card (the bear); B has 3 and D has 3: two draws.
+    expect(s.players[ap]!.hand.length).toBe(3);
   });
 });

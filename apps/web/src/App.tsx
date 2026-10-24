@@ -505,6 +505,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [discards, setDiscards] = useState<string[]>([]);
   const [viewing, setViewing] = useState<ZoneView | null>(null);
   const [targeting, setTargeting] = useState<Targeting | null>(null);
+  /** "Creatures from the battlefield and/or creature cards from graveyards": the graveyard cards are being looked at. */
+  const [yardTargets, setYardTargets] = useState(false);
   const [dividing, setDividing] = useState<Dividing | null>(null);
   const [modePick, setModePick] = useState<ModePick | null>(null);
   const [menu, setMenu] = useState<string | null>(null); // permanent (or card in hand) whose abilities are shown
@@ -1322,6 +1324,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                     : `(${targeting.specs.slice(0, targeting.chosen.length).filter((t) => !t.skip).length + 1}/${targeting.specs.filter((t) => !t.skip).length})`}
               </span>
               {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") || targeting.ahead?.some(Boolean) ? "Done" : "Choose none"}</button>}
+              {nextSpec?.orCard && <button onClick={() => setYardTargets(true)}>From a graveyard</button>}
               {targeting.mode === "copy" && pending?.kind === "copyTargets" && (
                 <button
                   onClick={() => {
@@ -1396,6 +1399,23 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onHover={setHover}
               onPick={(id) => pickTarget({ kind: "object", id })}
               onCancel={answering(targeting) ? undefined : () => setTargeting(null)}
+            />
+          )}
+          {targeting && yardTargets && nextSpec?.orCard && (
+            // The card half of "creatures from the battlefield and/or creature cards from graveyards"; a creature is
+            // clicked on the battlefield as usual.
+            <GraveyardPicker
+              s={s}
+              label={targeting.label}
+              spec={nextSpec.orCard}
+              sourceId={targetSource}
+              allowed={(id) => canTarget({ kind: "object", id })}
+              onHover={setHover}
+              onPick={(id) => {
+                setYardTargets(false);
+                pickTarget({ kind: "object", id });
+              }}
+              onCancel={() => setYardTargets(false)}
             />
           )}
           {(modePick || pending?.kind === "chooseModes") && (

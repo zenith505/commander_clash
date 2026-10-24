@@ -1715,6 +1715,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // that player equal to the total mana value of those cards." (Combustible Gearhulk), "defending player may have you
     // draw a card. If they do, untap ~ and remove it from combat" (Shakedown Heavy): that player decides as it resolves
     // (CR 608.2d), and what happens either way is yours to do.
+    // Join forces (Minds Aglow, Collective Voyage, Alliance of Arms): "Starting with you, each player may pay any amount of
+    // mana. Each player draws X cards, where X is the total amount of mana paid this way."
+    if (/^Starting with you, each player may pay any amount of mana$/.test(s)) {
+      // "..., where X is the total amount of mana paid this way, puts them onto the battlefield tapped" (Collective Voyage).
+      const where = /^(.+?), where X is the total amount of mana paid this way(, .+)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      if (!where) return null;
+      ctx.whereX = true;
+      const fx = attempt(ctx, () => parseOne(capital(`${where[1]!}${where[2] ?? ""}`), ctx));
+      ctx.whereX = false;
+      if (!fx) return null;
+      effects.push({ type: "joinForces" }, ...replaceX(fx, { count: { kind: "joinForcesPaid" } }));
+      si++;
+      continue;
+    }
     const haveYou = /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
     const haveIf = haveYou && /^If (?:the player|that player|they) (doesn't|don't|does|do), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (haveYou && haveIf) {
@@ -4100,6 +4114,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (effects[effects.length - 1]?.type !== "exile" || search?.length !== 1 || search[0]!.type !== "search" || spec?.kind !== "object") return null;
       effects.push({ type: "forEachThisWay", which: "exiled", filter: { ...spec, text: perSearch[1]! }, effects: [{ ...search[0]!, who: { ref: "eachOne" } }] });
       si++;
+      continue;
+    }
+    // "Destroy all creatures. Each player loses life equal to the number of creatures they controlled that were destroyed
+    // this way" (Deadly Tempest): each player loses that much at once, as they controlled them as they were destroyed
+    // (CR 608.2h).
+    const lossThisWay = /^Each player loses life equal to the number of (creatures) they controlled that were destroyed this way$/.exec(s);
+    if (lossThisWay) {
+      const spec = parseTargetPhrase(singularWord(lossThisWay[1]!), { chosen: true });
+      if (effects[effects.length - 1]?.type !== "destroy" || spec?.kind !== "object") return null;
+      effects.push({ type: "forEachThisWay", which: "destroyed", filter: { ...spec, text: lossThisWay[1]! }, effects: [{ type: "loseLife", who: { ref: "eachOne" }, n: 1 }] });
       continue;
     }
     const perThisWay = /^For each (.+?) (destroyed|exiled|put into a graveyard) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);

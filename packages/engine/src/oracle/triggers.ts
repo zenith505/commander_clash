@@ -988,7 +988,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+) deal /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
@@ -1029,7 +1029,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
-    const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
+    // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
+    const counters = / with counters on them$/.exec(phrase);
+    const words = counters ? phrase.slice(0, counters.index) : phrase;
+    const spec = parseTargetPhrase(words.split(/\s+/).map(singularWord).join(" ") + (counters ? " with counters on it" : ""));
     if (!spec || spec.kind !== "object") return "fail";
     group = { ...spec, text: phrase };
   }
@@ -1113,6 +1116,21 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (filter === null) return "fail";
     batch = { what: "toGraveyard", from: "library", milled: true, ...(filter ? { filter } : {}) };
     rest = m[2]!;
+  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are milled, (.+)$/.exec(line))) {
+    // The Wise Mothman: cards a mill instruction put into any graveyard (CR 701.17a), once for the whole event even when
+    // several players mill at the same time (rulings).
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    batch = { what: "toGraveyard", from: "library", milled: true, together: true, ...(filter ? { filter } : {}) };
+    rest = m[2]!;
+    // "..., where X is the number of nonland cards milled this way": how many of them, known as it triggers, so it can
+    // count targets (CR 601.2c, 603.3d).
+    const x = new RegExp(`^(.+), where X is the number of ${m[1] ? `${m[1]} ` : ""}cards milled this way\\.?$`).exec(rest);
+    if (x) {
+      const body = parseBody(`${x[1]}.`, { ownX: true });
+      if (!body) return "fail";
+      return { event: "batch", batch, body, eventX: true };
+    }
   } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere(?: other than the battlefield)?), (.+)$/.exec(line))) {
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
     // leaves your graveyard": once for each card (CR 603.2c).
@@ -1233,6 +1251,12 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (equipped) {
     const body = parseBody(equipped[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "any", equipped: true }, body } : "fail";
+  }
+  // Satoru Umezawa: "Whenever you activate a ninjutsu ability" (commander ninjutsu is one too, CR 702.49d).
+  const ninja = /^Whenever you activate a ninjutsu ability, (.+)$/.exec(line);
+  if (ninja) {
+    const body = parseBody(ninja[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", ninjutsu: true }, body } : "fail";
   }
   // "An ability with {X} in its activation cost" (Glava, Unbound Flourishing as compile.ts splits it).
   const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?| with \{X\} in its activation cost)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);

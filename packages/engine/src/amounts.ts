@@ -121,6 +121,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o?.counters[c.counter] ?? 0;
     }
+    case "affectedControllerPoison": {
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      return o ? (s.players[controllerOf(s, o)]?.poison ?? 0) : 0;
+    }
     case "timesAffectedAttacked": {
       // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
@@ -226,6 +230,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "joinForcesPaid":
+      return s.resolving?.joinForcesPaid ?? 0;
     case "manifestedThisWay":
       return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
@@ -589,6 +595,8 @@ function describeCount(c: Count): string {
       return `#${c.counter} counters on it`;
     case "affectedManaValue":
       return "its mana value";
+    case "affectedControllerPoison":
+      return "#poison counters its controller has";
     case "cardsInLibrary":
       return "#cards in library";
     case "discardedThisWay":
@@ -609,6 +617,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "joinForcesPaid":
+      return "#mana paid";
     case "manifestedThisWay":
       return "#cards manifested";
     case "parleyRevealed":

@@ -648,6 +648,15 @@ export function moveObject(
     log(s, `${defOf(s, o).name} can't be sacrificed.`);
     return;
   }
+  // The Master, Multiplied: a triggered ability its controller controls doesn't sacrifice or exile their creature tokens
+  // (the ability still resolves, rulings).
+  if ((opts.sacrificed || to === "exile") && fromZone === "battlefield" && o.isToken && s.resolving?.item.triggered && objIsType(s, o, "Creature")) {
+    const you = s.resolving.item.controller;
+    if (controllerOf(s, o) === you && s.battlefield.some((x) => controllerOf(s, obj(s, x)) === you && abilitiesOf(s, obj(s, x)).ownTriggersSpareTokens)) {
+      log(s, `${defOf(s, o).name} isn't ${opts.sacrificed ? "sacrificed" : "exiled"} (The Master, Multiplied).`);
+      return;
+    }
+  }
   // A creature tapped for a station ability that's still on the stack: its power as it last existed (rulings on station).
   if (fromZone === "battlefield")
     for (const item of s.stack) if (item.stationed?.id === id && item.stationed.zc === (o.zoneChanges ?? 0)) item.stationed.power = power(s, o);
@@ -2596,6 +2605,11 @@ function startNextTurn(s: GameState, skipping = false) {
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).
+  if (ap.attackBansNextTurn) {
+    ap.attackBansNextTurn = ap.attackBansNextTurn.flatMap((b) => (b.turn === undefined ? [{ ...b, turn: s.turn }] : []));
+    if (!ap.attackBansNextTurn.length) ap.attackBansNextTurn = undefined;
+  }
   ap.turnsTaken = (ap.turnsTaken ?? 0) + 1;
   for (const p of s.players) {
     p.landsPlayedThisTurn = 0;
@@ -6182,7 +6196,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -7379,6 +7393,9 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+  // The Second Doctor: during the attacker's next turn, not the player or a permanent they control.
+  const hit = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
+  if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).

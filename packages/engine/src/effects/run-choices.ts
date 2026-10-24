@@ -216,6 +216,37 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       sc.villain = undefined;
       return;
     }
+    case "joinForces": {
+      // Join forces: from the controller on, in turn order, each player may pay any amount of mana (Minds Aglow; CR 101.4
+      // doesn't apply, "starting with you" does), seeing what the ones before paid. Each says how much, then pays it.
+      const sc = (s.resolving!.scratch ??= {});
+      const i = s.turnOrder.indexOf(ctx.controller);
+      const j = (sc.join ??= { queue: [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0 });
+      while (j.queue.length) {
+        const pid = j.queue[0]!;
+        if (j.asked === undefined && sc.payX === undefined) {
+          const cap = Math.min(availableMana(s, pid), 40);
+          if (cap > 0) {
+            const options = ["none", ...Array.from({ length: cap }, (_, k) => String(k + 1))];
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana (${j.paid} paid so far)` };
+            return "paused";
+          }
+        } else if (j.asked === undefined && sc.payX !== "none") {
+          j.asked = Number(sc.payX);
+          sc.payX = undefined;
+          sc.may = undefined;
+          const pay = { mana: `{${j.asked}}` };
+          s.pending = { kind: "chooseMay", player: pid, prompt: `pay ${describePay(pay)}`, source: src, pay };
+          return "paused";
+        } else if (j.asked !== undefined && sc.may) j.paid += j.asked;
+        sc.payX = sc.may = j.asked = undefined;
+        j.queue.shift();
+      }
+      s.resolving!.joinForcesPaid = j.paid;
+      log(s, `${j.paid} mana was paid for ${src}.`);
+      sc.join = undefined;
+      return;
+    }
     case "eachMay": {
       // Each player decides in APNAP order, seeing the earlier answers (CR 101.4); then it happens to those who chose to.
       const sc = (s.resolving!.scratch ??= {});
@@ -241,7 +272,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "Each opponent who doesn't loses 2 life for each ..." (Fandaniel): the prompt says what declining costs.
           const after = e.each ? s.resolving!.body.effects[s.resolving!.next + 1] : undefined;
           const loss = after?.type === "loseLife" && after.who.ref === "notChoseThisWay" ? amountNow(s, after.n, ctx) : undefined;
-          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(loss !== undefined ? { otherwise: `If you don't, you lose ${loss} life.` } : {}) };
+          // The Second Doctor: what doing it means for an opponent.
+          const you = player(s, ctx.controller).name;
+          const ban = after?.type === "attackBanNextTurn" && pid !== ctx.controller ? `If you do, you can't attack ${you} or permanents ${you} controls during your next turn.` : undefined;
+          const otherwise = loss !== undefined ? `If you don't, you lose ${loss} life.` : ban;
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(otherwise ? { otherwise } : {}) };
           return "paused";
         }
         if (sc.may) sc.mayers!.push(pid);

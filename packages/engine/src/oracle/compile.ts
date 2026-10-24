@@ -1529,6 +1529,10 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    if (line === "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control.") {
+      out.ownTriggersSpareTokens = true;
+      continue;
+    }
     // "The "legend rule" doesn't apply to permanents you control" (Sakashima, Mirror Box), "... to Slivers you control",
     // "The "legend rule" doesn't apply." (Mirror Gallery): CR 704.5j skips those.
     const noLegend = /^The "legend rule" doesn't apply(?: to (.+?))?\.$/.exec(line);
@@ -1795,6 +1799,16 @@ export function compile(d: CardDef): CompiledCard {
       const filter = parseTargetPhrase(untapLimit[4]!.split(" ").map((w, i, a) => (i === a.length - 1 ? singularWord(w) : w)).join(" "));
       if (filter?.kind !== "object" || filter.controller || filter.bound) out.unsupported.push(raw);
       else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
+      continue;
+    }
+    // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
+    const handGrant = /^Each ([a-z]+) card in your hand has (ninjutsu (?:\{[^}]+\})+)\.$/.exec(line);
+    if (handGrant) {
+      // The card's kind read as a graveyard card's, without the graveyard.
+      const f = parseTargetPhrase(`${handGrant[1]} card from a graveyard`);
+      const kw = keywordAbilities(handGrant[2]!, d);
+      if (f?.kind !== "card" || kw?.activated.length !== 1 || kw.triggers.length || kw.statics.length) out.unsupported.push(raw);
+      else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in your hand` }, activated: kw.activated });
       continue;
     }
     const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
@@ -2861,6 +2875,15 @@ export function compile(d: CardDef): CompiledCard {
     if (out.striatedKeywords) out.striatedKeywords = out.striatedKeywords.filter((k) => !own.has(k.toLowerCase()));
   }
   checkX(d, out);
+  // "For each poison counter its controller has" counts for an affected permanent: a static ability's, or a resolved
+  // continuous effect's (Phyresis Outbreak). Anywhere else there's no "it".
+  const affectedPoison = (v: unknown): boolean => {
+    if (Array.isArray(v)) return v.some(affectedPoison);
+    if (!v || typeof v !== "object") return false;
+    if ((v as { type?: string }).type === "continuous" && (v as { what?: { ref?: string } }).what?.ref === "each") return false;
+    return (v as { kind?: string }).kind === "affectedControllerPoison" || Object.values(v).some(affectedPoison);
+  };
+  if (affectedPoison([out.spell, out.triggers, out.activated])) out.unsupported.push("(poison counters of an affected permanent's controller, with no affected permanent)");
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.
   const kinds = (costs: AdditionalCost[] = []) => costs.map((c) => c.kind);
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");
@@ -3053,10 +3076,12 @@ function linkExile(out: CompiledCard) {
     if (!others && exiles.length === 1) exiles[0]!.linked = true;
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
-  // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint).
+  // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint). "A copy of the exiled card" (Mardu
+  // Siegebreaker): the one its "exile ... until ~ leaves the battlefield" ability exiled, when it has no other exile.
   if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"')) && !out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
-    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const plain = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const exiles = plain.length ? plain : all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
@@ -3219,7 +3244,8 @@ function checkX(d: CardDef, out: CompiledCard) {
   const cyclingX = out.activated.some((a) => a.cycling && /\{X\}/.test(a.manaCost));
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX)) return true;
+    // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || tr.eventX) return true;
     bad(tr.body.text);
     return false;
   });

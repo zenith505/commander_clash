@@ -4,7 +4,7 @@ import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
-import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
+import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
@@ -56,6 +56,7 @@ import {
   altCost,
   delveRoom,
   spellTargets,
+  activationLessCost,
   availableMana,
   exilePlayable,
   topPlayable,
@@ -208,7 +209,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const orLose = e?.type === "may" && !!e.otherwise?.some((x) => x.type === "loseGame");
       // Transmute Artifact: unpaid, the card found goes to the graveyard; pay when we can.
       const orYard = !!s.resolving?.scratch?.payDiff;
-      const ok = !!taps && (orLose || orYard || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
+      // Join forces: the amount was ours to choose (payX), so pay it.
+      const joining = !!s.resolving?.scratch?.join;
+      const ok = !!taps && (orLose || orYard || joining || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
@@ -640,7 +643,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may pay {X}. If you do, ...": as much as we can, keeping cards in our library.
     if (pend.kind === "chooseOption" && pend.what === "payX") {
       const nums = pend.options.filter((o) => o !== "none").map(Number);
-      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw");
+      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw" || (x.type === "mill" && !!s.resolving!.scratch?.join));
+      // Join forces' "each player mills X" (Shared Trauma): only what its caster wants.
+      if (s.resolving?.scratch?.join && s.resolving.item.controller !== pid && allEffects(s.resolving.body.effects).some((x) => x.type === "mill")) return [{ type: "chooseOption", player: pid, choice: "none" }];
       const most = Math.max(...nums.filter((n) => !draws || n < player(s, pid).library.length - 1), -1);
       return [{ type: "chooseOption", player: pid, choice: most > 0 ? String(most) : "none" }];
     }
@@ -759,7 +764,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -1217,6 +1222,31 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const pick = ours[0] ?? me ?? (forced ? all[0] : undefined);
     return pick ? [pick] : null;
   }
+  // Mardu Siegebreaker: the creature of ours that copies best for each opponent, the one with an enters ability first,
+  // never a commander (it would leave the game for a while, and the tokens copy the card, not the commander).
+  const ex0 = body.effects[0];
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  if (body.targets.length === 1 && body.effects.length === 1 && ex0?.type === "exile" && ex0.until && ex0.what.ref === "target" && body.targets[0]!.controller === "you" && src && allEffects(compileCard(defOf(s, src)).triggers.flatMap((tr) => tr.body.effects)).some((e) => e.type === "createTokenCopy" && e.attackingEach)) {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, botSource(s, sourceId!), sourceId).filter((t) => t.kind === "object" && t.id !== sourceId && !obj(s, t.id).isToken && !obj(s, t.id).isCommander);
+    const rank = (t: TargetChoice) => (t.kind !== "object" ? 0 : worth(s, pid, obj(s, t.id)) + (compileCard(defOf(s, obj(s, t.id))).triggers.some((tr) => tr.event === "selfEnters") ? 5 : 0));
+    const pick = [...all].sort((a, b) => rank(b) - rank(a))[0];
+    return [pick ?? { kind: "none" }];
+  }
+  // Angel of Serenity: opponents' best creatures first; then, when they come back to their owners' hands as it leaves,
+  // our own best creature cards from our graveyard.
+  const ex1 = allEffects(body.effects).find((e) => e.type === "exile");
+  if (body.targets.length && body.targets.every((t) => t.orCard && !t.skip) && ex1?.type === "exile" && ex1.what.ref === "target" && src) {
+    const back = compileCard(defOf(s, src)).triggers.some((tr) => tr.event === "selfLeaves" && tr.body.effects.some((e) => e.type === "returnLinked" && e.dest === "hand"));
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, botSource(s, sourceId!), sourceId).filter((t) => t.kind === "object" && t.id !== sourceId);
+    const rank = (t: TargetChoice) => {
+      if (t.kind !== "object") return -1;
+      const o = obj(s, t.id);
+      if (o.zone === "battlefield") return controllerOf(s, o) === pid ? -1 : 100 + worth(s, pid, o);
+      return back && o.owner === pid ? mv(s, o.id) : -1;
+    };
+    const picks = all.filter((t) => rank(t) >= 0).sort((a, b) => rank(b) - rank(a)).slice(0, body.targets.length);
+    return body.targets.map((_, i) => picks[i] ?? { kind: "none" });
+  }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.
@@ -1617,6 +1647,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
   }
   let xs: (number | undefined)[] = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  // With Doubling Cube, the bigger X it pays for first (autopay's planCubeMana pays what the other sources can't).
+  if (cost.hasX && !free) {
+    const most = xs[0] ?? 0;
+    const cubed = xChoices(cubeMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)).filter((x) => x > most);
+    xs = [...cubed, ...xs];
+  }
   // "Kicker {X}" (Thieving Skydiver): kicked with as big an X as we can pay, else not kicked.
   const kickX = compileCard(d).kicker?.costs.find((c) => parseManaCost(c).hasX);
   if (!cost.hasX && kickX && !via && !alt) {
@@ -1643,6 +1679,27 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (plan) return plan;
   }
   return null;
+}
+
+/**
+ * The most mana we could have with Doubling Cube's "{3}, {T}: Double the amount of each type of unspent mana you have":
+ * our other sources make all they can, the Cube's cost is paid from that and the rest doubled. 0 without a Cube we
+ * could activate.
+ */
+function cubeMana(s: GameState, pid: PlayerId): number {
+  let most = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    manaAbilitiesOn(s, o).forEach((ab, i) => {
+      if (ab.produces.kind !== "doublePool" || manaAbilityProblem(s, pid, o, i, true)) return;
+      const cost = activationLessCost(s, o, parseManaCost(ab.manaCost));
+      if (cost.symbols.some((x) => x.kind !== "generic")) return;
+      // The Cube itself makes nothing on its own, so availableMana counts our other sources only.
+      most = Math.max(most, 2 * (availableMana(s, pid) - manaValue(cost)));
+    });
+  }
+  return most;
 }
 
 /**
@@ -2644,6 +2701,9 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const spare = sac?.type === "pick" && pickOptions(s, sac, pid, r.item.sourceId).some((id) => !obj(s, id).isCommander && worth(s, pid, obj(s, id)) <= 3);
     return loss >= life || loss * 4 >= life || (spare && loss >= 4);
   }
+  // The Second Doctor: "each player may draw a card. Each opponent who does can't attack you ... during their next turn":
+  // the card, unless that player is the only opponent left to attack.
+  if (r && e?.type === "eachMay" && e.each && after?.type === "attackBanNextTurn" && pid !== r.item.controller) return opponents(s, pid).length > 1;
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).
@@ -4097,6 +4157,36 @@ function chooseDeathReturn(s: GameState, pid: PlayerId): Action[] | null {
         if ((s.delayed ?? []).some((d) => d.dies && d.subject.id === t.id && d.subject.zc === (t.zoneChanges ?? 0) && d.controller === pid)) continue;
         if (s.stack.some((x) => x.controller === pid && x.sourceId === id && x.targets?.some((y) => !Array.isArray(y) && y.kind === "object" && y.id === t.id))) continue;
         const plan = planActivate(s, pid, id, i, [{ kind: "object", id: t.id }]);
+        if (plan) return plan;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * "Return target commander you own from the battlefield to your hand" (Sanctum of Eternity): a commander of ours that's
+ * about to die or be exiled (doomedNow), or that an opponent controls, back to our hand, where it's cast again without
+ * commander tax (CR 903.8 counts only casts from the command zone).
+ */
+function chooseCommanderReturn(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const t = ab.body.targets[0];
+      if (ab.body.targets.length !== 1 || t?.kind !== "object" || !t.commander || t.owner !== "you") continue;
+      if (ab.body.effects.length !== 1 || ab.body.effects[0]!.type !== "bounce" || ab.sacrificeSelf || ab.costs?.length) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      for (const c of legalTargets(s, t, pid, undefined, sourceQuality(s, id), id)) {
+        if (c.kind !== "object") continue;
+        const cmd = obj(s, c.id);
+        if (controllerOf(s, cmd) === pid && !doomedNow(s, pid, cmd)) continue;
+        if (s.stack.some((x) => x.controller === pid && x.sourceId === id)) continue;
+        const plan = planActivate(s, pid, id, i, [{ kind: "object", id: cmd.id }]);
         if (plan) return plan;
       }
     }

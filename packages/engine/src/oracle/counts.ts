@@ -34,6 +34,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^the total mana value of those exiled cards$/i.test(p)) return { count: { kind: "exiledTopManaValue" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
+  // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
+  // Outbreak): each creature's own controller's (Count affectedControllerPoison).
+  if (each && /^poison counter its controller has$/i.test(p)) return { count: { kind: "affectedControllerPoison" } };
   // "For each Urza's land you control" (Urza's Workshop): the land type Urza's (CR 205.3i), not a possessive.
   if ((m = /^(?:the number of )?(Urza's lands? you control)$/.exec(p))) {
     const g = parseGroup(m[1]!.replace(/land you/, "lands you"), true);

@@ -314,6 +314,13 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
   if (encoded.length) own = { ...own, triggers: [...own.triggers, ...encoded.map((e) => cipherTrigger(defOf(s, s.objects[e.id]!).name, e))] };
+  // "Each creature card in your hand has ninjutsu" (Satoru Umezawa): from a permanent its owner controls.
+  if (o.zone === "hand")
+    for (const id of s.battlefield) {
+      const p = s.objects[id]!;
+      const grants = characteristics(s, p).controller === o.owner && characteristics(s, p).hasPrintedAbilities ? compileCard(defOf(s, p)).handGrants : undefined;
+      for (const g of grants ?? []) if (printedMatches(g.filter, defOf(s, o))) own = { ...own, activated: [...own.activated, ...g.activated] };
+    }
   const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
   if (lent.length) own = withLent(own, lent);
   return own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;

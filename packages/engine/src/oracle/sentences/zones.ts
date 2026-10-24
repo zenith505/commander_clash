@@ -553,7 +553,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
   if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
-    const what = parseObject(m[1]!, ctx, true);
+    // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
+    const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
   }
   if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {
@@ -688,8 +689,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const cond = parseStaticCondition(m[1], { affects: { kind: "self" }, mods: [], text: "" });
     return cond ? [{ type: "if", cond: { kind: "state", cond }, effects: [{ type: "playLinked" }] }] : null;
   }
-  // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3).
-  if ((m = /^Exile (target .+|up to one target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
+  // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3), "up to one other target
+  // creature you control" (Mardu Siegebreaker).
+  if ((m = /^Exile (target .+|up to one (?:other )?target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }

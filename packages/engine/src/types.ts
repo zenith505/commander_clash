@@ -669,6 +669,11 @@ export interface Player {
    * player's next turn begins (whatever creatures they control by then, rulings).
    */
   attackBansUntil?: PlayerId[];
+  /**
+   * The Second Doctor: during this player's next turn (`turn`, set as it begins), they can't attack `player` or
+   * permanents `player` controls.
+   */
+  attackBansNextTurn?: { player: PlayerId; turn?: number }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
@@ -1120,7 +1125,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -1852,6 +1857,8 @@ export interface Resolving {
   tappedThisWay?: number;
   /** Cards a putFromHand with `manifest` put onto the battlefield face down: "for each card manifested this way". */
   manifestedThisWay?: number;
+  /** Join forces: the total amount of mana all players paid ("where X is the total amount of mana paid this way"). */
+  joinForcesPaid?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
@@ -2047,6 +2054,8 @@ export interface Resolving {
     drawUpToQueue?: PlayerId[];
     /** "You may pay {X}": the X chosen, or "none". */
     payX?: string;
+    /** Join forces: the players still to decide, from the controller on in turn order, and what they've paid so far. */
+    join?: { queue: PlayerId[]; paid: number; asked?: number };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */

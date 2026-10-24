@@ -509,7 +509,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "choseWord":
       return apnap(s, Object.entries(s.resolving?.chose ?? {}).filter(([, w]) => w === ref.option).map(([k]) => Number(k) as PlayerId)).filter((p) => !player(s, p).lost);
     case "choseThisWay":
-      return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost);
+      return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost && (!ref.opponents || p !== ctx.controller));
     case "notChoseThisWay": {
       const did = s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? [];
       return (ref.opponents ? opponents(s, ctx.controller) : apnap(s, s.players.map((p) => p.id))).filter((p) => !did.includes(p) && !player(s, p).lost);
@@ -663,8 +663,8 @@ function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[]): string
   return [...out];
 }
 
-export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Modification[] {
-  const c = amountCtx(s, ctx);
+export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, affected?: ObjectId): Modification[] {
+  const c = { ...amountCtx(s, ctx), ...(affected !== undefined ? { affected } : {}) };
   return mods.map((m) =>
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
@@ -906,6 +906,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ownersGainControl":
     case "exchangeControl":
     case "playerGains":
+    case "attackBanNextTurn":
     case "attach":
     case "attachAny":
     case "attachLastKnown":
@@ -1014,6 +1015,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "either":
     case "villainous":
     case "eachMay":
+    case "joinForces":
     case "punisher":
     case "cumulativeUpkeep":
     case "collectEvidence":

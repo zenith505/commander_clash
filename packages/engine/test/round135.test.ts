@@ -76,7 +76,8 @@ describe("Doubling Cube: bots use it for abilities, hybrid and {X} costs too", (
     expect(untapped(s, lands)).toBe(7);
   });
 
-  it("an {X} spell keeps the X the lands alone would pay, with four lands left", () => {
+  // Round 136: the Cube raises X to what the doubled mana pays (it kept the lands' X before).
+  it("an {X} spell: the Cube raises X to what all the lands and the doubling pay", () => {
     const blaze = card("Test Blaze", "Sorcery", "{X}{R}", { oracleText: "Test Blaze deals X damage to any target." });
     const xOf = (acts: Action[]) => acts.flatMap((a) => (a.type === "castSpell" ? [a.x] : []))[0];
     const without = scene([blaze], false);
@@ -84,11 +85,11 @@ describe("Doubling Cube: bots use it for abilities, hybrid and {X} costs too", (
     const { s: s0, ap, ids, cubeId, lands } = scene([blaze], true);
     const acts = botActions(s0, ap);
     expect(acts.some((a) => a.type === "activateMana" && a.objectId === cubeId)).toBe(true);
-    expect(xOf(acts)).toBe(13);
+    // Fourteen lands, the Cube's three paid from them, the other eleven doubled: twenty-two, X is 21.
+    expect(xOf(acts)).toBe(21);
     const s = run(s0, acts);
     expect(s.stack.map((x) => x.objectId)).toContain(ids[0]);
-    // Seven lands and the Cube's three: fourteen.
-    expect(untapped(s, lands)).toBe(4);
+    expect(untapped(s, lands)).toBe(0);
   });
 
   it("an activated ability that costs eight, in the second main phase", () => {

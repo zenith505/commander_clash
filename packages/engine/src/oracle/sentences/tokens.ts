@@ -166,6 +166,11 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (each && amt(m[2]!) !== 1) return null;
     return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(each ? { each: true as const } : {}), ...(except ? { except } : {}), ...state }];
   }
+  // "For each opponent, create a tapped token that's a copy of the exiled card attacking that opponent" (Mardu
+  // Siegebreaker): one copy for each opponent of the card its exile ability exiled (CR 607.2a, linkExile), each attacking
+  // that opponent (CR 508.4) if it's a creature (CR 506.3a) and this player's combat.
+  if (!ctx.spell && /^[Ff]or each opponent, create a tapped token that's a copy of the exiled card attacking that opponent$/.test(s))
+    return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "linkedCard" }, tapped: true, attackingEach: true }];
   // "Whenever ~ attacks a player, for each other opponent, create a token that's a copy of ~ tapped and attacking that
   // player, except it isn't legendary" (Shredder): myriad's tokens (CR 702.116a), each opponent but the defending player,
   // with no "may".

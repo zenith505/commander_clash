@@ -105,6 +105,8 @@ export type Count =
   | { kind: "affectedCounters"; counter: CounterKind }
   /** "Becomes an artifact creature with power and toughness each equal to its mana value" (Karn, the Great Creator): the permanent the effect is applied to; X in its mana cost is 0 (CR 202.3e). */
   | { kind: "affectedManaValue" }
+  /** "For each poison counter its controller has" (Phyresis Outbreak): of the affected permanent's controller, counted for each one as the effect is made (rulings). */
+  | { kind: "affectedControllerPoison" }
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef }
@@ -146,6 +148,8 @@ export type Count =
   | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
+  /** Join forces: "the total amount of mana paid this way" (Minds Aglow). */
+  | { kind: "joinForcesPaid" }
   /** "For each card manifested this way" (Kozilek, the Broken Reality): the cards a putFromHand with `manifest` turned face down onto the battlefield. */
   | { kind: "manifestedThisWay" }
   /**
@@ -594,6 +598,11 @@ export interface TargetSpec {
    */
   orPermanent?: TargetSpec;
   /**
+   * For "object" targets: a card in a graveyard matching this can be the target instead, "up to three other target
+   * creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity). One target, either kind.
+   */
+  orCard?: TargetSpec;
+  /**
    * "Target spell that targets a permanent you control", "... that targets you": a spell with at least one target that's
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */
@@ -817,7 +826,7 @@ export type PlayerRef =
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
   | { ref: "opponentsAttackingEventPlayer" }
   /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
-  | { ref: "choseThisWay" }
+  | { ref: "choseThisWay"; /** "Each opponent who does" (The Second Doctor): only the opponents among them. */ opponents?: true }
   /** "Each opponent who didn't" (Kynaios and Tiro), "each player who doesn't": those not among choseThisWay, still in the game. */
   | { ref: "notChoseThisWay"; opponents?: true }
   /** The players who did none of a punisher's options (see the punisher effect). */
@@ -2257,7 +2266,7 @@ export type Effect =
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
   /** `each`: "For each token you control, create a token that's a copy of that permanent" (Second Harvest): one copy of each object in the group `what`, as it is now. */
-  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true }
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true; /** "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): `n` for each opponent, each attacking them. */ attackingEach?: true }
   /**
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
@@ -2611,6 +2620,8 @@ export type Effect =
   /** `chain`: the Chain cards' "that permanent's controller may copy ~" (Chain of Vapor), for the bots' answer. */
   /** `untappedSubject`: only while the trigger's subject is still there untapped (Charismatic Conqueror's "they may tap that permanent"). */
   /** `pay`: paid on saying yes (Chain Lightning's "may pay {R}{R}"); someone who can't pay isn't asked. `need` "hand": a card in hand to discard (Chain of Plasma). */
+  /** Join forces: "Starting with you, each player may pay any amount of mana" (Minds Aglow), the total kept for X. */
+  | { type: "joinForces" }
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
@@ -2922,6 +2933,11 @@ export type Effect =
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
+  /**
+   * "Each opponent who does can't attack you or permanents you control during their next turn" (The Second Doctor):
+   * see Player.attackBansNextTurn.
+   */
+  | { type: "attackBanNextTurn"; who: PlayerRef }
   | {
       type: "playerGains";
       keywords: string[];
@@ -3495,6 +3511,8 @@ export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn"
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** "Where X is the number of nonland cards milled this way" (The Wise Mothman): X is the event's amount, known as it triggers, so it can count targets ("up to X target creatures"). */
+  eventX?: true;
   /** For "permanentIsDealtDamage": what has to be dealt damage. */
   dealtFilter?: TargetSpec;
   /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn. */
@@ -3574,7 +3592,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -3812,6 +3830,8 @@ export interface BatchTrigger {
   notPlayed?: true;
   /** `toGraveyard` from the library: "Whenever a player mills one or more creature cards" (Zellix), milled ones only (CR 701.17a). */
   milled?: true;
+  /** With `milled`: once for the whole event, whoever milled them (The Wise Mothman, rulings), not once for each player. */
+  together?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
   sacrificed?: true;
 }
@@ -4863,6 +4883,10 @@ export interface CompiledCard {
   untapLimits?: { n: number; filter: TargetSpec; you?: true; whileUntapped?: true }[];
   /** "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master, CR 602.2b applies 601.2f). */
   ninjutsuLess?: number;
+  /** "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): these abilities for its controller's cards in hand that match (CR 113.6, 702.49a). */
+  handGrants?: { filter: TargetSpec; activated: ActivatedAbility[] }[];
+  /** The Master, Multiplied: "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control." */
+  ownTriggersSpareTokens?: true;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
   noLegendRule?: TargetSpec[];
   /**

@@ -990,23 +990,31 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           const no = gains.filter((k) => cant.some((x) => x.toLowerCase() === k.toLowerCase()));
           if (no.length) notGranted[id] = no;
         }
-      s.effects.push({
-        id: `e${s.nextId++}`,
-        timestamp: s.nextTimestamp++, // CR 613.7b
-        ...(Object.keys(notGranted).length ? { notGranted } : {}),
-        controller: giveTo ?? ctx.controller,
-        sourceName: src,
-        sourceId: ctx.sourceId,
-        duration: e.duration,
-        ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" ? { turnOf: ctx.controller, sinceTurn: s.turn } : {}),
-        ...(whileTapped ? { whileTapped } : {}),
-        ...(whileControlled ? { whileControlled } : {}),
-        ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
-        affected,
-        mods,
-      });
-      const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
+      // "For each poison counter its controller has" (Phyresis Outbreak): each controller's creatures get their own amount,
+      // counted once now (rulings), as effects with one timestamp.
+      const perController = JSON.stringify(e.mods).includes('"affectedControllerPoison"');
+      const groups = perController ? [...new Set(affected.map((id) => controllerOf(s, obj(s, id))))].map((pid) => affected.filter((id) => controllerOf(s, obj(s, id)) === pid)) : [affected];
+      const timestamp = s.nextTimestamp++; // CR 613.7b
+      for (const group of groups) {
+        const groupMods = perController ? fixMods(s, e.mods, ctx, group[0]) : mods;
+        s.effects.push({
+          id: `e${s.nextId++}`,
+          timestamp,
+          ...(Object.keys(notGranted).length ? { notGranted } : {}),
+          controller: giveTo ?? ctx.controller,
+          sourceName: src,
+          sourceId: ctx.sourceId,
+          duration: e.duration,
+          ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" ? { turnOf: ctx.controller, sinceTurn: s.turn } : {}),
+          ...(whileTapped ? { whileTapped } : {}),
+          ...(whileControlled ? { whileControlled } : {}),
+          ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
+          affected: group,
+          mods: groupMods,
+        });
+        const names = group.map((id) => defOf(s, obj(s, id)).name);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
+      }
       return;
     }
     case "exchangeControl": {
@@ -1048,6 +1056,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: e.duration, ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}), affected: [], group: e.affects, mods: e.mods });
       invalidateCharacteristics(s);
       log(s, `Until ${e.duration === "endOfTurn" ? "end of turn" : `${player(s, ctx.controller).name}'s next turn`}, ${e.text} ${describeMods(s, e.mods, ctx.controller, true)}.`);
+      return;
+    }
+    case "attackBanNextTurn": {
+      for (const pid of players(s, e.who, ctx)) {
+        (player(s, pid).attackBansNextTurn ??= []).push({ player: ctx.controller });
+        log(s, `${player(s, pid).name} can't attack ${player(s, ctx.controller).name} or permanents ${player(s, ctx.controller).name} controls during their next turn.`);
+      }
       return;
     }
     case "playerGains": {

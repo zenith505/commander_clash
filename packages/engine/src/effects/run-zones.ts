@@ -2422,7 +2422,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const pid of apnap(s, [...counts.keys()])) {
         if (player(s, pid).lost || done.includes(pid)) continue;
         const n = counts.get(pid)!;
-        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" ? { ...inner, n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
+        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" || inner.type === "loseLife" ? { ...inner, n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
         done.push(pid);
         // The next player's search starts afresh (its queue, count and found cards are in the scratch).
         s.resolving!.scratch = { forEachDone: done };

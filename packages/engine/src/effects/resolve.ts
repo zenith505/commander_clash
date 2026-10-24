@@ -849,6 +849,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "permanentPiles":
     case "returnExiled":
     case "exileIfDies":
+    case "exileReturnThisTurn":
     case "exileIfLeaves":
     case "noRegen":
     case "noCombatDamage":

@@ -292,7 +292,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "enteredThisTurn":
       return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t)))).length;
     case "sacrificedThisTurn":
-      return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type))).length;
+      return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
     case "toGraveyardThisTurn":

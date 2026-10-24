@@ -283,6 +283,34 @@
   ]
  },
  {
+  "oracleId": "151c867f-cc77-42de-9ae5-5fd2233ccdab",
+  "name": "Afterlife from the Loam",
+  "manaCost": "{5}{B}{B}{B}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Delve (Each card you exile from your graveyard while casting this spell pays for {1}.)\nFor each player, choose up to one target creature card in that player's graveyard. Put those cards onto the battlefield under your control. They're Zombies in addition to their other types.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Delve"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdc",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "abe377f8-35f0-4dea-a681-91d31a36815c",
   "name": "Agitator Ant",
   "manaCost": "{2}{R}",
@@ -2945,6 +2973,32 @@
   "set": "frc",
   "releasedAt": "2026-10-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a3d287ec-1a39-4f91-acf1-7c1d2c00ed89",
+  "name": "Concentrate",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw three cards.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pc2",
+  "releasedAt": "2012-06-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7214,6 +7268,32 @@
   "set": "slz",
   "releasedAt": "2026-09-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5b3f041e-ad4a-47ea-bdc4-1be2353f2e18",
+  "name": "Invoke Calamity",
+  "manaCost": "{1}{R}{R}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast up to two instant and/or sorcery spells with total mana value 6 or less from your graveyard and/or hand without paying their mana costs. If those spells would be put into your graveyard, exile them instead. Exile Invoke Calamity.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

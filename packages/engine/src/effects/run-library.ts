@@ -74,7 +74,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = p.library.slice(0, amountNow(s, e.n, { ...ctx, eachOne: pid }));
-        for (const id of ids) moveObject(s, id, "exile");
+        for (const id of ids) {
+          moveObject(s, id, "exile");
+          const o = obj(s, id);
+          if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        }
         if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
         if (s.resolving) s.resolving.exiledTopCards = ids;
         // An empty library: nothing happens (ingest rulings).

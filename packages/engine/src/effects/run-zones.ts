@@ -1029,6 +1029,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
         sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
+      if (!sc.castAmong && e.handAndYard) {
+        // Invoke Calamity: cast from your hand and/or graveyard, where they are (rulings: the spells' mana values on the
+        // stack count toward the total).
+        sc.castAmong = { ids: [...you.hand, ...you.graveyard].map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}) };
+      }
       if (!sc.castAmong && e.fromHand) {
         const whose = players(s, e.who, ctx)[0];
         if (whose === undefined) return;
@@ -1062,7 +1067,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (st.done) return;
       const mvOf = (id: ObjectId) => defMv(defOf(s, obj(s, id)));
       // Still where they were put: in exile, or revealed in the library (`reveal`).
-      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === (e.fromHand ? "hand" : e.reveal ? "library" : "exile") && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && (e.handAndYard ? ["hand", "graveyard"].includes(s.objects[id]?.zone ?? "") : s.objects[id]?.zone === (e.fromHand ? "hand" : e.reveal ? "library" : "exile")) && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
       // Done: the exiled cards that weren't cast go where `rest` says (rulings on Muse Vortex: all the instants and
       // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
       const finish = (): "paused" | undefined => {
@@ -1124,7 +1129,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Cast: it's on the stack now (a new object, CR 400.7); declined: it stays in exile.
         if (exiled(st.casting)) st.declined.push(st.casting);
         else {
-          if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+          // The spell's mana value on the stack: the half or face cast (rulings on Invoke Calamity, CR 709.3, 712.11c).
+          const cast = s.stack.find((x) => x.objectId === st.casting);
+          if (st.budget !== undefined) st.budget -= cast ? spellManaValue(s, cast) : mvOf(st.casting);
+          if (e.exileCast && s.objects[st.casting]?.zone === "stack") s.objects[st.casting]!.exileIfToGraveyard = true;
           st.cast = (st.cast ?? 0) + 1;
           if (e.ownersLoseLife) {
             const item = s.stack.find((x) => x.objectId === st.casting);
@@ -1140,7 +1148,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // card's half, a prototyped spell), checked as it's cast (CR 202.3, 709.3, 718.3b; rulings on Powerbalance).
       const maxMv = st.maxMv === undefined ? st.budget : st.budget === undefined ? st.maxMv : Math.min(st.maxMv, st.budget);
       const mv = maxMv === undefined && st.exactMv === undefined ? undefined : { ...(maxMv !== undefined ? { max: maxMv } : {}), ...(st.exactMv !== undefined ? { exact: st.exactMv } : {}) };
-      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}) });
+      // Invoke Calamity: the spell's types as it's cast, not the card's (rulings).
+      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}), ...(e.handAndYard && e.filter?.types ? { types: e.filter.types } : {}) });
       if (st.handPick) return finish();
       // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
       if (e.opponentExcludes && !st.excluded) {
@@ -1209,7 +1218,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sharesType = (id: ObjectId) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === you.id && objIsType(s, obj(s, b), "Creature") && shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, b))));
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) && !e.handAndYard ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || e.handAndYard || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       if (e.look && options.length === 1) {
         // Planetarium: the one card looked at is offered as the free cast itself (cast it, or decline).
@@ -1217,7 +1226,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return runEffect(s, e, ctx);
       }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name + (e.handAndYard ? ` (${obj(s, id).zone})` : "")), "Done"], prompt: e.handAndYard ? `cast a spell from your hand or graveyard without paying its mana cost${left}?` : `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
       return "paused";
     }
     case "exileCastEachType": {
@@ -2418,6 +2427,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "exileIfLeaves":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfLeaves = "battlefield";
       return;
+    case "exileReturnThisTurn": {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      s.exileReturnTurn = [...(s.exileReturnTurn ?? []).filter((x) => x.turn === s.turn), { player: ctx.controller, turn: s.turn, source: src, sourceCardId: me ? cardIdOf(me) : "" }];
+      log(s, `This turn, ${player(s, ctx.controller).name}'s permanents are exiled instead of being put into a graveyard, and return at the beginning of the next end step.`);
+      return;
+    }
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield" && (!e.ifCreature || objIsType(s, o, "Creature"))) o.exileIfDiesTurn = s.turn;
       return;

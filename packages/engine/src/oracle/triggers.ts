@@ -1538,6 +1538,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever you proliferate, ${expend[2]}`);
     return t && t !== "fail" && t.event === "youProliferate" && Object.keys(t).every((k) => k === "event" || k === "body") ? { ...t, event: "youExpend", expend: Number(expend[1]) } : "fail";
   }
+  // Jenova, Ancient Calamity: "Whenever a Mutant you control dies during your turn, ...": only during its controller's
+  // turn, as it dies (CR 603.10a looks back to it).
+  const diesOnYourTurn = /^(Whenever (?:an?|another) [^,]+? dies) during your turn, (.+)$/.exec(line);
+  if (diesOnYourTurn) {
+    const t = parseTrigger(`${diesOnYourTurn[1]}, ${diesOnYourTurn[2]}`);
+    return t && t !== "fail" && t.event === "permanentDies" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
+  }
   // Kefka, Ruler of Ruin: "Whenever an opponent loses life during your turn, you draw that many cards": it triggers only
   // during its controller's turn.
   const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);
@@ -1560,6 +1567,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (groupDamage) return groupDamage;
   const sourceDamage = parseSourceDamagesOpponent(line);
   if (sourceDamage) return sourceDamage;
+  // Emberwilde Captain: "Whenever an opponent attacks you while you're the monarch, ...": a condition on the event, checked
+  // as they attack only (rulings: it resolves as normal if someone else became the monarch meanwhile; attacking only your
+  // planeswalkers doesn't trigger it).
+  const attacksMonarch = /^Whenever an opponent attacks you while you're the monarch, (.+)$/.exec(line);
+  if (attacksMonarch) {
+    const t = parseTrigger(`Whenever an opponent attacks you, ${attacksMonarch[1]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "monarch" } } : "fail";
+  }
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
   // the event, checked as it attacks only (rulings), not an intervening if.
   const attacksWhile = /^Whenever ~ attacks while (you control .+?), (.+)$/.exec(line);

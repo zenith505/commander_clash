@@ -860,7 +860,10 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
   const d = defOf(s, o);
-  if (compileCard(d).cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
+  const compiled = compileCard(d);
+  if (compiled.cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
+  // Banefire: its X, chosen as it was cast (a copy has the same X, CR 707.10).
+  if (compiled.cantBeCounteredX !== undefined && (item.x ?? 0) >= compiled.cantBeCounteredX) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).
   // "Can't be countered by blue or black spells this turn" (Autumn's Veil): the countering spell's colors as it resolves
   // (rulings); abilities still can.

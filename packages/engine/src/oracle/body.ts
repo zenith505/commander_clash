@@ -720,6 +720,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(deals damage to each opponent equal to the number of [^.]+?) that opponent controls\b/g, "$1 that player controls");
   // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
   // of the Bridge): the same X, counted again (nothing between them changes it).
+  // Afterlife from the Loam: "For each player, choose up to one target creature card in that player's graveyard. Put those
+  // cards onto the battlefield under your control." One target in each player's graveyard, yours too, all put at once.
+  text = text.replace(/(^|\. )For each player, choose up to one target ([a-z]+ card) in that player's graveyard\. Put those cards onto the battlefield under your control\./, "$1For each player, put up to one target $2 from that player's graveyard onto the battlefield under your control.");
   text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
   // Tevesh Szat: "If you do, draw two cards, then draw another card if the sacrificed permanent was a commander."
   text = text.replace(/(^|\. )(If you do, draw (?:a card|two cards)), then draw another card if the sacrificed permanent was a commander\./, "$1$2. If the sacrificed permanent was a commander, draw a card.");
@@ -1346,6 +1349,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // whether to is part of choosing them (keeping them all is allowed).
     if (/^You may choose new targets for that spell(?: or ability)?$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell") {
       effects.push({ type: "newTargets", index: ctx.lastObjectTarget });
+      continue;
+    }
+    // Invoke Calamity: "You may cast up to two instant and/or sorcery spells with total mana value 6 or less from your
+    // graveyard and/or hand without paying their mana costs. If those spells would be put into your graveyard, exile them
+    // instead." Cast one after the other as it resolves (rulings, CR 608.2g), from where they are; the total counts the
+    // spells' mana values on the stack (rulings), X being 0 (CR 107.3b).
+    const calamity = /^You may cast up to two instant and\/or sorcery spells with total mana value (\d+) or less from your graveyard and\/or hand without paying their mana costs$/.exec(s);
+    if (calamity && /^If those spells would be put into your graveyard, exile them instead\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, handAndYard: true, max: 2, totalMv: Number(calamity[1]), exileCast: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } });
+      si++;
       continue;
     }
     // The Great Synthesis: "You may cast any number of spells from your hand without paying their mana costs": one after
@@ -4661,6 +4674,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "eachMay", who: prev.what.of, text: `search their library for that many ${settleLands[1]}`, effects: [{ ...sr, n: { count: { kind: "exiledThisWay", filter: exiled } }, who: { ref: "choseThisWay" } }] });
       continue;
     }
+    // "They're Zombies in addition to their other types" after putting one target from each player's graveyard (Afterlife
+    // from the Loam): each of them.
+    const theyAre = /^They're ([A-Z][a-z]+)s in addition to their other types$/.exec(s);
+    if (theyAre) {
+      const prev = effects[effects.length - 1];
+      const spec = prev?.type === "putOntoBattlefield" && prev.what.ref === "target" && !prev.what.n ? ctx.targets[prev.what.index] : undefined;
+      const mods = parseBecomes(`a ${theyAre[1]} in addition to its other types`);
+      if (prev?.type !== "putOntoBattlefield" || !spec?.perOpponent || !mods || prev.alsoMods) return null;
+      prev.alsoMods = mods;
+      continue;
+    }
     const isAlso = /^(?:That creature is|It's|It is|Each of them is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
@@ -5434,6 +5458,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
+    // instead. Return it to the battlefield under its owner's control at the beginning of the next end step." (CR 614.1a,
+    // 603.7a): the "it" returned is each permanent exiled this way.
+    if (/^If a permanent you control would be put into a graveyard from the battlefield this turn, exile it instead$/.test(s) && /^Return it to the battlefield under its owner's control at the beginning of the next end step\.?$/.test(sentences[si + 1] ?? "") && opts.spell) {
+      effects.push({ type: "exileReturnThisTurn" });
+      si++;
+      continue;
+    }
     // "~ deals 4 damage to target creature. The damage can't be prevented." (CR 615.12)
     if (/^The damage can't be prevented$/.test(s)) {
       const last = effects[effects.length - 1];
@@ -6008,8 +6040,7 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const t = who.exec(` ${m[1]!}`) ?? yard.exec(` ${m[1]!}`);
   if (!t) return null;
   const card = !who.test(` ${m[1]!}`);
-  if (every && card) return null;
-  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from an opponent's graveyard`).trim() : ` ${m[1]!}`.replace(who, every ? ` target ${t[1]}` : ` target ${t[1]} an opponent controls`).trim();
+  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from ${every ? "a" : "an opponent's"} graveyard`).trim() : ` ${m[1]!}`.replace(who, every ? ` target ${t[1]}` : ` target ${t[1]} an opponent controls`).trim();
   if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
   const before = ctx.targets.length;
   // "For each opponent, you may put ...": a choice for each of them, as it resolves.
@@ -6024,7 +6055,7 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const fx = one && may && !castWhat ? [{ type: "may" as const, effects: one, text: may[1]!, eachTarget: true as const }] : one;
   if (!fx || ctx.targets.length !== before + 1) return null;
   const spec = ctx.targets[before]!;
-  if (card ? spec.kind !== "card" || spec.owner !== "opponent" || spec.linkedExile : spec.kind !== "object" || spec.controller !== (every ? undefined : "opponent")) return null;
+  if (card ? spec.kind !== "card" || spec.owner !== (every ? undefined : "opponent") || spec.linkedExile : spec.kind !== "object" || spec.controller !== (every ? undefined : "opponent")) return null;
   if (spec.optional || spec.distinctFrom || spec.notSource) return null;
   ctx.targets[before] = { ...spec, perOpponent: true, ...(every ? { perPlayer: true as const } : {}), text: card ? `target ${t[1]} from that player's graveyard` : `target ${t[1]} that player controls` };
   ctx.lastObjectTarget = undefined;

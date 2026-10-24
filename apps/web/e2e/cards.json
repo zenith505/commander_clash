@@ -519,6 +519,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f4ce6078-8c7b-4f68-b324-13130c63a983",
+  "name": "Angel of Serenity",
+  "manaCost": "{4}{W}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may exile up to three other target creatures from the battlefield and/or creature cards from graveyards.\nWhen this creature leaves the battlefield, return the exiled cards to their owners' hands.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c0d8fef4-65f4-4769-982d-b397d2b7e977",
   "name": "Animate Dead",
   "manaCost": "{1}{B}",
@@ -11176,6 +11208,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed1d21ba-ddfe-4f82-9e37-93f9e2c7ba33",
+  "name": "Satoru Umezawa",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "Whenever you activate a ninjutsu ability, look at the top three cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order. This ability triggers only once each turn.\nEach creature card in your hand has ninjutsu {2}{U}{B}.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
   "name": "Savannah Lions",
   "manaCost": "{W}",
@@ -13243,6 +13310,43 @@
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "8a6eda31-2791-4def-b9e7-3adde155a4f0",
+  "name": "The Second Doctor",
+  "manaCost": "{2}{W}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Time Lord Doctor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Time Lord",
+   "Doctor"
+  ],
+  "oracleText": "Players have no maximum hand size.\nHow Civil of You — At the beginning of your end step, each player may draw a card. Each opponent who does can't attack you or permanents you control during their next turn.",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "How Civil of You"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "be922360-ee9f-4cfb-bf10-d481c5de5cb1",

@@ -1228,6 +1228,21 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const pick = [...all].sort((a, b) => rank(b) - rank(a))[0];
     return [pick ?? { kind: "none" }];
   }
+  // Angel of Serenity: opponents' best creatures first; then, when they come back to their owners' hands as it leaves,
+  // our own best creature cards from our graveyard.
+  const ex1 = allEffects(body.effects).find((e) => e.type === "exile");
+  if (body.targets.length && body.targets.every((t) => t.orCard && !t.skip) && ex1?.type === "exile" && ex1.what.ref === "target" && src) {
+    const back = compileCard(defOf(s, src)).triggers.some((tr) => tr.event === "selfLeaves" && tr.body.effects.some((e) => e.type === "returnLinked" && e.dest === "hand"));
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, botSource(s, sourceId!), sourceId).filter((t) => t.kind === "object" && t.id !== sourceId);
+    const rank = (t: TargetChoice) => {
+      if (t.kind !== "object") return -1;
+      const o = obj(s, t.id);
+      if (o.zone === "battlefield") return controllerOf(s, o) === pid ? -1 : 100 + worth(s, pid, o);
+      return back && o.owner === pid ? mv(s, o.id) : -1;
+    };
+    const picks = all.filter((t) => rank(t) >= 0).sort((a, b) => rank(b) - rank(a)).slice(0, body.targets.length);
+    return body.targets.map((_, i) => picks[i] ?? { kind: "none" });
+  }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.

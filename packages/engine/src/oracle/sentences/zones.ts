@@ -553,7 +553,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
   if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
-    const what = parseObject(m[1]!, ctx, true);
+    // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
+    const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
   }
   if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {

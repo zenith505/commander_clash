@@ -530,3 +530,78 @@ describe("\"With counters on them\" and \"up to one other target\": the cards th
     expect(s.objects[foe]!.zone).toBe("battlefield");
   });
 });
+
+describe("Angel of Serenity: up to three creatures from the battlefield and/or creature cards from graveyards", () => {
+  const angel = card("Angel of Serenity", "Creature — Angel", "{4}{W}{W}{W}", {
+    power: "5",
+    toughness: "6",
+    keywords: ["Flying"],
+    oracleText: "Flying\nWhen this creature enters, you may exile up to three other target creatures from the battlefield and/or creature cards from graveyards.\nWhen this creature leaves the battlefield, return the exiled cards to their owners' hands.",
+  });
+  const murder = card("Test Murder", "Instant", "{1}", { oracleText: "Destroy target creature." });
+  /** A card in `pid`'s graveyard. */
+  const inYard = (s: GameState, pid: PlayerId, d: CardDef) => {
+    const id = putOnBattlefield(s, pid, d);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "graveyard";
+    s.players[pid]!.graveyard.push(id);
+    return id;
+  };
+  const inHand = (s: GameState, pid: PlayerId, d: CardDef) => {
+    const id = putOnBattlefield(s, pid, d);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "hand";
+    s.players[pid]!.hand.push(id);
+    return id;
+  };
+  const setupAngel = () => {
+    const { s: s0, ap, ids, opp } = setup([angel]);
+    const foe = putOnBattlefield(s0, opp, bear({ name: "Test Foe" }));
+    const mine = inYard(s0, ap, bear({ name: "Test Fallen" }));
+    const theirs = inYard(s0, opp, bear({ name: "Test Their Fallen" }));
+    const spell = inYard(s0, ap, card("Test Sorcery", "Sorcery", "{1}", { oracleText: "Draw a card." }));
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    return { s, ap, opp, angelId: ids[0]!, foe, mine, theirs, spell };
+  };
+
+  it("is fully supported", () => supported(angel));
+
+  it("a creature and creature cards from two graveyards, not a noncreature card or itself; back to their owners' hands", () => {
+    let { s, ap, opp, angelId, foe, mine, theirs, spell } = setupAngel();
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: spell }, { kind: "none" }, { kind: "none" }] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: angelId }, { kind: "none" }, { kind: "none" }] })).toThrow();
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [foe, mine, theirs].map((id) => ({ kind: "object" as const, id })) }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect([foe, mine, theirs].map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile"]);
+    const m = inHand(s, ap, murder);
+    s = resolveAll(run(s, planCast(s, ap, m, [{ kind: "object", id: angelId }])));
+    expect(s.objects[angelId]!.zone).toBe("graveyard");
+    expect([foe, mine, theirs].map((id) => s.objects[id]!.zone)).toEqual(["hand", "hand", "hand"]);
+    expect(s.players[opp]!.hand).toEqual(expect.arrayContaining([foe, theirs]));
+    expect(s.players[ap]!.hand).toContain(mine);
+  });
+
+  it("a targeted creature that dies first is no longer a legal target, though its card is in a graveyard (rulings)", () => {
+    let { s, ap, foe, mine } = setupAngel();
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: foe }, { kind: "object", id: mine }, { kind: "none" }] });
+    // In response, the creature is destroyed.
+    while (waitingOn(s) !== ap) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const m = inHand(s, ap, murder);
+    s = run(s, planCast(s, ap, m, [{ kind: "object", id: foe }]));
+    s = resolveAll(s);
+    expect(s.objects[foe]!.zone).toBe("graveyard");
+    if (s.pending?.kind === "chooseMay") s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[foe]!.zone).toBe("graveyard");
+    expect(s.objects[mine]!.zone).toBe("exile");
+  });
+
+  it("a bot takes an opponent's creature and its own creature cards, not an opponent's graveyard", () => {
+    let { s, ap, foe, mine } = setupAngel();
+    expect(botActions(s, ap)).toEqual([{ type: "chooseTargets", player: ap, targets: [{ kind: "object", id: foe }, { kind: "object", id: mine }, { kind: "none" }] }]);
+    s = resolveAll(run(s, botActions(s, ap)));
+    for (let k = 0; k < 3 && s.pending; k++) s = resolveAll(run(s, botActions(s, s.pending.player)));
+    expect([s.objects[foe]!.zone, s.objects[mine]!.zone]).toEqual(["exile", "exile"]);
+  });
+});

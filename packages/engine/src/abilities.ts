@@ -596,6 +596,11 @@ export interface TargetSpec {
    */
   orPermanent?: TargetSpec;
   /**
+   * For "object" targets: a card in a graveyard matching this can be the target instead, "up to three other target
+   * creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity). One target, either kind.
+   */
+  orCard?: TargetSpec;
+  /**
    * "Target spell that targets a permanent you control", "... that targets you": a spell with at least one target that's
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */

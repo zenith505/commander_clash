@@ -659,11 +659,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
   if ((m = new RegExp(`^an opponent had (?:an?|${NUM} or more) (?:(white|blue|black|red|green) )?(artifact|creature|land|enchantment|planeswalker)s? enter the battlefield under their control this turn$`).exec(text)))
     return { kind: "opponentEntered", types: [capital(m[3]!)], ...(m[2] ? { color: COLOR_WORDS[m[2]]! } : {}), n: m[1] ? num(m[1]) : 1 };
-  if ((m = new RegExp(`^(?:you had )?(?:an?|${NUM} or more) (nonland permanent|permanent|artifact|creature|land|enchantment|planeswalker|[A-Z][a-z]+)s? (?:entered|enter) (?:the battlefield )?under your control this turn$`).exec(text))) {
-    const what = m[2]!;
+  if ((m = new RegExp(`^(?:you had )?(?:an?|(another)|${NUM} or more) (nonland permanent|permanent|artifact|creature|land|enchantment|planeswalker|[A-Z][a-z]+)s? (?:entered|enter) (?:the battlefield )?under your control this turn$`).exec(text))) {
+    const what = m[3]!;
     const kinds = ["nonland permanent", "permanent", "artifact", "creature", "land", "enchantment", "planeswalker"];
     if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
-      return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[1] ? num(m[1]) : 1 };
+      return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[2] ? num(m[2]) : 1, ...(m[1] ? { other: true as const } : {}) };
   }
   if (/^a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled$/.test(text)) return { kind: "destroyedByOpponent" };
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };

@@ -17,7 +17,7 @@ import { compileCard } from "../oracle";
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
  * enter at the same time (CR 608.2f), so each sees the others enter and none counts another as it enters (603.6a, 614.12).
  */
-export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null } = {}) {
+export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null; embalmed?: true } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
   const { same: k, extra } = tokenBatch(s, pid, s.cards[key]!, n);
@@ -27,6 +27,7 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
     for (let i = 0; i < k; i++) {
       const o = newObject(s, s.cards[key]!, pid, "exile");
       o.isToken = true;
+      if (opts.embalmed) o.embalmed = true;
       // An Aura token enters attached to what its controller chose (CR 303.4f); with nothing it could enchant, it isn't
       // created at all (CR 303.4g, rulings on Roles).
       const host = opts.auraHost !== undefined ? (opts.auraHost && auraHostOptions(s, o, pid).some((h) => auraHostKey(h) === auraHostKey(opts.auraHost!)) ? opts.auraHost : null) : undefined;

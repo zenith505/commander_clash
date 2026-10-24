@@ -198,6 +198,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that land's controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && isLandSpec(ctx.targets[ctx.lastObjectTarget]!)) return { ref: "targetController", index: ctx.lastObjectTarget };
   // "Its owner loses life equal to its mana value" (Brainstealer Dragon): whose the entering permanent is.
   if (x === "its owner" && ctx.lastObjectTarget === undefined && ctx.subjectIt && !ctx.targets.length) return { ref: "subjectOwner" };
+  if (x === "each player other than its controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many) return { ref: "otherThanTargetController", index: ctx.lastObjectTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -622,6 +623,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
   p = p.replace(/^((?:all |each )?)(creatures?) that(?:'s| is| are|'re) enchanted by an Aura you control$/i, "$1aura-yours-enchanted $2");
+  // "Each permanent you control that's a creature or Vehicle" (Ao, the Dawn Sky): each creature or Vehicle you control.
+  p = p.replace(/^((?:all |each )?)permanents? you control that(?:'s| is| are|'re) (?:an? )?creatures? or (?:an? )?Vehicles?$/i, "$1creature or Vehicle you control");
   // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
   p = p.replace(/^((?:all |each )?)([a-z ]+?) that (?:aren't|are not|isn't|is not) legendary$/i, "$1nonlegendary $2");
   // "Each nonland permanent that's not historic" (Desynchronization): not an artifact, not legendary, not a Saga (CR 700.6).
@@ -634,6 +637,14 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
       { kind: "object", types: ["Creature"], status: "modified", text: "modified creature" },
     ];
     return { filter: { kind: "object", types: ["Enchantment", "Artifact", "Creature"], notTypes: [], notColors: [], anyOf, controller: "you", text: phrase.trim().toLowerCase() }, other: false };
+  }
+  // "Each other creature you control that's a token or a Rabbit" (Finneas, Ace Archer): either one (TargetSpec.anyOf).
+  const tokenOr = /^((?:all |each )?(?:other )?creatures? you control) that(?:'s| is| are|'re) (?:a )?tokens? or (?:an? )?([A-Z][a-z]+)$/.exec(p);
+  if (tokenOr && CREATURE_TYPES.has(singular(tokenOr[2]!))) {
+    const base = parseGroup(tokenOr[1]!, bare, count);
+    if (!base || base.filter.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", token: true, text: "token" }, { kind: "object", subtypes: [singular(tokenOr[2]!)], text: singular(tokenOr[2]!) }];
+    return { filter: { ...base.filter, anyOf, text: phrase.trim().toLowerCase() }, other: base.other };
   }
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);

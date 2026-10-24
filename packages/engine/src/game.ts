@@ -1280,7 +1280,9 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
   const own = compileCard(defOf(s, o)).entersAsCopy;
   if (choice !== "none" && own) {
     const target = obj(s, choice);
-    const key = copyKey(s, defOf(s, target), exceptFor(s, o, own.except, realDefOf(s, o).name));
+    // Vizier of Many Faces: more exceptions for an embalmed token (CR 702.128b).
+    const except = own.ifEmbalmed && o.embalmed ? { ...own.except, ...own.ifEmbalmed } : own.except;
+    const key = copyKey(s, defOf(s, target), exceptFor(s, o, except, realDefOf(s, o).name));
     if (own.tapped) opts = { ...opts, tapped: true };
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
     else o.copyOf = key;
@@ -2708,6 +2710,7 @@ function startNextTurn(s: GameState, skipping = false) {
     if (began.has(p.id)) {
       p.gainedUntilNextTurn = undefined;
       p.lifeCantChange = undefined;
+      p.noMaxHandSizeUntilNextTurn = undefined;
       p.attackTaxUntil = undefined;
       p.attackBansUntil = undefined;
     }
@@ -3036,6 +3039,7 @@ function sagaSBAs(s: GameState): boolean {
 /** "You have no maximum hand size" on a permanent the player controls, or "Players have ..." on any (CR 402.2, 514.1). */
 export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
   !!player(s, pid).noMaxHandSize ||
+  !!player(s, pid).noMaxHandSizeUntilNextTurn ||
   !!player(s, pid).noMaxHandSizeWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc && controllerOf(s, s.objects[w.id]!) === pid) ||
   s.battlefield.some((id) => {
     const a = abilitiesOf(s, obj(s, id)).noMaxHandSize;

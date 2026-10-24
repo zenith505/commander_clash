@@ -536,6 +536,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${player(s, ctx.controller).name} has no maximum hand size for as long as they control ${src}.`);
         return;
       }
+      // "Until your next turn" (Enter the Infinite): over as that turn begins (CR 611.2b).
+      if (e.untilYourNextTurn) {
+        player(s, ctx.controller).noMaxHandSizeUntilNextTurn = true;
+        log(s, `${player(s, ctx.controller).name} has no maximum hand size until their next turn.`);
+        return;
+      }
       player(s, ctx.controller).noMaxHandSize = true;
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;

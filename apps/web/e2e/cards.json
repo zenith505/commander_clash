@@ -635,6 +635,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "697ac261-263b-4879-bf45-6d10d23312ae",
+  "name": "Ao, the Dawn Sky",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Dragon Spirit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon",
+   "Spirit"
+  ],
+  "oracleText": "Flying, vigilance\nWhen Ao dies, choose one —\n• Look at the top seven cards of your library. Put any number of nonland permanent cards with total mana value 4 or less from among them onto the battlefield. Put the rest on the bottom of your library in a random order.\n• Put two +1/+1 counters on each permanent you control that's a creature or Vehicle.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "28d500ea-720f-4332-891e-404fb03acb5c",
   "name": "Arachne, Psionic Weaver",
   "manaCost": "{2}{W}",
@@ -4020,6 +4056,34 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2026-09-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a9abed25-9256-4fc7-8afb-edb4286e18f4",
+  "name": "Dina's Guidance",
+  "manaCost": "{1}{B}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for a creature card, reveal it, put it into your hand or graveyard, then shuffle.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sos",
+  "releasedAt": "2026-04-24",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -8173,6 +8237,47 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2452be47-cc23-47f7-a3a1-fec900bb0119",
+  "name": "Kitesail Larcenist",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Pirate",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Pirate"
+  ],
+  "oracleText": "Flying, ward {1}\nWhen this creature enters, for each player, choose up to one other target artifact or creature that player controls. For as long as this creature remains on the battlefield, the chosen permanents become Treasure artifacts with \"{T}, Sacrifice this artifact: Add one mana of any color\" and lose all other abilities.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Ward"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8cefa5d6-5151-4e75-8b72-f210a4c751ea",
   "name": "Klauth, Unrivaled Ancient",
   "manaCost": "{5}{R}{G}",
@@ -9218,6 +9323,35 @@
   "set": "som",
   "releasedAt": "2010-10-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "75e9ac31-5993-4039-93b2-9380ced2499a",
+  "name": "Memory's Journey",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player shuffles up to three target cards from their graveyard into their library.\nFlashback {G} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

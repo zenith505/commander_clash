@@ -762,8 +762,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         if (e.controller !== you && cond.types.every((ty) => e.types.includes(ty)) && (!cond.color || e.colors.includes(cond.color))) n[e.controller] = (n[e.controller] ?? 0) + 1;
       return Object.values(n).some((k) => k >= cond.n);
     }
-    case "youEntered":
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype))).length >= cond.n;
+    case "youEntered": {
+      const selfZc = sourceZc ?? s.objects[sourceId]?.zoneChanges ?? 0;
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === you && !(cond.other && e.id === sourceId && e.zc === selfZc) && cond.types.every((ty) => e.types.includes(ty)) && !cond.notTypes?.some((ty) => e.types.includes(ty)) && (!cond.subtype || !!e.subtypes?.includes(cond.subtype))).length >= cond.n;
+    }
     case "destroyedByOpponent":
       return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);
     case "damagedByCreatures":

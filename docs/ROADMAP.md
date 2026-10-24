@@ -1,7 +1,7 @@
 # Roadmap
 
-24,032 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,764 of 4,988 (95%).
+24,060 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,779 of 4,988 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,7 +22,7 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 150, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 151, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
    spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
    batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
@@ -33,12 +33,18 @@ line blocks.
    the end of the upkeep step); Clockspinning (a counter on a suspended card); The Legend of Yangchen (each player in
    turn chooses among the opponents' permanents); Umbra Mystic (with several Auras, which one's umbra armor applies is
    the controller's choice, not modeled); Lozhan, Dragons' Legacy ("Adventure spell", "any target that isn't a
-   commander"); Helga, Skittish Seer (its mana's spend restriction); Rammas Echor, Conspiracy Theorist, Cayth, Phial of
+   commander"); Helga, Skittish Seer (its mana's spend restriction); Jinnie Fay, Jetmir's Second ("if you would create one or more
+   tokens, you may instead": a choice at every token creation, and tokens are created in many places, some outside a
+   resolution); Rammas Echor, Conspiracy Theorist, Cayth, Phial of
    Galadriel and Shadowgrange Archfiend (a line each with no piece yet); Serum Snare (the bounced permanent's last known
    mana value), Elturel Survivors (lands the defending player controls), Within Range (creatures attacking each
    opponent); Tidal Barracuda ("any player may cast spells as though they had flash": flash for the controller only so
-   far). Next most played: Vizier of Many Faces, Kitesail Larcenist, Ao, the Dawn Sky, Quandrix Command, Jinnie Fay,
-   Jetmir's Second, The Emperor of Palamecia.
+   far); Blatant Thievery ("for each opponent, gain control of target permanent that player controls": whether the
+   spell can be cast when an opponent controls no permanent it could target isn't settled by CR 601.2c or the
+   rulings). Next most played: Secret Arcade, Siphon Insight, Animation Module, Luxior, Giada's Gift, Tato Farmer,
+   Flow State.
+   Smaller gaps from round 151: bots always put Dina's Guidance's card into their hand; bots pick Kitesail Larcenist's
+   targets among opponents' permanents by the usual removal scoring, never their own.
    Smaller gaps from round 150: bots pay life for Necrodominance by a simple rule (up to five cards in hand, keeping 15
    life and two cards in the library); the payment is asked as one number from 0 to the player's life, with no "don't
    pay" button (paying 0 is the same, CR 119.4).

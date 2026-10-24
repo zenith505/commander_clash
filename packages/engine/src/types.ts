@@ -489,6 +489,8 @@ export interface GameObject {
   webSlung?: LastKnown;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
   bargained?: true;
+  /** A token created by a resolving embalm ability (CR 702.128b). */
+  embalmed?: true;
   /** As a spell, and as the permanent it became: its "you may collect evidence N" additional cost was paid (CR 701.59c). */
   evidence?: true;
   /** As a spell, and as the permanent it became: how much mana from Treasures was spent to cast it (CR 106.3). */
@@ -634,6 +636,8 @@ export interface Player {
   noMaxHandSize?: true;
   /** "You have no maximum hand size for as long as you control ~" (The Great Synthesis): while they control that object (CR 611.2b). */
   noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
+  /** "You have no maximum hand size until your next turn" (Enter the Infinite): until that player's next turn begins. */
+  noMaxHandSizeUntilNextTurn?: true;
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
   /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
@@ -1301,7 +1305,7 @@ export interface TurnLog {
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
-  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[] }[];
+  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
@@ -1887,6 +1891,8 @@ export interface Resolving {
   held?: { id: ObjectId; zc: number }[];
   /** The cards its mill instructions milled, as they are in the graveyard ("if a card with the chosen name was milled this way"). */
   milled?: { id: ObjectId; zc: number }[];
+  /** The cards its mill instructions exiled instead (a replacement, Rest in Peace): still "the milled cards" for Gyruda's rulings. */
+  milledExiled?: { id: ObjectId; zc: number }[];
   /** The cards the last "exile the top N cards of their library" exiled (Ensnared by the Mara's "those exiled cards"). */
   exiledTopCards?: ObjectId[];
   /** How many cards its exileNamed instruction exiled from the hand ("for each card exiled from their hand this way"). */

@@ -94,7 +94,10 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
 
 /** What a search looks for: undefined for "a card", null when it isn't understood. */
 export function parseSearchFilter(phrase: string, count?: (text: string) => AmountExpr | null): TargetSpec | undefined | null {
-  const p = phrase.replace(/\bcards\b/g, "card");
+  // "Up to two artifact, creature, and/or enchantment cards" (Brightglass Gearhulk): each card is any one of those card
+  // types, the same as "artifact, creature, or enchantment cards".
+  const TYPE = "(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)";
+  const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
   // "A card with mana value less than or equal to the number of lands you control" (Beseech the Queen): counted as the
   // search resolves (TargetSpec.bound).
   const bound = count && (/ with (?:mana value|power|toughness) (?:(?:less|greater) than or )?equal to .+$/i.exec(p) ?? / with (?:mana value|power|toughness) X or (?:less|greater)$/.exec(p));
@@ -112,6 +115,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     const amount = count(under[1]!);
     if (head === null || !amount || amount.plus !== undefined || amount.times !== undefined) return null;
     return { ...(head ?? { kind: "card" }), bound: { key: "manaValue", at: "most", amount: { ...amount, plus: -1, signed: true } }, text: p };
+  }
+  // "A creature card with an even mana value" (Gyruda, Doom of Depths; zero is even, X counts 0 off the stack, CR 202.3e).
+  const parity = / with an? (even|odd) mana value$/.exec(p);
+  if (parity) {
+    const head = parseSearchFilter(p.slice(0, parity.index));
+    return head === null || head?.manaValue ? null : { ...(head ?? { kind: "card" }), manaValue: { parity: parity[1] as "even" | "odd" }, text: p };
   }
   if (/^card$/i.test(p)) return undefined;
   if (p === "card that shares a color with a legendary creature you control") return { kind: "card", colorOfYourLegend: true, text: p };

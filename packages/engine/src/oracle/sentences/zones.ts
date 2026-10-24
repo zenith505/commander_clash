@@ -243,6 +243,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseCardTarget(m[1]!, ctx, "you");
     return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what, yours: true }] : null;
   }
+  // "Target player shuffles up to three target cards from their graveyard into their library" (Memory's Journey, Quandrix
+  // Command): cards in that player's graveyard (TargetSpec.inGraveyardOfTarget); that player shuffles their library even
+  // when every card target has become illegal, as long as the player is still a legal target (rulings on Quandrix Command).
+  if ((m = /^Target player shuffles (up to (?:one|two|three|four|five)) target cards from their graveyard into their library$/.exec(s))) {
+    const who = parsePlayer("target player", ctx);
+    const pi = ctx.targets.length - 1;
+    const first = ctx.targets.length;
+    const what = who?.ref === "target" ? parseCardTarget(`${m[1]} target cards from a graveyard`, ctx) : null;
+    if (!what || what.ref !== "target" || ctx.targets[pi]?.kind !== "player") return null;
+    for (let i = first; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, inGraveyardOfTarget: pi, text: "target card from that player's graveyard" };
+    return [{ type: "shuffleIntoLibrary", what, who: who! }];
+  }
   // Teferi, Temporal Pilgrim: "Then they shuffle each nonland permanent they control into its owner's library", "they"
   // being the target opponent: each of them goes into its owner's library, then each of those libraries is shuffled (CR
   // 701.24c).

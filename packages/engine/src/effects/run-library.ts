@@ -60,12 +60,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "mill":
       // Kept for "if a card with the chosen name was milled this way" (Predict).
       s.resolving!.milled = [];
+      s.resolving!.milledExiled = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
         for (const id of p.library.slice(0, n)) {
           moveObject(s, id, "graveyard", { milled: true });
           if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+          else if (obj(s, id).zone === "exile") s.resolving!.milledExiled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
         }
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
       }
@@ -663,6 +665,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (me) owners.add(me.owner);
         }
         if (e.yours) owners.add(ctx.controller);
+        if (e.who) for (const pid of players(s, e.who, ctx)) owners.add(pid);
         for (const o of objects(s, e.what, ctx)) {
           owners.add(o.owner);
           log(s, `${src} shuffles ${defOf(s, o).name} into its owner's library.`);
@@ -839,7 +842,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // wants it there; asked after the search, before the shuffle.
       if (e.mayInstead && searchers.length === 1 && foundBy(searchers[0]!).length === 1 && exiledFor(searchers[0]!) === undefined && sc.mayInstead === undefined) {
         sc.mayInstead = false;
-        if (staticConditionNow(s, e.mayInstead.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller)) {
+        if (!e.mayInstead.cond || staticConditionNow(s, e.mayInstead.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller)) {
           sc.may = undefined;
           sc.mayInstead = true;
           s.pending = { kind: "chooseMay", player: searchers[0]!, source: src, prompt: `put ${defOf(s, obj(s, foundBy(searchers[0]!)[0]!)).name} ${describeDest(e.mayInstead.dest)} (if you don't, ${describeDest(e.dest)})` };
@@ -1125,7 +1128,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const chosenFilter = e.filter?.chosen ? bindChosen(e.filter, ctx.chosen) : e.filter;
         const filter = chosenFilter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(chosenFilter) : chosenFilter && bindBound(s, chosenFilter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
-        const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        const options = sc.looked.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
         const count = e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.count;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
@@ -1134,10 +1137,11 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
-          const what = e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
+          // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
+          const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : "on the bottom of your library";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
         }
         // Nothing to choose: all of them, or (one for each) as many as fit.

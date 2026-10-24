@@ -14,6 +14,7 @@ import { parseGrants } from "../grants";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  if (/^You have no maximum hand size until your next turn$/.test(s)) return [{ type: "noMaxHandSize", untilYourNextTurn: true }];
   // Illusion of Choice (CR 701.38): the votes of every vote this turn are this player's to make.
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
   // Odric, Master Tactician: the defending players' blocks are declared by you (rulings: they must still be legal).
@@ -876,7 +877,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Target creature becomes a Treasure artifact with "..." and loses all other card types and abilities" (Vraska,
   // Betrayal's Sting): for as long as it stays on the battlefield (CR 611.2a). Its supertypes stay (rulings, CR 205.1a);
   // losing its abilities comes before the one it gains, in layer 6.
-  if ((m = /^(target .+?) becomes (an? .+?) and loses all other card types and abilities$/i.exec(s))) {
+  if ((m = /^((?:another )?target .+?) becomes (an? .+?) and loses all other card types and abilities$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" ? parseIsA(m[2]!, true) : null;
     return what && mods ? [{ type: "continuous", what, mods: [{ kind: "loseAllAbilities" }, ...mods], duration: "game" }] : null;

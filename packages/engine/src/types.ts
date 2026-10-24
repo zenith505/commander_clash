@@ -1465,6 +1465,8 @@ export interface GameState {
   damageBatch?: { events: DamageEvent[]; answers: number[] };
   /** The controllers of the creatures that died this turn, one entry per creature (morbid, CR 700.4). */
   diedThisTurn?: PlayerId[];
+  /** The same for nontoken creatures (Gadrak, the Crown-Scourge). */
+  nontokenDiedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */
   toGraveyardThisTurn?: number;
   /** Cards put into each player's graveyard from anywhere this turn, by owner (Fraying Sanity). */

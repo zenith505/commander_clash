@@ -28,6 +28,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.subtypes?.length !== 2) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, subtypes: types, text: p.replace(/^the number of /, "") } } };
   }
+  // Hare Apparent: "the number of other creatures you control named ~": with the source's name (CR 201.5), as it is now.
+  if ((m = /^(the number of (?:other )?creatures you control) named ~$/.exec(p))) {
+    const c = parseCount(m[1]!, ctx);
+    if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
+    return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
+  }
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
@@ -216,7 +222,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // battlefield under their control this turn".
   if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
-  if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
+  // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
+  if ((m = /^(nontoken )?creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[2] ? { yours: true as const } : {}), ...(m[1] ? { nontoken: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
@@ -260,6 +267,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Rug of Smothering: "for each spell they've cast this turn", the player the trigger is about.
+  if (ctx?.eventPlayer && /^spells? (?:they've|that player has) cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", eventPlayer: true });
   // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
   if ((m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells you've cast this turn$/i.exec(p))) {
     const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);

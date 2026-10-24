@@ -1152,6 +1152,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "14493624-fdc7-4630-9b1e-f35668651108",
+  "name": "Baldin, Century Herdmaster",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "During your turn, each creature assigns combat damage equal to its toughness rather than its power.\nWhenever Baldin attacks, up to one hundred target creatures each get +0/+X until end of turn, where X is the number of cards in your hand.",
+  "power": "0",
+  "toughness": "7",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slx",
+  "releasedAt": "2023-02-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e8df915f-f509-4c6c-9261-a5a16c3f06c5",
   "name": "Ballot Broker",
   "manaCost": "{2}{W}",
@@ -6587,6 +6620,38 @@
   "set": "dmu",
   "releasedAt": "2022-09-09",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8b202c63-c961-4590-958f-d17e76610ab5",
+  "name": "Indulgent Tormentor",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "Flying\nAt the beginning of your upkeep, draw a card unless target opponent sacrifices a creature of their choice or pays 3 life.",
+  "power": "5",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m15",
+  "releasedAt": "2014-07-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

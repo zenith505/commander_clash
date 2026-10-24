@@ -476,7 +476,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           : e.cond.kind === "theyChose"
           ? !!s.resolving!.choseThisWay?.length !== !!e.cond.not
           : e.cond.kind === "selfHere"
-          ? objects(s, { ref: "self" }, ctx).some((o) => !(e.cond as { yours?: true }).yours || controllerOf(s, o) === ctx.controller)
+          ? objects(s, { ref: "self" }, ctx).some((o) => {
+              const c = e.cond as { yours?: true; controlledByTarget?: number };
+              const t = c.controlledByTarget !== undefined ? ctx.targets[c.controlledByTarget] : undefined;
+              return c.controlledByTarget !== undefined ? t?.kind === "player" && controllerOf(s, o) === t.id : !c.yours || controllerOf(s, o) === ctx.controller;
+            })
           : e.cond.kind === "libraryHas"
           ? player(s, ctx.controller).library.length >= e.cond.n
           : e.cond.kind === "resolvedNth"

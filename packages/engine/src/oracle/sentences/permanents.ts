@@ -433,6 +433,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, "another "), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
+  // Rikku, Resourceful Guardian: "Move a counter from target creature an opponent controls onto target creature you
+  // control": two targets that can't be the same object (their controllers differ), so no "another" is needed.
+  if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?<from>target [a-z]+ an opponent controls) onto (?<to>target [a-z]+ you control)$`, "i").exec(s))) {
+    const g = m.groups!;
+    const from = parseObject(g.from!, ctx);
+    const to = from && !isGroup(from) ? parseObject(g.to!, ctx) : null;
+    return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
+  }
   // Portent Tracker (see parseBody): an opponent's battle loses defense, anyone else's gains it.
   if ((m = /^Remove (a|\w+) defense counters? from (target battle) if an opponent protects it, otherwise put that many on it$/.exec(s))) {
     const n = m[1] === "a" ? 1 : num(m[1]!);
@@ -614,6 +622,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
+  // Bucknard's Everfull Purse: "The player to your right gains control of ~": seats follow turn order, which goes to each
+  // player's left (CR 101.4), so the player to your right is the one before you in turn order.
+  if ((m = /^The player to your (right|left) gains control of ~$/.exec(s)) && !ctx.spell)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "neighbor", side: m[1] as "right" | "left" } }];
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.

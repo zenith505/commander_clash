@@ -811,6 +811,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Until your next turn, those creatures can't block" (Taunt from the Rampart): the same, said first.
   const front = /^Until your next turn, (.+? can't (?:block|attack|attack or block|be blocked))$/.exec(s);
   if (front) s = `${front[1]} until your next turn`;
+  // Rikku, Resourceful Guardian: "until end of turn, that creature can't be blocked by creatures your opponents control"
+  // (the duration moved to the end by then).
+  const eot = /^([^"]+? can't be blocked by [^"]+) until end of turn$/i.exec(s);
+  if (eot) s = `${eot[1]} this turn`;
   if ((m = /^(?!.* until end of turn and )(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods: Modification[] =
@@ -824,6 +828,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // The Black Gate: "... by creatures that player controls this turn", the player chosen as it resolves.
     if (m[2] === "by creatures that player controls this turn")
       return what && ctx.chosenOpponent ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "chosenPlayer", text: "creatures that player controls" } }], duration: "endOfTurn" }] : null;
+    // Rikku, Resourceful Guardian: "... by creatures your opponents control this turn": the opponents of the effect's
+    // controller (bound as it resolves, fixMods), whoever controls the creature.
+    if (m[2] === "by creatures your opponents control this turn")
+      return what ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "opponent", text: "creatures your opponents control" } }], duration: "endOfTurn" }] : null;
     // Skrelv: "... by creatures of the chosen color this turn", the color chosen as it resolves.
     const ofChosen = /^by (.+?) of the chosen color this turn$/.exec(m[2]!);
     if (ofChosen) {

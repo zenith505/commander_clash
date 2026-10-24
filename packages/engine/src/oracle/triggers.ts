@@ -543,7 +543,11 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (xM) what = what.slice(0, xM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
-  const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
+  const parsed0 = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
+  // Firespitter Whelp: "a noncreature or Dragon spell": either kind (TargetSpec.anyOf).
+  const orKind = !parsed0 ? /^(non[a-z]+|[A-Z][a-z]+) or ([A-Z][a-z]+|non[a-z]+)(?: spell)?$/.exec(what) : null;
+  const sides = orKind ? [parseTargetPhrase(`${orKind[1]} spell`), parseTargetPhrase(`${orKind[2]} spell`)] : [];
+  const parsed = orKind && sides.every((x) => x?.kind === "spell" && !x.anyOf) ? { kind: "spell" as const, types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: `${orKind[1]} or ${orKind[2]} spell` } : parsed0;
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
@@ -971,6 +975,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let min: number | undefined;
   let anyone = false;
   let damageX = false;
+  let shownText: string | undefined;
   // "Whenever you attack a player (with one or more equipped creatures)": once for each player attacked, not a
   // planeswalker or battle (CR 508.3e; rulings on Akiri, Fearless Voyager and Horizon Explorer). "That player" is them.
   let perPlayer = false;
@@ -1038,6 +1043,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
       bodyText = bodyText.slice(0, dealtX.index) + ".";
       damageX = true;
     }
+    // Broodcaller Scourge: "a permanent card with mana value less than or equal to that damage": the damage those
+    // creatures dealt to that player.
+    const thatDamage = / with mana value less than or equal to that damage\b/;
+    if (thatDamage.test(bodyText) && !/\bX\b|\bthat (?:much|many)\b/.test(bodyText) && !damageX) {
+      shownText = bodyText;
+      bodyText = bodyText.replace(thatDamage, " with mana value X or less");
+      damageX = true;
+    }
     // "To a player or battle": "that player" isn't about a battle (CR 310).
     orBattle = m[2] === "a player or battle";
     if (orBattle && /\b(that player|defending player)\b/.test(bodyText)) return "fail";
@@ -1085,7 +1098,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" || perPlayer, ...(those ? { eventGroup: true as const } : {}) });
   if (!body) return "fail";
-  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: damageX ? body.text : unX(body.text, bodyText) };
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: shownText ?? (damageX ? body.text : unX(body.text, bodyText)) };
   if (toOpponent) {
     const said = (b: AbilityBody): AbilityBody => ({ ...withOtherOpponents(b), text: withOtherOpponents(b).text.replaceAll("that player", "that opponent"), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map(said) } } : {}) });
     body = said(body);

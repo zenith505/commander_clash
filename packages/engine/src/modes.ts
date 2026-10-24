@@ -235,6 +235,7 @@ export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0): { bo
   const group = targets.slice(i, end).filter((t) => t.kind !== "none");
   if (spec.skip && group.length) return `${spec.text} isn't a target this spell has, cast this way`;
   if (spec.many === "x" && group.length > x) return `choose at most X (${x}) targets for ${spec.text}`;
+  if (spec.manyMax !== undefined && group.length > spec.manyMax) return `choose at most ${spec.manyMax} targets for ${spec.text}`;
   if (spec.many === "exactX" && group.length !== x) return `choose X (${x}) targets for ${spec.text}`;
   // Divided as you choose (CR 601.2d): at least 1 each, so no more targets than the amount, and at least one if there's
   // anything to divide (none if it's 0, rulings on Rolling Thunder).

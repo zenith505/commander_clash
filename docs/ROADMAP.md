@@ -1,7 +1,7 @@
 # Roadmap
 
-23,744 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,579 of 4,988 (91%).
+23,766 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,594 of 4,988 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,12 +22,17 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 138, most played first: Rikku, Resourceful Guardian, Yes Man,
-   Personal Securitron, Baldin, Century Herdmaster ("up to one hundred target creatures"), Broodcaller Scourge,
-   Bucknard's Everfull Purse, Ghostly Dancers, Sorcerer Class, Jegantha, the Wellspring, Heirloom Blade ("a creature card
-   that shares a creature type with it", the equipped creature that died), Illusionist's Gambit, Maddening Hex, Gadrak,
-   Hakbal of the Surging Soul; Wildfire Devils and Arcane Proxy too. Karazikar's "whenever an opponent attacks another
-   one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Smaller gaps from round 138:
+00. Most played first (`npm run popular`). Out after round 139, most played first: Ghostly Dancers ("return an enchantment
+   card from your graveyard to your hand or unlock a locked door of a Room you control": only a choice that can be done),
+   Sorcerer Class, Jegantha, the Wellspring (mana that can't pay generic costs), Illusionist's Gambit, Maddening Hex,
+   Hakbal of the Surging Soul ("each Merfolk creature you control explores", in the order you choose), Hunting
+   Velociraptor, Breaching Dragonstorm, Sorin of House Markov, Preston, the Vanisher, Determined Iteration; Wildfire
+   Devils, Arcane Proxy and Lilypad Village too. Karazikar's "whenever an opponent attacks another one of your opponents"
+   has no rulings on planeswalkers and battles, so it stays out. Smaller gaps from round 139: bots use Rikku's Steal in
+   their second main phase (its evasion is then wasted that turn), and only when the opponent's creature they'd pick
+   has a counter that helps; bots give Yes Man away and use Bucknard's Everfull Purse and Hithlain Rope whenever they
+   can; "the player to your right" is the one before you in turn order (CR 101.4: turn order goes to the left);
+   Indulgent Tormentor's "pays 3 life" asks again to pay after it's chosen. Smaller gaps from round 138:
    bots dredge a land card (The Necrobloom) only with no land in hand and fewer than seven lands out; bots keep Victory
    Chimes' {C} for themselves (another player's mana never helps a bot, there are no teams); bots choose Bane of the
    Living's X by trying each X on a copy of the game, but join forces amounts and Aurelia's Vindicator's X are still

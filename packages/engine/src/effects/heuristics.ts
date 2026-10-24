@@ -40,6 +40,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // A suspected creature can't block (CR 701.60c): aimed at opponents unless the card says "you control".
     if (e.type === "suspect" && !e.no && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
+    // "Move a counter from target creature an opponent controls onto target creature you control" (Rikku): taken from them.
+    if (e.type === "moveCounter" && e.from.ref === "target" && (e.counter === "any" || !harmfulCounter(e.counter))) mark(e.from.index);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     // "Target player gains control of target permanent you control" (Donate): given to an opponent, a permanent that does
     // its new controller harm (bots don't look for one: with only their own permanents to choose from, they don't cast it).

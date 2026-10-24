@@ -1086,6 +1086,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^(Roll a d\d+\.) (.+?) ((?:\d+(?:—\d+)? \| X is (?:one|two|three|four|five)\.\s*)+)$/, (all, roll: string, body: string, rows: string) =>
     /\bX\b/.test(body) ? `${roll} ${[...rows.matchAll(/(\d+(?:—\d+)?) \| X is (\w+)\./g)].map((r) => `${r[1]} | ${body.replace(/\bX\b/g, r[2]!)}`).join(" ")}` : all,
   );
+  // Bucknard's Everfull Purse: "Roll a d4 and create a number of Treasure tokens equal to the result": the roll, then the
+  // tokens (the result is known as one instruction finishes, CR 706.2).
+  text = text.replace(/(^|\. )Roll a (d\d+) and (create a number of [A-Z][a-z]+ tokens equal to the result\.)/, (_m, pre: string, d: string, rest: string) => `${pre}Roll a ${d}. ${rest.charAt(0).toUpperCase()}${rest.slice(1)}`);
   let rowToken: string | undefined;
   let rowCopy: string | undefined;
   // The instructions split off after a ", then" (the first part of each sentence stays out).
@@ -4267,6 +4270,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.otherwise = inner;
       continue;
     }
+    // Yes Man, Personal Securitron: "Target opponent gains control of ~. When they do, ...": a reflexive trigger (CR
+    // 603.12) only if that opponent now controls ~ (rulings: not if ~ left the battlefield or the target is illegal).
+    const whenThey = /^When they do, (.+)$/.exec(s);
+    if (whenThey) {
+      const prev = effects[effects.length - 1];
+      if (!(effects.length === 1 && prev?.type === "continuous" && prev.what.ref === "self" && prev.duration === "game" && prev.giveTo?.ref === "target" && prev.mods.length === 1 && prev.mods[0]!.kind === "control")) return null;
+      const reflexive = reflexiveBody([whenThey[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
+      if (!reflexive) return null;
+      si = sentences.length;
+      effects.push({ type: "if", cond: { kind: "selfHere", controlledByTarget: prev.giveTo.index ?? 0 }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
     // "You may collect evidence 3. When you do, put a +1/+1 counter on target creature you control": a reflexive
     // trigger (CR 603.12), with targets of its own chosen as it's put on the stack. The rest of the ability is its.
     const whenDo = /^When you do, (.+)$/.exec(s);
@@ -4937,7 +4952,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Spinner of Souls: "you may reveal cards ... until you reveal a creature card. Put that card into your hand and the
     // rest ...": the whole process, if you choose (CR 608.2d).
     const mayUntil = /^[Yy]ou may (reveal cards from the top of your library until you reveal .+)$/.exec(s);
-    const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(mayUntil ? mayUntil[1]! : s);
+    // Heirloom Blade: "... until you reveal a creature card that shares a creature type with it", "it" being the creature
+    // that died, as it last existed (rulings).
+    const sharesM = ctx.subjectIt && ctx.subjectLeft ? / that shares a creature type with it$/.exec(mayUntil ? mayUntil[1]! : s) : null;
+    const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec((mayUntil ? mayUntil[1]! : s).replace(/ that shares a creature type with it$/, sharesM ? "" : "$&"));
     // Songbirds' Blessing: "... until you reveal an Aura card. You may put that card onto the battlefield. If you don't, put
     // it into your hand. Put the rest on the bottom of your library in a random order."
     if (until && !mayUntil && sentences[si + 1] === "You may put that card onto the battlefield" && sentences[si + 2] === "If you don't, put it into your hand" && /^Put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 3] ?? "") && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
@@ -4959,8 +4977,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Planeswalker") && !filter.anyOf;
       const tribal = !filter.types?.length && !!filter.subtypes?.length && filter.subtypes.every((x) => CREATURE_TYPES.has(x));
       if (onto && !safe && !tribal) return null;
-      const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}) };
-      effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(until[1]!) ? "an" : "a"} ${until[1]!} is revealed` } : reveal);
+      if (sharesM && (onto || filter.types?.length !== 1 || filter.types[0] !== "Creature")) return null;
+      const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}), ...(sharesM ? { sharesCreatureTypeWithSubject: true as const } : {}) };
+      effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(until[1]!) ? "an" : "a"} ${until[1]!}${sharesM ? " that shares a creature type with it" : ""} is revealed` } : reveal);
       si++;
       continue;
     }
@@ -5853,9 +5872,11 @@ export function scaleAmount(n: Amount, per: AmountExpr): Amount | null {
  * as it resolves (CR 608.2h). The number before it is what gets multiplied.
  */
 function parseForEach(s: string, ctx: Ctx): Effect[] | null {
-  const m = /^(.+) for each (.+)$/.exec(s) ?? /^For each (.+?), (.+)$/.exec(s);
+  // Lowercase after a trigger's condition: "Whenever ~ deals combat damage to a player, for each token you control, create
+  // ..." (Cadira, Caller of the Small).
+  const m = /^(.+) for each (.+)$/.exec(s) ?? /^[Ff]or each (.+?), (.+)$/.exec(s);
   if (!m) return null;
-  const [main, phrase] = s.startsWith("For each ") ? [m[2]!.charAt(0).toUpperCase() + m[2]!.slice(1), m[1]!] : [m[1]!, m[2]!];
+  const [main, phrase] = /^[Ff]or each /.test(s) ? [m[2]!.charAt(0).toUpperCase() + m[2]!.slice(1), m[1]!] : [m[1]!, m[2]!];
   const fx = parseSentence(main, ctx);
   if (!fx || fx.length !== 1) return null;
   // "Each player loses 1 life for each creature they control" (Stronghold Discipline), "target player loses 1 life for each

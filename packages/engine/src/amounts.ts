@@ -133,7 +133,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "permanents": {
       let n = 0;
       const names = new Set<string>();
-      const filter = bindChosen(c.filter, ctx.chosen);
+      // "Named ~" (Hare Apparent): the source's name as it is now (a copy's is what it copies, CR 707.2).
+      const me = c.filter.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const filter = c.filter.named === "~" ? { ...c.filter, named: me?.zone === "battlefield" ? characteristics(s, me).name : (ctx.sourceName ?? (me ? defOf(s, me).name : "")) } : bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;
@@ -268,7 +270,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "stateIf":
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
     case "diedThisTurn":
-      return (s.diedThisTurn ?? []).filter((p) => !c.yours || p === ctx.controller).length;
+      return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "tokensCreatedThisTurn":
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
     case "enteredThisTurn":
@@ -510,7 +512,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return best;
     }
     case "spellsCastThisTurn":
-      return (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      return (s.castThisTurn ?? []).filter((x) => x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
@@ -671,7 +673,7 @@ function describeCount(c: Count): string {
     case "players":
       return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
     case "diedThisTurn":
-      return "#creatures that died this turn";
+      return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
     case "tokensCreatedThisTurn":
       return `#${c.subtype ? `${c.subtype} ` : ""}tokens you created this turn`;
     case "enteredThisTurn":
@@ -708,7 +710,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells you've cast this turn`;
+      return `#${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":

@@ -600,3 +600,62 @@ describe("Old Stickfingers", () => {
     expect(pt(s, ids[0]!)).toBe("2/2");
   });
 });
+
+const shay = card("Shay Cormac", "Legendary Creature — Human Knight Rogue", "{W}{B}", { power: "1", toughness: "1", oracleText: "{1}: Permanents your opponents control lose hexproof, indestructible, protection, shroud, and ward until end of turn.\nWhenever a creature an opponent controls becomes the target of a spell or ability you control, put a bounty counter on that creature.\nWhenever a creature with a bounty counter on it dies, put two +1/+1 counters on Shay Cormac." });
+const warded = card("Test Warded Knight", "Creature — Knight", "{2}{W}", { power: "2", toughness: "2", keywords: ["Ward", "Protection", "Indestructible"], oracleText: "Ward {2}\nProtection from black\nIndestructible" });
+const doom = card("Test Doom Blade", "Instant", "{B}", { oracleText: "Destroy target creature." });
+
+describe("Shay Cormac", () => {
+  it("is fully supported; {1}: opponents' permanents lose protection, ward and indestructible, so a black removal spell kills one", () => {
+    supported(shay);
+    const { s: s0, ap, opp, ids } = setup([doom]);
+    const sc = putOnBattlefield(s0, ap, shay);
+    const knight = putOnBattlefield(s0, opp, warded);
+    expect(characteristics(s0, s0.objects[knight]!).keywords.filter((k) => /^(ward|protection)/i.test(k)).length).toBe(2);
+    // Protection from black: not a legal target yet.
+    expect(planCast(s0, ap, ids[0]!, [{ kind: "object", id: knight }])).toBeNull();
+    let s = resolveAll(run(s0, planActivate(s0, ap, sc, 0)));
+    const c = characteristics(s, s.objects[knight]!);
+    expect(c.keywords.filter((k) => /protection|ward|indestructible/i.test(k))).toEqual([]);
+    s = run(s, planCast(s, ap, ids[0]!, [{ kind: "object", id: knight }]));
+    // No ward trigger (nothing to pay); the bounty counter goes on as it's targeted.
+    s = resolveAll(s);
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[knight]!.zone).toBe("graveyard");
+    // It died with a bounty counter on it.
+    expect(s.objects[sc]!.counters["+1/+1"]).toBe(2);
+  });
+
+  it("only the permanents there as it resolved lose them (CR 611.2c); a creature without a bounty counter dying does nothing", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const sc = putOnBattlefield(s0, ap, shay);
+    let s = resolveAll(run(s0, planActivate(s0, ap, sc, 0)));
+    const later = putOnBattlefield(s, opp, warded);
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[later]!).keywords).toContain("Indestructible");
+    const plain = putOnBattlefield(s, opp, bear());
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s.objects[plain]!.damage = 5;
+    invalidateCharacteristics(s);
+    s = resolveAll(act(s, { type: "passPriority", player: waitingOn(s)! }));
+    expect(s.objects[plain]!.zone).toBe("graveyard");
+    expect(s.objects[sc]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+});
+
+const bountyHunter = card("Bounty Hunter", "Creature — Human Archer Minion", "{2}{B}{B}", { power: "2", toughness: "2", oracleText: "{T}: Put a bounty counter on target nonblack creature.\n{T}: Destroy target creature with a bounty counter on it." });
+
+describe("Bounty Hunter (bounty counters, as Shay Cormac's)", () => {
+  it("is fully supported; it destroys only a creature with a bounty counter on it", () => {
+    supported(bountyHunter);
+    const { s: s0, ap, opp } = setup([]);
+    const bh = putOnBattlefield(s0, ap, bountyHunter);
+    const b = putOnBattlefield(s0, opp, bear());
+    expect(planActivate(s0, ap, bh, 1, [{ kind: "object", id: b }])).toBeNull();
+    let s = resolveAll(run(s0, planActivate(s0, ap, bh, 0, [{ kind: "object", id: b }])));
+    expect(s.objects[b]!.counters.bounty).toBe(1);
+    s.objects[bh]!.tapped = false;
+    s = resolveAll(run(s, planActivate(s, ap, bh, 1, [{ kind: "object", id: b }])));
+    expect(s.objects[b]!.zone).toBe("graveyard");
+  });
+});

@@ -99,6 +99,8 @@ export interface Characteristics {
   sparedBy?: Record<string, ObjectId>;
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
+  /** "Lose ... ward" (Shay Cormac): its ward abilities, printed or gained before, don't trigger; one gained later does (CR 613.7). */
+  wardLost?: true;
   /** It lost all abilities, the mana abilities of its basic land types too (CR 305.6). */
   landAbilitiesLost?: true;
   /** Abilities effects gave it, as text ("~" is this object), in layer 6 order. */
@@ -1099,6 +1101,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // "Has protection from the chosen color": the color chosen as the source entered.
       for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined)) {
         const key = k.toLowerCase();
+        if (/^ward\b/i.test(k)) delete c.wardLost;
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);
           if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = e.sourceId;
@@ -1107,8 +1110,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "removeKeywords":
       // Losing hexproof loses each "hexproof from [quality]" too (CR 702.11e).
-      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x))));
+      // Losing protection or ward loses every one of them, whatever its quality or cost (Shay Cormac).
+      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x)) || (sameCI(k, "Protection") && /^protection from /i.test(x)) || (sameCI(k, "Ward") && /^ward\b/i.test(x))));
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
+      if (c.sparedBy && m.keywords.some((k) => sameCI(k, "Protection"))) for (const k of Object.keys(c.sparedBy)) if (k.startsWith("protection from ")) delete c.sparedBy[k];
+      if (m.keywords.some((k) => sameCI(k, "Ward"))) c.wardLost = true;
       return;
     case "cantHaveKeywords":
       c.cantHave = [...new Set([...(c.cantHave ?? []), ...m.keywords])];
@@ -1129,6 +1135,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.unblockedDamage = true;
       return;
     case "addAbility":
+      if (/^ward\b/i.test(m.text)) delete c.wardLost;
       c.grantedAbilities.push(m.text);
       (c.grantedAt ??= []).push(e.timestamp);
       return;

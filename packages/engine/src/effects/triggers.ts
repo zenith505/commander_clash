@@ -1509,7 +1509,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       };
       const that = { player: by };
       // Nowhere to Run: ward abilities of the creatures it exposes don't trigger.
-      const noWard = exposed(s, o);
+      // Shay Cormac: nor those of a permanent that lost ward.
+      const noWard = exposed(s, o) || !!characteristics(s, o).wardLost;
       const ward = (tr: TriggeredAbility) => tr.body.effects.some((x) => x.type === "counterUnlessPays" && x.ward);
       add(o, you, (e, tr) => ((e === "becomesTargetOfOpponent" && you !== by) || (e === "selfBecomesTarget" && fits(tr, you))) && !(noWard && ward(tr)), undefined, ev.stackId, undefined, undefined, undefined, undefined, that);
       addHosted(o, (e) => e === "selfBecomesTarget", ev.stackId);

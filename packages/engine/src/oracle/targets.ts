@@ -873,9 +873,9 @@ export function parseTargetPhrase(
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
   }
-  // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
+  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

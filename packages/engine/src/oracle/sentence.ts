@@ -329,9 +329,13 @@ export function parseChanges(text: string): Modification[] | null {
       if (!k || !again || JSON.stringify([...k].sort()) !== JSON.stringify([...again].sort())) return null;
       out.push({ kind: "removeKeywords", keywords: k }, { kind: "cantHaveKeywords", keywords: k });
     } else if ((m = /^loses? (.+)$/i.exec(p))) {
-      const k = parseKeywordList(m[1]!);
+      // "Lose hexproof, indestructible, protection, shroud, and ward" (Shay Cormac): bare "protection" and "ward" are
+      // every protection and ward ability (see removeKeywords).
+      const words = m[1]!.split(/,? and |, /);
+      const bare: string[] = words.filter((w) => w === "protection" || w === "ward");
+      const k = bare.length === words.length ? [] : parseKeywordList(words.filter((w) => !bare.includes(w)).join(", "));
       if (!k) return null;
-      out.push({ kind: "removeKeywords", keywords: k });
+      out.push({ kind: "removeKeywords", keywords: [...k, ...bare.map((w) => (w === "ward" ? "Ward" : "Protection"))] });
     }
     // Zur, Eternal Schemer: "becomes a creature in addition to its other types and has base power and base toughness each
     // equal to its mana value": the object's own, set in layer 7b (CR 613.4b), X counting as 0 on the battlefield (rulings).

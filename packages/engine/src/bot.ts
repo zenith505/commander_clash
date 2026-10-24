@@ -578,6 +578,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
+    // Slippery Bogbonder: onto an opponent's creature, our harmful counters (-1/-1, stun); onto ours, none.
+    if (pend.kind === "chooseOption" && pend.what === "removeCounter" && pend.options.some((o) => o.includes(":"))) {
+      const onto = pend.onto !== undefined ? s.objects[pend.onto] : undefined;
+      const bad = onto && controllerOf(s, onto) !== pid ? pend.options.find((o) => o.includes(":") && harmfulCounter(o.slice(o.indexOf(":") + 1))) : undefined;
+      return [{ type: "chooseOption", player: pid, choice: bad ?? "done" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "removeCounter") {
       // Off our own permanents the harmful kinds (-1/-1, stun), off others' the helpful ones (loyalty, +1/+1, ...).
       const o = pend.about ? s.objects[pend.about] : undefined;
@@ -1307,6 +1313,16 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const rank = (t: TargetChoice) => (t.kind !== "object" ? -1 : !reselectPick(s, pid, obj(s, t.id)) ? -1 : (obj(s, t.id).attacking === pid ? 1000 : 0) + power(s, obj(s, t.id)));
     const pick = [...all].sort((a, b) => rank(b) - rank(a))[0];
     return pick && rank(pick) >= 0 ? [pick] : forced && all[0] ? [all[0]] : null;
+  }
+  // Reins of Power: in our own first main phase, the opponent whose creatures are worth the most, if more than ours (we
+  // attack with theirs, and they can block with ours).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "swapCreatures") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const army = (who: PlayerId) => s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === who).reduce((n, id) => n + worth(s, who, obj(s, id)), 0);
+    const ranked = all.filter((t): t is Extract<TargetChoice, { kind: "player" }> => t.kind === "player").sort((a, b) => army(b.id) - army(a.id));
+    const pick = ranked[0];
+    if (forced) return pick ? [pick] : null;
+    return pick && s.activePlayer === pid && s.step === "main1" && army(pick.id) > army(pid) + 3 ? [pick] : null;
   }
   // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {

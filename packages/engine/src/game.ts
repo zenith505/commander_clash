@@ -5,7 +5,7 @@ import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
-import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
+import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
@@ -16,7 +16,7 @@ import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatch
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
+import { countersBanned, countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -651,6 +651,8 @@ export function moveObject(
     x?: number;
     /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
     sacrificed?: boolean;
+    /** A spell or ability this player controls destroyed it (CR 701.8a), for Karmic Justice. */
+    destroyedBy?: PlayerId;
     /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
     milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
@@ -1059,7 +1061,7 @@ export function moveObject(
     noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
@@ -1847,7 +1849,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   log(s, message);
   const noncreature = !objIsType(s, o, "Creature");
   const controller = controllerOf(s, o);
-  moveObject(s, o.id, "graveyard");
+  moveObject(s, o.id, "graveyard", by !== undefined ? { destroyedBy: by } : {});
   // Destroyed even when a replacement (Rest in Peace, "exile it instead") sends it elsewhere: that replaces only where it
   // goes (CR 614.6), not the destruction (Fumigate's and Bane of Progress' rulings). Only regeneration, a shield counter
   // or umbra armor replace the destruction itself, and they returned above.
@@ -3738,7 +3740,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
-export const spellUse = (d: CardDef, alt?: AltCostKind): ManaUse => (altCost(d, alt)?.treasureOnly ? { spell: d, treasureOnly: true } : { spell: d });
+export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -3942,6 +3944,12 @@ export function castProblem(
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
+  // Vivien, Champion of the Wilds: "you may cast it if it's a creature spell", the spell as it would be cast (its face,
+  // CR 601.3e), unless something else lets it be cast from exile.
+  if (!free && !via && o.zone === "exile" && o.mayPlay?.creatureOnly && ownExilePermission(s, o, pid) && !selfCastFromExile(s, o, pid) && !linkedPlayPermission(s, o, pid) && !preparedCopyCastable(s, o, pid) && linkedFreeGrant(s, o, pid) < 0) {
+    const cast = choices?.face !== undefined && d.faces?.length ? faceDef(d, choices.face) : d;
+    if (!isType(cast, "Creature")) return `${cast.name} can be cast from exile only as a creature spell`;
+  }
   // "A spell with mana value X or less", "the same mana value": the spell as cast, a split card's half or a prototyped
   // spell, not the card (CR 202.3, 709.3, 718.3b; rulings on Powerbalance).
   const pendMv = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.mv : undefined;
@@ -4060,7 +4068,7 @@ export function castProblem(
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
-  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt), cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
+  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt, cost.cost), cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
 }
 
@@ -4688,8 +4696,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
-  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
+  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost)).pool);
+  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -5832,6 +5840,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
   if (banned) return banned;
+  // Solemnity: a cost that puts counters on an artifact, creature, enchantment or land can't be paid (rulings).
+  if (ab.putCounters && countersBanned(s, o)) return `counters can't be put on ${d.name}`;
   // The Immortal Sun: no loyalty abilities (CR 606.3) while it's on the battlefield.
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     const sun = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).noLoyaltyAbilities);
@@ -6916,7 +6926,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "removeCounter") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the kinds of counter it has");
     (r.scratch ??= {}).counterKind = choice;
-    if (choice !== "done") log(s, `${p.name} chooses a ${choice} counter to remove (${pend.source}).`);
+    // Slippery Bogbonder's options are "objectId:kind", labeled.
+    if (choice !== "done") log(s, choice.includes(":") ? `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)]?.replace(/^A /, "a ").replace(/ \(\d+ left\)$/, "") ?? "a counter"} (${pend.source}).` : `${p.name} chooses a ${choice} counter to remove (${pend.source}).`);
     continueResolution(s);
     return;
   }
@@ -7216,7 +7227,9 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "tributePay") {
       const n = compileCard(defOf(s, o)).tribute ?? 0;
       const to = o.tribute?.to;
-      if (to === undefined || player(s, to).lost) {
+      // Solemnity: the chosen opponent can't pay tribute (rulings).
+      if (to === undefined || player(s, to).lost || countersBanned(s, o)) {
+        if (to !== undefined && !player(s, to).lost) log(s, `${player(s, to).name} can't pay tribute for ${defOf(s, o).name}: counters can't be put on it.`);
         q.shift();
         if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
         continue;

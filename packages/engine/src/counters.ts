@@ -65,6 +65,7 @@ const putterFits = (s: GameState, mod: CountMod, controller: PlayerId, putter: P
  */
 export function countersToPut(s: GameState, o: GameObject, kind: string, n: number, entering = false): number {
   if (n <= 0 || o.zone !== "battlefield") return n;
+  if (countersBanned(s, o)) return 0;
   const owner = controllerOf(s, o);
   const putter = putterNow ?? owner;
   const { types, subtypes } = characteristics(s, o);
@@ -83,6 +84,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
 /** How many `kind` counters (poison, energy) a player really gets when `n` would be put on them: only Vorinclex-style mods apply. */
 export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n: number): number {
   if (n <= 0) return n;
+  if (playerCountersBanned(s)) return 0;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
     .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
@@ -225,6 +227,20 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
   }
   return m;
 }
+
+/**
+ * Solemnity: "Counters can't be put on artifacts, creatures, enchantments, or lands." A permanent with one of those card
+ * types gets none: as it enters, from an effect, or as a cost, which then can't be paid (rulings). Cards elsewhere still
+ * do (suspend's time counters).
+ */
+export function countersBanned(s: GameState, o: GameObject): boolean {
+  if (o.zone !== "battlefield") return false;
+  const types = characteristics(s, o).types;
+  return s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noCountersOn?.some((t) => types.includes(t)));
+}
+
+/** Solemnity: "Players can't get counters." No poison (infect damage then does nothing to a player), energy, experience or rad counters (rulings). */
+export const playerCountersBanned = (s: GameState): boolean => s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPlayerCounters);
 
 /**
  * Whether counters of `kind` can't be removed from `o` now: "Stun counters can't be removed from permanents your

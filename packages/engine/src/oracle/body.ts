@@ -837,6 +837,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   }
+  // Reins of Power (see Effect "swapCreatures").
+  if (opts.spell && /^Untap all creatures you control and all creatures target opponent controls\. You and that opponent each gain control of all creatures the other controls until end of turn\. Those creatures gain haste until end of turn\.$/.test(text.trim()))
+    return { targets: [{ kind: "player", opponent: true, text: "target opponent" }], effects: [{ type: "swapCreatures", who: { ref: "target", index: 0 } }], text };
   // Ugin, Eye of the Storms: "Search your library for any number of colorless nonland cards, exile them, then shuffle.
   // Until end of turn, you may cast those cards without paying their mana costs." With the normal timing (rulings).
   const ugin = /^Search your library for any number of (.+? cards), exile them, then shuffle\. Until end of turn, you may cast those cards without paying their mana costs\.$/.exec(text.trim());
@@ -1233,6 +1236,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // Vivien, Champion of the Wilds: "Look at the top three cards of your library. Exile one face down and put the rest on
+    // the bottom of your library in any order. For as long as it remains exiled, you may cast it if it's a creature
+    // spell." One must be exiled, creature or not; it may be looked at while exiled (rulings).
+    const vivien = new RegExp(`^[Ll]ook at the top ${NUM} cards of your library$`).exec(s);
+    if (vivien && sentences[si + 1]?.replace(/\.$/, "") === "Exile one face down and put the rest on the bottom of your library in any order" && sentences[si + 2]?.replace(/\.$/, "") === "For as long as it remains exiled, you may cast it if it's a creature spell") {
+      effects.push({ type: "hideaway", n: num(vivien[1]!), castCreature: true });
+      si += 2;
+      continue;
+    }
     // Haunting Voyage: "Choose a creature type. Return up to two creature cards of that type ...": the type chosen.
     if (/ cards? of that type\b/.test(s) && effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/( cards?) of that type\b/g, "$1 of the chosen type");
     // Lae'zel's Acrobatics: "Exile all nontoken creatures you control, then roll a d20. 1—9 | Return those cards to the
@@ -2149,6 +2161,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Apex of Power: "Exile the top seven cards of your library. Until end of turn, you may cast spells from among them."
+    // Spells only (the lands stay in exile), with their normal timing, paying their costs (rulings).
+    if (exTop && exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "Until end of turn, you may cast spells from among them") {
+      effects.push({ type: "impulse", n: amt(exTop[1]), until: "thisTurn", castOnly: true });
+      si++;
+      continue;
+    }
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
       const free = playIt[3] ? { free: true as const } : {};
@@ -2174,10 +2193,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // up to two cards. If you do, draw that many cards." (Fable of the Mirror-Breaker): none up to that many, chosen as it
     // resolves (CR 107.1c); "that many" is how many were discarded.
     const anyDiscard = /^(?:([Yy]ou may) d|[Dd])iscard (any number of|up to two|up to three) cards$/.exec(s);
-    const drawThat = anyDiscard && /^(If you do, d|D)raw that many cards( plus one)?$/.exec(sentences[si + 1] ?? "");
-    if (anyDiscard && drawThat && !!anyDiscard[1] === !!drawThat[1]?.startsWith("If")) {
+    // Neheb, Dreadhorde Champion: "... If you do, draw that many cards and add that much {R}": as much mana as cards
+    // discarded, however many are drawn (rulings).
+    const drawThat = anyDiscard && /^(If you do, d|D)raw that many cards( plus one)?(?: and add that much (\{[WUBRGC]\}))?$/.exec(sentences[si + 1] ?? "");
+    if (anyDiscard && drawThat && !!anyDiscard[1] === !!drawThat[1]?.startsWith("If") && !(drawThat[2] && drawThat[3])) {
       const max = anyDiscard[2] === "any number of" ? 99 : num(anyDiscard[2]!.slice(6));
-      effects.push({ type: "discard", who: { ref: "you" }, n: max, upTo: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "discardedThisWay", who: { ref: "you" } }, ...(drawThat[2] ? { plus: 1 } : {}) } });
+      const discarded = { count: { kind: "discardedThisWay" as const, who: { ref: "you" as const } } };
+      effects.push({ type: "discard", who: { ref: "you" }, n: max, upTo: true }, { type: "draw", who: { ref: "you" }, n: { ...discarded, ...(drawThat[2] ? { plus: 1 } : {}) } });
+      if (drawThat[3]) effects.push({ type: "addMana", mana: drawThat[3], times: discarded });
       si++;
       continue;
     }

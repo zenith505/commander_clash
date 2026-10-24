@@ -809,6 +809,52 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "gatherCounters": {
+      // Slippery Bogbonder: one counter at a time from any creature it may come from (not the one they go onto, rulings),
+      // then all moved at once (CR 122.5); none if the target is gone.
+      const to = objects(s, e.onto, ctx)[0];
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.gathered ??= {});
+      const sources = () => (to?.zone === "battlefield" ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== to.id && objectMatches(s, e.from, o, ctx.controller, false)) : []);
+      const left = (id: ObjectId, k: string) => (obj(s, id).counters[k] ?? 0) - (picked[`${id}:${k}`] ?? 0);
+      const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
+      while (to && !sc.countersDone) {
+        if (sc.counterKind !== undefined) {
+          if (sc.counterKind === "done") sc.countersDone = true;
+          else {
+            const [id, k] = [sc.counterKind.slice(0, sc.counterKind.indexOf(":")), sc.counterKind.slice(sc.counterKind.indexOf(":") + 1)];
+            if (left(id, k) > 0) picked[sc.counterKind] = (picked[sc.counterKind] ?? 0) + 1;
+          }
+          sc.counterKind = undefined;
+          continue;
+        }
+        const options = sources().flatMap((o) => Object.keys(o.counters).filter((k) => left(o.id, k) > 0 && !countersStay(s, o, k)).map((k) => `${o.id}:${k}`));
+        if (!options.length) break;
+        const label = (opt: string) => {
+          const id = opt.slice(0, opt.indexOf(":"));
+          const k = opt.slice(opt.indexOf(":") + 1);
+          return `A ${k} counter from ${characteristics(s, obj(s, id)).name} (${left(id, k)} left)`;
+        };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", onto: to.id, options: [...options, "done"], labels: [...options.map(label), count() ? "That's all" : "None"], prompt: `choose a counter to move onto ${characteristics(s, to).name} (${count()} so far)` };
+        return "paused";
+      }
+      sc.gathered = undefined;
+      sc.countersDone = undefined;
+      if (!to || to.zone !== "battlefield") return;
+      for (const [key, m] of Object.entries(picked)) {
+        const id = key.slice(0, key.indexOf(":"));
+        const k = key.slice(key.indexOf(":") + 1);
+        const o = obj(s, id);
+        if (m <= 0 || o.zone !== "battlefield") continue;
+        const had = o.counters[k] ?? 0;
+        o.counters[k] = had - m;
+        const put = putCounters(s, to, k, m);
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, o).name} moves ${m} ${k} counter${m > 1 ? "s" : ""} onto ${characteristics(s, to).name}${put !== m ? ` (${put} are put on it)` : ""}.`);
+        if (had === m) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+      }
+      return;
+    }
     case "battleDefense":
       // Its protector is "who protects it" (CR 310.9e): an opponent's protection, defense counters off; else on.
       for (const o of objects(s, e.what, ctx)) {
@@ -1056,6 +1102,23 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       log(s, `${player(s, ca).name} and ${player(s, cb).name} exchange control of ${defOf(s, a).name} and ${defOf(s, b).name}.`);
       if (s.resolving) s.resolving.did = true;
+      return;
+    }
+    case "swapCreatures": {
+      // Each group is what each player controls as it resolves (CR 611.2c): the creatures are untapped, then each player
+      // gains control of the other's at once, until end of turn, and all of them gain haste (rulings on Reins of Power).
+      const opp = players(s, e.who, ctx)[0];
+      if (opp === undefined || player(s, opp).lost) return;
+      const creaturesOf = (pid: PlayerId) => s.battlefield.filter((id) => !s.phasedOut?.includes(id) && objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === pid);
+      for (const id of [...creaturesOf(ctx.controller), ...creaturesOf(opp)]) untapPermanent(s, obj(s, id));
+      const mine = creaturesOf(ctx.controller);
+      const theirs = creaturesOf(opp);
+      const base = { sourceName: src, sourceId: ctx.sourceId, duration: "endOfTurn" as const };
+      if (mine.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: opp, ...base, affected: mine, mods: [{ kind: "control" }] });
+      if (theirs.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, ...base, affected: theirs, mods: [{ kind: "control" }] });
+      if (mine.length + theirs.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, ...base, affected: [...mine, ...theirs], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      invalidateCharacteristics(s);
+      log(s, `${player(s, ctx.controller).name} and ${player(s, opp).name} exchange control of their creatures until end of turn (${mine.length} and ${theirs.length}).`);
       return;
     }
     case "ownersGainControl": {

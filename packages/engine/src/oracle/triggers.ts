@@ -452,6 +452,14 @@ const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "oppo
  * "That player" is the controller of the spell or ability; "that spell or ability" is it.
  */
 function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Unsettled Mariner: "Whenever you or a permanent you control becomes the target of a spell or ability an opponent
+  // controls, counter that spell or ability unless its controller pays {1}." Once for you and once for each permanent it
+  // targets, however many times (rulings).
+  const mariner = /^Whenever you or a permanent you control becomes the target of a spell or ability an opponent controls, counter that spell or ability unless its controller pays (\{\d+\})\.$/.exec(line);
+  if (mariner) {
+    const unless = { cost: mariner[1]! };
+    return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[1]}.` } };
+  }
   const m = /^When(?:ever)? (~|an?(?:other)? .+?) becomes the target of a spell( or ability)?( you control| an opponent controls)?( for the first time each turn)?, (.+)$/.exec(line);
   if (!m) return null;
   const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
@@ -952,6 +960,20 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
     // Only while it's your turn: whether it triggers at all, not an intervening if.
     ...(m[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
   };
+}
+
+/**
+ * "Whenever a spell or ability an opponent controls destroys a noncreature permanent you control" (Karmic Justice): once
+ * for each permanent destroyed (CR 701.8a), as it last existed (CR 603.10a), "that opponent" the destroying spell's or
+ * ability's controller.
+ */
+function parseDestroyedTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever a spell or ability an opponent controls destroys an? (.+? you control), (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = parseTargetPhrase(m[1]!);
+  const body = parseBody(m[2]!.replace(/\bthat opponent\b/g, "that player"), { subjectIt: true, subjectLeft: true, eventPlayer: true });
+  if (!filter || filter.kind !== "object" || !body) return "fail";
+  return { event: "permanentDestroyed", destroyed: { filter: { ...filter, text: m[1]! }, by: "opponent" }, body };
 }
 
 /**
@@ -2007,6 +2029,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(attackCauses[1]!, { activatedAbility: true });
     return body ? { event: "attackCausesTrigger", body } : "fail";
   }
+  // Aboleth Spawn: "that ability" is the entering creature's own triggered ability, put on the stack just below this one
+  // (rulings).
+  const entersCauses = /^Whenever a creature entering under an opponent's control causes a triggered ability of that creature to trigger, (.+)$/.exec(line);
+  if (entersCauses) {
+    const body = parseBody(entersCauses[1]!, { activatedAbility: true });
+    return body ? { event: "opponentEntersCausesTrigger", body } : "fail";
+  }
   const manaTap = parseManaTapTrigger(line);
   if (manaTap) return manaTap;
   const dies = parseDiesTrigger(line);
@@ -2017,6 +2046,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (attacker) return attacker;
   const sacrifices = parseSacrificeTrigger(line);
   if (sacrifices) return sacrifices;
+  const destroyed = parseDestroyedTrigger(line);
+  if (destroyed) return destroyed;
   const group = parseGroupTrigger(line);
   if (group) return group;
   const exploits = parseExploitsTrigger(line);
@@ -2242,7 +2273,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       // "If a source would deal damage ..., it deals that much damage plus 2 instead" (Rankle and Torbran): that "that much"
       // is the replaced damage's own, not the event's.
-      let text = (self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0).replace(/(would deal [^.]*?damage[^.]*?, it deals )that much( damage)/g, "$1THAT_MUCH$2");
+      let text = (self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0).replace(/(would deal [^.]*?damage[^.]*?, it deals )that much( damage)/g, "$1THAT_MUCH$2")
+        // Neheb, Dreadhorde Champion: "you may discard any number of cards. If you do, draw that many cards and add that
+        // much {R}": how many were discarded, not the damage.
+        .replace(/(discard any number of cards\. If you do, draw )that many( cards and add )that much( \{[WUBRGC]\})/, "$1THAT_MANY$2THAT_MUCH$3");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).
@@ -2259,7 +2293,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text = text.replace(/\bthat (?:much|many)\b/g, "X");
         if (damage) text = text.replace(/\bless than or equal to that damage\b/g, "less than or equal to X");
       }
-      text = text.replace(/THAT_MUCH/g, "that much");
+      text = text.replace(/THAT_MUCH/g, "that much").replace(/THAT_MANY/g, "that many");
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfToGraveyard" || event === "selfLeaves";

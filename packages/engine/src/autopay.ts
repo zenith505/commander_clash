@@ -292,6 +292,8 @@ export function planCast(
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets, modes });
+  // Whether its total cost has {X} (CR 601.2f), for mana spent only on such costs.
+  if (typeof use === "object" && "spell" in use) use.xCost = cost.hasX;
   if (choices.delve?.length) {
     // Cards exiled for delve pay generic mana (CR 702.66a).
     const reduced = payGenericWith(cost, extra, choices.delve.length);

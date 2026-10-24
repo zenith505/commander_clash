@@ -5,6 +5,7 @@ import type { Color } from "../types";
 import { BASIC_TYPES, COLOR_WORDS, TYPE_WORDS, capital } from "./words";
 import { parseKeywordList } from "./targets";
 import { compileQuoted, innerQuotes } from "./grants";
+import { QUOTED_SOURCE_NAME } from "./compile";
 
 /** Tokens the rules define (CR 111.10). */
 export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
@@ -231,7 +232,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
       for (const piece of m[1]!.split(/,? and (?=\u0000)|, (?=\u0000)|(?<=\u0000) and /)) {
         const q = /^\u0000(\d+)\u0000$/.exec(piece.trim());
         if (q) {
-          (out.text ??= []).push(quoted[Number(q[1])]!);
+          // "This Equipment" in it (Firion) is the copy itself, whose own ability it becomes (CR 707.9b).
+          (out.text ??= []).push(quoted[Number(q[1])]!.replaceAll(QUOTED_SOURCE_NAME, "~"));
           continue;
         }
         for (const kw of piece.split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean)) {

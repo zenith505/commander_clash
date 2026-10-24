@@ -38,6 +38,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Nicol Bolas, Dragon-God: "Each opponent exiles a card from their hand or a permanent they control" (rulings: chosen in
+  // turn order, exiled together).
+  if ((m = /^(Each opponent|Each player) exiles a card from their hand or a permanent they control$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "exileHandOrPermanent", who }] : null;
+  }
   // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
   // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
   // Idol of Endurance: "... a creature spell from among ...": only a spell of that kind.
@@ -575,6 +581,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
+  }
+  // Bronzebeak Foragers: "Put target card with mana value X exiled with ~ into its owner's graveyard": a card its exile
+  // ability exiled (CR 607.2a), with the X it's activated with.
+  if ((m = /^Put (target (?:[a-z]+ )?card(?: with mana value X)? exiled with ~) into its owner's graveyard$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    return what?.ref === "target" && ctx.targets[i]?.linkedExile ? [{ type: "putInGraveyard", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
   if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {

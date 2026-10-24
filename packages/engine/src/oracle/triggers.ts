@@ -492,6 +492,21 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
     return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}), ...(nth[4] === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
+  // Alania, Divergent Storm: "Whenever you cast a spell, if it's the first instant spell, the first sorcery spell, or the
+  // first Otter spell other than ~ you've cast this turn, ...": one trigger if it's the first of any of those kinds (an
+  // intervening if, CR 603.4, true at resolution too); "other than ~" leaves out spells with its name.
+  const firstOf = /^Whenever you cast a spell, if it's (the first .+?) you've cast this turn, (.+)$/.exec(line);
+  if (firstOf) {
+    const kinds: { spec: TargetSpec; notSelfName?: true }[] = [];
+    for (const part of firstOf[1]!.split(/,? or |, /)) {
+      const k = /^the first (.+?) spell( other than ~)?$/.exec(part);
+      const spec = k ? parseTargetPhrase(`${k[1]} spell`) : null;
+      if (!k || spec?.kind !== "spell") return "fail";
+      kinds.push({ spec: { ...spec, text: `${k[1]} spell` }, ...(k[2] ? { notSelfName: true as const } : {}) });
+    }
+    const body = parseBody(firstOf[2]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" }, firstOfKinds: kinds }, body } : "fail";
+  }
   // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
   const m = CAST_TRIGGER.exec(line.replace(/ with mana value (\d+), (\d+), or (\d+),/, (all, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with mana value ${a} through ${c},` : all)));
   if (!m) return null;

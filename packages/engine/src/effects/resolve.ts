@@ -331,6 +331,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "milled") return (s.resolving?.milled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "subjectCard") {
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    if (ref.zone === "public") return o && (o.zone === "graveyard" || o.zone === "exile" || o.zone === "command") && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
     if (ref.zone) return o && o.zone === ref.zone && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }
@@ -515,6 +516,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
       return s.turnOrder.filter((p) => !player(s, p).lost && !!key && !!s.turnLog?.combatDamagedBy?.[p]?.includes(key));
     }
+    case "opponentsControllingNo":
+      return opponents(s, ctx.controller).filter((p) => !s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, ref.filter, o, ctx.controller, false); }));
     case "opponentsLostLife":
       return opponents(s, ctx.controller).filter((p) => (s.turnLog?.lifeLost?.[p] ?? 0) >= ref.n);
     case "choseWord":
@@ -810,6 +813,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileFaceDown":
     case "moveLinked":
     case "revealHandOrTop":
+    case "exileHandOrPermanent":
     case "playLinked":
     case "cipher":
     case "haunt":

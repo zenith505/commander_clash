@@ -16,8 +16,9 @@ test("Zada: you pick Hill Giant first, so its copy of Giant Growth goes on the s
   await expect(bar.getByRole("button", { name: "Grizzly Bears (You)" })).toBeVisible();
   await bar.getByRole("button", { name: "Hill Giant (You)" }).click();
   // Both copies are on the stack above Giant Growth: Hill Giant's first, Grizzly Bears' on top.
-  await expect.poll(async () => (await state(page)).stack.length).toBe(3);
-  const mid = await state(page);
+  // The state read that saw all three: the copies can start resolving right after.
+  let mid = await state(page);
+  await expect.poll(async () => (mid = await state(page)).stack.length).toBe(3);
   const target = (i: number) => (mid.stack[i]!.targets?.[0] as { id: string }).id;
   expect([target(1), target(2)]).toEqual([giant, bears]);
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);

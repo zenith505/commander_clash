@@ -293,6 +293,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: 0, double: true }] : null;
   }
+  // Nazgûl Battle-Mace: "Whenever an opponent sacrifices a nontoken permanent, put that card onto the battlefield under your
+  // control unless that player pays 3 life": they decide as it resolves (CR 608.2d), even if the card has left the zone it
+  // went to, which then stays where it is (rulings). Any public zone a replacement effect sent it to (rulings).
+  if (/^[Pp]ut that card onto the battlefield under your control unless that player pays (\d+) life$/.test(s) && ctx.subjectLeft && ctx.eventPlayer) {
+    const who = parsePlayer("that player", ctx);
+    const options = parsePunisherOptions(s.replace(/^.* unless that player /, ""), ctx);
+    if (!who || who.ref === "you" || !options || options.some((o) => !("pay" in o))) return null;
+    return [{ type: "punisher", who, options, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "public" } }] }];
+  }
   // Kazuul, Tyrant of the Cliffs: "create a 3/3 red Ogre creature token unless that creature's controller pays {3}": the
   // attacking creature's controller chooses as it resolves (rulings), as it last existed if it has left (CR 608.2h).
   if ((m = /^[Cc]reate (.+?) unless that creature's controller (pays? .+)$/.exec(s)) && ctx.subjectIt) {
@@ -819,6 +828,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Each player ~ attacked this turn loses the game" (Angel of Destiny, CR 104.3e).
   if (/^[Ee]ach player ~ attacked this turn loses the game$/.test(s)) return [{ type: "loseGame", who: { ref: "attackedThisTurnBySelf" } }];
+  // "Each opponent who doesn't control a legendary creature or planeswalker loses the game" (Nicol Bolas, Dragon-God).
+  if ((m = /^(Each opponent who doesn't control .+) loses the game$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who?.ref === "opponentsControllingNo" ? [{ type: "loseGame", who }] : null;
+  }
   // Life. "You may gain 1 life" leaves "Gain 1 life": yours.
   if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
   // "You lose half your life, rounded up", "each opponent loses half their life, rounded up": each of them half their own

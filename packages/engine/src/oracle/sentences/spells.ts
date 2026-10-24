@@ -117,6 +117,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^Exile the top (card|${NUMX} cards) of your library$`).exec(s))) return [{ type: "exileTop", who: { ref: "you" }, n: m[1] === "card" ? 1 : amt(m[2]!) }];
   // Discarding (CR 701.9): "Target player discards two cards", "Each opponent discards a card at random", "Discard a card"
   if ((m = new RegExp(`^Discard ${NUMX} cards?( at random)?$`, "i").exec(s))) return [{ type: "discard", who: { ref: "you" }, n: amt(m[1]!), random: !!m[2] }];
+  // Felothar the Steadfast: "then discard cards equal to its power", the sacrificed creature's (as it last existed, CR 608.2h).
+  if ((m = /^Discard cards equal to (the sacrificed creature's (?:power|toughness))$/i.exec(s))) {
+    const n = parseCount(m[1]!, ctx);
+    return n ? [{ type: "discard", who: { ref: "you" }, n }] : null;
+  }
   // "Then you may discard a nonland card" (Hypothesizzle): only a card of that kind can be discarded (CR 701.9a).
   if ((m = /^Discard an? ((?:(?!\bcards?\b).)+ card)$/i.exec(s))) {
     const filter = parseSearchFilter(m[1]!);

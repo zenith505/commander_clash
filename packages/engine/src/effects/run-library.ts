@@ -1123,7 +1123,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
-        const count = e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.count;
+        const count = e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.count;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);

@@ -4,9 +4,9 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, canBeSacrificed, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
-import { abilityProblem, activationLessCost, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, activationLessCost, firstArtifactLess, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
-import { parseManaCost } from "./mana";
+import { parseManaCost, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
 import { canPayFromPool, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
@@ -402,7 +402,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
-  if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, activationLessCost(s, o, parseManaCost(ab.manaCost)), { ability: o })) return "not enough mana";
+  if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, manaAbilityCost(s, pid, o, ab.manaCost), { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);
@@ -410,6 +410,12 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
     if (tap.length !== ab.tapCost.n || new Set(tap).size !== tap.length || tap.some((id) => !can.includes(id))) return `choose ${ab.tapCost.n === 1 ? "an" : ab.tapCost.n} ${ab.tapCost.filter.text} to tap`;
   } else if (tap?.length) return "that ability doesn't tap other permanents";
   return null;
+}
+
+/** A mana ability's mana cost as `pid` activates it, after reductions (CR 602.2b applies 601.2f; Tezzeret, Betrayer of Flesh). */
+export function manaAbilityCost(s: GameState, pid: PlayerId, o: GameObject, manaCost: string): ParsedCost {
+  const first = firstArtifactLess(s, pid, o, true);
+  return activationLessCost(s, o, parseManaCost(manaCost), 0, first ? { n: first, atLeastOne: false } : undefined);
 }
 
 /** How much a player gives up by using it, beyond the tap: lower is better. */

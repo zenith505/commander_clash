@@ -742,7 +742,7 @@ export type ObjRef =
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
-  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard"; /** "A copy of that card" (Myrkul): copied as the card, not as the permanent it was. */ printed?: true } // "a creature dealt damage this way": what this ability's damage hit
+  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"); `public`: a graveyard, exile or the command zone (Nazgûl Battle-Mace's rulings), not a hidden zone (CR 400.2). */ zone?: "graveyard" | "public"; /** "A copy of that card" (Myrkul): copied as the card, not as the permanent it was. */ printed?: true } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
   | { ref: "eventGroup" }
@@ -881,7 +881,9 @@ export type PlayerRef =
   /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
   | { ref: "choseWord"; option: string }
   /** "Each opponent who lost 3 or more life this turn" (Davros, Dalek Creator): paid life counts too (CR 119.4). */
-  | { ref: "opponentsLostLife"; n: number };
+  | { ref: "opponentsLostLife"; n: number }
+  /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
+  | { ref: "opponentsControllingNo"; filter: TargetSpec };
 
 export type DamageRecipient =
   | ObjRef
@@ -2200,7 +2202,8 @@ export type Effect =
   | {
       type: "revealUntil";
       filter: TargetSpec;
-      found: "hand" | "battlefield";
+      /** "Graveyard": "Put all creature cards revealed this way into your graveyard" (Old Stickfingers). */
+      found: "hand" | "battlefield" | "graveyard";
       /** "You may put that card onto the battlefield. If you don't, put it into your hand." (Songbirds' Blessing): `found` is "battlefield", if its controller chooses and it can go there. */
       mayElseHand?: true;
       tapped?: true;
@@ -2420,6 +2423,11 @@ export type Effect =
   | { type: "castCommanderFree" }
   /** Eladamri, Korvecdal: reveal a card from your hand or the top card of your library; one matching `filter` goes onto the battlefield. */
   | { type: "revealHandOrTop"; filter: TargetSpec }
+  /**
+   * "Each opponent exiles a card from their hand or a permanent they control" (Nicol Bolas, Dragon-God): each of `who`
+   * chooses one, in turn order from the active player's, knowing the choices before; then all are exiled at once (rulings).
+   */
+  | { type: "exileHandOrPermanent"; who: PlayerRef }
   /**
    * "Create a 1/1 Insect token, then mill a card. If an Insect card was milled this way, put a loyalty counter on ~ and
    * repeat this process." (Grist): `effects`, then `then` and all of it again for as long as `cond` holds after them.
@@ -2883,7 +2891,7 @@ export type Effect =
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
-  | { type: "graveyardCastThisTurn"; filter: TargetSpec }
+  | { type: "graveyardCastThisTurn"; filter: TargetSpec; /** The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types." */ rider?: GraveCastRider }
   /**
    * For the rest of the turn, its controller may cast spells (`cast`: those cards) and/or play lands (`lands`) from their
    * graveyard, as many as they like, paying their costs and following their timing rules (rulings on Forgotten Cellar;
@@ -2942,7 +2950,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; /** "If ~ was kicked, put two of those cards into your hand instead": `count` when kicked (CR 702.33e). */ kickedCount?: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak" | "exile"; /** Into exile: "You may play the exiled card this turn" (Nahiri's Warcrafting, Florian). */ play?: "thisTurn"; /** Into exile, then "You may cast the exiled card without paying its mana cost" (The Key to the Vault): once the rest are put away, as this resolves (CR 608.2g). */ castFree?: true; /** "keep": the rest stay on top, in order, for the next instruction (Expressive Iteration). */ rest: "graveyard" | "bottom" | "shuffle" | "hand" | "keep"; /** Takes only while this many cards are left for the rest (Expressive Iteration's exile, after one goes to the bottom). */ minRest?: number; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Another player's library the cards come from: "manifest the top card of that player's library" (Orochi Soul-Reaver), `who` getting them. */ library?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it" (Turntimber Symbiosis, CR 614.1c). */ countersIfMv?: { max: number; counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true; /** "A creature card and/or a land card" (Kiora): up to one for each, each card taken matching a different one. */ oneOfEach?: TargetSpec[]; /** "Each player looks at the top five cards of their library" (Explore the Vastlands): each one in turn, in their own library. */ each?: true }
+  | { type: "dig"; n: Amount; count: number; /** "Put X cards from among them into your hand" (Stargaze): `count` is the X it was cast with. */ countX?: true; /** "If ~ was kicked, put two of those cards into your hand instead": `count` when kicked (CR 702.33e). */ kickedCount?: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak" | "exile"; /** Into exile: "You may play the exiled card this turn" (Nahiri's Warcrafting, Florian). */ play?: "thisTurn"; /** Into exile, then "You may cast the exiled card without paying its mana cost" (The Key to the Vault): once the rest are put away, as this resolves (CR 608.2g). */ castFree?: true; /** "keep": the rest stay on top, in order, for the next instruction (Expressive Iteration). */ rest: "graveyard" | "bottom" | "shuffle" | "hand" | "keep"; /** Takes only while this many cards are left for the rest (Expressive Iteration's exile, after one goes to the bottom). */ minRest?: number; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Another player's library the cards come from: "manifest the top card of that player's library" (Orochi Soul-Reaver), `who` getting them. */ library?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it" (Turntimber Symbiosis, CR 614.1c). */ countersIfMv?: { max: number; counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true; /** "A creature card and/or a land card" (Kiora): up to one for each, each card taken matching a different one. */ oneOfEach?: TargetSpec[]; /** "Each player looks at the top five cards of their library" (Explore the Vastlands): each one in turn, in their own library. */ each?: true }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
@@ -3665,7 +3673,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /**
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** Alania: "if it's the first instant spell, the first sorcery spell, or the first Otter spell other than ~ you've cast this turn": the first of any of these kinds (`notSelfName`: not counting spells with this permanent's name). */ firstOfKinds?: { spec: TargetSpec; notSelfName?: true }[]; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /**
    * "If it shares a card type with the exiled card" (Cemetery Protector): the spell or land played shares one with a card
    * this permanent's linked ability exiled (CR 607.2a), an intervening "if" checked again as it resolves (CR 603.4).
    */ sharesTypeWithLinked?: true };
@@ -4012,6 +4020,8 @@ export interface ActivatedAbility {
    * (CR 601.2f), 0 with 0 or less life (rulings on Lurking Evil).
    */
   halfLifeCost?: "up" | "down";
+  /** "Discard your hand" as part of the cost (Tarrian's Journal; CR 701.9a): with no cards in it too (rulings). */
+  discardHand?: true;
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
   /** "Pay X {E}" (Sphinx of the Revelation): X energy, X announced as it's activated (CR 107.3a). */
@@ -4315,6 +4325,12 @@ export interface CostMod {
   text: string;
 }
 
+/** What a spell cast with a permission to cast it from a graveyard gets: a counter it enters with, creature types on the stack and for good (CR 614.1c, 400.7a). */
+export interface GraveCastRider {
+  counter?: CounterKind;
+  subtypes?: string[];
+}
+
 /** Everything the engine knows how to do with one card. */
 /** A cost paid along with a spell's mana cost (CR 118.8). */
 /**
@@ -4504,7 +4520,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true; /** "All loyalty abilities" (Nicol Bolas, Dragon-God): only those. */ loyalty?: true };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while
@@ -5036,7 +5052,12 @@ export interface CompiledCard {
   powerUpLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
   powerUpAgain?: true;
-  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  /**
+   * "The first activated ability of an artifact you activate each turn costs {2} less to activate" (Tezzeret, Betrayer of
+   * Flesh; CR 602.2b applies 601.2f): mana abilities count as that first ability too (rulings). See TurnLog.artifactAbility.
+   */
+  firstArtifactAbilityLess?: number;
+  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** "~'s equip abilities" (Firion's token copies): only this Equipment's own. */ self?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /** "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back, CR 601.2f). */
   auraLessEnchanted?: number;
   /** "You may activate equip abilities any time you could cast an instant" (Leonin Shikari); Forge Anew's "During your turn, ...". */
@@ -5119,6 +5140,8 @@ export interface CompiledCard {
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /** "You may play Forests from your graveyard." (Titania, Nature's Force): only lands with one of these subtypes. */
+  landsFromGraveyardOf?: string[];
   /**
    * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
    * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).

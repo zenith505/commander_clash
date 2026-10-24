@@ -400,7 +400,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Cipher: encode it on the creature most likely to deal combat damage to a player.
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
-    if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
+    if (pend.kind === "pickPermanents" && pend.action === "tap") {
+      // Exactly that many ("you may tap three untapped creatures you control", Aziza, once we said yes): creatures that
+      // could still attack too, if it takes them.
+      const ids = choosePicks(s, pid, pend.options, pend.count, "tap");
+      if (pend.min === undefined && !pend.anyNumber && ids.length < pend.count) ids.push(...pend.options.filter((id) => !ids.includes(id)).slice(0, pend.count - ids.length));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Orzhov Advokist: the counters on our best creature, unless its controller is the only opponent we could attack.
     if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count === 1) {
       const giver = s.resolving?.item.controller;
@@ -537,6 +543,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
+    }
+    // Nicol Bolas, Dragon-God's +1: a token, else the cheapest card in hand (an extra land once we have five), else the
+    // cheapest permanent.
+    if (pend.kind === "chooseOption" && pend.what === "exileHandOrPermanent") {
+      const inHand = pend.options.filter((o) => obj(s, o).zone === "hand");
+      const perms = pend.options.filter((o) => obj(s, o).zone === "battlefield");
+      const token = perms.find((o) => obj(s, o).isToken && !obj(s, o).isCommander);
+      const spare = (o: string) => (isType(defOf(s, obj(s, o)), "Land") ? (lands(s, pid) >= 5 ? -1 : 2) : mv(s, o));
+      const pick = token ?? [...inHand].sort((a, b) => spare(a) - spare(b))[0] ?? [...perms].sort((a, b) => mv(s, a) - mv(s, b))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     // Eladamri: the biggest creature card in hand, else the top card of the library (it may be one).
     if (pend.kind === "chooseOption" && pend.what === "revealHandOrTop") {
@@ -3488,7 +3504,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
-      if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
+      // "Discard your hand" (Tarrian's Journal): only with at most one card in it, which then becomes a land worth tapping.
+      if (ab.discardHand && hand > 1) continue;
+      if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0) && !(ab.discardHand && objIsType(s, o, "Artifact"))) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)

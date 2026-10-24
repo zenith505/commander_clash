@@ -121,6 +121,14 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (chose && ctx.chooseWords?.includes(chose[1]!)) return { ref: "choseWord", option: chose[1]! };
   const lost = /^each opponent who lost (?:(\d+) or more )?life this turn$/.exec(x);
   if (lost) return { ref: "opponentsLostLife", n: lost[1] ? Number(lost[1]) : 1 };
+  // "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): a legendary
+  // creature or a legendary planeswalker (CR 205.4e words it so).
+  const without = /^each opponent who doesn't control an? (.+)$/.exec(x);
+  if (without) {
+    const spec = parseTargetPhrase(without[1]!);
+    if (spec?.kind === "object" && !spec.controller && !spec.bound) return { ref: "opponentsControllingNo", filter: spec };
+    return null;
+  }
   // "Choose an opponent. That player sacrifices a creature of their choice."
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // Stuffy Doll: "the chosen player" of "As ~ enters, choose a player" (compile checks there is one).
@@ -865,9 +873,9 @@ export function parseTargetPhrase(
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
   }
-  // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
+  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1178,7 +1186,11 @@ export function parseTargetPhrase(
   // Supertypes are "and" requirements ("basic land"); with alternatives they'd need per-alternative filters.
   // "Nonlegendary, nonland card" is one card that's neither: only "non" words, so every one is required.
   const onlyNon = alts.every((a) => a.trim().split(/\s+/).every((w) => w.startsWith("non") || w === "permanent"));
-  if ((supertypes.length || (notSupertypes.length && !onlyNon)) && alts.length > 1) return null;
+  // A leading supertype is for every alternative, as "a legendary creature or planeswalker" is a legendary creature or a
+  // legendary planeswalker (CR 205.4e): only before bare card types ("legendary creature or planeswalker").
+  const firstWords = alts[0]?.trim().split(/\s+/) ?? [];
+  const leadingSuper = supertypes.length === 1 && firstWords.length === 2 && SUPERTYPE_WORDS[firstWords[0]!] && TYPE_WORDS[firstWords[1]!] && alts.slice(1).every((a) => { const ws = a.trim().split(/\s+/); return ws.length === 1 && !!TYPE_WORDS[ws[0]!]; });
+  if ((supertypes.length || (notSupertypes.length && !onlyNon)) && alts.length > 1 && !leadingSuper) return null;
   // Subtypes mixed with card types in alternatives ("Wall or artifact") would need per-alternative filters too.
   if (subtypes.length && (types.length || notTypes.length) && alts.length > 1) return null;
   if (permanentSpell) notTypes.push(...["Instant", "Sorcery"].filter((t) => !notTypes.includes(t)));

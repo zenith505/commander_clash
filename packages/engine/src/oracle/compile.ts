@@ -545,6 +545,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Nicol Bolas, Dragon-God: "~ has all loyalty abilities of all other planeswalkers on the battlefield": theirs as they
+    // have them now (CR 613.1f), not their static, triggered or other activated abilities; "~" in them is Bolas (rulings).
+    if (line === "~ has all loyalty abilities of all other planeswalkers on the battlefield." && !out.borrows) {
+      out.borrows = { filter: { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], text: "other planeswalkers" }, other: true, noMana: true, loyalty: true };
+      continue;
+    }
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
       continue;
@@ -1361,6 +1367,12 @@ export function compile(d: CardDef): CompiledCard {
       out.landsFromGraveyard = true;
       continue;
     }
+    // Titania, Nature's Force: "You may play Forests from your graveyard." Land cards with that basic land type (CR 305.6).
+    const typedYard = /^You may play (Plains|Islands|Swamps|Mountains|Forests) from your graveyard\.$/.exec(line);
+    if (typedYard) {
+      (out.landsFromGraveyardOf ??= []).push(typedYard[1] === "Plains" ? "Plains" : typedYard[1]!.slice(0, -1));
+      continue;
+    }
     // Wrenn and Realmbreaker's emblem: "You may play lands and cast permanent spells from your graveyard." Any number,
     // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
     const permYard = /^You may (play lands and )?cast permanent spells from your graveyard\.$/.exec(line);
@@ -1836,6 +1848,11 @@ export function compile(d: CardDef): CompiledCard {
       else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in your hand` }, activated: kw.activated });
       continue;
     }
+    const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);
+    if (firstArtifactLess) {
+      out.firstArtifactAbilityLess = (out.firstArtifactAbilityLess ?? 0) + Number(firstArtifactLess[1]);
+      continue;
+    }
     const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
     if (ninjutsuLess) {
       out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
@@ -1849,6 +1866,12 @@ export function compile(d: CardDef): CompiledCard {
     const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line);
     if (equipLess) {
       (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      continue;
+    }
+    // Firion's token copies: "This Equipment's equip abilities cost {2} less to activate" (its own only).
+    const ownEquipLess = /^~'s equip abilities cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (ownEquipLess) {
+      (out.equipLess ??= []).push({ n: Number(ownEquipLess[1]), self: true });
       continue;
     }
     // "Aura spells you cast that target enchanted creature cost {3} less to cast." (Strong Back)
@@ -3088,7 +3111,9 @@ function linkExile(out: CompiledCard) {
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => b.targets.some((t) => t.linkedExile))) {
-    const exiles = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const all = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    // Bronzebeak Foragers: "exile ... until ~ leaves the battlefield" when that's its only exile ability.
+    const exiles = all.some((e) => !e.until) ? all.filter((e) => !e.until) : all.filter((e) => e.until === "sourceLeaves");
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
     else if (exiles[0]) exiles[0].linked = true;

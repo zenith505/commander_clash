@@ -764,6 +764,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // Discarding your hand can be done with an empty hand (rulings on Moonveil Regent).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
+    if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
     if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;

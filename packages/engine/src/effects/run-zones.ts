@@ -1416,6 +1416,33 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (obj(s, id).zone === "battlefield") log(s, `${p.name} puts ${d.name} onto the battlefield.`);
       return;
     }
+    case "exileHandOrPermanent": {
+      // Each chooses in turn order (APNAP, CR 101.4) a card in their hand, unrevealed, or a permanent they control; then all
+      // the chosen ones are exiled simultaneously (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      const st = (sc.handOrPermanent ??= { queue: apnap(s, players(s, e.who, ctx)), picks: [] });
+      while (st.queue.length) {
+        const pid = st.queue[0]!;
+        const p = player(s, pid);
+        const perms = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+        const options = [...p.hand, ...perms];
+        if (p.lost || !options.length) {
+          st.queue.shift();
+          continue;
+        }
+        s.pending = { kind: "chooseOption", player: pid, source: src, what: "exileHandOrPermanent", options, labels: [...p.hand.map((id) => `${defOf(s, obj(s, id)).name} (hand)`), ...perms.map((id) => nameOf(s, id))], prompt: "exile a card from your hand or a permanent you control" };
+        return "paused";
+      }
+      sc.handOrPermanent = undefined;
+      for (const id of st.picks) {
+        const o = obj(s, id);
+        if (o.zone !== "hand" && o.zone !== "battlefield") continue;
+        log(s, `${player(s, o.zone === "hand" ? o.owner : controllerOf(s, o)).name} exiles ${o.zone === "hand" ? `${defOf(s, o).name} from their hand` : nameOf(s, o.id)}.`);
+        moveObject(s, id, "exile");
+      }
+      invalidateCharacteristics(s);
+      return;
+    }
     case "playLinked": {
       // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
       // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.

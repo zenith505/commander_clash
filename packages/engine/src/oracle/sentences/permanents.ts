@@ -824,7 +824,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // lands you control."': no number of its own; the ability it gains sets them, in layer 7b (CR 604.3a, 613.4b).
   // Overloaded Rise and Shine: "Each noncreature artifact you control becomes a 0/0 artifact creature": the ones there as
   // it resolves, locked in (CR 611.2c).
-  if ((m = /^(target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+")$/i.exec(s))) {
+  // Zur, Eternal Schemer: "Target non-Aura enchantment you control becomes a creature in addition to its other types and has
+  // base power and base toughness each equal to its mana value": no duration either (rulings).
+  if ((m = /^(target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

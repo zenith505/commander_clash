@@ -251,6 +251,9 @@ const checkableMay = (e: Effect) =>
   // Moonveil Regent).
   (e.type === "discard" && e.who.ref === "you" && e.hand && !e.filter) ||
   (e.type === "draw" && e.who.ref === "you") ||
+  // "You may have target opponent draw a card. If you do, copy that spell." (Alania): done if that player is still a legal
+  // target with a card to draw.
+  (e.type === "draw" && e.who.ref === "target" && !("n" in e.who && e.who.n) && e.n === 1) ||
   // "You may have that player lose 2 life. If you do, you gain 2 life." (Bloodchief Ascension): one player, who can lose
   // life now (CR 119.8).
   (e.type === "loseLife" && (e.who.ref === "eventPlayer" || (e.who.ref === "target" && !("n" in e.who && e.who.n))) && typeof e.n === "number" && e.n > 0) ||
@@ -769,6 +772,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Momentous Fall: "You draw cards equal to the sacrificed creature's power, then you gain life equal to its toughness":
   // "its" is the sacrificed creature, as it last existed (CR 608.2h).
   text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
+  // Level Up: "Then if it has power 10 or greater, draw a card": the same as "if its power is 10 or greater".
+  text = text.replace(/\b([Ii]f) (it|~) has (power|toughness) (\w+) or (greater|less),/g, (_, i: string, w: string, st: string, n: string, c: string) => `${i} ${w === "~" ? "~'s" : "its"} ${st} is ${n} or ${c},`);
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
   text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
@@ -1369,7 +1374,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const yardCast = /^You may cast an? (creature|artifact|instant|sorcery) spell from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardCast) {
       const type = yardCast[1]!.charAt(0).toUpperCase() + yardCast[1]!.slice(1);
-      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` } });
+      // The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types."
+      const rider = yardCast[1] === "creature" ? /^If you do, it enters with a finality counter on it and is an? ([A-Z][a-z]+) in addition to its other types\.?$/.exec(sentences[si + 1] ?? "") : null;
+      if (rider && !CREATURE_TYPES.has(rider[1]!)) return null;
+      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` }, ...(rider ? { rider: { counter: "finality", subtypes: [rider[1]!] } } : {}) });
+      if (rider) si++;
       continue;
     }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
@@ -3037,6 +3046,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
       continue;
     }
+    // Ajani's Chosen: "Whenever an enchantment you control enters, create a 2/2 white Cat creature token. If that enchantment
+    // is an Aura, you may attach it to the token." Only if the Aura can legally enchant the token, both still on the
+    // battlefield as this resolves (rulings, CR 701.3b).
+    if ((ctx.subject || ctx.subjectIt) && s === "If that enchantment is an Aura, you may attach it to the token") {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "createToken" || prev.n !== 1 || prev.who.ref !== "you") return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura" };
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter }, effects: [{ type: "may", effects: [{ type: "attach", what: { ref: "created" }, source: { ref: "subject" } }], text: "Attach it to the token" }] });
+      continue;
+    }
     // Toph, Hardheaded Teacher: "Whenever you cast a spell, earthbend 1. If that spell is a Lesson, put an additional +1/+1
     // counter on that land." The land earthbending chose, the spell as it was cast.
     const lessonIf = ctx.castSpell && /^If that spell is an? ([A-Z][a-z]+), put an additional \+1\/\+1 counter on that land$/.exec(s);
@@ -3073,8 +3092,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "flickeredIs", filter: { ...typed, text: ifBack[1]! } }, effects: fx });
       continue;
     }
+    // Tezzeret, Betrayer of Flesh: "Target artifact becomes an artifact creature. If it isn't a Vehicle, it has base power
+    // and toughness 4/4." No duration, so for as long as it stays on the battlefield (CR 611.2a); the Vehicle checked as this
+    // resolves (CR 608.2c). A Vehicle keeps its printed power and toughness (rulings), and isn't crewed.
+    const notVehicle = /^[Tt]arget artifact becomes an artifact creature$/.test(s) ? /^If it isn't a Vehicle, it has base power and toughness (\d+)\/(\d+)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (notVehicle) {
+      const what = parseObject("target artifact", ctx);
+      if (what?.ref !== "target") return null;
+      const i = ctx.targets.length - 1;
+      effects.push({ type: "continuous", what, mods: [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }], duration: "game" });
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], notSubtypes: ["Vehicle"], text: "not a Vehicle" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: [{ type: "continuous", what, mods: [{ kind: "setPT", power: Number(notVehicle[1]), toughness: Number(notVehicle[2]) }], duration: "game" }] });
+      si++;
+      continue;
+    }
     // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
-    const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
+    const ifIts =/^If it's (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
     if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (CREATURE_TYPES.has(ifIts[2]!) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
@@ -3231,6 +3264,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const anyOf = specs as TargetSpec[];
       effects.push({ type: "dig", n: num(eachLook[1]!), reveal: false, count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${eachLook[2]!.replace(/^an? /, "")} and/or ${eachLook[3]!}` }, oneOfEach: anyOf, into: "hand", rest: "bottom", random: true, each: true });
       si++;
+      continue;
+    }
+    // Stargaze: "Look at twice X cards from the top of your library" (the X it was cast with).
+    if (!dig && ctx.spell && /^Look at twice X cards from the top of your library$/.test(s)) {
+      dig = { type: "dig", n: { ...X, times: 2 }, reveal: false };
       continue;
     }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
@@ -3915,7 +3953,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."; Firebender
       // Ascension: "Then if it has four or more quest counters on it, you may copy that ability. ..."
-      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : undefined;
+      // Alania: "You may have target opponent draw a card. If you do, copy that spell. You may choose new targets for the copy."
+      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : both.length === 1 && prev?.type === "if" && prev.cond.kind === "youDid" && !prev.otherwise ? both[0] : undefined;
       if (only?.type === "copySpell" && prev?.type === "if") {
         only.newTargets = true;
         continue;
@@ -5099,6 +5138,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (untilVotes && ctx.vote?.options?.includes(untilVotes[1]!) && /^Put those creature cards onto the battlefield, then shuffle the rest into your library$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, found: "battlefield", rest: "shuffle", n: { count: { kind: "votes", option: untilVotes[1]! } } });
       si++;
+      continue;
+    }
+    // Old Stickfingers: "When you cast ~, reveal cards from the top of your library until you reveal X creature cards. Put
+    // all creature cards revealed this way into your graveyard, then put the rest on the bottom of your library in a random
+    // order." X is the spell's, as it was cast (rulings); fewer if the library runs out (CR 701.20a).
+    if (ctx.ownX && /^[Rr]eveal cards from the top of your library until you reveal X creature cards$/.test(s) && sentences[si + 1] === "Put all creature cards revealed this way into your graveyard" && /^(?:[Tt]hen )?[Pp]ut the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, found: "graveyard", rest: "bottom", n: { count: { kind: "x" } } });
+      si += 2;
       continue;
     }
     if (untilX) {

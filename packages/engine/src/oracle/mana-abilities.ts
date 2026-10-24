@@ -16,6 +16,13 @@ import { parseOnlyClauses, parseStaticCondition } from "./statics";
  * we can run (mana that can only be spent on some spells, "in any combination", ...).
  */
 export function parseManaAbility(line0: string): ManaAbility | null {
+  // Victory Chimes: "{T}: A player of your choice adds {C}." Still a mana ability (rulings, CR 605.1a): its mana goes to
+  // the player chosen.
+  const chosen = /^(.+): A player of your choice adds ((?:\{[WUBRGC]\})+)\.$/.exec(line0);
+  if (chosen) {
+    const ab = parseManaAbility(`${chosen[1]}: Add ${chosen[2]}.`);
+    return ab && { ...ab, text: line0, toChosenPlayer: true };
+  }
   // "{T}: For each color among permanents you control, add one mana of that color." (Bloom Tender), "{2}, {T}: Choose a
   // color. Add an amount of mana of that color equal to ..." (Nykthos, Three Tree City: the color is chosen as it resolves,
   // CR 605.3b, like "X mana of any one color").

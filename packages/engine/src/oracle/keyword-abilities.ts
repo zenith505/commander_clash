@@ -223,7 +223,9 @@ export function parseCostKeyword(
   // Morph, megamorph, disguise (CR 702.37, 702.168): costs other than mana ("Reveal a blue card") aren't modeled.
   if ((m = /^(Morph|Megamorph|Disguise)(?: |—)(.+?)\.?$/.exec(line))) {
     const cost = m[2]!;
-    if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail";
+    // "Disguise {X}{3}{W}", "Morph {X}{X}{R}": X chosen as it's turned face up (CR 107.3d), for its own abilities (702.37f, 702.168e).
+    const withX = parseManaCost(cost).supported && parseManaCost(cost).hasX;
+    if (!/^(\{[^}]+\})+$/.test(cost) || !(plainMana(cost) || withX)) return "fail";
     return { faceDown: { kind: m[1]!.toLowerCase() as FaceDownKind, cost } };
   }
   if ((m = /^Echo(?: |—)(.+?)\.?$/.exec(line))) {

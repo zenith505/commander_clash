@@ -333,7 +333,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo, action.to);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -428,7 +428,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "turnFaceUp":
       requireNoPending(s);
-      turnFaceUp(s, p, action.objectId, action.way);
+      turnFaceUp(s, p, action.objectId, action.way, action.x);
       break;
     case "suspend":
       requireNoPending(s);
@@ -3604,7 +3604,7 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
   return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
@@ -3613,6 +3613,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
   if (problem) throw new RulesError(problem);
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
+  // Victory Chimes: the player chosen as it's activated, any player still in the game.
+  if (to !== undefined && to !== p.id && (!ab.toChosenPlayer || !s.players[to] || s.players[to]!.lost)) throw new RulesError(`${name}'s mana can't go to that player`);
+  const getter = to ?? p.id;
   // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b). A storage land's: how
   // many counters it removes, announced as it's activated (CR 107.3a), and how that mana is split.
   const combos = manaCombos(s, o, ab);
@@ -3656,7 +3659,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  if (getter !== p.id) log(s, `${p.name} taps ${name}: ${player(s, getter).name} adds ${adds.map((m) => `{${m}}`).join("")}.`);
+  addMana(s, getter, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   // Yuna, Grand Summoner: "When you next cast a creature spell this turn, ..." (a delayed trigger, CR 603.7a).
@@ -6139,6 +6143,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
+  // Its last known information takes in the counters its cost put on or removed (CR 608.2h): Nissa, Ascended Animist's
+  // +1 gone before it resolves makes a Horror as big as her loyalty after the +1.
+  if (lki?.counters && o.zone === "battlefield" && (ab.loyalty !== undefined || ab.loyaltyX || ab.putCounters || ab.removeCounters)) Object.assign(lki, { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } });
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];
@@ -8939,7 +8946,7 @@ export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; c
  * Why `pid` can't turn this permanent face up right now (the `way`-th of faceUpWays), or null (with the mana in
  * their pool). It's a special action, any time they have priority (CR 116.2b).
  */
-export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way = 0): string | null {
+export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way = 0, x = 0): string | null {
   const o = s.objects[id];
   if (!o || o.zone !== "battlefield" || !o.faceDown) return "that isn't a face-down permanent";
   if (controllerOf(s, o) !== pid) return "you don't control that permanent";
@@ -8948,32 +8955,37 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   if (!ways.length) return o.faceDown === "manifest" || o.faceDown === "cloak" ? "it isn't a creature card with a mana cost" : "it has no morph or disguise cost"; // CR 702.37e, 701.40b
   const fd = ways[way];
   if (!fd) return "it can't be turned face up that way";
-  if (!canPayFromPool(s, pid, parseManaCost(fd.cost), "other")) return `not enough mana to turn it face up (${fd.cost})`;
+  if (!Number.isInteger(x) || x < 0 || (x > 0 && !parseManaCost(fd.cost).hasX)) return "that isn't a value of X for it";
+  const cost = faceUpManaCost(fd.cost, x);
+  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to turn it face up (${cost})`;
   return null;
 }
 
 /** The cost of turning a face-down permanent face up the `way`-th way, if it has one. */
 export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s, o)[way];
 
-function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0) {
-  const problem = turnFaceUpProblem(s, p.id, id, way);
+/** A morph or disguise cost with its {X} as the X chosen (CR 107.3d): "{X}{3}{W}" with X 2 is "{2}{3}{W}". */
+export const faceUpManaCost = (cost: string, x = 0) => cost.replace(/\{X\}/g, x ? `{${x}}` : "") || "{0}";
+
+function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0) {
+  const problem = turnFaceUpProblem(s, p.id, id, way, x);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const fd = faceUpWays(s, o)[way]!;
-  spendFromPool(s, p.id, parseManaCost(fd.cost), "other");
+  spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
   // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
   // permanent, so nothing "enters".
   o.faceDown = undefined;
   lockIfRoom(s, o);
   invalidateCharacteristics(s);
   const d = defOf(s, o);
-  log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}).`);
+  log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`);
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
   if (fd.kind === "megamorph") putCounters(s, o, "+1/+1", 1);
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
   const up = compileCard(d).faceUpCounters;
   if (up) putCounters(s, o, up.counter, up.n);
-  fireEvent(s, { type: "turnedFaceUp", id });
+  fireEvent(s, { type: "turnedFaceUp", id, ...(x ? { x } : {}) });
   s.passedInSuccession = [];
 }
 

@@ -16,7 +16,7 @@ import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
-import { parseGroup, parseTargetPhrase } from "./targets";
+import { PLANESWALKER_TYPES, parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
@@ -347,7 +347,9 @@ export function normalizeSelf(d: CardDef): string {
   if (short && short !== full) {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
-    const re = new RegExp(`(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
+    // Not "each Garruk you control" in Garruk, Cursed Huntsman: there it's the planeswalker type (CR 205.3j).
+    const pwType = PLANESWALKER_TYPES.has(short) ? "(?<!(?:^|[^\\p{L}])(?:each|another|other|target|a|an) )" : "";
+    const re = new RegExp(`${pwType}(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
@@ -3088,7 +3090,8 @@ function linkExile(out: CompiledCard) {
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;
-  const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]
+  // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
+  const exiles = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)]
     .flatMap((b) => allEffects(b.effects))
     .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile)) && !("until" in e && e.until));
   if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
@@ -3242,10 +3245,12 @@ function checkX(d: CardDef, out: CompiledCard) {
   const monstrousX = out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "monstrosity" && usesX(e.n)));
   // "When you cycle this card" uses the X of an {X} in the cycling cost (Shark Typhoon, rulings).
   const cyclingX = out.activated.some((a) => a.cycling && /\{X\}/.test(a.manaCost));
+  // "When this creature is turned face up" uses the X of an {X} in its morph or disguise cost (CR 702.37f, 702.168e).
+  const faceUpX = !!out.faceDownCast && /\{X\}/.test(out.faceDownCast.cost);
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
     // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || tr.eventX) return true;
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX) return true;
     bad(tr.body.text);
     return false;
   });
@@ -3432,6 +3437,8 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   // to trigger, that ability triggers an additional time" (CR 603.2d): only the abilities of the permanent that has it and
   // of its controller's emblems, about any creature dying (rulings).
   if (line === "If a creature dying causes a triggered ability of ~ or an emblem you own to trigger, that ability triggers an additional time.") return { by: { event: "dies", filter: [{ kind: "object", types: ["Creature"], text: "creature" }] }, selfOrEmblems: true };
+  // Wizard's Staff: "If a triggered ability of equipped creature triggers, that ability triggers an additional time" (CR 603.2d).
+  if (line === "If a triggered ability of equipped creature triggers, that ability triggers an additional time.") return { ofEquipped: true };
   // Cloud, Midgar Mercenary: its own abilities and its Equipment's, while it's equipped.
   if (line === "As long as ~ is equipped, if a triggered ability of ~ or an Equipment attached to it triggers, that ability triggers an additional time.") return { selfOrEquipment: true };
   // Veyran, Voice of Duality.

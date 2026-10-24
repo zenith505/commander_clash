@@ -1859,6 +1859,8 @@ export interface Resolving {
   manifestedThisWay?: number;
   /** Join forces: the total amount of mana all players paid ("where X is the total amount of mana paid this way"). */
   joinForcesPaid?: number;
+  /** What each player paid for it ("the amount of mana they paid this way", Liege of the Hollows). */
+  joinForcesPaidBy?: Record<PlayerId, number>;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
@@ -2055,7 +2057,9 @@ export interface Resolving {
     /** "You may pay {X}": the X chosen, or "none". */
     payX?: string;
     /** Join forces: the players still to decide, from the controller on in turn order, and what they've paid so far. */
-    join?: { queue: PlayerId[]; paid: number; asked?: number };
+    join?: { queue: PlayerId[]; paid: number; asked?: number; by: Record<PlayerId, number> };
+    /** "Then repeat this process X more times": the passes left (this one too), the next instruction, and the scratch from before it started. */
+    repeat?: { left: number; step?: number; keep: string[] };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
@@ -2075,7 +2079,7 @@ export interface Resolving {
     vaultPaid?: number;
     /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
     impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** With `copyTimes`: how many copies of each card have been made. */ copied?: Record<ObjectId, number>; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;
@@ -2126,7 +2130,7 @@ export type Action =
   /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
   /** `extra`: the mana picked for the triggered mana abilities tapping it triggers ("one mana of any color", CR 605.4a). */
   /** `combo`: for "Add {W}{W}, {W}{U}, or {U}{U}", which of them (ManaOption.combo). */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number }
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */
@@ -2194,7 +2198,7 @@ export type Action =
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
-  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
+  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number; /** The X chosen for an {X} in the cost (CR 107.3d), "Disguise {X}{3}{W}". */ x?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
   | { type: "payUnless"; player: PlayerId; pay: boolean; /** Waterbend (CR 701.67a): untapped artifacts and creatures tapped to pay {1} each of the cost. */ tap?: ObjectId[] }
   | { type: "concede"; player: PlayerId };

@@ -293,6 +293,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
     return of && count({ kind, of });
   }
+  // "Where X is ~'s loyalty" (Nissa, Ascended Animist): a planeswalker's loyalty is its loyalty counters (CR 306.5b), as
+  // it last existed if it's gone (rulings).
+  if (/^~'s loyalty$/.test(p)) return count({ kind: "counters", counter: "loyalty", of: { ref: "self" } });
   // "The amount of mana spent to cast that spell" (Mana Sculpt): the targeted spell's, as it last existed on the stack.
   if ((m = /^(?:the )?amount of mana spent to cast that spell$/.exec(p))) {
     const of = whoseObject("that spell's", ctx);

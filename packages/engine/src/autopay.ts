@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -764,14 +764,14 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
 }
 
 /** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */
-export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId, way = 0): Action[] | null {
+export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId, way = 0, x = 0): Action[] | null {
   const o = s.objects[id];
   const fd = o && faceUpCost(s, o, way);
   if (!fd) return null;
-  const problem = turnFaceUpProblem(s, pid, id, way);
+  const problem = turnFaceUpProblem(s, pid, id, way, x);
   if (problem && !/not enough mana/.test(problem)) return null;
-  const taps = problem ? planMana(s, pid, parseManaCost(fd.cost)) : [];
-  return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id, ...(way ? { way } : {}) }] : null;
+  const taps = problem ? planMana(s, pid, parseManaCost(faceUpManaCost(fd.cost, x))) : [];
+  return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id, ...(way ? { way } : {}), ...(x ? { x } : {}) }] : null;
 }
 
 /** Tap mana for a card's suspend cost, then suspend it (CR 702.62a), or null if that can't be done now. */

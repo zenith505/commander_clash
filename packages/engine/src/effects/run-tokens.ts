@@ -357,8 +357,11 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     }
     return;
   }
+  // "Each player creates a number of ... tokens equal to the amount of mana they paid this way" (Liege of the Hollows):
+  // each one's own number (PlayerRef eachOne).
+  const each = JSON.stringify(e.n).includes('"eachOne"');
   for (const pid of players(s, e.who, ctx)) {
-    const { same: k, extra } = tokenBatch(s, pid, e.token, n);
+    const { same: k, extra } = tokenBatch(s, pid, e.token, each ? amountNow(s, e.n, { ...ctx, eachOne: pid }) : n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
     const defender = e.attackingEvent ? eventDefender(s, ctx, pid) : e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
     const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;

@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -148,8 +148,11 @@ export type Count =
   | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
-  /** Join forces: "the total amount of mana paid this way" (Minds Aglow). */
-  | { kind: "joinForcesPaid" }
+  /**
+   * Join forces: "the total amount of mana paid this way" (Minds Aglow). `whose`: only what these players paid, "the
+   * amount of mana they paid this way" (Liege of the Hollows, PlayerRef eachOne).
+   */
+  | { kind: "joinForcesPaid"; whose?: PlayerRef }
   /** "For each card manifested this way" (Kozilek, the Broken Reality): the cards a putFromHand with `manifest` turned face down onto the battlefield. */
   | { kind: "manifestedThisWay" }
   /**
@@ -2347,6 +2350,8 @@ export type Effect =
    * repeat this process." (Grist): `effects`, then `then` and all of it again for as long as `cond` holds after them.
    */
   /** Sphinx's Tutelage: "If two nonland cards that share a color were milled this way, repeat this process" (cond "milledShareColor"). */
+  /** "Then repeat this process X more times" (Another Round): `effects` `n` times in all, each pass its own choices. */
+  | { type: "repeat"; effects: Effect[]; n: Amount }
   | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" }; then: Effect[] }
   /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
   | { type: "rollAgain" }
@@ -2620,8 +2625,12 @@ export type Effect =
   /** `chain`: the Chain cards' "that permanent's controller may copy ~" (Chain of Vapor), for the bots' answer. */
   /** `untappedSubject`: only while the trigger's subject is still there untapped (Charismatic Conqueror's "they may tap that permanent"). */
   /** `pay`: paid on saying yes (Chain Lightning's "may pay {R}{R}"); someone who can't pay isn't asked. `need` "hand": a card in hand to discard (Chain of Plasma). */
-  /** Join forces: "Starting with you, each player may pay any amount of mana" (Minds Aglow), the total kept for X. */
-  | { type: "joinForces" }
+  /**
+   * Join forces: "Starting with you, each player may pay any amount of mana" (Minds Aglow), the total kept for X.
+   * `activeFirst`: "Each player may pay any amount of mana" (Liege of the Hollows): starting with the active player
+   * (CR 101.4, rulings), each one's amount kept too.
+   */
+  | { type: "joinForces"; activeFirst?: true }
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
@@ -2928,7 +2937,8 @@ export type Effect =
    * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
    */
   /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; /** With `reveal`: only looked at, not revealed (Planetarium of Wan Shi Tong). */ look?: true; /** "Do this only once each turn": casting one is doing it (CR 603.2h, rulings on Planetarium). */ once?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true }; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true }
+  /** `copyTimes` with `copies`: "Copy that card three times. You may cast the copies" (Mnemonic Deluge): that many copies of each. */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; copyTimes?: number; /** With `reveal`: only looked at, not revealed (Planetarium of Wan Shi Tong). */ look?: true; /** "Do this only once each turn": casting one is doing it (CR 603.2h, rulings on Planetarium). */ once?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true }; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -4006,6 +4016,8 @@ export type ManaProduce =
  */
 export interface ManaAbility {
   text: string;
+  /** "{T}: A player of your choice adds {C}." (Victory Chimes): the player chosen as it's activated adds it (Action activateMana `to`). */
+  toChosenPlayer?: true;
   manaCost: string; // "{1}" or ""
   tap: boolean;
   sacrificeSelf: boolean;
@@ -4923,7 +4935,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

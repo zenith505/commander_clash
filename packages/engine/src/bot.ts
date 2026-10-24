@@ -3,7 +3,7 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -17,6 +17,7 @@ import {
   livingPlayers,
   abilityProblem,
   faceUpWays,
+  faceUpManaCost,
   assistedRemaining,
   returnCandidates,
   attackablePermanentProblem,
@@ -404,6 +405,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const others = opponents(s, pid).filter((p) => p !== giver);
       return [{ type: "pickPermanents", player: pid, ids: giver === pid || others.length ? choosePicks(s, pid, pend.options, 1, "counters", pend.counter) : [] }];
     }
+    if (pend.kind === "pickPermanents" && pend.action === "flicker") return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {
@@ -643,9 +645,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may pay {X}. If you do, ...": as much as we can, keeping cards in our library.
     if (pend.kind === "chooseOption" && pend.what === "payX") {
       const nums = pend.options.filter((o) => o !== "none").map(Number);
-      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw" || (x.type === "mill" && !!s.resolving!.scratch?.join));
-      // Join forces' "each player mills X" (Shared Trauma): only what its caster wants.
-      if (s.resolving?.scratch?.join && s.resolving.item.controller !== pid && allEffects(s.resolving.body.effects).some((x) => x.type === "mill")) return [{ type: "chooseOption", player: pid, choice: "none" }];
+      if (s.resolving?.scratch?.join) {
+        const n = joinForcesAmount(s, pid, Math.max(...nums));
+        return [{ type: "chooseOption", player: pid, choice: n > 0 ? String(n) : "none" }];
+      }
+      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw");
       const most = Math.max(...nums.filter((n) => !draws || n < player(s, pid).library.length - 1), -1);
       return [{ type: "chooseOption", player: pid, choice: most > 0 ? String(most) : "none" }];
     }
@@ -778,7 +782,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A manifested card with morph has two ways (CR 701.40c): the cheaper first.
       const ways = faceUpWays(s, o).map((w, i) => ({ i, v: manaValue(parseManaCost(w.cost)) })).sort((a, b) => a.v - b.v);
       for (const w of ways) {
-        const plan = planTurnFaceUp(s, pid, id, w.i);
+        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i));
         if (plan) return plan;
       }
     }
@@ -976,6 +980,70 @@ function chooseEndTurnEscape(s: GameState, pid: PlayerId): Action[] | null {
  * Exert (CR 701.43d): for what it triggers (its own "when you do", or "whenever you exert a creature"), while there's
  * life to spare for it not untapping to block.
  */
+/**
+ * The X to turn a face-down permanent face up with, for an {X} in its morph or disguise cost (CR 107.3d): as much as we
+ * can pay, except that "up to X targets" (Aurelia's Vindicator) takes only as many as we'd choose, and "all creatures
+ * get -X/-X" (Bane of the Living) the X that kills the most worth of our opponents' creatures for the least of ours.
+ */
+function faceUpX(s: GameState, pid: PlayerId, o: GameObject, way: number): number {
+  const cost = faceUpWays(s, o)[way]!.cost;
+  const per = xCount(parseManaCost(cost));
+  if (!per) return 0;
+  const most = Math.max(0, Math.floor((availableMana(s, pid) - manaValue(parseManaCost(faceUpManaCost(cost)))) / per));
+  const card = faceUpDefOf(s, o);
+  const body = compileCard(card).triggers.find((t) => t.event === "selfTurnedFaceUp")?.body;
+  if (!body || !most) return most;
+  if (body.targets.some((t) => t.many === "x")) return (chooseTargets(s, pid, body, false, o.id, most) ?? []).filter((t) => t.kind !== "none").length;
+  const shrinks = body.effects.some((e) => e.type === "continuous" && e.what.ref === "each" && e.mods.some((m) => m.kind === "modifyPT" && typeof m.toughness === "object" && !!m.toughness.negate));
+  if (!shrinks) return most;
+  // Its own toughness once it's face up: the card's, with what else applies to it now.
+  const tough = (c: GameObject) => (c.id === o.id ? toughness(s, c) - 2 + Number(card.toughness ?? 0) : toughness(s, c));
+  const creatures = s.battlefield.map((id) => obj(s, id)).filter((c) => objIsType(s, c, "Creature") || c.id === o.id);
+  const score = (x: number) => creatures.reduce((n, c) => (tough(c) > x ? n : n + (controllerOf(s, c) === pid ? -1.5 : 1) * worth(s, pid, c)), 0);
+  let best = 0;
+  for (let x = 1; x <= most; x++) if (score(x) > score(best)) best = x;
+  return best;
+}
+
+/**
+ * Another Round's "exile any number of creatures you control, then return them": ours that do something as they enter
+ * (or come back face up), not tokens (they'd be gone, CR 111.7), commanders (they'd go to the command zone), what we don't
+ * own (it would return to its owner), or what would lose counters or Auras on it.
+ */
+function chooseFlickers(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  return options.filter((id) => {
+    const o = obj(s, id);
+    if (o.owner !== pid || o.isToken || o.isCommander || Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
+    if (s.battlefield.some((b) => obj(s, b).attachedTo === id && objIsType(s, obj(s, b), "Aura"))) return false;
+    const c = compileCard(faceUpDefOf(s, o));
+    return !!o.faceDown || c.triggers.some((tr) => tr.event === "selfEnters") || !!c.entersWithCounters;
+  });
+}
+
+/**
+ * Join forces (Minds Aglow, Collective Voyage, Alliance of Arms, Shared Trauma) and Liege of the Hollows: how much of the
+ * `max` mana we could pay to pay. Our own share (Liege's Squirrels): all of it. A shared X does as much for every player,
+ * so only what still does us good: cards we can draw without emptying our library, basic lands left to find, and no
+ * milling for an opponent's spell. On an opponent's spell we also keep the mana for our dearest instant-speed card.
+ */
+function joinForcesAmount(s: GameState, pid: PlayerId, max: number): number {
+  const r = s.resolving!;
+  const fx = allEffects(r.body.effects);
+  if (JSON.stringify(fx).includes('"whose"')) return max;
+  const paid = r.scratch?.join?.paid ?? 0;
+  const me = player(s, pid);
+  const mine = r.item.controller === pid;
+  let room = Infinity;
+  for (const e of fx) {
+    if (e.type === "draw" || (e.type === "mill" && mine)) room = Math.min(room, me.library.length - 1 - paid);
+    else if (e.type === "mill") room = 0;
+    else if (e.type === "search") room = Math.min(room, me.library.filter((id) => (e.filter ? printedMatches(e.filter, defOf(s, obj(s, id))) : true)).length - paid);
+  }
+  const instants = mine ? [] : me.hand.map((id) => defOf(s, obj(s, id))).filter((d) => isType(d, "Instant") || d.keywords.includes("Flash"));
+  const keep = Math.max(0, ...instants.map((d) => manaValue(parseManaCost(d.manaCost))));
+  return Math.max(0, Math.min(max - keep, room));
+}
+
 function chooseExert(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
   if (player(s, pid).life <= 10) return [];
   const onExert = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "youExert"));

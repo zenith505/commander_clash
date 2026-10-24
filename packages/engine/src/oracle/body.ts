@@ -1048,6 +1048,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Until end of turn, target creature gains trample and gets +1/+0 for each card you've drawn this turn" (Fists of
   // Flame): both until end of turn, the bonus counted as it resolves (rulings, CR 608.2h).
   text = text.replace(/(^|\. )Until end of turn, target creature gains ([a-z]+) and gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1Target creature gains $2 until end of turn. It gets $3 until end of turn for each $4.");
+  // "Until end of turn, creatures you control get +1/+1 for each Forest you control and gain trample" (Nissa, Ascended
+  // Animist): two instructions about the same creatures, all of them as it resolves (CR 611.2c).
+  text = text.replace(/(^|\. )Until end of turn, creatures you control get ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gain ([a-z]+)\./, "$1Creatures you control get $2 until end of turn for each $3. Creatures you control gain $4 until end of turn.");
   // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
@@ -1404,6 +1407,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
       continue;
     }
+    // Another Round: "Exile any number of creatures you control, then return them to the battlefield under their owner's
+    // control. Then repeat this process X more times." Chosen as it resolves, each time anew (rulings), exiled and
+    // returned together; a token doesn't come back (CR 111.7).
+    const anyFlicker = /^[Ee]xile any number of (.+?) you control$/.exec(s);
+    if (anyFlicker && /^(?:Then r|R)eturn them to the battlefield under their owner's control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      si++;
+      const filter = pickFilter(anyFlicker[1]!);
+      if (!filter) return null;
+      const pass: Effect[] = [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "flicker", anyNumber: true }, { type: "flicker", what: { ref: "created" }, under: "owner" }];
+      const more = /^Then repeat this process (X|once|twice|\w+) more times?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      if (!more) {
+        effects.push(...pass);
+        continue;
+      }
+      if (more[1] !== "X" || !ctx.spell) return null;
+      effects.push({ type: "repeat", effects: pass, n: { count: { kind: "x" }, plus: 1 } });
+      si++;
+      continue;
+    }
     // "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield
     // tapped, then shuffle." (Scapeshift): the same count.
     const anySac = /^(?:[Yy]ou may )?[Ss]acrifice any number of (other )?(.+)$/.exec(s);
@@ -1726,6 +1748,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ctx.whereX = false;
       if (!fx) return null;
       effects.push({ type: "joinForces" }, ...replaceX(fx, { count: { kind: "joinForcesPaid" } }));
+      si++;
+      continue;
+    }
+    // Liege of the Hollows: "Each player may pay any amount of mana. Then each player creates a number of 1/1 green
+    // Squirrel creature tokens equal to the amount of mana they paid this way." Starting with the active player (rulings).
+    const theyPaid = /^[Ee]ach player may pay any amount of mana$/.test(s) ? /^Then each player creates a number of (.+? tokens?) equal to the amount of mana they paid this way$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (theyPaid) {
+      ctx.whereX = true;
+      const fx = attempt(ctx, () => parseOne(`Each player creates X ${theyPaid[1]!}`, ctx));
+      ctx.whereX = false;
+      if (!fx || fx.length !== 1 || fx[0]!.type !== "createToken") return null;
+      effects.push({ type: "joinForces", activeFirst: true }, ...replaceX(fx, { count: { kind: "joinForcesPaid", whose: { ref: "eachOne" } } }));
       si++;
       continue;
     }
@@ -2205,6 +2239,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const what = parseObject(reenact[1]!, ctx, true);
       if (what?.ref !== "target") return null;
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index } });
+      si += 2;
+      continue;
+    }
+    // Mnemonic Deluge: "Exile target instant or sorcery card from a graveyard. Copy that card three times. You may cast the
+    // copies without paying their mana costs." Flawless Forgery: "... from an opponent's graveyard. Copy that card. You may
+    // cast the copy without paying its mana cost." Made and cast as it resolves, or never (rulings).
+    const deluge = /^Exile (target instant or sorcery card from (?:a|an opponent's|your) graveyard)$/.exec(s);
+    const copyN = deluge && /^Copy that card(?: (twice|three times))?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (deluge && copyN && /^You may cast the (?:copy without paying its mana cost|copies without paying their mana costs)$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "") && (!copyN[1] === /the copy without/.test(sentences[si + 2]!))) {
+      const what = parseObject(deluge[1]!, ctx, true);
+      if (what?.ref !== "target") return null;
+      const times = copyN[1] === "twice" ? 2 : copyN[1] === "three times" ? 3 : undefined;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index }, ...(times ? { copyTimes: times } : {}) });
       si += 2;
       continue;
     }
@@ -4729,6 +4776,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // effect).
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "state", cond: stateCond }, effects: inner });
+      // "Then if you're the monarch, ~ deals X damage to each opponent, where X is the number of creatures you control"
+      // (Court of Embereth): the instruction's own X (CR 107.3c), counted as it resolves.
+      if (!defineX()) return null;
       continue;
     }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).

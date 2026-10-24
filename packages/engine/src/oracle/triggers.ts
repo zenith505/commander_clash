@@ -179,6 +179,14 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
   // its controller's turn.
   const yours = /^(deals (?:combat )?damage) during your turn, /.exec(m[3]!);
   if (yours) m[3] = m[3]!.replace(" during your turn, ", ", ");
+  // "Whenever equipped creature becomes blocked by a creature, you may draw two cards" (Infiltration Lens): once for each
+  // creature blocking it (rulings), which "that creature" would mean.
+  const byOne = m[2] === "creature" && !m[1] && !yours ? /^becomes blocked by a creature, (.+)$/.exec(m[3]!) : null;
+  if (byOne) {
+    if (/\b(it|its|that creature)\b/i.test(byOne[1]!)) return "fail";
+    const body = parseBody(byOne[1]!, {});
+    return body ? { event: "selfBlockedByCreature", body, host: "attached" } : "fail";
+  }
   for (const [re, event, o] of HOST_TRIGGERS) {
     const h = re.exec(m[3]!);
     if (!h) continue;
@@ -2210,7 +2218,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && fewer) {
         // The one return of the card itself, maybe delayed to the next end step.

@@ -198,6 +198,8 @@ export type Count =
   | { kind: "opponentsLifeLost" }
   /** "The total amount of noncombat damage dealt to your opponents this turn" (Chandra's Incinerator). */
   | { kind: "opponentsNoncombatDamage" }
+  /** "The damage dealt to your opponents this turn" (Notorious Throng): by all sources, combat or not (rulings). */
+  | { kind: "opponentsDamage" }
   /** "The life they lost this turn" (Wound Reflection): each one's own, however they lost it (rulings). */
   | { kind: "lifeLostThisTurn"; who: PlayerRef }
   /** "For each unspent green mana you have" (Omnath, Locus of Mana), "six or more unspent mana" (Ozai): what's in your mana pool (CR 106.4). */
@@ -441,6 +443,11 @@ export interface TargetSpec {
   lesserPowerThanSource?: boolean;
   /** "With greater power" than the ability's source (Éowyn, Fearless Knight). */
   greaterPowerThanSource?: true;
+  /**
+   * "A creature that saddled it this turn" (The Gitrog, Ravenous Ride; CR 702.171c): tapped to pay the source's saddle
+   * cost this turn, the source as the object it was (TurnLog.saddledBy). Only for a pick as the source's ability resolves.
+   */
+  saddledSource?: true;
   /** "Target creature it's blocking" (Tinder Wall): one the source is blocking, or was as it last existed (CR 608.2h). */
   blockedBySource?: true;
   /**
@@ -1200,6 +1207,11 @@ export type Affects =
       ownedCommanders?: boolean;
       /** Anything more the group says: "with a +1/+1 counter on it", "of the chosen type", "with flying". */
       spec?: TargetSpec;
+      /**
+       * "With power less than ~'s power" (Baeloth Barrityl): compared once power is known, so only for effects that apply
+       * after layer 7 (goad).
+       */
+      lesserPowerThanSource?: true;
     };
 
 /** A static ability that generates a continuous effect (CR 604.1, 611.3). */
@@ -1496,6 +1508,10 @@ export type StaticCondition =
   | { kind: "increment"; /** "If the amount of mana spent to cast that spell is greater than ~'s power" (Liberator): power only. */ powerOnly?: true }
   /** "If that player has two or fewer cards in hand": the trigger's player (whose upkeep it is), checked as it triggers and resolves (CR 603.4). */
   | { kind: "eventPlayerHand"; max?: number; min?: number }
+  /** "If that player lost less than 8 life this turn" (Lolth's emblem): the life the event's player lost this turn (CR 119.3). */
+  | { kind: "eventPlayerLifeLost"; max: number }
+  /** "If the player is your opponent" (Fevered Visions): the event's player is an opponent of this ability's controller. */
+  | { kind: "eventPlayerOpponent" }
   /**
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
@@ -2718,7 +2734,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G" }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -3683,6 +3699,11 @@ export interface TriggeredAbility {
    * ("put a wind counter on it").
    */
   tappedFilter?: TargetSpec;
+  /**
+   * "If it isn't being declared as an attacker" (Verity Circle): not when it's tapped as it's declared as an attacker
+   * (CR 508.1f); tapped any other way, an attacking one too (rulings).
+   */
+  notDeclaringAttack?: true;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
   countersKind?: string;
   /** For "selfCountersPut" / "permanentCountersPut": "whenever you put one or more counters on ...", only counters this ability's controller puts. */
@@ -3794,6 +3815,11 @@ export interface TriggeredAbility {
   attacksOpponent?: { orPlaneswalkers?: true };
   /** "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once, if it or a commander you own is among the attackers. */
   selfOrCommander?: true;
+  /**
+   * "Whenever you attack with ~ and another legendary creature" (Merry, Esquire of Rohan): once for the attack, if it and
+   * another creature like this are among the attackers, whoever each attacks (rulings).
+   */
+  selfAnd?: TargetSpec;
   /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
   anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */

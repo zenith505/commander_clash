@@ -28,7 +28,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Haunt (CR 702.55b-c): it triggers from exile, see "hauntedDies".
   [/^When the creature ~ haunts dies, (.+)$/, "hauntedDies"],
   [/^When(?:ever)? ~ becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget"],
-  [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
+  [/^At the beginning of (?:the|each|each player's) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
   // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
@@ -485,6 +485,11 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   const what = m[1]!.replace(/^an? |^another /, "");
   const filter = parseTargetPhrase(what);
   if (!filter || filter.kind !== "object" || counter) return "fail";
+  // Diffusion Sliver: "Whenever a Sliver creature you control becomes the target of a spell or ability an opponent
+  // controls, counter that spell or ability unless its controller pays {2}": once for each of them it targets, as
+  // with Unsettled Mariner.
+  const taxed = m[2] && /^counter that spell or ability unless its controller pays (\{\d+\})\.?$/.exec(m[5]!);
+  if (taxed) return { event: "permanentBecomesTarget", targeted: { ...targeted, ...(other ? { other } : {}) }, subjectFilter: { ...filter, text: what }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: taxed[1]! } }], text: `counter that spell or ability unless its controller pays ${taxed[1]}.` } };
   const body = parseBody(m[5]!.replace(/\bthat (?:permanent|creature)\b/g, "it"), { subjectIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
   return body ? { event: "permanentBecomesTarget", targeted: { ...targeted, ...(other ? { other } : {}) }, subjectFilter: { ...filter, text: what }, body } : "fail";
 }
@@ -997,8 +1002,16 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   const phrase = m[2]!.replace(/ or (?=[a-z])/g, " or ");
   const filter = parseTargetPhrase(phrase);
   if (!filter || filter.kind !== "object" || filter.controller) return "fail";
-  const body = parseBody(m[4]!, { subjectIt: true, subjectLeft: true, ...(any ? { eventPlayer: true } : {}) });
+  // "You may return target creature card with lesser mana value from your graveyard to the battlefield" (Riveteers
+  // Ascendancy): less than the sacrificed permanent's, as it last existed (CR 608.2h), fixed as the target is chosen.
+  const lesser = / with lesser mana value\b/.test(m[4]!);
+  let body = parseBody(m[4]!.replace(/ with lesser mana value\b/, ""), { subjectIt: true, subjectLeft: true, ...(any ? { eventPlayer: true } : {}) });
   if (!body) return "fail";
+  if (lesser) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue) return "fail";
+    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+  }
   const kind = m[1]!.toLowerCase();
   return {
     event: "youSacrifice",
@@ -1061,6 +1074,22 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   if (groupAttacksAPlayer) {
     perPlayer = true;
     line = `Whenever one or more ${groupAttacksAPlayer[1]} you control attack, ${line.slice(groupAttacksAPlayer[0].length)}`;
+  }
+  // "Whenever you attack with ~ and another legendary creature" (Merry, Esquire of Rohan).
+  let selfAnd: TargetSpec | undefined;
+  const withAnother = /^Whenever you attack with ~ and another ([a-z ]+?creature), /.exec(line);
+  if (withAnother) {
+    const f = parseTargetPhrase(withAnother[1]!);
+    if (f?.kind !== "object" || f.controller) return "fail";
+    selfAnd = { ...f, text: withAnother[1]! };
+    line = `Whenever you attack, ${line.slice(withAnother[0].length)}`;
+  }
+  // "Whenever two or more creatures you control attack a player" (Horn of the Mark): once for each player at least two of
+  // them attack, not counting those attacking planeswalkers or battles (rulings).
+  const nAttackAPlayer = /^Whenever (two|three|four|five) or more creatures you control attack a player, /.exec(line);
+  if (nAttackAPlayer) {
+    perPlayer = true;
+    line = `Whenever you attack with ${nAttackAPlayer[1]} or more creatures, ${line.slice(nAttackAPlayer[0].length)}`;
   }
   // "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once for the attack, if it or your commander
   // (a commander you own, CR 903.3) is among the creatures you attacked with.
@@ -1143,7 +1172,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // The attackers as a group aren't modeled. Mishra's meld sentence's "them" is Mishra and the other creature it names.
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
-  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. Put (?:one|two) of them [^.]+\./;
+  // "Look at the top five cards of your library. You may reveal a creature card from among them and put it into your
+  // hand." (Horn of the Mark) too.
+  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? [a-z ]+ card from among them and put it into your hand)\./;
   // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
   const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
   // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next
@@ -1182,7 +1213,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -1873,6 +1904,25 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = filter?.kind === "spell" && !filter.controller ? parseBody(`${spellDmg[3]![0]!.toUpperCase()}${spellDmg[3]!.slice(1)}`) : null;
     return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, ...(spellDmg[2] ? { orBattle: true as const } : {}) }, body } : "fail";
   }
+  // Verity Circle: "Whenever a creature an opponent controls becomes tapped, if it isn't being declared as an attacker":
+  // not tapped as it attacks (CR 508.1f). As it resolves, nothing is being declared as an attacker, so only as it triggers.
+  const notAttack = /^(Whenever an? [^,]+ becomes tapped), if it isn't being declared as an attacker, (.+)$/.exec(line);
+  if (notAttack) {
+    const t = parseTrigger(`${notAttack[1]}, ${notAttack[2]}`);
+    return t && t !== "fail" && t.event === "permanentBecomesTapped" ? { ...t, notDeclaringAttack: true } : "fail";
+  }
+  // Lolth, Spider Queen's emblem: "Whenever an opponent is dealt combat damage by one or more creatures you control, if
+  // that player lost less than 8 life this turn, they lose life equal to the difference": once for each opponent, after
+  // all the combat damage is dealt (CR 510.2, 603.2c); the life lost counts every way they lost life this turn, that
+  // damage included (CR 119.3), as it triggers and again as it resolves (CR 603.4).
+  const lolth = /^Whenever an opponent is dealt combat damage by one or more creatures you control, if that player lost less than (\w+) life this turn, they lose life equal to the difference\.?$/.exec(line);
+  if (lolth) {
+    const n = num(lolth[1]!);
+    const t = parseTrigger("Whenever one or more creatures you control deal combat damage to an opponent, that player loses 1 life.");
+    if (!t || t === "fail" || !n) return "fail";
+    const lost = { count: { kind: "lifeLostThisTurn", who: { ref: "eventPlayer" } }, times: -1, plus: n } as const;
+    return { ...t, body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eventPlayer" }, n: lost }], text: `that player loses life equal to the difference between ${n} and the life they lost this turn.` }, ifCond: { kind: "eventPlayerLifeLost", max: n - 1 } };
+  }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
@@ -2402,7 +2452,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && fewer) {
         // The one return of the card itself, maybe delayed to the next end step.

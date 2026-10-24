@@ -18,7 +18,7 @@ export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,
 const OTHER_SUBTYPES = ["Arcane", "Omen", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town", "Urza's"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
-const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
+export const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
 
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   // "The player or planeswalker it's attacking" in an attack trigger about the source (Myr Battlesphere, Fathom Fleet
@@ -650,7 +650,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const typed = /^(?:[A-Z][a-z]+ )+creatures$/.test(p) && p.split(" ").slice(0, -1).every((w) => CREATURE_TYPES.has(w));
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
@@ -834,6 +834,13 @@ export function parseTargetPhrase(
   if (entered) {
     extra.enteredThisTurn = true;
     p = p.slice(0, entered.index);
+  }
+  // The Gitrog, Ravenous Ride: "a creature that saddled it this turn" (CR 702.171c), "it" the source; only in a choice
+  // made as the source's ability resolves (see pickOptions).
+  const saddled = / that saddled (?:it|~) this turn$/.exec(p);
+  if (saddled) {
+    extra.saddledSource = true;
+    p = p.slice(0, saddled.index);
   }
   // Witch-king of Angmar: "a creature of their choice that dealt combat damage to you this turn".
   const dealtYou = / that dealt combat damage to you this turn$/.exec(p);
@@ -1032,6 +1039,8 @@ export function parseTargetPhrase(
     tapped = !m[1];
     p = p.slice(m[0].length);
   }
+  // "A goaded attacking or blocking creature" (Baeloth Barrityl): the same as "an attacking or blocking goaded creature".
+  if ((m = /^goaded (attacking or blocking|attacking|blocking) /.exec(p))) p = `${m[1]} goaded ${p.slice(m[0].length)}`;
   if (p.startsWith("attacking or blocking ")) {
     extra.combat = "attackingOrBlocking";
     p = p.slice("attacking or blocking ".length);

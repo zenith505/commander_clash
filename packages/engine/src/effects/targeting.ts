@@ -41,8 +41,9 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
 
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
   if (o.zone !== "battlefield") return false;
-  // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it.
-  if (spec.bound) return false;
+  // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
+  // the source (see pickOptions, isLegalTarget).
+  if (spec.bound || spec.saddledSource) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
@@ -472,7 +473,9 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   if (spec.kind === "spell" && spec.orPermanent) return o.zone === "battlefield" && isLegalTarget(s, spec.orPermanent, t, controller, src);
   // A mutating creature spell's target has the same owner as the spell (CR 702.140a).
   if (spec.ownerIs !== undefined && o.owner !== spec.ownerIs) return false;
-  return spec.kind === "object" && objectMatches(s, spec, o, controller, true, src);
+  // "That saddled it this turn" needs the source: checked with it (lesserPowerOk).
+  const { saddledSource: _, ...rest } = spec;
+  return spec.kind === "object" && objectMatches(s, rest, o, controller, true, src);
 }
 
 /**
@@ -732,7 +735,21 @@ export function linkedCards(s: GameState, sourceId: ObjectId | undefined, zc?: n
   return (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
 }
 
+/**
+ * "A creature that saddled it this turn" (CR 702.171c): tapped for the source's saddle cost this turn, as the object it
+ * was then (CR 400.7); "it" the source as it is now or, after it left the battlefield, as it last was.
+ */
+function saddledSource(s: GameState, id: ObjectId, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  const zc = sourceZc ?? (src?.zone === "battlefield" ? (src.zoneChanges ?? 0) : s.lastKnown?.[sourceId!]?.zc);
+  const by = sourceId && zc !== undefined ? (s.turnLog?.saddledBy?.[`${sourceId}@${zc}`] ?? []) : [];
+  const o = s.objects[id];
+  return !!o && by.includes(`${id}@${o.zoneChanges ?? 0}`);
+}
+
 export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
+  // Giant Beaver: "target creature that saddled it this turn".
+  if (spec.saddledSource && t.kind === "object" && !saddledSource(s, t.id, sourceId, sourceZc)) return false;
   // "Target card exiled with ~": one of the cards linked to the source (CR 607.2a).
   if (spec.linkedExile && t.kind === "object" && !linkedCards(s, sourceId, sourceZc).some((l) => l.id === t.id)) return false;
   if (spec.blockedBySource && t.kind === "object") {
@@ -869,7 +886,12 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+  // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
+  if (e.filter.saddledSource) {
+    const { saddledSource: _, ...filter } = e.filter;
+    return pickOptions(s, { ...e, filter }, pid, sourceId).filter((id) => saddledSource(s, id, sourceId, sourceZc));
+  }
   // Without an action: permanents to sacrifice (a sacrifice option or payment), which can't include one that "can't be sacrificed" (CR 701.21).
   const sacrificing = !e.action || e.action === "sacrifice";
   // "Unattach an Equipment from a creature you control" (Akiri, Fearless Voyager): whoever controls the Equipment.

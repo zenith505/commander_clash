@@ -4,7 +4,7 @@ import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
 import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
-import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { HISTORIC, pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
 import { parseSearchFilter } from "./search";
 import { parseDamageMod } from "./damage-mods";
@@ -845,6 +845,7 @@ export function parseAffected(subject: string): Affects | null {
     let legendary: boolean | undefined;
     let status: TargetSpec["status"];
     let nontoken = false;
+    let historic = false;
     for (const [i, w] of words.entries()) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
       // "Green or blue creatures you control" (Murkfiend Liege): colors already match any of the listed ones.
@@ -864,9 +865,11 @@ export function parseAffected(subject: string): Affects | null {
       else if (/^(enchanted|equipped|modified|goaded)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
       // "Nontoken creatures you control have riot" (Rhythm of the Wild).
       else if (/^nontoken$/i.test(w) && !nontoken) nontoken = true;
+      // "Other historic creatures you control have double strike" (Bayek of Siwa): artifacts, legendaries and Sagas (CR 700.6).
+      else if (/^historic$/i.test(w) && !historic) historic = true;
       else return null;
     }
-    const specWords = [nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
+    const specWords = [historic ? "historic" : undefined, nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
     const spec: TargetSpec | undefined = specWords.length
       ? {
           kind: "object",
@@ -876,6 +879,7 @@ export function parseAffected(subject: string): Affects | null {
           ...(legendary === true ? { supertypes: ["Legendary"] } : legendary === false ? { notSupertypes: ["Legendary"] } : {}),
           ...(status ? { status } : {}),
           ...(nontoken ? { token: false } : {}),
+          ...(historic ? { anyOf: HISTORIC } : {}),
           text: `${specWords.join(" ")} creature`,
         }
       : undefined;
@@ -1467,6 +1471,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
   // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)
   if (/^Creatures with power less than ~'s power can't block creatures you control$/.test(text)) return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [{ kind: "cantBeBlockedByLesserPower", than: "source" }], text: line };
+  // Baeloth Barrityl: "Creatures your opponents control with power less than ~'s power are goaded" (CR 701.15): for as
+  // long as their power is less than its own (rulings), both as the layers leave them; it's the source's controller who
+  // goads them.
+  if (/^Creatures your opponents control with power less than ~'s power are goaded$/.test(text))
+    return { affects: { kind: "filter", types: ["Creature"], controller: "opponent", lesserPowerThanSource: true }, mods: [{ kind: "goad" }], text: line };
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
   if (/^All creatures able to block (enchanted|equipped) creature do so$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line };
   // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).

@@ -702,6 +702,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const most = Math.max(...nums.filter((n) => !draws || n < player(s, pid).library.length - 1), -1);
       return [{ type: "chooseOption", player: pid, choice: most > 0 ? String(most) : "none" }];
     }
+    // "You may pay any amount of life. If you do, draw that many cards" (Necrodominance): enough to fill our hand to five,
+    // keeping 15 life and cards in our library.
+    if (pend.kind === "chooseOption" && pend.what === "payLife") {
+      const p = player(s, pid);
+      const n = Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 15, p.library.length - 2, 5 - p.hand.length));
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "drawUpTo") {
       const left = player(s, pid).library.length;
       return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => Number(o) < left) ?? "0" }];

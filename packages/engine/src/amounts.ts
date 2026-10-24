@@ -323,6 +323,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.turnLog?.lifeLost?.[pid] ?? 0), 0);
     case "opponentsLifeLost":
       return Object.entries(s.turnLog?.lifeLost ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
+    case "opponentsDamage":
+      return Object.entries(s.damageThisTurn ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "opponentsNoncombatDamage":
       return Object.entries(s.turnLog?.noncombatDamage ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":
@@ -731,6 +733,8 @@ function describeCount(c: Count): string {
       return "#creatures in your party";
     case "opponentsLifeLost":
       return "life your opponents lost this turn";
+    case "opponentsDamage":
+      return "damage dealt to your opponents this turn";
     case "opponentsNoncombatDamage":
       return "noncombat damage dealt to your opponents this turn";
     case "lifeLostThisTurn":

@@ -1778,10 +1778,10 @@ function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
  * Tap a permanent (CR 701.26a). Only an untapped one can be: then it "becomes tapped", which triggers abilities
  * (rulings: tapping a tapped permanent, or one entering tapped, doesn't).
  */
-export function tapPermanent(s: GameState, o: GameObject) {
+export function tapPermanent(s: GameState, o: GameObject, /** Tapped as it's declared as an attacker (CR 508.1f). */ attacking?: true) {
   if (o.tapped) return;
   o.tapped = true;
-  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id });
+  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}) });
 }
 
 /**
@@ -6513,6 +6513,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     return true;
   }
   s.stack.push(item);
+  // The creatures tapped for a saddle cost saddled it (CR 702.171c), whether or not the ability resolves.
+  if (ab.saddle && tapCreatures?.length) {
+    const list = (((s.turnLog ??= {}).saddledBy ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []);
+    for (const c of tapCreatures) if (!list.includes(`${c}@${obj(s, c).zoneChanges ?? 0}`)) list.push(`${c}@${obj(s, c).zoneChanges ?? 0}`);
+  }
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
@@ -7126,6 +7131,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "tapOrUntap") {
     (r.scratch ??= {}).tapOrUntap = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "payLife") {
+    // "You may pay any amount of life": that much, paid next (CR 119.4).
+    (r.scratch ??= {}).payX = choice;
+    log(s, `${p.name} chooses to pay ${choice} life for ${pend.source}.`);
     continueResolution(s);
     return;
   }
@@ -7939,7 +7951,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const o = obj(s, a.attacker);
     o.attacking = a.defender;
     if (a.planeswalker !== undefined) o.attackingPermanent = attackingPermanentOf(s, a.planeswalker);
-    if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
+    if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o, true); // CR 508.1f
     const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
     const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
     const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));

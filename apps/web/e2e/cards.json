@@ -10135,6 +10135,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a10b3e35-8cc4-450e-9e30-0fce8df0fea4",
+  "name": "Necrodominance",
+  "manaCost": "{B}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Enchantment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Skip your draw step.\nAt the beginning of your end step, you may pay any amount of life. If you do, draw that many cards.\nYour maximum hand size is five.\nIf a card or token would be put into your graveyard from anywhere, exile it instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2026-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b48a149c-aead-43b2-a99e-c964d6d28aa0",
   "name": "Necromantic Selection",
   "manaCost": "{4}{B}{B}{B}",

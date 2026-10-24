@@ -172,7 +172,7 @@ export type TriggerSourceEvent =
   | { type: "coinFlipped"; player: PlayerId; won: boolean }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
-  | { type: "tapped"; id: ObjectId }
+  | { type: "tapped"; id: ObjectId; /** As it was declared as an attacker (CR 508.1f). */ attacking?: true }
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
@@ -961,7 +961,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesTapped");
     addHosted(o, (e) => e === "selfBecomesTapped");
-    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(tapWatch);
   } else if (ev.type === "untapped") {
@@ -1116,6 +1116,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const t of list ?? abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
         if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;
+        if (t.selfAnd && !(ev.ids.includes(o.id) && ev.ids.some((x) => x !== o.id && s.objects[x] && objectMatches(s, t.selfAnd!, obj(s, x), ev.controller, false)))) continue;
         // "To a player or battle": only those are about a battle dealt it (CR 310).
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
@@ -1152,7 +1153,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever one or more creatures attack" (Duelist's Heritage): every permanent's, whoever attacked.
     if (ev.type === "groupAttack") for (const id of s.battlefield) groupWatch(obj(s, id), true);
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
-    fromCommand((o, owner) => owner === ev.controller && groupWatch(o));
+    // An emblem's too (Lolth's: "whenever an opponent is dealt combat damage by one or more creatures you control").
+    fromEmblems((o, owner) => owner === ev.controller && groupWatch(o));
     // "Whenever one or more creatures you control deal combat damage to one or more players this turn" (Forth Eorlingas!).
     // "Whenever you attack this turn" (Dalkovan Encampment): its controller's attacks.
     fromFloating((src, ctrl, triggers) => ctrl === ev.controller && groupWatch(src, false, triggers));

@@ -1089,6 +1089,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, doubleIfXAtLeast: Number(twiceX[1]) };
       continue;
     }
+    // Banquet Guests: "~ enters with twice X +1/+1 counters on it": the X chosen, times two (a replacement, CR 614.1c).
+    if (line === "~ enters with twice X +1/+1 counters on it." && !isSpell) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" }, times: 2 } };
+      continue;
+    }
     // Ravenous (CR 702.156a): "This permanent enters with X +1/+1 counters on it" and "When this permanent enters, if X
     // is 5 or more, draw a card."
     if (line === "Ravenous") {
@@ -2701,7 +2707,8 @@ export function compile(d: CardDef): CompiledCard {
     // Aura you control (CR 702.41a); two of them, {2} less (CR 702.41b, rulings).
     // "Creature and planeswalker spells you cast have affinity for artifacts" (Tezzeret, Master of the Bridge), "Artifact
     // creature spells ..." (Mycosynth Golem).
-    const grantAffinity = /^((?:[A-Z][a-z]+ (?:(?:and )?[a-z]+ )?)?spells) you cast have affinity for ([A-Za-z]+s)\.$/.exec(line);
+    // "Spells you cast have affinity for artifacts" (Sami, Wildcat Captain): every spell.
+    const grantAffinity = /^((?:[A-Z][a-z]+ (?:(?:and )?[a-z]+ )?)?spells|Spells) you cast have affinity for ([A-Za-z]+s)\.$/.exec(line);
     if (grantAffinity) line = `${grantAffinity[1]} you cast cost {1} less to cast for each ${grantAffinity[2]!.slice(0, -1)} you control.`;
     const cost = parseCostChange(line);
     if (cost) {

@@ -975,6 +975,12 @@ export function parseTargetPhrase(
     owner = "opponent";
     p = p.replace(/ (?:you don't|an opponent) owns?$/, "");
   }
+  // "Each other creature that's attacking one of your opponents" (Martial Impetus): attacking that player, not a
+  // planeswalker or battle (CR 506.3), as for Oviya's static.
+  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking one of your opponents$/.test(p)) {
+    extra.combat = "attackingOpponent";
+    p = "creature";
+  }
   // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you$/.test(p)) {
     extra.combat = "attackingYou";

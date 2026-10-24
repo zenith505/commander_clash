@@ -165,6 +165,28 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
 ];
 
 /**
+ * A hosted trigger's body with each "other" group or count made "other than the subject" (the creature the Aura or
+ * Equipment is attached to), or null if some other "other" is in it.
+ */
+function otherMeansSubject(body: AbilityBody): AbilityBody | null {
+  let ok = true;
+  const walk = (x: unknown): unknown => {
+    if (Array.isArray(x)) return x.map(walk);
+    if (!x || typeof x !== "object") return x;
+    const o = Object.fromEntries(Object.entries(x).map(([k, v]) => [k, walk(v)])) as Record<string, unknown>;
+    if (o.other === true) {
+      if (o.ref === "each" || o.kind === "permanents") {
+        delete o.other;
+        o.otherThanSubject = true;
+      } else ok = false;
+    }
+    return o;
+  };
+  const out = walk(body) as AbilityBody;
+  return ok ? out : null;
+}
+
+/**
  * "Whenever enchanted creature deals damage, you gain that much life", "Whenever equipped creature attacks, put a
  * +1/+1 counter on it", "Whenever ~ or equipped creature deals combat damage to a player, draw a card": triggered
  * abilities of an Aura or Equipment about the creature it's attached to as the event happens. "It" and "that
@@ -209,6 +231,13 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     }
     let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
     if (!body) return "fail";
+    // "Each other creature ...", "for each other creature you control": other than the creature it's attached to (Martial
+    // Impetus, Sigil of Valor), which "it" is.
+    if (!o.creature && /\bother\b/.test(text)) {
+      const moved = otherMeansSubject(body);
+      if (!moved) return "fail";
+      body = moved;
+    }
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
     return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
@@ -945,6 +974,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you attack a player (with one or more equipped creatures)": once for each player attacked, not a
   // planeswalker or battle (CR 508.3e; rulings on Akiri, Fearless Voyager and Horizon Explorer). "That player" is them.
   let perPlayer = false;
+  // "When you attack with three or more creatures, transform ~" (Legion's Landing): "when" and "whenever" trigger alike.
+  line = line.replace(/^When you attack with /, "Whenever you attack with ");
   const youAttackAPlayer = /^Whenever you attack a player( with one or more [^,]+)?, /.exec(line);
   if (youAttackAPlayer) {
     perPlayer = true;
@@ -996,7 +1027,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them) deal /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with power \d+ or greater) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
@@ -1850,6 +1881,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (each) {
     const body = parseBody(each[2]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
     return body ? { event: "selfCountersPut", countersKind: each[1]!.trim(), countersEach: true, body } : "fail";
+  }
+  // "Whenever a -1/-1 counter is put on a creature, you may create a 1/1 green Elf Warrior creature token" (Flourishing
+  // Defenses): once for each counter put on any creature (CR 122.6).
+  const eachOn = /^Whenever an? ((?:\+1\/\+1|-1\/-1) )counter is put on (a creature|a creature you control|a creature an opponent controls), (.+)$/.exec(line);
+  if (eachOn) {
+    if (/\b(it|its|that creature)\b/.test(eachOn[3]!)) return "fail";
+    const body = parseBody(eachOn[3]!, {});
+    const filter = parseTargetPhrase(eachOn[2]!.replace(/^an? /, ""));
+    return body && filter?.kind === "object" ? { event: "permanentCountersPut", tappedFilter: filter, countersKind: eachOn[1]!.trim(), countersEach: true, body } : "fail";
   }
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
   // them). "That many" is how many were put on it.

@@ -1330,6 +1330,12 @@ export function compile(d: CardDef): CompiledCard {
       out.shuffleInsteadOfGraveyard = true;
       continue;
     }
+    // Granted by Realmbreaker, the Invasion Tree, Geth, Thane of Contracts: 'It gains "If this land would leave the
+    // battlefield, exile it instead of putting it anywhere else."' A replacement effect of the permanent's own (CR 614.1a).
+    if (/^If ~ would leave the battlefield, exile it instead of putting it anywhere else\.$/.test(line)) {
+      out.exileIfLeavesSelf = true;
+      continue;
+    }
     if (line === "~ enters prepared.") {
       out.entersPrepared = true;
       continue;
@@ -2599,6 +2605,21 @@ export function compile(d: CardDef): CompiledCard {
         text: line,
         equip: true,
         ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
+      });
+      continue;
+    }
+    // Mjölnir, Hammer of Thor: "Equip worthy {1} (A creature is worthy if it's a legendary non-Villain that's red and/or
+    // white.)" An equip ability for creatures of that quality (CR 702.6c), the quality its reminder text defines.
+    const worthy = /^Equip worthy ((?:\{[^}]+\})+)$/.exec(line);
+    if (worthy && d.subtypes.includes("Equipment") && /A creature is worthy if it's a legendary non-Villain that's red and\/or white\./.test(d.oracleText)) {
+      out.activated.push({
+        manaCost: worthy[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        body: { targets: [{ kind: "object", types: ["Creature"], supertypes: ["Legendary"], notSubtypes: ["Villain"], colors: ["R", "W"], controller: "you", text: "target worthy creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target worthy creature you control." },
+        text: line,
+        equip: true,
       });
       continue;
     }

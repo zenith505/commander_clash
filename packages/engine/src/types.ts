@@ -373,6 +373,13 @@ export interface GameObject {
     /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */
     oneOf?: string;
     /**
+     * "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only a spell like
+     * this, the face cast counting (an instant Adventure of a creature card, rulings).
+     */
+    castFilter?: TargetSpec;
+    /** "You may play it until you exile another card with this artifact" (Unstable Amulet): the source (`id@zc`); its next such exile ends this. */
+    untilAnother?: string;
+    /**
      * "For each nonland card type, you may cast a spell of that type from among the exiled cards" (Aminatou's Augury): the
      * cards of one group, each cast as one of its nonland card types that no other card cast from the group was cast as
      * (GameState.byTypeCast).
@@ -2033,6 +2040,8 @@ export interface Resolving {
       /** For the bots: the life the penalty costs, or that it makes a token for its controller. */
       lose?: number;
       tokens?: number;
+      /** Or that they discard this many cards (Bandit's Talent's "discards two cards unless ..."). */
+      discards?: number;
       /** "If a player does" / "If no one does" (see the punisher effect). */
       mode?: "ifAny" | "ifNone";
     };

@@ -408,6 +408,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Exile a card from a graveyard" (Cemetery Prowler): any player's, chosen as it resolves (not targeted).
   if (/^[Ee]xile a card from a graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true }];
+  // Realmbreaker, the Invasion Tree: "Target opponent mills three cards. Put a land card from their graveyard onto the
+  // battlefield tapped under your control." Not targeted: you choose it as this resolves, any land card there, milled
+  // just now or not (rulings).
+  if ((m = /^[Pp]ut an? (.+? card) from (their|that player's) graveyard onto the battlefield( tapped)? under your control$/.exec(s))) {
+    const who = parsePlayer(m[2] === "their" ? "that player" : m[2]!.replace(/'s$/, ""), ctx);
+    const filter = parseSearchFilter(m[1]!);
+    if (!who || who.ref === "you" || !filter) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", who, youChoose: true, filter, ...(m[3] ? { tapped: true as const } : {}) }];
+  }
   // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): the same,
   // under your control.
   if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from a graveyard onto the battlefield under your control$/.exec(s))) {
@@ -676,9 +685,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Target creature's owner puts it on their choice of the top or bottom of their library", "The owner of target
   // nonland permanent puts it ...": one permanent, its owner choosing as it resolves.
   if ((m = /^(?:(target .+?)'s owner|The owner of ((?:up to one (?:other )?)?target .+?)|Its owner) puts it on their choice of the top or bottom of their library$/i.exec(s))) {
+    // Subtlety: "up to one target creature or planeswalker spell": one spell, or none (CR 115.6, 601.2c).
+    const spellUpTo = m[2] && /^up to one target (.+ spell)$/.exec(m[2]);
+    const spellSpec = spellUpTo ? parseTargetPhrase(spellUpTo[1]!) : undefined;
+    if (spellUpTo) return spellSpec?.kind === "spell" && !spellSpec.orPermanent && !spellSpec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, { ...spellSpec, optional: true, text: `up to one ${spellSpec.text}` }), bounce: true, libraryChoice: true }] : null;
     const what = parseObject(m[1] ?? m[2] ?? "it", ctx);
     if (what?.ref !== "target" || (what.n ?? 1) !== 1) return null;
     const spec = ctx.targets[what.index];
+    // Subtlety: "Choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the
+    // top or bottom of their library." It leaves the stack without being countered (like Commit's, rulings).
+    if (spec?.kind === "spell" && !spec.orPermanent) return [{ type: "counterSpell", index: what.index, bounce: true, libraryChoice: true }];
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: "ownersChoice" }];
   }
@@ -833,6 +849,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(.+?) must be blocked (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
     if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }];
+  }
+  // Neyith of the Dire Hunt: "That creature must be blocked this combat if able": in the combat going on only.
+  if ((m = /^(That creature|It|Target creature) must be blocked this combat if able$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked", combat: "this" }], duration: "endOfTurn" }];
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

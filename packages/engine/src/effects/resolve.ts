@@ -690,6 +690,8 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
+      : m.kind === "mustBeBlocked" && m.combat === "this"
+      ? { kind: "mustBeBlocked", combat: s.combatsThisTurn ?? 0 }
       : // "Those players" (Chaos Dragon): the opponents with the highest result of the roll just made, ties included.
       m.kind === "cantAttackPlayers"
       ? { kind: "cantAttackPlayers", players: m.players === "highestRoll" ? highestRollers(s, ctx.controller) : m.players, ...(m.combat !== undefined ? { combat: m.combat === "this" ? s.combatsThisTurn ?? 0 : m.combat } : {}) }

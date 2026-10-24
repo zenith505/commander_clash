@@ -700,6 +700,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Subtlety: "choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the top or
+  // bottom of their library." One instruction, as "The owner of up to one target ... puts it ...".
+  text = text.replace(/^[Cc]hoose (up to one )?target ([a-z]+) spell or ([a-z]+) spell\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1target $2 or $3 spell puts it on their choice of the top or bottom of their library.");
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
   text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
@@ -2250,6 +2253,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences.splice(si + 2, 1);
       continue;
     }
+    // Unstable Amulet, Furious Rise: "Exile the top card of your library. You may play it until you exile another card
+    // with ~." For as long as it stays exiled, until this object exiles another card (rulings).
+    if (exTop && !exTop[1] && !exEqual && !impulseIf && !ctx.spell && /^You may play (?:it|that card) until you exile another card with ~$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", untilAnother: true });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
     // Neyali, Suns' Vanguard: "During any turn you attacked with a token, you may play that card." For as long as it stays
     // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
@@ -2276,6 +2287,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (castAmongKind) {
       if (!castFilter) return null;
       effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, free: true, castFilter });
+      si++;
+      continue;
+    }
+    // Chandra, Hope's Beacon: "Exile the top five cards of your library. Until the end of your next turn, you may cast an
+    // instant or sorcery spell from among those exiled cards." One spell, of that kind (the face cast counting, rulings),
+    // with its normal timing, paying its costs.
+    const castOneAmong = exTop && exTop[1] && !exEqual && !impulseIf ? /^(Until the end of your next turn|Until end of turn), you may cast an? ((?:instant|sorcery|creature|artifact|enchantment)(?: or (?:instant|sorcery|creature|artifact|enchantment))?) spell from among (?:those exiled cards|them|the exiled cards)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (castOneAmong) {
+      const spellFilter = parseSearchFilter(`${castOneAmong[2]!} card`);
+      if (!spellFilter) return null;
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: /next turn/.test(castOneAmong[1]!) ? "nextTurn" : "thisTurn", castOnly: true, oneOf: true, spellFilter });
       si++;
       continue;
     }
@@ -5148,6 +5170,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // don't control": ~ does it, if you choose.
       const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `)
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able")
+        // "You may gain life equal to the power of target creature you control" (Wall of Reverence).
+        .replace(/^Gain life equal to /, "You gain life equal to ")
         // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
         // you choose (the choice is yours, CR 608.2d).
         .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `)
@@ -6101,6 +6125,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
       // permanent the card became (CR 400.7; no Role if it didn't return as a creature, rulings).
       (put?.type === "putOntoBattlefield" && put.what.ref === "selfCard" && !put.attachToSubject && put.attachToTarget === undefined) ||
       (put?.type === "putFromHand" && !put.any) ||
+      // "Put a land card from their graveyard onto the battlefield tapped under your control. It gains ..." (Realmbreaker).
+      (put?.type === "chooseFromGraveyard" && put.dest === "battlefield" && put.youChoose === true && put.n === 1 && !put.upTo && put.who?.ref !== "eachPlayer") ||
       // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     // "Put a +1/+1 counter on a creature you control. It gains vigilance and trample until end of turn" (Season of
@@ -6416,7 +6442,9 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  // "You create a 2/2 green Wolf creature token and that player mills ten cards" (Sword of Body and Mind): "that player"
+  // after a part about you.
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

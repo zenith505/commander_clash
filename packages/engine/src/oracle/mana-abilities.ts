@@ -415,6 +415,10 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
 /** "creature", "instant and sorcery", "noncreature", "Dragon": a filter on the spell's characteristics. */
 function spellFilter(words0: string): TargetSpec | null {
   if (words0 === "legendary") return { kind: "spell", supertypes: ["Legendary"], text: "legendary spells" };
+  // Séance Board: "instant, sorcery, Demon, and Spirit spells": a spell of one of those card types or creature types.
+  const mixed = words0.split(/, (?:and |or )?| and | or /);
+  if (mixed.length > 1 && mixed.every((w) => ["instant", "sorcery", "creature", "artifact", "enchantment", "planeswalker"].includes(w) || CREATURE_TYPES.has(w)) && mixed.some((w) => CREATURE_TYPES.has(w)) && mixed.some((w) => !CREATURE_TYPES.has(w)))
+    return { kind: "spell", types: mixed.filter((w) => !CREATURE_TYPES.has(w)).map((w) => w.charAt(0).toUpperCase() + w.slice(1)), orSubtypes: mixed.filter((w) => CREATURE_TYPES.has(w)), text: `${words0} spells` };
   // "A creature spell of the chosen type" (Unclaimed Territory).
   const chosen = / spells? of the chosen type$/.test(words0);
   const words = words0.replace(/ spells? of the chosen type$/, "");

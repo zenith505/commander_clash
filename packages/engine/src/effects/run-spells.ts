@@ -759,7 +759,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
       }
       const spellObj = e.suspend ? s.stack.find((x) => x.id === t.id && x.kind === "spell")?.objectId : undefined;
-      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.librarySecond ? "librarySecond" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
       // Delay: the card it was, countered and exiled this way (a copy has ceased to exist, CR 707.10a).
       const o = spellObj ? s.objects[spellObj] : undefined;
@@ -796,14 +796,32 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
   return o && !o.faceDown ? defOf(s, o).name : undefined;
 }
 
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond", bounce?: true): "paused" | void {
+function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond" | "libraryChoice", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack
   const what = item.kind === "spell" ? item.description : `${item.description.split(":")[0]}'s ability`;
   if (bounce) {
+    // Subtlety: its owner chooses the top or the bottom as this resolves (CR 608.2d); a copy just ceases to exist.
+    let position: "top" | "bottom" | undefined;
+    if (instead === "libraryChoice") {
+      const o = item.objectId ? s.objects[item.objectId] : undefined;
+      const sc = (s.resolving!.scratch ??= {});
+      if (o && !o.spellCopy && !sc.topOrBottom) {
+        s.pending = { kind: "chooseOption", player: o.owner, source: by, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], prompt: `put ${defOf(s, o).name} on the top or bottom of your library?` };
+        return "paused";
+      }
+      position = sc.topOrBottom === "bottom" ? "bottom" : "top";
+      sc.topOrBottom = undefined;
+    }
     // Returned or exiled, not countered (Reprieve, Mindbreak Trap). A copy of a spell ceases to exist (CR 707.10a).
     s.stack.splice(i, 1);
+    if (instead === "libraryChoice") {
+      const o = item.objectId ? s.objects[item.objectId] : undefined;
+      if (o) moveObject(s, o.id, "library", { top: position === "top" });
+      log(s, o && !o.spellCopy ? `${by}: ${player(s, o.owner).name} puts ${what} on the ${position} of their library.` : `${by} removes ${what} from the stack.`);
+      return;
+    }
     // Commit: second from the top, or the only card of an empty library (rulings).
     if (instead === "librarySecond") {
       const o = item.objectId ? s.objects[item.objectId] : undefined;

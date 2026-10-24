@@ -120,6 +120,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the
   // number of enchantments destroyed this way": what this spell's or ability's destroy instructions destroyed. "Incubate
   // X, where X is the number of creatures exiled this way" (Sunfall): the same.
+  // Kaya's Wrath: "the number of creatures you controlled that were destroyed this way": controlled by you as they last
+  // existed on the battlefield (CR 608.2h).
+  if ((m = /^(?:the number of )?([a-z]+) you controlled that were (destroyed|exiled) this way$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${singularWord(m[1]!)} you control`, { chosen: true });
+    if (spec?.kind !== "object" || spec.controller !== "you") return null;
+    return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: `${m[1]!} you controlled` } } };
+  }
   if ((m = /^(?:the number of )?(.+?) (destroyed|exiled) this way$/i.exec(p)) && !/\b(you|your|that|they|their|cards?)\b/i.test(m[1]!)) {
     const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
     if (spec?.kind !== "object") return null;
@@ -221,6 +228,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
   }
+  // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.
+  if (each && (m = /^opponent who has (one|two|three|zero|no) or fewer cards in hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtMost: m[1] === "no" ? 0 : num(m[1]!) });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });

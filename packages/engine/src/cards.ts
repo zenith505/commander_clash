@@ -504,6 +504,8 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     const rooms = (base.roomsTwice ?? 0) + extra.reduce((n, x) => n + (x.roomsTwice ?? 0), 0);
     if (rooms) hit.roomsTwice = rooms;
     if (extra.some((x) => x.firstDrawLook)) hit.firstDrawLook = true;
+    // Realmbreaker's "If this land would leave the battlefield, exile it instead ..." (CR 614.1a).
+    if (extra.some((x) => x.exileIfLeavesSelf)) hit.exileIfLeavesSelf = true;
     byKey.set(key, hit);
   }
   return hit;

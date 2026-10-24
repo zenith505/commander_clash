@@ -52,7 +52,7 @@ export interface PayCost {
  * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
  * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
  */
-export type PunisherOption = { discard: number } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { damage: number };
+export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { damage: number };
 
 export interface UnlessPays {
   cost: string;
@@ -327,7 +327,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1164,7 +1164,7 @@ export type Modification =
   /** "It can't be turned face up" (Unable to Scream): not by its controller's special action (CR 116.2b, 702.37e). */
   | { kind: "cantTurnFaceUp" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
-  | { kind: "mustBeBlocked" }
+  | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this" }
   | { kind: "allMustBlock" }
   /**
    * Doran: "assigns combat damage equal to its toughness rather than its power" (CR 510.1a as modified); `ifGreater`
@@ -2119,7 +2119,7 @@ export type Effect =
    * Locthwain): one spell, from the cards its linked exile took (CR 607.2a), cast for its AltCostKind "linkedFree" (CR 118.9).
    */
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; /** Elder Brain: "exile all cards from that player's hand, then they draw that many cards" (`n` unused). */ hand?: true; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec; /** "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): only spells like this, the face cast counting (GameObject.mayPlay.castFilter); with `oneOf`, one of them. */ spellFilter?: TargetSpec; /** "You may play it until you exile another card with ~" (Unstable Amulet, Furious Rise): until the source's next such exile (GameObject.mayPlay.untilAnother). */ untilAnother?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -2657,6 +2657,8 @@ export type Effect =
       bounce?: true;
       /** With `bounce`: "Put target spell ... into its owner's library second from the top" (Commit): there instead of the hand. */
       librarySecond?: true;
+      /** With `bounce`: "Its owner puts it on their choice of the top or bottom of their library" (Subtlety): there instead. */
+      libraryChoice?: true;
       /** "Exile any number of target spells" (Mindbreak Trap): not a counter either, so it exiles one that can't be countered (rulings). */
       exileSpell?: true;
       /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */
@@ -3589,6 +3591,11 @@ export type TriggerEvent =
    * is that opponent.
    */
   | "opponentCreaturesUnblocked"
+  /**
+   * "Whenever one or more creatures you control fight or become blocked" (Neyith of the Dire Hunt): once for each fight
+   * (CR 701.14) one of yours is in, and once when blockers are declared if one or more of yours became blocked (rulings).
+   */
+  | "yourCreaturesFightOrBlocked"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
   | "selfCycled"
   /**
@@ -4581,6 +4588,8 @@ export interface CompiledCard {
   };
   /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
   shuffleInsteadOfGraveyard?: boolean;
+  /** "If this land would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a), as an ability it has (Realmbreaker's gift). */
+  exileIfLeavesSelf?: true;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   exileInsteadOfGraveyard?: boolean;
   /** An instant or sorcery whose last instruction is "Exile ~.": exiled as it finishes resolving (CR 608.2n). */

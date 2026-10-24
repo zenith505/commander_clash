@@ -2106,15 +2106,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           : count === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
             : `${e.upTo ? "up to " : ""}${count} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+        // Realmbreaker: you choose from their graveyard.
+        s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : p.id, source: src, what: e.youChoose ? `${what} in ${p.name}'s graveyard` : what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
       if (e.dest === "battlefield") {
         // An Aura's controller chooses what it enchants as it enters (CR 303.4f), or it stays in the graveyard (303.4g).
-        const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src);
+        const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: e.youChoose ? ctx.controller : p.id })), src);
         if (hosts === "paused") return "paused";
         const ids = found.filter((id) => !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
+        if (e.youChoose) {
+          // Realmbreaker: under your control; "it" afterwards is the permanent it became (CR 400.7).
+          const me = player(s, ctx.controller);
+          if (ids.length) log(s, `${me.name} puts ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${p.name}'s graveyard onto the battlefield under their control${e.tapped ? ", tapped" : ""}.`);
+          enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: me.id, ...(e.tapped ? { tapped: true } : {}), ...hosts.get(id) })));
+          if (s.resolving) s.resolving.created = ids.filter((id) => obj(s, id).zone === "battlefield");
+          return;
+        }
         if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
         enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...hosts.get(id) })));
         return;
@@ -2675,17 +2684,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
+      // "You may cast an instant or sorcery spell from among those exiled cards" (Chandra, Hope's Beacon): one group.
+      const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
+      // Unstable Amulet: exiling another card with this object ends the permission for the one before (the same object,
+      // CR 400.7; once it has left, the last card's permission lasts as long as the card stays exiled, rulings).
+      const another = e.untilAnother && ctx.sourceId ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : undefined;
+      if (another && ids.length)
+        for (const x of Object.values(s.objects)) if (x.zone === "exile" && x.mayPlay?.untilAnother === another) x.mayPlay = undefined;
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
         if (e.castFilter && !printedMatches(e.castFilter, defOf(s, o))) continue;
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}), ...(e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(e.free ? { free: true as const } : {}), ...(e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (s.resolving) (s.resolving.impulsed ??= []).push(...ids);
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.spellFilter && e.oneOf ? `${/^[aeiou]/i.test(e.spellFilter.text) ? "an" : "a"} ${e.spellFilter.text.replace(/ card$/, "")} spell from among them` : e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}.`);
       return;
     }
   }

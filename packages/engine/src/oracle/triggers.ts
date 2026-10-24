@@ -2094,6 +2094,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Coveted Jewel: "that player draws three cards and gains control of ~. Untap it." (two instructions for that player, then
   // untapping ~).
+  // Neyith of the Dire Hunt: "Whenever one or more creatures you control fight or become blocked, draw a card."
+  const fightOrBlocked = /^Whenever one or more creatures you control fight or become blocked, (.+)$/.exec(line);
+  if (fightOrBlocked) {
+    const body = parseBody(fightOrBlocked[1]!, {});
+    return body ? { event: "yourCreaturesFightOrBlocked", body } : "fail";
+  }
   const unblocked = /^Whenever one or more creatures an opponent controls attack you and aren't blocked, (.+)$/.exec(line);
   if (unblocked) {
     const text = unblocked[1]!.replace(/^that player (draws [a-z]+ cards?) and (gains control of ~)\. Untap it\.$/, "That player $1. That player $2. Untap ~.");

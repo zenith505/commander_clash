@@ -2202,7 +2202,8 @@ export type Effect =
   | {
       type: "revealUntil";
       filter: TargetSpec;
-      found: "hand" | "battlefield";
+      /** "Graveyard": "Put all creature cards revealed this way into your graveyard" (Old Stickfingers). */
+      found: "hand" | "battlefield" | "graveyard";
       /** "You may put that card onto the battlefield. If you don't, put it into your hand." (Songbirds' Blessing): `found` is "battlefield", if its controller chooses and it can go there. */
       mayElseHand?: true;
       tapped?: true;
@@ -5139,6 +5140,8 @@ export interface CompiledCard {
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /** "You may play Forests from your graveyard." (Titania, Nature's Force): only lands with one of these subtypes. */
+  landsFromGraveyardOf?: string[];
   /**
    * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
    * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).

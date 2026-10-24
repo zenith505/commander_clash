@@ -5140,6 +5140,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Old Stickfingers: "When you cast ~, reveal cards from the top of your library until you reveal X creature cards. Put
+    // all creature cards revealed this way into your graveyard, then put the rest on the bottom of your library in a random
+    // order." X is the spell's, as it was cast (rulings); fewer if the library runs out (CR 701.20a).
+    if (ctx.ownX && /^[Rr]eveal cards from the top of your library until you reveal X creature cards$/.test(s) && sentences[si + 1] === "Put all creature cards revealed this way into your graveyard" && /^(?:[Tt]hen )?[Pp]ut the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 2] ?? "") && si + 3 === sentences.length) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, found: "graveyard", rest: "bottom", n: { count: { kind: "x" } } });
+      si += 2;
+      continue;
+    }
     if (untilX) {
       effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, found: "battlefield", rest: "bottom", tapped: true, n: { count: { kind: "x" } } });
       si++;

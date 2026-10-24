@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, island, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, activationCost, botActions, characteristics, compileCard, invalidateCharacteristics, isFullySupported, manaValue, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, activationCost, botActions, mayPlayLandFromGraveyard, characteristics, compileCard, invalidateCharacteristics, isFullySupported, manaValue, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -561,5 +561,42 @@ describe("Cloud, Ex-SOLDIER (\"if ~ has power N or greater\", as Level Up's)", (
       expect(s.players[ap]!.hand.length).toBe(hand + 1);
       expect(s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Treasure"))).toHaveLength(treasures);
     }
+  });
+});
+
+const titania = card("Titania, Nature's Force", "Legendary Creature — Elemental", "{4}{G}{G}", { power: "6", toughness: "6", oracleText: "You may play Forests from your graveyard.\nWhenever a Forest you control enters, create a 5/3 green Elemental creature token.\nWhenever an Elemental you control dies, you may mill three cards." });
+
+describe("Titania, Nature's Force", () => {
+  it("is fully supported; a Forest card in your graveyard can be played (your land play), not another land", () => {
+    supported(titania);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, titania);
+    const f = into(s0, ap, forest, "graveyard");
+    const i = into(s0, ap, island, "graveyard");
+    expect(mayPlayLandFromGraveyard(s0, s0.objects[f]!, ap)).toBe(true);
+    expect(mayPlayLandFromGraveyard(s0, s0.objects[i]!, ap)).toBe(false);
+    let s = act(s0, { type: "playLand", player: ap, objectId: f });
+    expect(s.objects[f]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.landsPlayedThisTurn).toBe(1);
+    s = resolveAll(s);
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && pt(s, id) === "5/3")).toHaveLength(1);
+  });
+});
+
+const stickfingers = card("Old Stickfingers", "Legendary Creature — Horror", "{X}{B}{G}", { power: "*", toughness: "*", oracleText: "When you cast this spell, reveal cards from the top of your library until you reveal X creature cards. Put all creature cards revealed this way into your graveyard, then put the rest on the bottom of your library in a random order.\nOld Stickfingers's power and toughness are each equal to the number of creature cards in your graveyard." });
+
+describe("Old Stickfingers", () => {
+  it("is fully supported; casting it with X=2 mills the first two creature cards revealed and puts the rest on the bottom", () => {
+    supported(stickfingers);
+    const { s: s0, ap, ids } = setup([stickfingers]);
+    const lib = s0.players[ap]!.library;
+    const creatures = lib.filter((id) => s0.cards[s0.objects[id]!.cardId]!.types.includes("Creature")).slice(0, 2);
+    const upTo = lib.indexOf(creatures[1]!) + 1;
+    const others = lib.slice(0, upTo).filter((id) => !creatures.includes(id));
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 2)));
+    expect(creatures.map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "graveyard"]);
+    const after = s.players[ap]!.library;
+    expect(after.slice(after.length - others.length).sort()).toEqual([...others].sort());
+    expect(pt(s, ids[0]!)).toBe("2/2");
   });
 });

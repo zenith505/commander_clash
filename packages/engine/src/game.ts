@@ -3456,7 +3456,7 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+  return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid, o) || !!landPermit(s, pid);
 }
 
 /** Mayhem on a land (Oscorp Industries): discarded this turn, so its owner may play it from their graveyard (CR 702.187c). */
@@ -3470,9 +3470,16 @@ function ownGraveyardPlay(s: GameState, o: GameObject, pid: PlayerId): boolean {
   return o.zone === "graveyard" && !!m && m.player === pid && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && !m.castOnly;
 }
 
-/** Every land may be played from `pid`'s graveyard now: Crucible of Worlds, or an effect this turn (Yawgmoth's Will). */
-function landsFromGraveyardNow(s: GameState, pid: PlayerId): boolean {
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
+/**
+ * Every land may be played from `pid`'s graveyard now: Crucible of Worlds, or an effect this turn (Yawgmoth's Will); or
+ * this land card `o`, by its subtype (Titania, Nature's Force's Forests).
+ */
+function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const typed = (id: ObjectId) => {
+    const of = abilitiesOf(s, obj(s, id)).landsFromGraveyardOf;
+    return !!of && of.some((st) => characteristics(s, o).subtypes.includes(st));
+  };
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
 /** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */
@@ -3640,7 +3647,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id)) {
+  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id, o)) {
     const permit = landPermit(s, p.id)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.

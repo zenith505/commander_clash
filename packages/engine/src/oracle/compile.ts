@@ -1367,6 +1367,12 @@ export function compile(d: CardDef): CompiledCard {
       out.landsFromGraveyard = true;
       continue;
     }
+    // Titania, Nature's Force: "You may play Forests from your graveyard." Land cards with that basic land type (CR 305.6).
+    const typedYard = /^You may play (Plains|Islands|Swamps|Mountains|Forests) from your graveyard\.$/.exec(line);
+    if (typedYard) {
+      (out.landsFromGraveyardOf ??= []).push(typedYard[1] === "Plains" ? "Plains" : typedYard[1]!.slice(0, -1));
+      continue;
+    }
     // Wrenn and Realmbreaker's emblem: "You may play lands and cast permanent spells from your graveyard." Any number,
     // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
     const permYard = /^You may (play lands and )?cast permanent spells from your graveyard\.$/.exec(line);

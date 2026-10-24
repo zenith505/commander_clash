@@ -5293,6 +5293,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "createdFightEach", filter: n.count.filter });
       continue;
     }
+    // The Ordeals: "Whenever enchanted creature attacks, put a +1/+1 counter on it. Then if it has three or more +1/+1
+    // counters on it, sacrifice ~": that creature as the ability resolves (rulings).
+    const ordeal = /^(?:Then i|I)f it has (two|three|four|five) or more \+1\/\+1 counters on it, sacrifice ~$/.exec(s);
+    const counted = effects[effects.length - 1];
+    if (ordeal && counted?.type === "counters" && counted.what.ref === "subject" && counted.counter === "+1/+1") {
+      const sac = parseOne("Sacrifice ~", ctx);
+      if (!sac) return null;
+      effects.push({ type: "if", cond: { kind: "amountsCompare", a: { count: { kind: "counters", counter: "+1/+1", of: { ref: "subject" } } }, atLeast: num(ordeal[1]!) }, effects: sac });
+      continue;
+    }
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
     // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").

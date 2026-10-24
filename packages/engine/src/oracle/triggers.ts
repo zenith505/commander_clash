@@ -975,7 +975,8 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "When you sacrifice ~" (Heaped Harvest): ~ itself, wherever it went.
   const self = /^(?:When|Whenever) you sacrifice ~, (.+)$/.exec(line);
   if (self) {
-    const body = parseBody(self[1]!);
+    // "When you sacrifice ~, it deals 3 damage to any target" (Ordeal of Purphoros): ~ as it last existed (CR 608.2h).
+    const body = parseBody(self[1]!.replace(/^it deals /, "~ deals "));
     return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
   }
   // "Whenever you sacrifice one or more Foods" (Camellia, the Seedmiser): once for each event that sacrificed any (CR
@@ -1149,7 +1150,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you attack with eight or more creatures, those creatures get +4/+4 until end of turn" (Champions from
   // Beyond): the creatures that attacked, as they were declared.
   const those = event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.

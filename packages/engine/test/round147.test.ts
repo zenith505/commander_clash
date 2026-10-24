@@ -773,3 +773,93 @@ describe("Nahiri's Lithoforming", () => {
     expect(s.players[ap]!.extraLands).toMatchObject({ turn: s.turn, n: 3 });
   });
 });
+
+const chocobo = card("Chocobo Knights", "Creature — Human Knight", "{3}{W}", { power: "3", toughness: "3", oracleText: "Whenever you attack, creatures you control with counters on them gain double strike until end of turn." });
+
+describe("Chocobo Knights", () => {
+  it("is fully supported; when you attack, your creatures with counters on them gain double strike", () => {
+    supported(chocobo);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, chocobo);
+    const a = putOnBattlefield(s0, ap, bear({ name: "Bear A" }));
+    s0.objects[a]!.counters["+1/+1"] = 1;
+    const b = putOnBattlefield(s0, ap, bear({ name: "Bear B" }));
+    const home = putOnBattlefield(s0, ap, bear({ name: "Home Bear" }));
+    s0.objects[home]!.counters.stun = 1;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = resolveAll(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: next(s, ap) }] }));
+    expect(objHasKeyword(s, s.objects[a]!, "Double strike")).toBe(true);
+    expect(objHasKeyword(s, s.objects[home]!, "Double strike")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b]!, "Double strike")).toBe(false);
+  });
+});
+
+const ordealNylea = card("Ordeal of Nylea", "Enchantment — Aura", "{1}{G}", { oracleText: "Enchant creature\nWhenever enchanted creature attacks, put a +1/+1 counter on it. Then if it has three or more +1/+1 counters on it, sacrifice this Aura.\nWhen you sacrifice this Aura, search your library for up to two basic land cards, put them onto the battlefield tapped, then shuffle." });
+const ordealPurphoros = card("Ordeal of Purphoros", "Enchantment — Aura", "{1}{R}", { oracleText: "Enchant creature\nWhenever enchanted creature attacks, put a +1/+1 counter on it. Then if it has three or more +1/+1 counters on it, sacrifice this Aura.\nWhen you sacrifice this Aura, it deals 3 damage to any target." });
+
+describe("The Ordeals", () => {
+  const attackWith = (def: CardDef, counters: number) => {
+    const { s: s0, ap } = setup([]);
+    const c = putOnBattlefield(s0, ap, bear());
+    s0.objects[c]!.counters["+1/+1"] = counters;
+    const o = putOnBattlefield(s0, ap, def);
+    s0.objects[o]!.attachedTo = c;
+    into(s0, ap, card("Test Forest", "Basic Land — Forest"), "library");
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: c, defender: next(s, ap) }] });
+    return { s, ap, c, o };
+  };
+
+  it("are fully supported; the third counter sacrifices Ordeal of Nylea, which fetches two basic lands", () => {
+    supported(ordealNylea, ordealPurphoros);
+    const { s: s0, ap, c, o } = attackWith(ordealNylea, 2);
+    let s = s0;
+    for (let i = 0; i < 30 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[c]!.counters["+1/+1"]).toBe(3);
+    expect(s.objects[o]!.zone).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 2 });
+  });
+
+  it("with fewer counters, the Ordeal stays", () => {
+    const { s: s0, c, o } = attackWith(ordealNylea, 0);
+    const s = resolveAll(s0);
+    expect(s.objects[c]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[o]!.zone).toBe("battlefield");
+  });
+
+  it("Ordeal of Purphoros deals 3 damage when sacrificed", () => {
+    const { s: s0, ap, o } = attackWith(ordealPurphoros, 2);
+    let s = s0;
+    for (let i = 0; i < 30 && s.pending?.kind !== "chooseTargets" && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[o]!.zone).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const foe = next(s, ap, 2);
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: foe }] }));
+    expect(s.players[foe]!.life).toBe(37);
+  });
+});
+
+const starfield = card("Starfield Shepherd", "Creature — Angel", "{3}{W}{W}", { power: "3", toughness: "2", keywords: ["Flying", "Warp"], oracleText: "Flying\nWhen this creature enters, search your library for a basic Plains card or a creature card with mana value 1 or less, reveal it, put it into your hand, then shuffle.\nWarp {1}{W} (You may cast this card from your hand for its warp cost. Exile this creature at the beginning of the next end step, then you may cast it from exile on a later turn.)" });
+
+describe("Starfield Shepherd", () => {
+  it("is fully supported; finds a basic Plains or a creature card with mana value 1 or less", () => {
+    supported(starfield);
+    const { s: s0, ap } = setup([]);
+    const plains = into(s0, ap, card("Test Plains", "Basic Land — Plains"), "library");
+    const one = into(s0, ap, card("Test One Drop", "Creature — Human", "{W}", { power: "1", toughness: "1" }), "library");
+    const two = into(s0, ap, bear({ name: "Test Two Drop" }), "library");
+    const st = into(s0, ap, starfield, "hand");
+    s0.players[ap]!.manaPool.W = 5;
+    let s = run(s0, planCast(s0, ap, st));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("searchLibrary");
+    const cards = s.pending?.kind === "searchLibrary" ? s.pending.cards : [];
+    expect(cards).toContain(plains);
+    expect(cards).toContain(one);
+    expect(cards).not.toContain(two);
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [one] }));
+    expect(s.objects[one]!.zone).toBe("hand");
+  });
+});

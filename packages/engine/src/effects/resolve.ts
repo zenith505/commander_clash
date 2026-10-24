@@ -1015,6 +1015,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "either":
     case "villainous":
     case "eachMay":
+    case "joinForces":
     case "punisher":
     case "cumulativeUpkeep":
     case "collectEvidence":

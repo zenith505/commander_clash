@@ -1857,6 +1857,8 @@ export interface Resolving {
   tappedThisWay?: number;
   /** Cards a putFromHand with `manifest` put onto the battlefield face down: "for each card manifested this way". */
   manifestedThisWay?: number;
+  /** Join forces: the total amount of mana all players paid ("where X is the total amount of mana paid this way"). */
+  joinForcesPaid?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
@@ -2052,6 +2054,8 @@ export interface Resolving {
     drawUpToQueue?: PlayerId[];
     /** "You may pay {X}": the X chosen, or "none". */
     payX?: string;
+    /** Join forces: the players still to decide, from the controller on in turn order, and what they've paid so far. */
+    join?: { queue: PlayerId[]; paid: number; asked?: number };
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */

@@ -216,6 +216,37 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       sc.villain = undefined;
       return;
     }
+    case "joinForces": {
+      // Join forces: from the controller on, in turn order, each player may pay any amount of mana (Minds Aglow; CR 101.4
+      // doesn't apply, "starting with you" does), seeing what the ones before paid. Each says how much, then pays it.
+      const sc = (s.resolving!.scratch ??= {});
+      const i = s.turnOrder.indexOf(ctx.controller);
+      const j = (sc.join ??= { queue: [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0 });
+      while (j.queue.length) {
+        const pid = j.queue[0]!;
+        if (j.asked === undefined && sc.payX === undefined) {
+          const cap = Math.min(availableMana(s, pid), 40);
+          if (cap > 0) {
+            const options = ["none", ...Array.from({ length: cap }, (_, k) => String(k + 1))];
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana (${j.paid} paid so far)` };
+            return "paused";
+          }
+        } else if (j.asked === undefined && sc.payX !== "none") {
+          j.asked = Number(sc.payX);
+          sc.payX = undefined;
+          sc.may = undefined;
+          const pay = { mana: `{${j.asked}}` };
+          s.pending = { kind: "chooseMay", player: pid, prompt: `pay ${describePay(pay)}`, source: src, pay };
+          return "paused";
+        } else if (j.asked !== undefined && sc.may) j.paid += j.asked;
+        sc.payX = sc.may = j.asked = undefined;
+        j.queue.shift();
+      }
+      s.resolving!.joinForcesPaid = j.paid;
+      log(s, `${j.paid} mana was paid for ${src}.`);
+      sc.join = undefined;
+      return;
+    }
     case "eachMay": {
       // Each player decides in APNAP order, seeing the earlier answers (CR 101.4); then it happens to those who chose to.
       const sc = (s.resolving!.scratch ??= {});

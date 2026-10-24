@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, attackProblem, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, attackProblem, botActions, controllerOf, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -603,5 +603,65 @@ describe("Angel of Serenity: up to three creatures from the battlefield and/or c
     s = resolveAll(run(s, botActions(s, ap)));
     for (let k = 0; k < 3 && s.pending; k++) s = resolveAll(run(s, botActions(s, s.pending.player)));
     expect([s.objects[foe]!.zone, s.objects[mine]!.zone]).toEqual(["exile", "exile"]);
+  });
+});
+
+describe("Deadly Tempest: each player loses life for the creatures they controlled that were destroyed", () => {
+  const tempest = card("Deadly Tempest", "Sorcery", "{4}{B}{B}", { oracleText: "Destroy all creatures. Each player loses life equal to the number of creatures they controlled that were destroyed this way." });
+
+  it("is fully supported", () => supported(tempest));
+
+  it("two, one and none; an indestructible creature isn't destroyed and doesn't count", () => {
+    const { s: s0, ap, ids, opp } = setup([tempest]);
+    const third = nextOf(s0, opp);
+    putOnBattlefield(s0, ap, bear({ name: "Test Bear A" }));
+    putOnBattlefield(s0, ap, bear({ name: "Test Bear B" }));
+    putOnBattlefield(s0, opp, bear({ name: "Test Bear C" }));
+    putOnBattlefield(s0, third, bear({ name: "Test Wall", keywords: ["Indestructible"], oracleText: "Indestructible" }));
+    const life = s0.turnOrder.map((p) => s0.players[p]!.life);
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.turnOrder.map((p) => life[s.turnOrder.indexOf(p)]! - s.players[p]!.life)).toEqual(s.turnOrder.map((p) => (p === ap ? 2 : p === opp ? 1 : 0)));
+    expect(s.battlefield.filter((id) => s.objects[id]!.cardId.includes("Test")).length).toBe(1);
+  });
+});
+
+describe("Join forces: each player may pay any amount of mana, starting with you", () => {
+  const aglow = card("Minds Aglow", "Sorcery", "{U}", { oracleText: "Join forces — Starting with you, each player may pay any amount of mana. Each player draws X cards, where X is the total amount of mana paid this way." });
+  const voyage = card("Collective Voyage", "Sorcery", "{G}", { oracleText: "Join forces — Starting with you, each player may pay any amount of mana. Each player searches their library for up to X basic land cards, where X is the total amount of mana paid this way, puts them onto the battlefield tapped, then shuffles." });
+  const alliance = card("Alliance of Arms", "Sorcery", "{W}", { oracleText: "Join forces — Starting with you, each player may pay any amount of mana. Each player creates X 1/1 white Soldier creature tokens, where X is the total amount of mana paid this way." });
+  const trauma = card("Shared Trauma", "Sorcery", "{B}", { oracleText: "Join forces — Starting with you, each player may pay any amount of mana. Each player mills X cards, where X is the total amount of mana paid this way." });
+
+  it("are fully supported", () => supported(aglow, voyage, alliance, trauma));
+
+  it("Minds Aglow: you pay 3, an opponent 2, the others nothing; everyone draws 5", () => {
+    const { s: s0, ap, ids, opp } = setup([aglow]);
+    for (const l of ["Island", "Island"]) putOnBattlefield(s0, opp, card(l, `Basic Land — ${l}`));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    while (!s.pending) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const hands = s.turnOrder.map((p) => s.players[p]!.hand.length);
+    // You first: how much, then the payment.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payX", player: ap });
+    expect((s.pending as { options: string[] }).options).toEqual(["none", ...Array.from({ length: 13 }, (_, i) => String(i + 1))]);
+    s = act(s, { type: "chooseOption", player: ap, choice: "3" });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { mana: "{3}" } });
+    // Its mana tapped for it, as a bot would (planMana), then paid.
+    s = run(s, botActions(s, ap));
+    // Then the next player in turn order, who sees what's been paid.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payX", player: opp, prompt: "Minds Aglow: pay any amount of mana (3 paid so far)" });
+    s = act(s, { type: "chooseOption", player: opp, choice: "2" });
+    s = run(s, botActions(s, opp));
+    // The other two have no mana, so they aren't asked.
+    s = resolveAll(s);
+    expect(s.pending).toBeFalsy();
+    expect(s.turnOrder.map((p) => s.players[p]!.hand.length - hands[s.turnOrder.indexOf(p)]!)).toEqual([5, 5, 5, 5]);
+  });
+
+  it("a bot caster pays what it can, and opponents' bots answer too", () => {
+    const { s: s0, ap, ids } = setup([alliance]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let k = 0; k < 40 && (s.stack.length || s.pending); k++) s = s.pending ? run(s, botActions(s, s.pending.player)) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    const soldiers = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === p && s.objects[id]!.isToken && /Soldier/.test(s.cards[s.objects[id]!.cardId]!.name)).length;
+    expect(soldiers(ap)).toBe(13);
+    expect(s.turnOrder.every((p) => soldiers(p) === 13)).toBe(true);
   });
 });

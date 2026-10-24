@@ -8642,6 +8642,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b259f4e4-04a9-40e0-85e9-34b4b74ee388",
+  "name": "Minds Aglow",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Join forces — Starting with you, each player may pay any amount of mana. Each player draws X cards, where X is the total amount of mana paid this way.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Join forces"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-04-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "eaffdf95-8e20-408d-99fa-3adc9e19523d",
   "name": "Misleading Signpost",
   "manaCost": "{2}{U}",

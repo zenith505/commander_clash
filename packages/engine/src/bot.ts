@@ -209,7 +209,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const orLose = e?.type === "may" && !!e.otherwise?.some((x) => x.type === "loseGame");
       // Transmute Artifact: unpaid, the card found goes to the graveyard; pay when we can.
       const orYard = !!s.resolving?.scratch?.payDiff;
-      const ok = !!taps && (orLose || orYard || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
+      // Join forces: the amount was ours to choose (payX), so pay it.
+      const joining = !!s.resolving?.scratch?.join;
+      const ok = !!taps && (orLose || orYard || joining || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
@@ -641,7 +643,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may pay {X}. If you do, ...": as much as we can, keeping cards in our library.
     if (pend.kind === "chooseOption" && pend.what === "payX") {
       const nums = pend.options.filter((o) => o !== "none").map(Number);
-      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw");
+      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw" || (x.type === "mill" && !!s.resolving!.scratch?.join));
+      // Join forces' "each player mills X" (Shared Trauma): only what its caster wants.
+      if (s.resolving?.scratch?.join && s.resolving.item.controller !== pid && allEffects(s.resolving.body.effects).some((x) => x.type === "mill")) return [{ type: "chooseOption", player: pid, choice: "none" }];
       const most = Math.max(...nums.filter((n) => !draws || n < player(s, pid).library.length - 1), -1);
       return [{ type: "chooseOption", player: pid, choice: most > 0 ? String(most) : "none" }];
     }

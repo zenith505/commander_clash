@@ -148,6 +148,8 @@ export type Count =
   | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
+  /** Join forces: "the total amount of mana paid this way" (Minds Aglow). */
+  | { kind: "joinForcesPaid" }
   /** "For each card manifested this way" (Kozilek, the Broken Reality): the cards a putFromHand with `manifest` turned face down onto the battlefield. */
   | { kind: "manifestedThisWay" }
   /**
@@ -2618,6 +2620,8 @@ export type Effect =
   /** `chain`: the Chain cards' "that permanent's controller may copy ~" (Chain of Vapor), for the bots' answer. */
   /** `untappedSubject`: only while the trigger's subject is still there untapped (Charismatic Conqueror's "they may tap that permanent"). */
   /** `pay`: paid on saying yes (Chain Lightning's "may pay {R}{R}"); someone who can't pay isn't asked. `need` "hand": a card in hand to discard (Chain of Plasma). */
+  /** Join forces: "Starting with you, each player may pay any amount of mana" (Minds Aglow), the total kept for X. */
+  | { type: "joinForces" }
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards

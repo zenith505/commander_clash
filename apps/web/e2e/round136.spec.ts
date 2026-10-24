@@ -1,6 +1,6 @@
 // Round 136's prompts: Angel of Serenity's targets from the battlefield and/or graveyards (a "From a graveyard" button
 // beside the battlefield clicks), the ninjutsu Satoru Umezawa gives a creature card in your hand, and The Second Doctor's
-// draw offer to an opponent, which says what drawing costs them.
+// draw offer to an opponent, which says what drawing costs them, and join forces' "pay any amount of mana" (Minds Aglow).
 import { expect, test } from "@playwright/test";
 import { applyAction, type GameState } from "@cc/engine";
 import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
@@ -70,5 +70,22 @@ test("The Second Doctor: at Ana's end step you may draw, and the offer says you 
   await bar.getByRole("button", { name: "Yes" }).click();
   const after = await resolveUntil(page, (st) => !st.pending && st.players[0]!.hand.length === hand + 1);
   expect(after.players[0]!.attackBansNextTurn).toEqual([{ player: 1 }]);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Minds Aglow: you choose to pay 2, Pay taps it, and with no one else able to pay, each player draws 2", async ({ page }) => {
+  const s = scene({ hand: ["Minds Aglow"], board: LANDS });
+  await open(page, s);
+  await card(page, "Minds Aglow", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "payX");
+  const bar = controls(page);
+  await expect(bar).toContainText("Minds Aglow: pay any amount of mana (0 paid so far)");
+  await expect(bar.getByRole("button", { name: "Don't pay" })).toBeVisible();
+  await bar.getByRole("button", { name: "Pay 2", exact: true }).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay");
+  await bar.getByRole("button", { name: "Pay", exact: true }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
+  expect([0, 1, 2, 3].map((p) => after.players[p]!.hand.length - s.players[p]!.hand.length)).toEqual([1, 2, 2, 2]);
+  expect(after.battlefield.filter((id) => after.objects[id]!.tapped).length).toBe(3);
   expect(pageErrors(page)).toEqual([]);
 });

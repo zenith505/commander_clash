@@ -9886,6 +9886,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "581eedc4-efe4-4ae4-baf2-88071e7e6f6d",
+  "name": "Nicol Bolas, Dragon-God",
+  "manaCost": "{U}{B}{B}{B}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Planeswalker — Bolas",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Bolas"
+  ],
+  "oracleText": "Nicol Bolas has all loyalty abilities of all other planeswalkers on the battlefield.\n+1: You draw a card. Each opponent exiles a card from their hand or a permanent they control.\n−3: Destroy target creature or planeswalker.\n−8: Each opponent who doesn't control a legendary creature or planeswalker loses the game.",
+  "loyalty": "4",
+  "colors": [
+   "B",
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2019-12-16",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7ffae8f8-3006-4969-a339-6d30678f87ea",
   "name": "Night's Whisper",
   "manaCost": "{1}{B}",

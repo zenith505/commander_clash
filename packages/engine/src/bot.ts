@@ -538,6 +538,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
     }
+    // Nicol Bolas, Dragon-God's +1: a token, else the cheapest card in hand (an extra land once we have five), else the
+    // cheapest permanent.
+    if (pend.kind === "chooseOption" && pend.what === "exileHandOrPermanent") {
+      const inHand = pend.options.filter((o) => obj(s, o).zone === "hand");
+      const perms = pend.options.filter((o) => obj(s, o).zone === "battlefield");
+      const token = perms.find((o) => obj(s, o).isToken && !obj(s, o).isCommander);
+      const spare = (o: string) => (isType(defOf(s, obj(s, o)), "Land") ? (lands(s, pid) >= 5 ? -1 : 2) : mv(s, o));
+      const pick = token ?? [...inHand].sort((a, b) => spare(a) - spare(b))[0] ?? [...perms].sort((a, b) => mv(s, a) - mv(s, b))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     // Eladamri: the biggest creature card in hand, else the top card of the library (it may be one).
     if (pend.kind === "chooseOption" && pend.what === "revealHandOrTop") {
       const creatures = pend.options.filter((o) => o !== "top" && isType(defOf(s, obj(s, o)), "Creature"));

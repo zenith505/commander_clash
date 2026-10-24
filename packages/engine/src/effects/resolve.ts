@@ -516,6 +516,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
       return s.turnOrder.filter((p) => !player(s, p).lost && !!key && !!s.turnLog?.combatDamagedBy?.[p]?.includes(key));
     }
+    case "opponentsControllingNo":
+      return opponents(s, ctx.controller).filter((p) => !s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, ref.filter, o, ctx.controller, false); }));
     case "opponentsLostLife":
       return opponents(s, ctx.controller).filter((p) => (s.turnLog?.lifeLost?.[p] ?? 0) >= ref.n);
     case "choseWord":
@@ -811,6 +813,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileFaceDown":
     case "moveLinked":
     case "revealHandOrTop":
+    case "exileHandOrPermanent":
     case "playLinked":
     case "cipher":
     case "haunt":

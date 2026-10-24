@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, island, passUntil, pt, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, activationCost, characteristics, compileCard, invalidateCharacteristics, isFullySupported, manaValue, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, activationCost, botActions, characteristics, compileCard, invalidateCharacteristics, isFullySupported, manaValue, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -376,5 +376,73 @@ describe("Alania, Divergent Storm", () => {
     expect(s.players[ap]!.hand.length).toBe(hand - 1 + 1);
     const r = castWith(s, ap, ids[1]!, opp);
     expect(r.asked).toBe(true);
+  });
+});
+
+const bolas = card("Nicol Bolas, Dragon-God", "Legendary Planeswalker — Bolas", "{U}{B}{B}{B}{R}", { loyalty: "4", oracleText: "Nicol Bolas has all loyalty abilities of all other planeswalkers on the battlefield.\n+1: You draw a card. Each opponent exiles a card from their hand or a permanent they control.\n−3: Destroy target creature or planeswalker.\n−8: Each opponent who doesn't control a legendary creature or planeswalker loses the game." });
+const legend = card("Test Legend", "Legendary Creature — Human", "{2}", { power: "2", toughness: "2" });
+const plainWalker = card("Test Walker", "Planeswalker — Test", "{2}", { loyalty: "3", oracleText: "+1: You gain 1 life." });
+
+describe("Nicol Bolas, Dragon-God", () => {
+  it("is fully supported; he has the loyalty abilities of the other planeswalkers, not their other abilities (rulings)", () => {
+    supported(bolas);
+    const { s: s0, ap, opp } = setup([]);
+    const nb = withLoyalty(s0, putOnBattlefield(s0, ap, bolas));
+    withLoyalty(s0, putOnBattlefield(s0, opp, tezzeret));
+    const abs = abilitiesOf(s0, s0.objects[nb]!);
+    expect(abs.activated.map((a) => a.loyalty)).toEqual([1, -3, -8, 1, -2, -6]);
+    // Tezzeret's static ability isn't his: Bolas's own artifacts get no reduction.
+    expect(abs.firstArtifactAbilityLess).toBeUndefined();
+    const tome = putOnBattlefield(s0, ap, jalumTome);
+    expect(mvOf(s0, ap, tome, 0)).toBe(2);
+    // Tezzeret's +1 through Bolas: draw two, then discard two (no artifact card in hand).
+    const hand = s0.players[ap]!.hand.length;
+    let s = resolveAll(run(s0, planActivate(s0, ap, nb, 3)));
+    for (let i = 0; i < 5 && s.pending; i++) s = resolveAll(botActions(s, s.pending.player).reduce(act, s));
+    expect(s.players[ap]!.hand.length).toBe(hand);
+    expect(s.objects[nb]!.counters.loyalty).toBe(5);
+    // One loyalty ability of Bolas each turn, whatever he got it from (CR 606.3).
+    expect(planActivate(s, ap, nb, 0)).toBeNull();
+  });
+
+  it("+1: you draw; each opponent in turn order picks a card in hand or a permanent they control, then all are exiled together", () => {
+    const { s: s0, ap } = setup([]);
+    const nb = withLoyalty(s0, putOnBattlefield(s0, ap, bolas));
+    const order = [1, 2, 3].map((i) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + i) % 4]!);
+    const theirLegend = putOnBattlefield(s0, order[1]!, legend);
+    // The third has nothing to exile.
+    for (const id of [...s0.players[order[2]!]!.hand]) {
+      s0.players[order[2]!]!.hand.splice(s0.players[order[2]!]!.hand.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[order[2]!]!.graveyard.push(id);
+    }
+    const hand = s0.players[ap]!.hand.length;
+    let s = resolveAll(run(s0, planActivate(s0, ap, nb, 0)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "exileHandOrPermanent", player: order[0] });
+    const pick0 = s.players[order[0]!]!.hand[0]!;
+    s = act(s, { type: "chooseOption", player: order[0]!, choice: pick0 });
+    // Not exiled yet: all at once, after the last choice.
+    expect(s.objects[pick0]!.zone).toBe("hand");
+    expect(s.pending).toMatchObject({ what: "exileHandOrPermanent", player: order[1] });
+    expect((s.pending as { options: string[] }).options).toContain(theirLegend);
+    s = resolveAll(act(s, { type: "chooseOption", player: order[1]!, choice: theirLegend }));
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[pick0]!.zone).toBe("exile");
+    expect(s.objects[theirLegend]!.zone).toBe("exile");
+    expect(s.objects[nb]!.counters.loyalty).toBe(5);
+  });
+
+  it("−8: each opponent who controls no legendary creature and no legendary planeswalker loses the game (CR 205.4e)", () => {
+    const { s: s0, ap } = setup([]);
+    const nb = putOnBattlefield(s0, ap, bolas);
+    s0.objects[nb]!.counters.loyalty = 8;
+    const order = [1, 2, 3].map((i) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + i) % 4]!);
+    putOnBattlefield(s0, order[0]!, legend);
+    withLoyalty(s0, putOnBattlefield(s0, order[1]!, plainWalker)); // a nonlegendary planeswalker doesn't save them
+    withLoyalty(s0, putOnBattlefield(s0, order[2]!, tezzeret)); // a legendary planeswalker does
+    const s = resolveAll(run(s0, planActivate(s0, ap, nb, 2)));
+    expect(order.map((p) => s.players[p]!.lost)).toEqual([false, true, false]);
+    expect(s.players[ap]!.lost).toBe(false);
   });
 });

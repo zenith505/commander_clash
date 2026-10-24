@@ -6952,6 +6952,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "exileHandOrPermanent") {
+    const st = r.scratch?.handOrPermanent;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose a card in your hand or a permanent you control");
+    st.queue.shift();
+    st.picks.push(choice);
+    log(s, `${player(s, pend.player).name} chooses ${s.objects[choice]?.zone === "hand" ? "a card in their hand" : (pend.labels?.[pend.options.indexOf(choice)] ?? "a permanent")} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "impulseChoice") {
     const st = r.scratch?.impulseChoice;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the exiled cards");

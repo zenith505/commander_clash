@@ -38,6 +38,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Nicol Bolas, Dragon-God: "Each opponent exiles a card from their hand or a permanent they control" (rulings: chosen in
+  // turn order, exiled together).
+  if ((m = /^(Each opponent|Each player) exiles a card from their hand or a permanent they control$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "exileHandOrPermanent", who }] : null;
+  }
   // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
   // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
   // Idol of Endurance: "... a creature spell from among ...": only a spell of that kind.

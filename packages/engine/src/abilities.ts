@@ -881,7 +881,9 @@ export type PlayerRef =
   /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
   | { ref: "choseWord"; option: string }
   /** "Each opponent who lost 3 or more life this turn" (Davros, Dalek Creator): paid life counts too (CR 119.4). */
-  | { ref: "opponentsLostLife"; n: number };
+  | { ref: "opponentsLostLife"; n: number }
+  /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
+  | { ref: "opponentsControllingNo"; filter: TargetSpec };
 
 export type DamageRecipient =
   | ObjRef
@@ -2420,6 +2422,11 @@ export type Effect =
   | { type: "castCommanderFree" }
   /** Eladamri, Korvecdal: reveal a card from your hand or the top card of your library; one matching `filter` goes onto the battlefield. */
   | { type: "revealHandOrTop"; filter: TargetSpec }
+  /**
+   * "Each opponent exiles a card from their hand or a permanent they control" (Nicol Bolas, Dragon-God): each of `who`
+   * chooses one, in turn order from the active player's, knowing the choices before; then all are exiled at once (rulings).
+   */
+  | { type: "exileHandOrPermanent"; who: PlayerRef }
   /**
    * "Create a 1/1 Insect token, then mill a card. If an Insect card was milled this way, put a loyalty counter on ~ and
    * repeat this process." (Grist): `effects`, then `then` and all of it again for as long as `cond` holds after them.

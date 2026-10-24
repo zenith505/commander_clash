@@ -828,6 +828,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Each player ~ attacked this turn loses the game" (Angel of Destiny, CR 104.3e).
   if (/^[Ee]ach player ~ attacked this turn loses the game$/.test(s)) return [{ type: "loseGame", who: { ref: "attackedThisTurnBySelf" } }];
+  // "Each opponent who doesn't control a legendary creature or planeswalker loses the game" (Nicol Bolas, Dragon-God).
+  if ((m = /^(Each opponent who doesn't control .+) loses the game$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who?.ref === "opponentsControllingNo" ? [{ type: "loseGame", who }] : null;
+  }
   // Life. "You may gain 1 life" leaves "Gain 1 life": yours.
   if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
   // "You lose half your life, rounded up", "each opponent loses half their life, rounded up": each of them half their own

@@ -267,7 +267,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "graveyardCastThisTurn":
-      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src });
+      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src, ...(e.rider ? { rider: e.rider } : {}) });
       log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
       return;
     case "noLifeGain":

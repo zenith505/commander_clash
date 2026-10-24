@@ -1,9 +1,9 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty } from "./manaabilities";
+import { payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -72,7 +72,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
+          return { id: o.id, ...x, cost: ab.manaCost ? manaAbilityCost(s, pid, o, ab.manaCost) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
       if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
@@ -86,7 +86,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
 /** The activated mana abilities (CR 605.1a) a payment can use, as options. */
 function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): Option[] {
   return payableActivatedMana(s, pid, o).flatMap(({ ab, options, penalty }) => {
-    const cost = ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null;
+    const cost = ab.manaCost ? manaAbilityCost(s, pid, o, ab.manaCost) : null;
     return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...x, cost, penalty, activated: true as const }));
   });
 }
@@ -566,7 +566,12 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const exclude = [...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)];
   const use = abilityUse(obj(s, objectId), ab, s);
   const due = lessWaterbend(cost, (x ?? 0) * xCount(cost), ab, tapCreatures);
-  let taps = planMana(s, pid, due.cost, due.extra, ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...exclude], use);
+  // Tezzeret, Betrayer of Flesh: this ability is begun first and the mana abilities paying for it come after (rulings),
+  // so they don't take the reduction it gets.
+  const first = !ab.mana && firstArtifactLess(s, pid, obj(s, objectId), false) > 0;
+  const sPay: GameState = first ? { ...s, turnLog: { ...s.turnLog, artifactAbility: { ...s.turnLog?.artifactAbility, [pid]: "mana" } } } : s;
+  let taps = planMana(sPay, pid, due.cost, due.extra, ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...exclude], use);
+  if (first && taps) taps = taps.map((a) => (a.type === "activateMana" || a.type === "activateAbility" ? { ...a, forNext: true as const } : a));
   // Waterbend with nothing chosen to tap: mana first, then as few artifacts and creatures as it takes (CR 701.67a).
   if (!taps && ab.waterbend !== undefined && tapCreatures === undefined) {
     const wb = autoWaterbend(s, pid, cost, (x ?? 0) * xCount(cost), ab.waterbend === "X" ? (x ?? 0) : ab.waterbend, ab.tap ? [objectId, ...exclude] : exclude, use);
@@ -768,7 +773,7 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
   // Doubling Cube doubles the pool, so its cost is paid from the pool as it is (ManaProduce "doublePool").
   if (ab.produces.kind === "doublePool") return manaAbilityProblem(s, pid, o, ability) || !manaCombos(s, o, ab)?.[combo ?? -1] ? null : [{ type: "activateMana", player: pid, objectId, mana, ability, combo: combo! }];
-  const taps = ab.manaCost ? planMana(s, pid, activationLessCost(s, o, parseManaCost(ab.manaCost)), 0, objectId, tapped, { ability: o }) : [];
+  const taps = ab.manaCost ? planMana(s, pid, manaAbilityCost(s, pid, o, ab.manaCost), 0, objectId, tapped, { ability: o }) : [];
   return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
 }
 

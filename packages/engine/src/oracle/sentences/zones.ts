@@ -576,6 +576,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }
+  // Bronzebeak Foragers: "Put target card with mana value X exiled with ~ into its owner's graveyard": a card its exile
+  // ability exiled (CR 607.2a), with the X it's activated with.
+  if ((m = /^Put (target (?:[a-z]+ )?card(?: with mana value X)? exiled with ~) into its owner's graveyard$/.exec(s))) {
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    return what?.ref === "target" && ctx.targets[i]?.linkedExile ? [{ type: "putInGraveyard", what }] : null;
+  }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
   if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)

@@ -10,7 +10,7 @@ import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
@@ -318,6 +318,10 @@ export function applyInPlace(s: GameState, action: Action): void {
   let manaAbility = false;
   const expected = waitingOn(s);
   if (action.player !== expected) throw new RulesError(`waiting on player ${expected}, not ${action.player}`);
+  // Tezzeret, Betrayer of Flesh: whether this activates an ability of an artifact on the battlefield, as it's activated.
+  const artifactAbility = artifactAbilityKind(s, action);
+  // A mana ability paying for the next ability, which is begun first (rulings): it doesn't take the reduction.
+  if (artifactAbility.artifact && artifactAbility.kind === "mana" && "forNext" in action && action.forNext && !s.turnLog?.artifactAbility?.[p.id]) ((s.turnLog ??= {}).artifactAbility ??= {})[p.id] = "mana";
 
   switch (action.type) {
     case "passPriority":
@@ -464,8 +468,24 @@ export function applyInPlace(s: GameState, action: Action): void {
   }
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
+  if (artifactAbility.kind !== "none" || s.turnLog?.artifactAbility?.[p.id] === "mana") noteArtifactAbility(s, p.id, artifactAbility.artifact, artifactAbility.kind);
   afterAction(s, action.type === "activateMana" || manaAbility);
   watchForMandatoryLoop(s, action, allPassed);
+}
+
+/** The kind of ability `action` activates, and whether its source is an artifact on the battlefield (CR 109.2), for noteArtifactAbility. */
+function artifactAbilityKind(s: GameState, action: Action): { artifact: boolean; kind: "mana" | "costedMana" | "other" | "none" } {
+  if (action.type !== "activateMana" && action.type !== "activateAbility") return { artifact: false, kind: "none" };
+  const o = s.objects[action.objectId];
+  if (!o) return { artifact: false, kind: "none" };
+  const artifact = o.zone === "battlefield" && objIsType(s, o, "Artifact");
+  if (action.type === "activateAbility") {
+    const ab = abilitiesOf(s, o).activated[action.index];
+    return { artifact, kind: !ab ? "none" : !ab.mana ? "other" : ab.manaCost && parseManaCost(ab.manaCost).symbols.length && !action.forNext ? "costedMana" : "mana" };
+  }
+  const i = action.ability ?? pickManaAbility(s, action.player, o, action.mana);
+  const ab = i === undefined ? undefined : manaAbilitiesOn(s, o)[i];
+  return { artifact, kind: !ab ? "none" : (ab.manaCost || ab.produces.kind === "doublePool") && !action.forNext ? "costedMana" : "mana" };
 }
 
 /**
@@ -3686,7 +3706,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   // Doubling Cube's cost is paid with the mana from the pool chosen for it (`combo`).
-  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null;
+  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : ab.manaCost ? manaAbilityCost(s, p.id, o, ab.manaCost) : null;
   const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o }) : null;
   if (payCost && !manaPaid) throw new RulesError("not enough mana");
   if (ab.tap) tapPermanent(s, o);
@@ -4772,6 +4792,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     choices = { ...choices, permit }; // its costs are paid below
     const gains = permitGains(s, permit);
     if (gains) o.entersGaining = gains;
+    // The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other
+    // types": the spell, and the permanent it becomes (rulings, CR 614.1c, 400.7a).
+    const rider = s.graveGrants?.find((g) => g.key === permit)?.rider;
+    if (rider?.counter) o.extraCounters = { ...o.extraCounters, [rider.counter]: (o.extraCounters?.[rider.counter] ?? 0) + 1 };
+    if (rider?.subtypes?.length) (o.spellGains ??= []).push({ mods: [{ kind: "addTypes", types: [], subtypes: rider.subtypes }], timestamp: s.nextTimestamp++, controller: p.id, source: s.graveGrants!.find((g) => g.key === permit)!.source, forever: true });
   }
   // "Once each turn, you may pay {0} ..." (As Foretold): that permanent's permission is used up for this turn.
   if (choices.alt === "payZero") {
@@ -6017,7 +6042,33 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
       less += z.n;
       if (z.atLeastOne) atLeastOne = true;
     }
+  less += firstArtifactLess(s, pid, o, !!ab.mana);
   return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x, less ? { n: less, atLeastOne } : undefined);
+}
+
+/**
+ * Tezzeret, Betrayer of Flesh: what "the first activated ability of an artifact you activate each turn costs {2} less"
+ * takes off this ability of `o`, an artifact on the battlefield (CR 109.2), if `pid` activates it now. A mana ability gets
+ * it only as the very first: one activated just before another ability may be paying for it (TurnLog.artifactAbility).
+ */
+export function firstArtifactLess(s: GameState, pid: PlayerId, o: GameObject, mana: boolean): number {
+  const was = s.turnLog?.artifactAbility?.[pid];
+  if (was === "used" || (mana && was) || o.zone !== "battlefield" || !objIsType(s, o, "Artifact")) return 0;
+  let less = 0;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    if (controllerOf(s, src) === pid) less += abilitiesOf(s, src).firstArtifactAbilityLess ?? 0;
+  }
+  return less;
+}
+
+/** Tezzeret, Betrayer of Flesh: after `pid`'s action, whether they've now activated an ability of an artifact this turn (TurnLog.artifactAbility). */
+function noteArtifactAbility(s: GameState, pid: PlayerId, artifact: boolean, kind: "mana" | "costedMana" | "other" | "none"): void {
+  const marks = s.turnLog?.artifactAbility;
+  const was = marks?.[pid];
+  if (was === "used") return;
+  const now = kind === "mana" ? (artifact ? "mana" : was) : kind === "costedMana" ? (artifact ? "used" : was) : artifact || was ? "used" : undefined;
+  if (now && now !== was) ((s.turnLog ??= {}).artifactAbility ??= {})[pid] = now;
 }
 
 /**
@@ -6219,6 +6270,10 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   loseLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
   if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.discardHand) {
+    log(s, `${p.name} discards their hand${p.hand.length ? "" : " (no cards)"}.`);
+    discardCards(s, p.id, [...p.hand]);
+  }
   if (ab.energyX && x) {
     p.energy = (p.energy ?? 0) - x;
     log(s, `${p.name} pays ${x} energy.`);

@@ -331,6 +331,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "milled") return (s.resolving?.milled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "subjectCard") {
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    if (ref.zone === "public") return o && (o.zone === "graveyard" || o.zone === "exile" || o.zone === "command") && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
     if (ref.zone) return o && o.zone === ref.zone && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }

@@ -1369,7 +1369,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const yardCast = /^You may cast an? (creature|artifact|instant|sorcery) spell from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardCast) {
       const type = yardCast[1]!.charAt(0).toUpperCase() + yardCast[1]!.slice(1);
-      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` } });
+      // The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types."
+      const rider = yardCast[1] === "creature" ? /^If you do, it enters with a finality counter on it and is an? ([A-Z][a-z]+) in addition to its other types\.?$/.exec(sentences[si + 1] ?? "") : null;
+      if (rider && !CREATURE_TYPES.has(rider[1]!)) return null;
+      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` }, ...(rider ? { rider: { counter: "finality", subtypes: [rider[1]!] } } : {}) });
+      if (rider) si++;
       continue;
     }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
@@ -3037,6 +3041,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
       continue;
     }
+    // Ajani's Chosen: "Whenever an enchantment you control enters, create a 2/2 white Cat creature token. If that enchantment
+    // is an Aura, you may attach it to the token." Only if the Aura can legally enchant the token, both still on the
+    // battlefield as this resolves (rulings, CR 701.3b).
+    if ((ctx.subject || ctx.subjectIt) && s === "If that enchantment is an Aura, you may attach it to the token") {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "createToken" || prev.n !== 1 || prev.who.ref !== "you") return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura" };
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter }, effects: [{ type: "may", effects: [{ type: "attach", what: { ref: "created" }, source: { ref: "subject" } }], text: "Attach it to the token" }] });
+      continue;
+    }
     // Toph, Hardheaded Teacher: "Whenever you cast a spell, earthbend 1. If that spell is a Lesson, put an additional +1/+1
     // counter on that land." The land earthbending chose, the spell as it was cast.
     const lessonIf = ctx.castSpell && /^If that spell is an? ([A-Z][a-z]+), put an additional \+1\/\+1 counter on that land$/.exec(s);
@@ -3073,8 +3087,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "flickeredIs", filter: { ...typed, text: ifBack[1]! } }, effects: fx });
       continue;
     }
+    // Tezzeret, Betrayer of Flesh: "Target artifact becomes an artifact creature. If it isn't a Vehicle, it has base power
+    // and toughness 4/4." No duration, so for as long as it stays on the battlefield (CR 611.2a); the Vehicle checked as this
+    // resolves (CR 608.2c). A Vehicle keeps its printed power and toughness (rulings), and isn't crewed.
+    const notVehicle = /^[Tt]arget artifact becomes an artifact creature$/.test(s) ? /^If it isn't a Vehicle, it has base power and toughness (\d+)\/(\d+)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (notVehicle) {
+      const what = parseObject("target artifact", ctx);
+      if (what?.ref !== "target") return null;
+      const i = ctx.targets.length - 1;
+      effects.push({ type: "continuous", what, mods: [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }], duration: "game" });
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], notSubtypes: ["Vehicle"], text: "not a Vehicle" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: [{ type: "continuous", what, mods: [{ kind: "setPT", power: Number(notVehicle[1]), toughness: Number(notVehicle[2]) }], duration: "game" }] });
+      si++;
+      continue;
+    }
     // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
-    const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
+    const ifIts =/^If it's (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
     if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (CREATURE_TYPES.has(ifIts[2]!) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];

@@ -3488,7 +3488,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
-      if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
+      // "Discard your hand" (Tarrian's Journal): only with at most one card in it, which then becomes a land worth tapping.
+      if (ab.discardHand && hand > 1) continue;
+      if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0) && !(ab.discardHand && objIsType(s, o, "Artifact"))) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)

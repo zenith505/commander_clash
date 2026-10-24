@@ -1836,6 +1836,11 @@ export function compile(d: CardDef): CompiledCard {
       else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in your hand` }, activated: kw.activated });
       continue;
     }
+    const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);
+    if (firstArtifactLess) {
+      out.firstArtifactAbilityLess = (out.firstArtifactAbilityLess ?? 0) + Number(firstArtifactLess[1]);
+      continue;
+    }
     const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
     if (ninjutsuLess) {
       out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
@@ -3088,7 +3093,9 @@ function linkExile(out: CompiledCard) {
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => b.targets.some((t) => t.linkedExile))) {
-    const exiles = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const all = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
+    // Bronzebeak Foragers: "exile ... until ~ leaves the battlefield" when that's its only exile ability.
+    const exiles = all.some((e) => !e.until) ? all.filter((e) => !e.until) : all.filter((e) => e.until === "sourceLeaves");
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
     else if (exiles[0]) exiles[0].linked = true;

@@ -1616,7 +1616,10 @@ const typedDefs = new Map<string, CardDef>();
 export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef {
   // A phased-out permanent and a merged permanent's other cards are still on the battlefield (CR 702.26d, 730.2).
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" || !d.types.includes("Creature")) return d;
-  const gs = offFieldGrants(s).filter((g) => !g.everyone && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken));
+  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = offFieldGrants(s).filter((g) => !g.everyone && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken));
+  // The Tomb of Aclazotz: a creature spell cast with its permission "is a Vampire in addition to its other types" (rulings:
+  // on the stack too).
+  if (o.zone === "stack") for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "addTypes")) gs.push(g);
   if (!gs.length) return d;
   let subtypes = [...d.subtypes];
   let all = everyCreatureType(d);

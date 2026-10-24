@@ -330,6 +330,12 @@ export function parseChanges(text: string): Modification[] | null {
       const k = parseKeywordList(m[1]!);
       if (!k) return null;
       out.push({ kind: "removeKeywords", keywords: k });
+    }
+    // Zur, Eternal Schemer: "becomes a creature in addition to its other types and has base power and base toughness each
+    // equal to its mana value": the object's own, set in layer 7b (CR 613.4b), X counting as 0 on the battlefield (rulings).
+    else if (/^has base power and base toughness each equal to its mana value$/.test(p)) {
+      const mv = { count: { kind: "affectedManaValue" as const } };
+      out.push({ kind: "setPT", power: mv, toughness: mv });
     } else if ((m = /^(?:has|have) base power and toughness (\d+|X)\/(\d+|X)$/i.exec(p))) {
       const base = basePT(m[1]!, m[2]!);
       if (!base) return null;

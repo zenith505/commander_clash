@@ -742,7 +742,7 @@ export type ObjRef =
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
-  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard"; /** "A copy of that card" (Myrkul): copied as the card, not as the permanent it was. */ printed?: true } // "a creature dealt damage this way": what this ability's damage hit
+  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"); `public`: a graveyard, exile or the command zone (Nazgûl Battle-Mace's rulings), not a hidden zone (CR 400.2). */ zone?: "graveyard" | "public"; /** "A copy of that card" (Myrkul): copied as the card, not as the permanent it was. */ printed?: true } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
   | { ref: "eventGroup" }
@@ -2883,7 +2883,7 @@ export type Effect =
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
-  | { type: "graveyardCastThisTurn"; filter: TargetSpec }
+  | { type: "graveyardCastThisTurn"; filter: TargetSpec; /** The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other types." */ rider?: GraveCastRider }
   /**
    * For the rest of the turn, its controller may cast spells (`cast`: those cards) and/or play lands (`lands`) from their
    * graveyard, as many as they like, paying their costs and following their timing rules (rulings on Forgotten Cellar;
@@ -4012,6 +4012,8 @@ export interface ActivatedAbility {
    * (CR 601.2f), 0 with 0 or less life (rulings on Lurking Evil).
    */
   halfLifeCost?: "up" | "down";
+  /** "Discard your hand" as part of the cost (Tarrian's Journal; CR 701.9a): with no cards in it too (rulings). */
+  discardHand?: true;
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
   /** "Pay X {E}" (Sphinx of the Revelation): X energy, X announced as it's activated (CR 107.3a). */
@@ -4313,6 +4315,12 @@ export interface CostMod {
   /** "Other Dragon spells": not the card itself. */
   other?: true;
   text: string;
+}
+
+/** What a spell cast with a permission to cast it from a graveyard gets: a counter it enters with, creature types on the stack and for good (CR 614.1c, 400.7a). */
+export interface GraveCastRider {
+  counter?: CounterKind;
+  subtypes?: string[];
 }
 
 /** Everything the engine knows how to do with one card. */
@@ -5036,6 +5044,11 @@ export interface CompiledCard {
   powerUpLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
   powerUpAgain?: true;
+  /**
+   * "The first activated ability of an artifact you activate each turn costs {2} less to activate" (Tezzeret, Betrayer of
+   * Flesh; CR 602.2b applies 601.2f): mana abilities count as that first ability too (rulings). See TurnLog.artifactAbility.
+   */
+  firstArtifactAbilityLess?: number;
   equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /** "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back, CR 601.2f). */
   auraLessEnchanted?: number;

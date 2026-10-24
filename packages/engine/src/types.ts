@@ -1,4 +1,4 @@
-import type { AbilityBody, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
+import type { AbilityBody, GraveCastRider, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -1309,6 +1309,13 @@ export interface TurnLog {
   payZeroUsed?: string[];
   /** Players who activated an equip ability this turn (Forge Anew's "the first equip ability you activate"). */
   equipped?: PlayerId[];
+  /**
+   * Tezzeret, Betrayer of Flesh: for each player, "used" once they've activated an ability of an artifact this turn, mana
+   * abilities included (rulings); "mana" while the only ones are mana abilities activated since their last other action,
+   * which in paper could have been activated while paying for the next ability (rulings, CR 601.2g, 602.2b): if that's an
+   * artifact's, it's still the first. See CompiledCard.firstArtifactAbilityLess.
+   */
+  artifactAbility?: Record<number, "mana" | "used">;
   /** Players who gained life (Needlebite Trap). */
   gainedLife?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */
@@ -1550,7 +1557,7 @@ export interface GameState {
   flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
-  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string }[];
+  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider }[];
   /**
    * "You may cast spells from your graveyard this turn", "until end of turn, you may play lands ... from your graveyard",
    * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
@@ -2161,7 +2168,7 @@ export type Action =
   /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
   /** `extra`: the mana picked for the triggered mana abilities tapping it triggers ("one mana of any color", CR 605.4a). */
   /** `combo`: for "Add {W}{W}, {W}{U}, or {U}{U}", which of them (ManaOption.combo). */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId }
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[]; combo?: number; /** "A player of your choice adds {C}" (Victory Chimes): who; the player activating it if left out. */ to?: PlayerId; /** Activated to pay for the ability activated next, which counts as begun first (TurnLog.artifactAbility). */ forNext?: true }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */
@@ -2170,7 +2177,7 @@ export type Action =
    * For a mana ability (CR 605.1a), which resolves right away: `mana`, the color for its "one mana of any color" (chosen
    * as it resolves, CR 605.3b; without it, it's asked); `extra`, as for activateMana.
    */
-  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices; mana?: ManaType; extra?: ManaType[] }
+  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices; mana?: ManaType; extra?: ManaType[]; /** A mana ability activated to pay for the ability activated next (TurnLog.artifactAbility). */ forNext?: true }
   | { type: "chooseModes"; player: PlayerId; modes: number[] }
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */

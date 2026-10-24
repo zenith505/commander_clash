@@ -383,6 +383,15 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
 }
 
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Elesh Norn: "Whenever a source an opponent controls deals damage to you or a permanent you control, that source's
+  // controller ...": the source's controller is "that player".
+  const yours = /^Whenever a source an opponent controls deals damage to you or a permanent you control, (.+)$/.exec(line);
+  if (yours) {
+    const text = yours[1]!.replace(/\bthat source's controller\b/g, "that player");
+    if (/\b(it|its|that source|that creature|that permanent)\b/.test(text)) return "fail";
+    const body = parseBody(text, { eventPlayer: true });
+    return body ? { event: "opponentSourceDamagesYouOrYours", body: { ...body, text: yours[1]! } } : "fail";
+  }
   const m = /^Whenever (an?) (.+?) deals (combat )?damage to you, (.+)$/.exec(line);
   if (!m) return null;
   const who = /^source(?: (an opponent|you) controls?)?$/.exec(m[2]!);
@@ -966,7 +975,8 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "When you sacrifice ~" (Heaped Harvest): ~ itself, wherever it went.
   const self = /^(?:When|Whenever) you sacrifice ~, (.+)$/.exec(line);
   if (self) {
-    const body = parseBody(self[1]!);
+    // "When you sacrifice ~, it deals 3 damage to any target" (Ordeal of Purphoros): ~ as it last existed (CR 608.2h).
+    const body = parseBody(self[1]!.replace(/^it deals /, "~ deals "));
     return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
   }
   // "Whenever you sacrifice one or more Foods" (Camellia, the Seedmiser): once for each event that sacrificed any (CR
@@ -1073,6 +1083,11 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!draw) return "fail";
     const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
     return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
+  } else if ((m = /^Whenever a player attacks, if one or more players being attacked are poisoned, (the attacking player draws a card)\.?$/.exec(line))) {
+    // Norn's Decree: any player's attack (CR 508.3d), checked as it triggers and as it resolves (CR 603.4).
+    const draw = parseBody("That player draws a card.", { eventPlayer: true });
+    if (!draw) return "fail";
+    return { event: "creaturesYouControlAttack", body: { ...draw, text: m[1]! }, anyoneAttacks: true, ifCond: { kind: "attackedPlayerPoisoned" } };
   } else if ((m = /^Whenever one or more creatures attack one of your opponents( or a planeswalker they control)?, (.+)$/.exec(line))) {
     // Frontier Warmonger, Frenzied Gorespawn: any player's creatures (rulings), once for each of your opponents they attack
     // (with their planeswalkers, when it says so; not battles), as for "whenever you attack a player" (CR 508.3e). "Those
@@ -1135,7 +1150,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you attack with eight or more creatures, those creatures get +4/+4 until end of turn" (Champions from
   // Beyond): the creatures that attacked, as they were declared.
   const those = event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
@@ -1499,6 +1515,12 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
   if (hurt) {
     const body = parseBody(hurt[1]!);
     return body ? { event: "creaturesDealCombatDamageToYou", body } : "fail";
+  }
+  // Norn's Decree: "Whenever one or more creatures an opponent controls deal combat damage to you, that opponent ...".
+  const hurtBy = /^Whenever one or more creatures an opponent controls deal combat damage to you, (.+)$/.exec(line);
+  if (hurtBy) {
+    const body = parseBody(hurtBy[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    return body ? { event: "opponentCreaturesDealCombatDamageToYou", body: { ...body, text: hurtBy[1]! } } : "fail";
   }
   const attacks = /^Whenever a creature attacks enchanted player, (.+)$/.exec(line);
   if (attacks) {
@@ -1920,7 +1942,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : oppStep[1] === "combat" ? "eachBeginCombat" : "eachEndStep";
     // "They lose 2 life", "~ deals 2 damage to them": that player.
     // Slicer, Hired Muscle: "... gain control of ~ until end of turn. If you do, ... If you don't, convert it": ~.
-    const text = oppStep[2]!.replace(/^(you may have that player gain control of ~ until end of turn\. If you do, untap ~, goad it, and it can't be sacrificed this turn\. If you don't, convert) it\.$/, "$1 ~.");
+    // Assault Suit: "... gain control of equipped creature until end of turn. If you do, untap it": that creature.
+    const text = oppStep[2]!.replace(/^(you may have that player gain control of ~ until end of turn\. If you do, untap ~, goad it, and it can't be sacrificed this turn\. If you don't, convert) it\.$/, "$1 ~.").replace(/^(you may have that player gain control of equipped creature until end of turn\. If you do, untap) it\.$/, "$1 equipped creature.");
     const body = parseBody(text.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
   }

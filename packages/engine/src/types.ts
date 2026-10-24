@@ -1539,7 +1539,7 @@ export interface GameState {
    * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins
    * (CR 611.2b, 800.4m).
    */
-  entersTappedUntil?: { controller: PlayerId; filter: TargetSpec; source: string }[];
+  entersTappedUntil?: { controller: PlayerId; filter: TargetSpec; source: string; /** "... enter tapped this turn" (Nahiri's Lithoforming): ends in the cleanup step (CR 514.2). */ thisTurn?: true }[];
   /**
    * "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
    * (Conjurer's Ban), "that creature's owner can't cast spells with the same name as that creature until your next turn"

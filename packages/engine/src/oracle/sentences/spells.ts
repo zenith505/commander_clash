@@ -254,6 +254,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Empower Jace (CR 701.71a)
   if ((m = new RegExp(`^Empower Jace ${NUMX}$`, "i").exec(s))) return [{ type: "empowerJace", n: amt(m[1]!) }];
   // Fighting (CR 701.14) and "deals damage equal to its power to"
+  // "Choose target creature you control and target creature you don't control. ... Then those creatures fight each other"
+  // (Tail Swipe): the two targets, neither dealing damage if either is illegal (CR 701.14b).
+  if (/^(?:Then )?[Tt]hose creatures fight each other$/.test(s)) {
+    const [a, b] = ctx.targets;
+    const creature = (t: TargetSpec | undefined) => t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Creature" && !t.optional && !t.divided;
+    return ctx.targets.length === 2 && creature(a) && creature(b) && a!.controller === "you" && b!.controller === "opponent" ? [{ type: "fight", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }] : null;
+  }
   if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
     const a = parseObject(m[1]!, ctx);
     const b = a && parseObject(m[2]!, ctx);

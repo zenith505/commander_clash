@@ -164,8 +164,9 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
-  // "An instant card or a card with flash" (Waterlogged Teachings).
-  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$| card with a mana ability$/.test(x))) {
+  // "An instant card or a card with flash" (Waterlogged Teachings). "A basic Plains card or a creature card with mana value
+  // 1 or less" (Starfield Shepherd).
+  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$| card with a mana ability$| card with mana value \d+ or (?:less|greater)$/.test(x))) {
     const subs = parts.map((x) => parseSearchFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };

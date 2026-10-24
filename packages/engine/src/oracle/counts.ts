@@ -18,6 +18,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|~)$/, "$2's $1");
+  // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
+  // modified creatures you control".
+  p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
   let m: RegExpExecArray | null;
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
@@ -218,6 +221,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
   }
+  // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
+  if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
@@ -318,6 +323,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
     return of && count({ kind, of });
+  }
+  // "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller
+  // (rulings).
+  if ((m = /^the difference between (~'s|its|that creature's) power and its toughness$/i.exec(p))) {
+    const of = whoseObject(m[1]!, ctx);
+    return of && count({ kind: "absDifference", of: [{ kind: "power", of }, { kind: "toughness", of }] });
   }
   // "Where X is ~'s loyalty" (Nissa, Ascended Animist): a planeswalker's loyalty is its loyalty counters (CR 306.5b), as
   // it last existed if it's gone (rulings).

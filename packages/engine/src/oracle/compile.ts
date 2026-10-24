@@ -1629,6 +1629,10 @@ export function compile(d: CardDef): CompiledCard {
       out.stealsDraws = true;
       continue;
     }
+    if (line === "If an opponent would draw two or more cards, instead you and that player each draw a card.") {
+      out.splitsBigDraws = true;
+      continue;
+    }
     // Narset, Parter of Veils: draws past the first each turn don't happen, and can't be replaced (rulings).
     if (line === "Each opponent can't draw more than one card each turn.") {
       out.opponentsDrawOnce = true;
@@ -2679,6 +2683,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;
       else if ("targetLifeTax" in cost) out.targetLifeTax = (out.targetLifeTax ?? 0) + cost.targetLifeTax;
+      else if ("opponentsTargetTax" in cost) out.opponentsTargetTax = [...(out.opponentsTargetTax ?? []), cost.opponentsTargetTax];
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }

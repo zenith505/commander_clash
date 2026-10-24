@@ -458,6 +458,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const fewest = [...opps].sort((a, b) => player(s, Number(a)).graveyard.length - player(s, Number(b)).graveyard.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: fewest }];
       }
+      // Sandstone Oracle: "If that player has more cards in hand than you, draw cards equal to the difference": the most.
+      if (next?.type === "if" && next.cond.kind === "amountsCompare" && opps.length && JSON.stringify(next.cond.a).includes('"chosenPlayer"') && next.effects.some((e) => e.type === "draw")) {
+        const most = [...opps].sort((a, b) => player(s, Number(b)).hand.length - player(s, Number(a)).hand.length)[0]!;
+        return [{ type: "chooseOption", player: pid, choice: most }];
+      }
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
@@ -1801,6 +1806,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     // Rottenmouth Viper: each one sacrificed makes it cheaper, so as few as we can cast it with.
     if (compileCard(d).sacrificedReduction && !via && !alt) xs = Array.from({ length: most + 1 }, (_, i) => i);
   }
+  // Nahiri's Lithoforming: "Sacrifice X lands ... You may play X additional lands this turn": no more lands than we have
+  // in hand to play again.
+  if (cost.hasX && effects.some((e) => e.type === "pick" && e.action === "sacrifice" && e.filter.types?.includes("Land") && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "x")) {
+    const lands = player(s, pid).hand.filter((h) => h !== id && isType(defOf(s, obj(s, h)), "Land")).length;
+    xs = xs.filter((x) => x !== undefined && x >= 1 && x <= lands);
+  }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
     if (plan) return plan;
@@ -2886,7 +2897,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   // Slicer, Hired Muscle: "you may have that player gain control of ~ until end of turn. If you do, ... goad it": only
   // while there's another opponent for it to attack (goaded, it attacks a player other than us if able, CR 701.15b).
-  if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "self" && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
+  // Assault Suit: "... gain control of equipped creature until end of turn": the same, the creature it equips can't attack us.
+  if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && (e.effects[0]!.what.ref === "self" || e.effects[0]!.what.ref === "attached") && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
     return opponents(s, pid).filter((p) => p !== r.item.event?.player).length > 0;
   // Scavenger's Talent: "you may sacrifice three other nonland permanents. If you do, return a creature card from your
   // graveyard to the battlefield": only when the best creature card there is worth more than the cheapest ones we'd give.

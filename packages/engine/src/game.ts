@@ -1942,10 +1942,23 @@ export function removeFromCombat(s: GameState, o: GameObject) {
  * card that could, the draws stop for that choice and it returns false; answering it (chooseDredge) does the rest
  * of them, then carries on with what was drawing (`after`, or the resolving spell or ability).
  */
-export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", made: number[] = []): boolean {
+export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", made: number[] = [], resumed = false): boolean {
   // `made`: draws a replacement effect already made of an earlier one, which that effect doesn't replace again (CR
   // 614.5); each number is how many Alhammarret's Archives can still replace that draw.
   made = [...made];
+  // `resumed`: the rest of an instruction that already began, which Alms Collector looked at then.
+  const alms = !resumed && n >= 2 && !made.length ? almsCollector(s, pid) : undefined;
+  if (alms) {
+    // Alms Collector (CR 616.1g): the instruction becomes one draw for its controller and one for this player, the
+    // active player's first (CR 121.2c). The first of the two is drawn without asking about dredge or a look (as for
+    // Notion Thief); the second is an ordinary draw, which can pause.
+    const to = controllerOf(s, alms);
+    log(s, `${player(s, to).name} and ${player(s, pid).name} each draw a card instead (${nameOf(s, alms.id)}).`);
+    const seat = (x: PlayerId) => (s.turnOrder.indexOf(x) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+    const [first, second] = seat(to) < seat(pid) ? [to, pid] : [pid, to];
+    drawWithoutAsking(s, first);
+    return player(s, second).lost ? true : draw(s, second, 1, undefined, [], true);
+  }
   while (n > 0 || made.length) {
     // Narset, Parter of Veils: an opponent who has drawn a card this turn can't draw another; the draw doesn't happen, so
     // nothing replaces it (rulings), and the rest of these don't either.
@@ -2025,6 +2038,27 @@ function keepOne(s: GameState, p: Player, source: string, cards: ObjectId[], kee
   if (cards.length) log(s, `${p.name} puts a card into their hand${rest.length ? ` and ${rest.map((id) => nameOf(s, id)).join(", ")} into their graveyard` : ""}.`);
 }
 
+/**
+ * Alms Collector: one controlled by an opponent of `pid` (who hasn't left the game). With several, the first in turn
+ * order applies (the drawing player's choice, CR 616.1, isn't asked).
+ */
+function almsCollector(s: GameState, pid: PlayerId): GameObject | undefined {
+  const seat = (o: GameObject) => (s.turnOrder.indexOf(controllerOf(s, o)) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  return s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && abilitiesOf(s, o).splitsBigDraws)
+    .sort((a, b) => seat(a) - seat(b))[0];
+}
+
+/** One draw for `pid` that doesn't stop to offer dredge or Scion of Halaster's look (the card is just drawn). */
+function drawWithoutAsking(s: GameState, pid: PlayerId) {
+  const p = player(s, pid);
+  const asks = dredgeOptions(s, pid).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook));
+  if (!asks) draw(s, pid, 1, undefined, [], true);
+  else if (!notionThief(s, pid)) drawOne(s, pid);
+  else draw(s, pid, 1, undefined, [], true);
+}
+
 /** The Notion Thieves that already replaced a draw in the chain of draws being made now (CR 614.5). */
 let notionUsed: ObjectId[] = [];
 
@@ -2052,11 +2086,7 @@ function stealDraw(s: GameState, pid: PlayerId, thief: GameObject) {
   log(s, `${player(s, pid).name} skips that draw and ${player(s, to).name} draws a card instead (${nameOf(s, thief.id)}).`);
   notionUsed.push(thief.id);
   try {
-    const p = player(s, to);
-    const asks = dredgeOptions(s, to).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === to && abilitiesOf(s, obj(s, id)).firstDrawLook));
-    if (!asks) draw(s, to, 1);
-    else if (!notionThief(s, to)) drawOne(s, to);
-    else draw(s, to, 1);
+    drawWithoutAsking(s, to);
   } finally {
     notionUsed = notionUsed.filter((x) => x !== thief.id);
   }
@@ -2130,7 +2160,7 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
     lookInstead(s, p, pend.source, pend.cards, pend.cards.length === 2 ? id : undefined);
     more = [pend.left + 1, []];
   }
-  if (!draw(s, p.id, more[0], pend.after, more[1])) return;
+  if (!draw(s, p.id, more[0], pend.after, more[1], true)) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
 }
@@ -2337,7 +2367,7 @@ function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", sou
 
 /** The draws left after one was replaced, then whatever was drawing: the draw step, or a resolving spell or ability. */
 export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
-  if (!draw(s, pid, left, after, made)) return;
+  if (!draw(s, pid, left, after, made, true)) return;
   if (after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
 }
@@ -2379,7 +2409,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     log(s, `${p.name} draws two cards instead of one.`);
     made.unshift(pend.archive - 1, pend.archive - 1);
   } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
-  if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made)) return;
+  if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made, true)) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
 }
@@ -3026,6 +3056,8 @@ function finishCleanup(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
+  // "Lands you control enter tapped this turn" (Nahiri's Lithoforming, CR 514.2).
+  if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.some((r) => !r.thisTurn) ? s.entersTappedUntil.filter((r) => !r.thisTurn) : undefined;
   s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
@@ -4206,8 +4238,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     for (const id of s.battlefield) {
       const src = obj(s, id);
       const ab = abilitiesOf(s, src);
-      if (!ab.castTargetLess && !ab.commanderTargetTax) continue;
+      if (!ab.castTargetLess && !ab.commanderTargetTax && !ab.opponentsTargetTax) continue;
       const by = controllerOf(s, src);
+      // Kopala, Warden of Waves: a permanent its controller controls (CR 601.2f).
+      if (by !== pid && opponents(s, by).includes(pid)) for (const c of ab.opponentsTargetTax ?? []) if (!c.abilities && targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false))) mods.more += c.n;
       if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
       if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
     }
@@ -6149,7 +6183,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = ab.mana ? 0 : activationTax(s, o);
+  const more = ab.mana ? 0 : activationTax(s, o) + opponentsTargetTax(s, pid, targets);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -6203,6 +6237,25 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
  */
 function powerUpAgain(s: GameState, pid: PlayerId): number {
   return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).powerUpAgain).length;
+}
+
+/**
+ * Kopala, Warden of Waves: "Abilities your opponents activate that target a Merfolk you control cost {2} more to activate",
+ * once for each such permanent's ability however many it targets (rulings), with the targets chosen first (CR 602.2b).
+ */
+function opponentsTargetTax(s: GameState, pid: PlayerId, targets?: TargetChoice[]): number {
+  const targeted = [...new Set((targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))].map((id) => s.objects[id]).filter((t): t is GameObject => t?.zone === "battlefield");
+  if (!targeted.length) return 0;
+  let n = 0;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    const taxes = abilitiesOf(s, src).opponentsTargetTax;
+    if (!taxes) continue;
+    const by = controllerOf(s, src);
+    if (by === pid || !opponents(s, by).includes(pid)) continue;
+    for (const c of taxes) if (c.abilities && targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false))) n += c.n;
+  }
+  return n;
 }
 
 /** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */
@@ -8402,9 +8455,16 @@ function finishCombatDamage(s: GameState): boolean {
   for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
   // "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar): each player dealt it by creatures.
-  const toPlayers = new Map<PlayerId, ObjectId[]>();
-  for (const e of done) if (e.dealt && "player" in e.to && e.src.types.includes("Creature")) toPlayers.set(e.to.player, [...(toPlayers.get(e.to.player) ?? []), key(e)]);
-  for (const [player, ids] of toPlayers) fireEvent(s, { type: "creaturesDamagedPlayer", player, ids });
+  // Who controlled each creature as it dealt it: "creatures an opponent controls" (Norn's Decree).
+  const toPlayers = new Map<PlayerId, { ids: ObjectId[]; controllers: PlayerId[] }>();
+  for (const e of done)
+    if (e.dealt && "player" in e.to && e.src.types.includes("Creature")) {
+      const g = toPlayers.get(e.to.player) ?? { ids: [], controllers: [] };
+      g.ids.push(key(e));
+      if (!g.controllers.includes(e.src.controller)) g.controllers.push(e.src.controller);
+      toPlayers.set(e.to.player, g);
+    }
+  for (const [player, g] of toPlayers) fireEvent(s, { type: "creaturesDamagedPlayer", player, ...g });
   return false;
 }
 

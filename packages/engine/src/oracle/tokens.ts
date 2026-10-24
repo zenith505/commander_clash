@@ -75,6 +75,12 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   // of the token's, as if printed.
   // "With firebending 1" (Firebender Ascension): the same, "Whenever this creature attacks, add {R}" (CR 702.189a).
   if (!quoted && (kwText === "prowess" || /^firebending \d+$/.test(kwText ?? "")) && subtypes.length) return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: kwText!.charAt(0).toUpperCase() + kwText!.slice(1) };
+  // "With flying and firebending 4" (Avatar Roku): the keywords, and the triggered keyword as its ability.
+  const trig = !quoted && kwText ? /^(.+?),? and (prowess|firebending \d+)$/.exec(kwText) : null;
+  if (trig && subtypes.length) {
+    const kws = parseKeywordList(trig[1]!);
+    return kws ? { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: kws, abilities: trig[2]!.charAt(0).toUpperCase() + trig[2]!.slice(1) } : null;
+  }
   const keywords = kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(ability !== undefined ? { abilities: ability } : {}) };

@@ -198,6 +198,11 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : /upkeep/.test(m[2]!) ? "nextTurnUpkeep" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
     return [{ type: "delayed", when, each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
   }
+  // "Incubate 2 five times" (The Argent Etchings): one incubate after another (CR 701.53a).
+  if ((m = /^Incubate (\d+) (twice|three times|four times|five times)$/.exec(s))) {
+    const times = { twice: 2, "three times": 3, "four times": 4, "five times": 5 }[m[2]!]!;
+    return Array.from({ length: times }, () => ({ type: "createToken" as const, who: { ref: "you" as const }, n: 1, token: INCUBATOR, counters: { counter: "+1/+1" as const, n: Number(m![1]) } }));
+  }
   // Incubate N (CR 701.53a): an Incubator token that enters with N +1/+1 counters on it. "Its controller incubates X".
   if ((m = new RegExp(`^(?:(.+?) )?[Ii]ncubates? ${NUMX}$`).exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

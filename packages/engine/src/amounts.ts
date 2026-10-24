@@ -301,6 +301,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return c.of.reduce((n, x) => n + evalCount(s, x, ctx), 0);
     case "difference":
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
+    case "absDifference":
+      return Math.abs(evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx));
     case "cardsToGraveyardThisTurn":
       return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
@@ -374,6 +376,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
+      if (c.combatDamaged) return s.players.filter((p) => !(c.opponents && p.id === ctx.controller) && p.combatDamagedTurn === s.turn).length;
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
       // Aclazotz: an opponent with no card to discard (CR 701.9b) didn't discard one.
@@ -695,7 +698,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
     case "tokensCreatedThisTurn":
@@ -712,6 +715,8 @@ function describeCount(c: Count): string {
       return c.of.map(describeCount).join(" + ");
     case "difference":
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
+    case "absDifference":
+      return `|${describeCount(c.of[0])} - ${describeCount(c.of[1])}|`;
     case "cardsToGraveyardThisTurn":
       return "#cards put into that graveyard this turn";
     case "commanderCasts":

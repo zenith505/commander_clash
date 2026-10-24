@@ -540,7 +540,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;
     case "enterTappedUntil":
-      (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src });
+      (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src, ...(e.thisTurn ? { thisTurn: true as const } : {}) });
       return;
     case "counters": {
       // Distributed (CR 601.2d): each target gets its part; a part for an illegal target isn't put anywhere (CR 608.2b).
@@ -755,11 +755,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "removeCounters":
+      if (e.setsDid && s.resolving) s.resolving.did = false;
       for (const o of objects(s, e.what, ctx)) {
         const had = o.counters[e.counter] ?? 0;
         const can = removableCounters(s, o, e.counter);
-        const n = Math.min(can, e.n === "all" ? had : amountNow(s, e.n, ctx));
+        const want = e.n === "all" ? had : amountNow(s, e.n, ctx);
+        const n = Math.min(can, want);
         if (n <= 0) continue;
+        if (e.setsDid && s.resolving) s.resolving.did = n === want;
         o.counters[e.counter] = had - n;
         // "For each charge counter removed this way" (Coalition Relic).
         if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;

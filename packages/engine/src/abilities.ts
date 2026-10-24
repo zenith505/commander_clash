@@ -309,6 +309,8 @@ export type Count =
   | { kind: "sum"; of: Count[] }
   /** "Equal to the difference" after "if that creature has greater power than ~" (Conformer Shuriken): the first less the second. */
   | { kind: "difference"; of: [Count, Count] }
+  /** "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller. */
+  | { kind: "absDifference"; of: [Count, Count] }
   /** "The number of cards put into their graveyard from anywhere this turn" (Fraying Sanity): that player's. */
   | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
@@ -325,7 +327,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1300,6 +1302,8 @@ export type StaticCondition =
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
   /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
+  /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
+  | { kind: "attackedPlayerPoisoned" }
   /** "You control the creature with the greatest power or tied for the greatest power" (Triumph of Ferocity), "the artifact with the greatest mana value ..." (Padeem): among all on the battlefield. */
   | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
@@ -2001,8 +2005,8 @@ export type Effect =
   | { type: "skipUntap"; what: ObjRef }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
   | { type: "noMaxHandSize"; /** "For as long as you control ~" (The Great Synthesis): see Player.noMaxHandSizeWhile. */ whileControlled?: true }
-  /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. */
-  | { type: "enterTappedUntil"; filter: TargetSpec }
+  /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. `thisTurn`: "Lands you control enter tapped this turn" (Nahiri's Lithoforming). */
+  | { type: "enterTappedUntil"; filter: TargetSpec; thisTurn?: true }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
   /**
@@ -2157,7 +2161,7 @@ export type Effect =
      * `onlySelf`: an intervening "if that spell targets only ~" (CR 603.4), checked again as it resolves.
      */
     eachOther?: { among: TargetSpec; self?: true; caster?: true; onlySelf?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept }
-  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   /**
    * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
@@ -2833,7 +2837,7 @@ export type Effect =
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
-  | { type: "extraLandThisTurn"; n: number }
+  | { type: "extraLandThisTurn"; n: Amount }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
   | { type: "becomeSaddled"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
@@ -3610,6 +3614,10 @@ export type TriggerEvent =
   | "groupDealsDamageToPlayers"
   /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
   | "creaturesDealCombatDamageToYou"
+  /** "Whenever a source an opponent controls deals damage to you or a permanent you control" (Elesh Norn): once for each source and each of them dealt damage (rulings); the source's controller is "that player". */
+  | "opponentSourceDamagesYouOrYours"
+  /** "Whenever one or more creatures an opponent controls deal combat damage to you" (Norn's Decree): once for each such opponent, who is "that opponent". */
+  | "opponentCreaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
   | "spellYouControlDealsDamage"
   /**
@@ -4818,6 +4826,11 @@ export interface CompiledCard {
    */
   stealsDraws?: true;
   /**
+   * Alms Collector: "If an opponent would draw two or more cards, instead you and that player each draw a card" (CR
+   * 614.1a), applied to the instruction as a whole before any single draw (CR 121.2a, 616.1g; rulings).
+   */
+  splitsBigDraws?: true;
+  /**
    * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
    * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,
    * 614.1a), the factor it multiplies by. Several multiply together (rulings).
@@ -5248,6 +5261,8 @@ export interface CompiledCard {
   castTargetLess?: { n: number; filter: TargetSpec }[];
   /** "Spells your opponents cast that target one or more commanders you control cost {3} more to cast" (Esior): once per spell. */
   commanderTargetTax?: number;
+  /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */
+  opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true }[];
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */
   targetLifeTax?: number;
   /**

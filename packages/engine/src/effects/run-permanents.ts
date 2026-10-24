@@ -1,6 +1,7 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { abilitiesOf, basePowerNow, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { abilitiesOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { nextRandom } from "../rng";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
@@ -142,14 +143,35 @@ export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun";
 /** Changing permanents: tap, counters, connive, explore, renown, evolve, continuous effects, attaching. */
 export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
-    case "removeFromCombat":
+    case "unlockDoor": {
+      // CR 709.5f: its controller chooses a locked door of a Room they control, and the Room gets that designation.
+      const doors = lockedDoors(s, ctx.controller, e.what ? objects(s, e.what, ctx).map((o) => o.id) : undefined);
+      if (!doors.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (doors.length > 1 && sc.door === undefined) {
+        const rooms = new Set(doors.map((d) => d.id)).size;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "unlockDoor", options: doors.map((d) => `${d.id}:${d.door}`), labels: doors.map((d) => (rooms > 1 ? `${d.name} (${defOf(s, obj(s, d.id)).name})` : d.name)), prompt: "choose a locked door to unlock" };
+        return "paused";
+      }
+      const pick = doors.find((d) => `${d.id}:${d.door}` === sc.door) ?? doors[0]!;
+      sc.door = undefined;
+      const o = obj(s, pick.id);
+      log(s, `${player(s, ctx.controller).name} unlocks ${pick.name} (${src}).`);
+      setUnlocked(s, o, [...(o.unlocked ?? []), pick.door]);
+      return;
+    }
+    case "removeFromCombat": {
+      const removed: ObjectId[] = [];
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "battlefield" || (o.attacking === undefined && o.blocking === undefined)) continue;
         removeFromCombat(s, o);
         clearCombat(o);
+        removed.push(o.id);
         log(s, `${src} removes ${defOf(s, o).name} from combat.`);
       }
+      if (e.remember && s.resolving) s.resolving.created = removed;
       return;
+    }
     case "reselectAttack": {
       // Another player, or a planeswalker or battle it could attack (CR 506.2, 310.9b), never its controller or theirs;
       // requirements, restrictions and costs ignored, and it still attacked what it did (rulings).
@@ -913,30 +935,30 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${characteristics(s, o).name} evolves.`);
       return;
     }
-    case "explore": {
-      // CR 701.44a. The controller decides about a nonland card after the counter is put on (rulings).
-      const p = player(s, ctx.controller);
+    case "explore":
+      return explore(s, objects(s, e.what ?? { ref: "self" }, ctx)[0], ctx, src);
+    case "exploreEach": {
+      // The rulings: each of them explores, in the order its controller chooses; nobody acts in between.
       const sc = (s.resolving!.scratch ??= {});
-      if (sc.explored === undefined) {
-        const self = objects(s, e.what ?? { ref: "self" }, ctx)[0];
-        const top = p.library[0];
-        const name = self ? characteristics(s, self).name : src;
-        if (top && isType(defOf(s, obj(s, top)), "Land")) {
-          log(s, `${name} explores: ${p.name} reveals ${defOf(s, obj(s, top)).name} and puts it into their hand.`);
-          moveObject(s, top, "hand");
-          return;
+      const st = (sc.exploreEach ??= { left: objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id) });
+      for (;;) {
+        if (st.current === undefined) {
+          if (!st.left.length) break;
+          const picked = sc.chosen?.[ctx.controller]?.[0];
+          sc.chosen = sc.queue = undefined;
+          if (st.left.length > 1 && !(picked && st.left.includes(picked))) {
+            sc.queue = [ctx.controller];
+            sc.chosen = {};
+            s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: "creature to explore next", options: [...st.left], count: 1 };
+            return "paused";
+          }
+          st.current = picked && st.left.includes(picked) ? picked : st.left[0]!;
+          st.left = st.left.filter((id) => id !== st.current);
         }
-        log(s, `${name} explores${top ? `: ${p.name} reveals ${defOf(s, obj(s, top)).name}` : ""}.`);
-        if (self) {
-          putCounters(s, self, "+1/+1", 1);
-          invalidateCharacteristics(s);
-        }
-        if (!top) return; // nothing revealed: just the counter (rulings)
-        sc.explored = top;
-        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, top)).name} into your graveyard`, source: src, card: top };
-        return "paused";
+        if (explore(s, s.objects[st.current], ctx, src) === "paused") return "paused";
+        st.current = sc.explored = sc.may = undefined;
       }
-      if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
+      sc.exploreEach = undefined;
       return;
     }
     case "doublePT": {
@@ -1204,6 +1226,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attachToRandomOpponent": {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      const options = opponents(s, ctx.controller).filter((pid) => pid !== me.attachedToPlayer && canAttachTo(s, me, pid));
+      if (!options.length) return;
+      attachToPlayer(s, me, options[Math.floor(nextRandom(s) * options.length)]!);
+      return;
+    }
     case "attachElsewhere": {
       // "Attach target Aura attached to a creature to another creature" (Crown of the Ages): the creature is chosen as
       // it resolves, not targeted (rulings), among those the Aura could enchant (CR 303.4d, 702.16c).
@@ -1343,4 +1373,43 @@ export function attachTo(s: GameState, me: GameObject, host: GameObject) {
   if (was) fireEvent(s, { type: "unattached", id: me.id, host: was });
   invalidateCharacteristics(s); // reconfigure: it stops being a creature (CR 702.151b)
   log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+}
+
+/** The locked doors of Rooms `pid` controls (CR 709.5c), of `among` only if given: what "unlock a locked door" can unlock. */
+export function lockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]): { id: ObjectId; door: number; name: string }[] {
+  return s.battlefield.flatMap((id) => {
+    const o = obj(s, id);
+    const d = roomOf(s, o);
+    if (!d || o.unlocked === undefined || controllerOf(s, o) !== pid || (among && !among.includes(id))) return [];
+    return [0, 1].filter((door) => !o.unlocked!.includes(door) && d.faces![door]).map((door) => ({ id, door, name: d.faces![door]!.name }));
+  });
+}
+
+/**
+ * `self` explores (CR 701.44a): its controller reveals the top card of their library; a land card goes to their hand,
+ * otherwise `self` gets a +1/+1 counter, then they decide whether the card goes to their graveyard (rulings). A
+ * creature that has left still explores, with no counter.
+ */
+function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {
+  const p = player(s, ctx.controller);
+  const sc = (s.resolving!.scratch ??= {});
+  if (sc.explored === undefined) {
+    const top = p.library[0];
+    const name = self ? characteristics(s, self).name : src;
+    if (top && isType(defOf(s, obj(s, top)), "Land")) {
+      log(s, `${name} explores: ${p.name} reveals ${defOf(s, obj(s, top)).name} and puts it into their hand.`);
+      moveObject(s, top, "hand");
+      return;
+    }
+    log(s, `${name} explores${top ? `: ${p.name} reveals ${defOf(s, obj(s, top)).name}` : ""}.`);
+    if (self && self.zone === "battlefield") {
+      putCounters(s, self, "+1/+1", 1);
+      invalidateCharacteristics(s);
+    }
+    if (!top) return; // nothing revealed: just the counter (rulings)
+    sc.explored = top;
+    s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, top)).name} into your graveyard`, source: src, card: top };
+    return "paused";
+  }
+  if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
 }

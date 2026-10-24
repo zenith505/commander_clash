@@ -35,11 +35,9 @@ test("Indulgent Tormentor: at Ana's upkeep you choose to sacrifice a creature, p
   await expect(bar).toContainText("sacrifice a creature or pay 3 life, or");
   await expect(bar.getByRole("button", { name: "Sacrifice a creature" })).toHaveCount(1);
   await bar.getByRole("button", { name: "Pay 3 life" }).click();
-  // Then the payment itself (CR 119.4).
-  await resolveUntil(page, (st) => st.pending?.kind === "payUnless" && st.pending.player === 0);
-  await expect(bar).toContainText("pay 3 life or Ana draws a card");
-  await bar.getByRole("button", { name: "Pay", exact: true }).click();
+  // Choosing it pays it: no second "pay 3 life?" prompt (round 140 fix, CR 119.4).
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.players[0]!.life === 37, 200);
+  expect(after.log.some((l) => /pays 3 life/.test(l.text))).toBe(true);
   expect(after.objects[bears]!.zone).toBe("battlefield");
   expect(pageErrors(page)).toEqual([]);
 });

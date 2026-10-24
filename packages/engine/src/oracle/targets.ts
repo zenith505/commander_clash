@@ -239,6 +239,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
   // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
+  // "Populate. The token created this way gains haste." (Determined Iteration).
+  if ((ctx.lastCreated || ctx.lastCreatedAny) && /^the token created this way$/i.test(x)) return { ref: "created" };
   // "Put all land cards from among them onto the battlefield tapped ... untap those lands" (Animist's Awakening).
   if (ctx.lastDugLands && /^those lands$/i.test(x)) return { ref: "created" };
   // "Exile each permanent with the most votes or tied for most votes" (Council's Judgment): what the vote chose.
@@ -607,6 +609,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   let p = phrase.trim().replace(/\b(non-?[a-z]+), (?=non-?[a-z]+ )/gi, "$1 ");
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
+  // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
+  p = p.replace(/^((?:all |each )?)(creatures?) that(?:'s| is| are|'re) enchanted by an Aura you control$/i, "$1aura-yours-enchanted $2");
   // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
   p = p.replace(/^((?:all |each )?)([a-z ]+?) that (?:aren't|are not|isn't|is not) legendary$/i, "$1nonlegendary $2");
   // "Each nonland permanent that's not historic" (Desynchronization): not an artifact, not legendary, not a Saga (CR 700.6).
@@ -1114,6 +1118,9 @@ export function parseTargetPhrase(
       } else if (w === "enchanted-or-equipped" && !extra.status) {
         if (alts.length > 1) return null;
         extra.status = "enchantedOrEquipped";
+      } else if (w === "aura-yours-enchanted" && !extra.status) {
+        if (alts.length > 1) return null;
+        extra.status = "enchantedByYours";
       } else if (w === "goaded" && !extra.status) {
         if (alts.length > 1) return null;
         extra.status = "goaded";

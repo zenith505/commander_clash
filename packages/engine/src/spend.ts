@@ -12,13 +12,15 @@ import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSp
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
 export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
   // A borrowed ability of Drana and Linvala's: "you may spend mana as though it were mana of any color to activate those abilities".
   const anyColor = !!s && !!ab.borrowed && o.zone === "battlefield" && !!abilitiesOf(s, o).borrows?.anyColor && characteristics(s, o).hasPrintedAbilities;
-  return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [], ...(anyColor ? { anyColor } : {}) } : { ability: o, ...(anyColor ? { anyColor } : {}) };
+  // "To gain a Class level": its level ability, "~'s level becomes N" (CR 716.2a).
+  const level = ab.activateIf?.kind === "classLevel" && ab.body.effects.some((e) => e.type === "classLevel") ? { classLevel: true as const } : {};
+  return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [], ...level, ...(anyColor ? { anyColor } : {}) } : { ability: o, ...level, ...(anyColor ? { anyColor } : {}) };
 }
 
 /** The mana types a payment may use (all of them unless it says otherwise). */
@@ -67,6 +69,7 @@ function usableLots(s: GameState, pid: PlayerId, use: ManaUse): ManaLot[] {
 export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse): boolean {
   if (use === "other") return !!only.other;
   if ("spell" in use) return !!only.spells && printedMatches(only.spells, use.spell);
+  if (only.classLevel && use.classLevel) return true;
   if (only.abilities === "any") return true;
   if (!only.abilities) return false;
   // "Activate abilities of artifacts": of artifact permanents (CR 109.2), so only on the battlefield. A card in
@@ -79,20 +82,26 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
  * The mana `pid` can spend on `use`, how much of it is restricted mana that's best spent first (`prefer`), and how much
  * of it a Treasure (`treasure`) or a snow source (`snow`, for {S}, CR 107.4h) made.
  */
-export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: ManaPool; prefer: ManaPool; treasure: ManaPool; snow: ManaPool } {
+export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: ManaPool; prefer: ManaPool; treasure: ManaPool; snow: ManaPool; colorOnly?: ManaPool } {
   const pool = treasureOnly(use) ? emptyPool() : plainMana(s, pid);
   const prefer = emptyPool();
   const treasure = emptyPool();
   const snow = emptyPool();
+  const colorOnly = emptyPool();
+  let anyColorOnly = false;
   for (const l of usableLots(s, pid, use)) {
     pool[l.mana] += l.n;
     if (l.only) prefer[l.mana] += l.n;
     if (l.from?.includes("treasure")) treasure[l.mana] += l.n;
     if (l.from?.includes("snow")) snow[l.mana] += l.n;
+    if (l.only?.notGeneric) {
+      colorOnly[l.mana] += l.n;
+      anyColorOnly = true;
+    }
   }
   const only = usableTypes(use);
-  if (only) for (const x of [pool, prefer, treasure, snow]) for (const m of Object.keys(x) as ManaType[]) if (!only.includes(m)) x[m] = 0;
-  return { pool, prefer, treasure, snow };
+  if (only) for (const x of [pool, prefer, treasure, snow, colorOnly]) for (const m of Object.keys(x) as ManaType[]) if (!only.includes(m)) x[m] = 0;
+  return { pool, prefer, treasure, snow, ...(anyColorOnly ? { colorOnly } : {}) };
 }
 
 /**
@@ -133,8 +142,8 @@ function anyColorPays(cost: ParsedCost): ParsedCost {
 /** Could `pid` pay this from their pool for `use`? */
 export function canPayFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity): boolean {
   const cost = payableCost(s, pid, cost0, use);
-  const { pool, snow } = poolFor(s, pid, use);
-  return !!payFromPool(cost, pool, extraGeneric, life, { snow });
+  const { pool, snow, colorOnly } = poolFor(s, pid, use);
+  return !!payFromPool(cost, pool, extraGeneric, life, { snow, ...(colorOnly ? { colorOnly } : {}) });
 }
 
 /** What spending mana from these sources counts as (CR 106.3): "mana from a Treasure", "from creatures", "from an artifact". */
@@ -149,10 +158,10 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
 export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number; creatureCounters?: number; sources?: string[] }) | null {
   const p = s.players[pid]!;
   const cost = payableCost(s, pid, cost0, use);
-  const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
+  const { pool, prefer, treasure, snow, colorOnly } = poolFor(s, pid, use);
   const first = { ...prefer };
   if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] = Math.min(pool[m], first[m] + treasure[m]);
-  const paid = payFromPool(cost, pool, extraGeneric, life, { ...opts, prefer: first, snow });
+  const paid = payFromPool(cost, pool, extraGeneric, life, { ...opts, prefer: first, snow, ...(colorOnly ? { colorOnly } : {}) });
   if (!paid) return null;
   const lots = usableLots(s, pid, use);
   const plain = treasureOnly(use) ? emptyPool() : plainMana(s, pid);
@@ -195,9 +204,13 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
         for (const f of l.from ?? []) if (f !== "snow") from[f] += k;
       }
     };
-    // The snow mana it spent came from snow lots (CR 107.4h); the rest from the other lots and plain mana.
-    take(lots.filter((l) => l.mana === m && l.from?.includes("snow")), paid.snow[m]);
-    take([plainLot, ...lots.filter((l) => l.mana === m && !l.from?.includes("snow"))], spent[m] - paid.snow[m]);
+    // Mana that can't pay generic costs (Jegantha) paid colored symbols only, as payFromPool chose; the snow mana it spent
+    // came from snow lots (CR 107.4h); the rest from the other lots and plain mana.
+    const co = paid.colorOnly?.[m] ?? 0;
+    take(lots.filter((l) => l.mana === m && !!l.only?.notGeneric), co);
+    const others = lots.filter((l) => l.mana === m && !l.only?.notGeneric);
+    take(others.filter((l) => l.from?.includes("snow")), paid.snow[m]);
+    take([plainLot, ...others.filter((l) => !l.from?.includes("snow"))], spent[m] - co - paid.snow[m]);
   }
   if (p.manaLots) p.manaLots = p.manaLots.filter((l) => l.n > 0);
   if (!p.manaLots?.length) p.manaLots = undefined;

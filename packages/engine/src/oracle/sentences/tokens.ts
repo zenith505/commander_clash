@@ -290,5 +290,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && what.ref !== "self" ? [{ type: "explore", what }] : what?.ref === "self" ? [{ type: "explore" }] : null;
   }
+  // "Each Merfolk creature you control explores" (Hakbal of the Surging Soul): each of them, one after another.
+  if ((m = /^each ((?:[A-Z][a-z]+ )?creature you control) explores$/i.exec(s))) {
+    const what = parseObject(`each ${m[1]!}`, ctx);
+    return what && isGroup(what) ? [{ type: "exploreEach", what }] : null;
+  }
   return undefined;
 }

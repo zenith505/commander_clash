@@ -4988,7 +4988,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   // "You may cast that card this turn" (Emry): its owner, paying its mana cost; a card without one can't be cast.
   const m = o.mayPlay;
   if (m && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
-    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
+    // Vohar, Vodalian Desecrator: "If that spell would be put into your graveyard, exile it instead".
+    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}) });
   // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).
   for (const p of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     if (controllerOf(s, p) !== o.owner) continue;
@@ -5015,8 +5016,12 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   }
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
-  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission"))
+  // Its caster would choose it over a permission that exiles the spell afterwards (Vohar's).
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission" && !w.exileIfToGraveyard)) {
+    const i = out.findIndex((w) => w.kind === "permission");
+    if (i >= 0) out.splice(i, 1);
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
+  }
   // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
   // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
   const any = d.manaCost ? s.graveyardTurn?.find((g) => g.anyGraveyard && g.player === caster && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
@@ -6870,6 +6875,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (!v || !pend.options.includes(choice)) throw new RulesError("choose one of the two options");
     v.pick = Number(choice);
     log(s, `${p.name} faces a villainous choice and chooses: ${(pend.labels?.[v.pick] ?? choice).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "unlockDoor") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the locked doors");
+    (r.scratch ??= {}).door = choice;
     continueResolution(s);
     return;
   }

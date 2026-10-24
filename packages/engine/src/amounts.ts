@@ -164,6 +164,19 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return c.differentNames ? names.size : n;
     }
+    case "mostSharingCreatureType": {
+      // White Lotus Tile: for each creature type, how many creatures you control have it; a changeling has every one
+      // (CR 702.73a), so counts for each.
+      let all = 0;
+      const per = new Map<string, number>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Creature")) continue;
+        if (ch.allCreatureTypes) all++;
+        else for (const t of new Set(ch.subtypes.filter((x) => CREATURE_TYPES.has(x)))) per.set(t, (per.get(t) ?? 0) + 1);
+      }
+      return all + Math.max(0, ...per.values());
+    }
     case "greatestControlled": {
       // Each player's own count, the most of them (0 with none); players who have left the game control nothing.
       const per = new Map<PlayerId, number>();
@@ -737,6 +750,8 @@ function describeCount(c: Count): string {
       return "mana spent to cast that spell";
     case "webSlungMv":
       return "the returned creature's mana value";
+    case "mostSharingCreatureType":
+      return "the most of your creatures sharing a creature type";
     case "greatestControlled":
       return `the greatest number of ${c.filter.text} ${c.opponents ? "an opponent" : "a player"} controls`;
     case "greatestDrawn":

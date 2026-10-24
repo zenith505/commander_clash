@@ -613,6 +613,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const costs = v?.type === "villainous" ? v.options.map((fx) => villainCost(s, pid, fx)) : [0, 0];
       return [{ type: "chooseOption", player: pid, choice: costs[1]! < costs[0]! ? "1" : "0" }];
     }
+    // "Unlock a locked door" for free: the door that would cost the most to unlock (CR 709.5f).
+    if (pend.kind === "chooseOption" && pend.what === "unlockDoor") {
+      const cost = (o: string) => {
+        const [id, door] = o.split(":");
+        const c = s.objects[id!] && unlockCost(s, obj(s, id!), Number(door));
+        return c ? manaValue(parseManaCost(c)) : 0;
+      };
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => cost(b) - cost(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];

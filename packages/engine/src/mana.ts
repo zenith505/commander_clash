@@ -98,6 +98,8 @@ export interface Payment {
   phyrexianLife?: number;
   /** The mana from snow sources it spent, by type (CR 107.4h). */
   snow: ManaPool;
+  /** The mana that can't pay generic costs (Jegantha) it spent, by type: on colored symbols only. */
+  colorOnly?: ManaPool;
 }
 
 /**
@@ -106,7 +108,7 @@ export interface Payment {
  * symbols first so a greedy pass doesn't spend mana a later symbol needed.
  * Phyrexian symbols fall back to 2 life when `life` allows.
  */
-export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; snow?: ManaPool; wantSnow?: boolean } = {}): Payment | null {
+export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; snow?: ManaPool; wantSnow?: boolean; colorOnly?: ManaPool } = {}): Payment | null {
   if (!cost.supported) return null;
   // {2/B} that may be paid with 2 life as {B} (K'rrik): as two generic mana, or else as {B} or 2 life.
   if (cost.symbols.some((x) => x.kind === "twoHybrid" && x.life)) {
@@ -125,8 +127,17 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     sn[c]--;
     snowUsed[c]++;
   };
-  const spend = (c: ManaType) => {
-    if (sn[c] > 0 && (opts.wantSnow || p[c] <= sn[c])) takeSnow(c);
+  // `colorOnly`: the part of the pool that "can't be spent to pay generic mana costs" (Jegantha): only a colored, hybrid
+  // or Phyrexian symbol's colored mana, so it's spent there first, and never on generic mana or {S} (CR 107.4h).
+  const co = emptyPool();
+  for (const m of Object.keys(co) as ManaType[]) co[m] = Math.max(0, Math.min(opts.colorOnly?.[m] ?? 0, p[m]));
+  const coUsed = emptyPool();
+  const free = (c: ManaType) => p[c] - co[c];
+  const spend = (c: ManaType, colored = false) => {
+    if (colored && co[c] > 0) {
+      co[c]--;
+      coUsed[c]++;
+    } else if (sn[c] > 0 && (opts.wantSnow || p[c] <= sn[c])) takeSnow(c);
     p[c]--;
     if (pref[c] > 0) pref[c]--;
   };
@@ -142,7 +153,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   for (const sym of cost.symbols) if (sym.kind === "colored" || sym.kind === "phyrexian") named[sym.color]++;
   for (const sym of cost.symbols) {
     if (sym.kind !== "snow") continue;
-    const from = (["C", ...COLORS] as ManaType[]).filter((c) => sn[c] > 0).sort((a, b) => Number(pref[b] > 0) - Number(pref[a] > 0) || Number(b === "C") - Number(a === "C") || p[b] - named[b] - (p[a] - named[a]))[0];
+    const from = (["C", ...COLORS] as ManaType[]).filter((c) => sn[c] > 0 && free(c) > 0).sort((a, b) => Number(pref[b] > 0) - Number(pref[a] > 0) || Number(b === "C") - Number(a === "C") || p[b] - named[b] - (p[a] - named[a]))[0];
     if (!from) return null;
     takeSnow(from);
     p[from]--;
@@ -152,7 +163,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     if (s.kind === "generic") generic += s.amount;
     else if (s.kind === "colored") {
       if (p[s.color] <= 0) return null;
-      spend(s.color);
+      spend(s.color, true);
     } else if (s.kind === "hybrid") hybrids.push(s);
     else if (s.kind === "twoHybrid") twoHybrids.push(s.color);
     else if (s.kind === "phyrexian") phyrexian.push(s);
@@ -165,27 +176,27 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   // for last, the least costly first.
   const harm = (c: ManaType) => (c === "C" ? 0 : (opts.avoid?.[c] ?? 0));
   for (const { options: opts, life: orLife, phyrexian: phy } of hybrids) {
-    const best = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || harm(a) - harm(b) || pref[b] - pref[a] || p[b] - p[a])[0];
+    const best = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || harm(a) - harm(b) || Number(co[b] > 0) - Number(co[a] > 0) || pref[b] - pref[a] || p[b] - p[a])[0];
     if (!best && orLife && life - lifePaid >= 2) {
       lifePaid += 2;
       if (phy) phyrexianLife++;
       continue;
     }
     if (!best) return null;
-    spend(best);
+    spend(best, true);
   }
   for (const { color: c, krrik, any } of phyrexian) {
     // With Chromatic Orrery any mana pays it: its own color first, then colorless, then the color there's most of.
     const other = any ? (["C", ...COLORS] as ManaType[]).filter((m) => p[m] > 0).sort((a, b) => Number(b === "C") - Number(a === "C") || harm(a) - harm(b) || p[b] - p[a])[0] : undefined;
-    if (p[c] > 0) spend(c);
-    else if (other) spend(other);
+    if (p[c] > 0) spend(c, true);
+    else if (other) spend(other, true);
     else if (life - lifePaid >= 2) {
       lifePaid += 2;
       if (!krrik) phyrexianLife++;
     } else return null;
   }
   for (const c of twoHybrids) {
-    if (p[c] > 0) spend(c);
+    if (p[c] > 0) spend(c, true);
     else generic += 2;
   }
   // Generic: spend colorless first, then whichever color we have most of. With `spreadColors` (sunburst, which counts
@@ -194,16 +205,16 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   const spent = (c: ManaType) => p[c] < pool[c];
   const kinds: ManaType[] = ["C", ...COLORS];
   while (generic > 0) {
-    const snowy = opts.wantSnow ? kinds.filter((c) => sn[c] > 0).sort((a, b) => harm(a) - harm(b) || sn[b] - sn[a])[0] : undefined;
-    const fresh = COLORS.find((c) => p[c] > 0 && wanting(c)) ?? (opts.spreadColors ? COLORS.filter((c) => p[c] > 0 && !spent(c))[0] : undefined);
-    const preferred = kinds.filter((c) => pref[c] > 0 && p[c] > 0).sort((a, b) => pref[b] - pref[a])[0];
+    const snowy = opts.wantSnow ? kinds.filter((c) => sn[c] > 0 && free(c) > 0).sort((a, b) => harm(a) - harm(b) || sn[b] - sn[a])[0] : undefined;
+    const fresh = COLORS.find((c) => free(c) > 0 && wanting(c)) ?? (opts.spreadColors ? COLORS.filter((c) => free(c) > 0 && !spent(c))[0] : undefined);
+    const preferred = kinds.filter((c) => pref[c] > co[c] && free(c) > 0).sort((a, b) => pref[b] - pref[a])[0];
     const from: ManaType | undefined =
-      fresh ?? snowy ?? preferred ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => harm(a) - harm(b) || p[b] - p[a])[0] as ManaType | undefined));
+      fresh ?? snowy ?? preferred ?? (free("C") > 0 ? "C" : (COLORS.filter((c) => free(c) > 0).sort((a, b) => harm(a) - harm(b) || free(b) - free(a))[0] as ManaType | undefined));
     if (!from) return null;
     spend(from);
     generic--;
   }
-  return { pool: p, lifePaid, ...(phyrexianLife ? { phyrexianLife } : {}), snow: snowUsed };
+  return { pool: p, lifePaid, ...(phyrexianLife ? { phyrexianLife } : {}), snow: snowUsed, ...(opts.colorOnly ? { colorOnly: coUsed } : {}) };
 }
 
 /**

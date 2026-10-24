@@ -1,7 +1,7 @@
 # Roadmap
 
-23,766 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,594 of 4,988 (92%).
+23,787 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,610 of 4,988 (92%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,17 +22,23 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 139, most played first: Ghostly Dancers ("return an enchantment
-   card from your graveyard to your hand or unlock a locked door of a Room you control": only a choice that can be done),
-   Sorcerer Class, Jegantha, the Wellspring (mana that can't pay generic costs), Illusionist's Gambit, Maddening Hex,
-   Hakbal of the Surging Soul ("each Merfolk creature you control explores", in the order you choose), Hunting
-   Velociraptor, Breaching Dragonstorm, Sorin of House Markov, Preston, the Vanisher, Determined Iteration; Wildfire
-   Devils, Arcane Proxy and Lilypad Village too. Karazikar's "whenever an opponent attacks another one of your opponents"
-   has no rulings on planeswalkers and battles, so it stays out. Smaller gaps from round 139: bots use Rikku's Steal in
+00. Most played first (`npm run popular`). Out after round 140, most played first: Hunting Velociraptor (prowl, not
+   in the engine yet, granted to Dinosaur spells), Tevesh Szat, Metalworker ("reveal any number of artifact cards" in a
+   mana ability), Nils, Discipline Enforcer (an attack tax per creature, X its counters), Conformer Shuriken, Orochi
+   Soul-Reaver, Mystic Reflection, Cactus Preserve, The Irencrag, Vivien, Champion of the Wilds, Aboleth Spawn, Karmic
+   Justice, Reins of Power, Apex of Power, Neheb, Dreadhorde Champion; Wildfire Devils, Arcane Proxy and Lilypad Village
+   too. Karazikar's "whenever an opponent attacks another one of your opponents" has no rulings on planeswalkers and
+   battles, so it stays out. Smaller gaps from round 140: Jegantha's and the Wellspring's mana that can't pay generic
+   costs pays only colored symbols of its own color (with Chromatic Orrery-style "spend as any color" it still doesn't
+   pay a symbol of another color), and with two hybrid symbols the payment picks them greedily, one at a time; the
+   autopay's rainbow and "hopes" heuristics ignore that restriction; bots answer Ghostly Dancers' choice with the first
+   one that can be done (return the enchantment card), always put a land with Hakbal when they can, and unlock the door
+   with the highest mana cost; "you may return a card from your graveyard to your hand. If you do, ..." with no such
+   card is now skipped without asking, as "you may discard a card. If you do" with an empty hand already was. Smaller gaps from round 139: bots use Rikku's Steal in
    their second main phase (its evasion is then wasted that turn), and only when the opponent's creature they'd pick
    has a counter that helps; bots give Yes Man away and use Bucknard's Everfull Purse and Hithlain Rope whenever they
-   can; "the player to your right" is the one before you in turn order (CR 101.4: turn order goes to the left);
-   Indulgent Tormentor's "pays 3 life" asks again to pay after it's chosen. Smaller gaps from round 138:
+   can; "the player to your right" is the one before you in turn order (CR 101.4: turn order goes to the left).
+   Smaller gaps from round 138:
    bots dredge a land card (The Necrobloom) only with no land in hand and fewer than seven lands out; bots keep Victory
    Chimes' {C} for themselves (another player's mana never helps a bot, there are no teams); bots choose Bane of the
    Living's X by trying each X on a copy of the game, but join forces amounts and Aurelia's Vindicator's X are still

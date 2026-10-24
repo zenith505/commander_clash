@@ -567,10 +567,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
         // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
-        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src };
+        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src, ...(e.maxMv !== undefined ? { mv: { max: e.maxMv } } : {}) };
         if (freeCastable(s, caster, hit)) return "paused";
         s.pending = null;
-        log(s, `${defOf(s, obj(s, hit)).name} can't be cast.`);
+        log(s, `${defOf(s, obj(s, hit)).name} can't be cast${e.maxMv !== undefined ? ` (mana value ${e.maxMv} or less)` : ""}.`);
+      }
+      // "If you don't, put that card into your hand": its owner's, from exile (Breaching Dragonstorm).
+      const left = sc.untilNonland.hit;
+      if (e.orHand && left && s.objects[left]?.zone === "exile") {
+        moveObject(s, left, "hand");
+        log(s, `${player(s, obj(s, left).owner).name} puts ${defOf(s, obj(s, left)).name} into their hand.`);
       }
       return bottomRest(s, sc.untilNonland.seen);
     }

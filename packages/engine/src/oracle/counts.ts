@@ -19,6 +19,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|~)$/, "$2's $1");
   let m: RegExpExecArray | null;
+  // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
+  // linked by compile.ts).
+  if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
   // "The number of other Squirrels, Bats, Lizards, and Rats you control" (Valley Rotcaller): each that's any of them,
   // counted once, as "A or B" is.
   if ((m = /^(the number of (?:other )?)((?:[A-Z][a-z]+, )+)(?:and|or) ([A-Z][a-z]+)( you control)$/.exec(p))) {
@@ -148,6 +151,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object" || spec.controller) return null;
     return { count: { kind: "greatestControlled", filter: { ...spec, text: m[1]! }, ...(m[2] === "an opponent" ? { opponents: true as const } : {}) } };
   }
+  if (!each && /^the greatest number of creatures you control that have a creature type in common$/i.test(p)) return { count: { kind: "mostSharingCreatureType" } };
   if (!each && /^the greatest number of cards an opponent has drawn this turn$/i.test(p)) return { count: { kind: "greatestDrawn" } };
   // "For each card you've drawn this turn", "the number of cards they've drawn this turn" (CR 121.1: cards drawn, not put
   // into the hand otherwise).

@@ -560,6 +560,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" || w === "all opponents'" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s?$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
+  // "Exile all creature cards from target player's graveyard" (Crypt Incursion), "... from all graveyards" (Honor the Fallen).
+  if ((m = /^[Ee]xile all (.+?) cards from (target player's|target opponent's|each opponent's|all) graveyards?$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[1]} card`);
+    const w = m[2]!;
+    const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s$/, ""), ctx);
+    return filter && who ? [{ type: "exileGraveyard", who, filter }] : null;
+  }
   if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
     const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));

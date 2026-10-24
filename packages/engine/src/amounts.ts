@@ -236,6 +236,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
+    case "cardsExiledThisWay":
+      return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
     case "milledManaValue":
@@ -626,6 +628,8 @@ function describeCount(c: Count): string {
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
+    case "cardsExiledThisWay":
+      return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
     case "milledManaValue":

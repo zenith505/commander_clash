@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, attackProblem, beholdCandidates, botActions, castProblem, characteristics, compileCard, moveObject, invalidateCharacteristics, isFullySupported, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, attackProblem, beholdCandidates, botActions, castProblem, characteristics, compileCard, moveObject, invalidateCharacteristics, isFullySupported, loseLife, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -329,5 +329,281 @@ describe("Kinsbaile Aspirant: behold a Kithkin or pay {2}", () => {
     expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
     expect(s.objects[k]!.zone).toBe("battlefield");
     expect(s.log.some((e) => /beholds Field Kithkin\./.test(e.text))).toBe(true);
+  });
+});
+
+// Cards that came in with this round's new pieces.
+const sower = card("Sower of Temptation", "Creature — Faerie Wizard", "{2}{U}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, gain control of target creature for as long as this creature remains on the battlefield." });
+const giantsGrasp = card("Giant's Grasp", "Enchantment — Aura", "{2}{U}{U}", { oracleText: "Enchant Giant you control\nWhen this Aura enters, gain control of target nonland permanent for as long as this Aura remains on the battlefield." });
+const spellStutter = card("Spell Stutter", "Instant", "{1}{U}", { oracleText: "Counter target spell unless its controller pays {2} plus an additional {1} for each Faerie you control." });
+const titaniasCommand = card("Titania's Command", "Sorcery", "{4}{G}{G}", { oracleText: "Choose two —\n• Exile target player's graveyard. You gain 1 life for each card exiled this way.\n• Search your library for up to two land cards, put them onto the battlefield tapped, then shuffle.\n• Create two 2/2 green Bear creature tokens.\n• Put two +1/+1 counters on each creature you control." });
+const scarabSwarm = card("Canoptek Scarab Swarm", "Artifact Creature — Insect", "{4}", { power: "1", toughness: "1", keywords: ["Flying"], oracleText: "Flying\nFeeder Mandibles — When this creature enters, exile target player's graveyard. For each artifact or land card exiled this way, create a 1/1 colorless Insect artifact creature token with flying." });
+const releaseToMemory = card("Release to Memory", "Instant", "{3}{W}", { oracleText: "Exile target opponent's graveyard. For each creature card exiled this way, create a 1/1 colorless Spirit creature token." });
+const faerie = (name: string) => card(name, "Creature — Faerie Rogue", "{U}", { power: "1", toughness: "1" });
+const tokensOf = (s: GameState, pid: PlayerId, type: string) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid && characteristics(s, s.objects[id]!).subtypes.includes(type)).length;
+const castAndTarget = (s: GameState, pid: PlayerId, id: string, t: { kind: "player" | "object"; id: string | PlayerId }) => {
+  s = run(s, planCast(s, pid, id));
+  s = resolveAll(s);
+  if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: pid, targets: [t as never] }));
+  return s;
+};
+
+describe("Sower of Temptation and Giant's Grasp: control for as long as it remains on the battlefield", () => {
+  it("is fully supported; the stolen creature goes back when Sower leaves", () => {
+    supported(sower, giantsGrasp);
+    const { s: s0, ap, ids, opp } = setup([sower]);
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    let s = castAndTarget(s0, ap, ids[0]!, { kind: "object", id: theirs });
+    expect(characteristics(s, s.objects[theirs]!).controller).toBe(ap);
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    s = resolveAll(s);
+    expect(characteristics(s, s.objects[theirs]!).controller).toBe(opp);
+  });
+
+  it("if Sower has left before its trigger resolves, control never changes (CR 611.2b)", () => {
+    const { s: s0, ap, ids, opp } = setup([sower]);
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(s);
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+    // The trigger is on the stack; Sower dies in response.
+    expect(s.stack.length).toBeGreaterThan(0);
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    s = resolveAll(s);
+    expect(characteristics(s, s.objects[theirs]!).controller).toBe(opp);
+  });
+});
+
+describe("Spell Stutter: {2} plus an additional {1} for each Faerie you control", () => {
+  it("is fully supported; with two Faeries the cost is {4}", () => {
+    supported(spellStutter);
+    const { s: s0, ap, ids } = setup([bear({ name: "Target Bear" }), spellStutter]);
+    putOnBattlefield(s0, ap, faerie("Faerie One"));
+    putOnBattlefield(s0, ap, faerie("Faerie Two"));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[0]!.id }]));
+    s = resolveAll(s);
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap, cost: "{4}" });
+    s = resolveAll(act(s, { type: "payUnless", player: ap, pay: false }));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+  });
+
+  it("with no Faeries the cost is {2}", () => {
+    const { s: s0, ap, ids } = setup([bear({ name: "Target Bear" }), spellStutter]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[0]!.id }])));
+    expect(s.pending).toMatchObject({ kind: "payUnless", cost: "{2}" });
+  });
+});
+
+describe("Cards exiled this way", () => {
+  it("Titania's Command: exile a graveyard and gain 1 life per card exiled", () => {
+    supported(titaniasCommand);
+    const { s: s0, ap, ids, opp } = setup([titaniasCommand]);
+    for (let i = 0; i < 3; i++) into(s0, opp, bear({ name: `Dead Bear ${i}` }), "graveyard");
+    const life = s0.players[ap]!.life;
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }], [0, 2])));
+    expect(s.players[opp]!.graveyard).toHaveLength(0);
+    expect(s.players[ap]!.life).toBe(life + 3);
+    expect(tokensOf(s, ap, "Bear")).toBe(2);
+  });
+
+  it("Canoptek Scarab Swarm: an Insect for each artifact or land card exiled", () => {
+    supported(scarabSwarm);
+    const { s: s0, ap, ids, opp } = setup([scarabSwarm]);
+    into(s0, opp, card("Dead Rock", "Artifact", "{1}"), "graveyard");
+    into(s0, opp, forest, "graveyard");
+    into(s0, opp, bear({ name: "Dead Bear" }), "graveyard");
+    const s = castAndTarget(s0, ap, ids[0]!, { kind: "player", id: opp });
+    expect(s.players[opp]!.graveyard).toHaveLength(0);
+    expect(tokensOf(s, ap, "Insect")).toBe(2);
+  });
+
+  it("Release to Memory: a Spirit for each creature card exiled", () => {
+    supported(releaseToMemory);
+    const { s: s0, ap, ids, opp } = setup([releaseToMemory]);
+    into(s0, opp, bear({ name: "Dead Bear" }), "graveyard");
+    into(s0, opp, bear({ name: "Dead Bear 2" }), "graveyard");
+    into(s0, opp, forest, "graveyard");
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(tokensOf(s, ap, "Spirit")).toBe(2);
+  });
+});
+
+describe("Exile all creature cards from a graveyard", () => {
+  const cryptIncursion = card("Crypt Incursion", "Instant", "{2}{B}", { oracleText: "Exile all creature cards from target player's graveyard. You gain 3 life for each card exiled this way." });
+  const honorTheFallen = card("Honor the Fallen", "Instant", "{1}{W}", { oracleText: "Exile all creature cards from all graveyards. You gain 1 life for each card exiled this way." });
+  const covenant = card("Necromancer's Covenant", "Enchantment", "{3}{W}{B}{B}", { oracleText: "When this enchantment enters, exile all creature cards from target player's graveyard, then create a 2/2 black Zombie creature token for each card exiled this way.\nZombies you control have lifelink." });
+
+  it("Crypt Incursion: only the creature cards go, 3 life each", () => {
+    supported(cryptIncursion);
+    const { s: s0, ap, ids, opp } = setup([cryptIncursion]);
+    const a = into(s0, opp, bear({ name: "Dead Bear" }), "graveyard");
+    const b = into(s0, opp, bear({ name: "Dead Bear 2" }), "graveyard");
+    const land = into(s0, opp, forest, "graveyard");
+    const life = s0.players[ap]!.life;
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect([s.objects[a]!.zone, s.objects[b]!.zone, s.objects[land]!.zone]).toEqual(["exile", "exile", "graveyard"]);
+    expect(s.players[ap]!.life).toBe(life + 6);
+  });
+
+  it("Honor the Fallen: every graveyard, yours too", () => {
+    supported(honorTheFallen);
+    const { s: s0, ap, ids, opp } = setup([honorTheFallen]);
+    into(s0, opp, bear({ name: "Dead Bear" }), "graveyard");
+    into(s0, nextOf(s0, ap, 2), bear({ name: "Dead Bear 2" }), "graveyard");
+    into(s0, ap, bear({ name: "My Dead Bear" }), "graveyard");
+    into(s0, ap, forest, "graveyard");
+    const life = s0.players[ap]!.life;
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.players[ap]!.life).toBe(life + 3);
+    // The Forest and Honor the Fallen itself, which goes to the graveyard after.
+    expect(s.players[ap]!.graveyard).toHaveLength(2);
+  });
+
+  it("Necromancer's Covenant: a Zombie for each card exiled, with lifelink", () => {
+    supported(covenant);
+    const { s: s0, ap, ids, opp } = setup([covenant]);
+    into(s0, opp, bear({ name: "Dead Bear" }), "graveyard");
+    into(s0, opp, bear({ name: "Dead Bear 2" }), "graveyard");
+    into(s0, opp, forest, "graveyard");
+    const s = castAndTarget(s0, ap, ids[0]!, { kind: "player", id: opp });
+    expect(tokensOf(s, ap, "Zombie")).toBe(2);
+    const z = s.battlefield.find((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Zombie"))!;
+    expect(characteristics(s, s.objects[z]!).keywords).toContain("Lifelink");
+  });
+});
+
+describe("More of the most played", () => {
+  const channeler = card("Essence Channeler", "Creature — Human Cleric", "{1}{W}", { power: "2", toughness: "1", oracleText: "As long as you've lost life this turn, this creature has flying and vigilance.\nWhenever you gain life, put a +1/+1 counter on this creature.\nWhen this creature dies, put its counters on target creature you control." });
+  const revel = card("Viridian Revel", "Enchantment", "{1}{G}{G}", { oracleText: "Whenever an artifact is put into an opponent's graveyard from the battlefield, you may draw a card." });
+  const rock = (name: string) => card(name, "Artifact", "{1}");
+
+  it("Essence Channeler: flying and vigilance once you've lost life this turn", () => {
+    supported(channeler);
+    const { s, ap } = setup([]);
+    const c = putOnBattlefield(s, ap, channeler);
+    expect(characteristics(s, s.objects[c]!).keywords).not.toContain("Flying");
+    loseLife(s, ap, 1);
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[c]!).keywords).toEqual(expect.arrayContaining(["Flying", "Vigilance"]));
+  });
+
+  it("Viridian Revel: an artifact an opponent owns, whoever controlled it; not one of yours (rulings)", () => {
+    supported(revel);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, revel);
+    const theirs = putOnBattlefield(s0, opp, rock("Their Rock"));
+    // Their artifact under your control still goes to their graveyard.
+    const stolen = putOnBattlefield(s0, opp, rock("Stolen Rock"));
+    s0.objects[stolen]!.controller = ap;
+    const mine = putOnBattlefield(s0, ap, rock("My Rock"));
+    invalidateCharacteristics(s0);
+    const drawn = (id: string) => {
+      let s = structuredClone(s0);
+      const hand = s.players[ap]!.hand.length;
+      moveObject(s, id, "graveyard");
+      invalidateCharacteristics(s);
+      s = resolveAll(s);
+      if (s.pending?.kind === "chooseMay") s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: true }));
+      return s.players[ap]!.hand.length - hand;
+    };
+    expect(drawn(theirs)).toBe(1);
+    expect(drawn(stolen)).toBe(1);
+    expect(drawn(mine)).toBe(0);
+  });
+});
+
+describe("Other cards the new pieces complete", () => {
+  const runeSnag = card("Rune Snag", "Instant", "{1}{U}", { oracleText: "Counter target spell unless its controller pays {2} plus an additional {2} for each card named Rune Snag in each graveyard." });
+  const concerted = card("Concerted Defense", "Instant", "{U}", { oracleText: "Counter target noncreature spell unless its controller pays {1} plus an additional {1} for each creature in your party. (Your party consists of up to one each of Cleric, Rogue, Warrior, and Wizard.)" });
+  const opt = card("Opt", "Instant", "{U}", { oracleText: "Draw a card." });
+  const waste = card("Waste Management", "Instant", "{2}{B}", { keywords: ["Kicker"], oracleText: "Kicker {3}{B} (You may pay an additional {3}{B} as you cast this spell.)\nExile up to two target cards from a single graveyard. If this spell was kicked, instead exile target player's graveyard. Create a 2/2 black Rogue creature token for each creature card exiled this way." });
+  const civilWar = card("The Super Hero Civil War", "Enchantment — Saga", "{3}{R}{W}", { keywords: ["Fight"], oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Gain control of up to two target creatures with total mana value 6 or less for as long as this Saga remains on the battlefield.\nII — Creatures you control get +1/+1 and gain vigilance until end of turn.\nIII — Target creature you control fights up to one other target creature." });
+  const grimFeast = card("Grim Feast", "Enchantment", "{1}{B}{G}", { oracleText: "At the beginning of your upkeep, this enchantment deals 1 damage to you.\nWhenever a creature is put into an opponent's graveyard from the battlefield, you gain life equal to its toughness." });
+  const midnightRitual = card("Midnight Ritual", "Sorcery", "{X}{2}{B}", { oracleText: "Exile X target creature cards from your graveyard. For each creature card exiled this way, create a 2/2 black Zombie creature token." });
+  const malanthrope = card("Malanthrope", "Creature — Tyranid", "{3}{B}{G}", { power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nScavenge the Dead — When this creature enters, exile target player's graveyard. Put a +1/+1 counter on this creature for each creature card exiled this way." });
+  const astor = card("Astor, Bearer of Blades", "Legendary Creature — Human Warrior", "{2}{R}{W}", { power: "4", toughness: "4", oracleText: "When Astor enters, look at the top seven cards of your library. You may reveal an Equipment or Vehicle card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.\nEquipment you control have equip {1}.\nVehicles you control have crew 1." });
+
+  it("Rune Snag: {2} plus {2} for each Rune Snag in each graveyard", () => {
+    supported(runeSnag);
+    const { s: s0, ap, ids, opp } = setup([opt, runeSnag]);
+    into(s0, opp, runeSnag, "graveyard");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[0]!.id }])));
+    expect(s.pending).toMatchObject({ kind: "payUnless", cost: "{4}" });
+  });
+
+  it("Concerted Defense: {1} plus {1} for each creature in your party", () => {
+    supported(concerted);
+    const { s: s0, ap, ids } = setup([opt, concerted]);
+    putOnBattlefield(s0, ap, card("A Cleric", "Creature — Human Cleric", "{W}", { power: "1", toughness: "1" }));
+    putOnBattlefield(s0, ap, card("A Wizard", "Creature — Human Wizard", "{U}", { power: "1", toughness: "1" }));
+    putOnBattlefield(s0, ap, card("Another Wizard", "Creature — Human Wizard", "{U}", { power: "1", toughness: "1" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[0]!.id }])));
+    expect(s.pending).toMatchObject({ kind: "payUnless", cost: "{3}" });
+  });
+
+  it("Waste Management: two cards from one graveyard, or kicked a whole graveyard; a Rogue per creature card", () => {
+    supported(waste);
+    const { s: s0, ap, ids, opp } = setup([waste]);
+    const a = into(s0, opp, bear({ name: "Dead Bear" }), "graveyard");
+    const b = into(s0, opp, forest, "graveyard");
+    into(s0, opp, bear({ name: "Dead Bear 2" }), "graveyard");
+    const plain = resolveAll(run(structuredClone(s0), planCast(s0, ap, ids[0]!, [{ kind: "object", id: a }, { kind: "object", id: b }, { kind: "none" }])));
+    expect(plain.players[opp]!.graveyard).toHaveLength(1);
+    expect(tokensOf(plain, ap, "Rogue")).toBe(1);
+    const kicked = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "none" }, { kind: "none" }, { kind: "player", id: opp }], undefined, "auto", undefined, { kicks: [0] })));
+    expect(kicked.players[opp]!.graveyard).toHaveLength(0);
+    expect(tokensOf(kicked, ap, "Rogue")).toBe(2);
+  });
+
+  it("The Super Hero Civil War: the creatures come back when the Saga leaves", () => {
+    supported(civilWar);
+    const { s: s0, ap, ids, opp } = setup([civilWar]);
+    const x = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    const y = putOnBattlefield(s0, opp, bear({ name: "Their Other Bear" }));
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: x }, { kind: "object", id: y }] }));
+    expect([x, y].map((id) => characteristics(s, s.objects[id]!).controller)).toEqual([ap, ap]);
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    expect([x, y].map((id) => characteristics(s, s.objects[id]!).controller)).toEqual([opp, opp]);
+  });
+
+  it("Grim Feast: life equal to the toughness the opponent's creature had", () => {
+    supported(grimFeast);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, grimFeast);
+    const big = putOnBattlefield(s0, opp, card("Big One", "Creature — Beast", "{4}", { power: "2", toughness: "5" }));
+    const life = s0.players[ap]!.life;
+    moveObject(s0, big, "graveyard");
+    invalidateCharacteristics(s0);
+    const s = resolveAll(s0);
+    expect(s.players[ap]!.life).toBe(life + 5);
+  });
+
+  it("Midnight Ritual and Malanthrope: a token or a counter for each creature card exiled", () => {
+    supported(midnightRitual, malanthrope);
+    const { s: s0, ap, ids, opp } = setup([midnightRitual, malanthrope]);
+    const a = into(s0, ap, bear({ name: "My Dead Bear" }), "graveyard");
+    const b = into(s0, ap, bear({ name: "My Dead Bear 2" }), "graveyard");
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: a }, { kind: "object", id: b }], undefined, "auto", 2)));
+    expect(tokensOf(s, ap, "Zombie")).toBe(2);
+    into(s, opp, bear({ name: "Dead Bear" }), "graveyard");
+    into(s, opp, forest, "graveyard");
+    s = castAndTarget(s, ap, ids[1]!, { kind: "player", id: opp });
+    expect(pt(s, ids[1]!)).toBe("4/4");
+  });
+
+  it("Astor: Vehicles you control have crew 1", () => {
+    supported(astor);
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, astor);
+    const v = putOnBattlefield(s, ap, card("Test Wagon", "Artifact — Vehicle", "{2}", { power: "3", toughness: "3", oracleText: "Crew 3" }));
+    expect(abilitiesOf(s, s.objects[v]!).activated.some((a) => /^Crew 1/.test(a.text ?? ""))).toBe(true);
   });
 });

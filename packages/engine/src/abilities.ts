@@ -116,6 +116,8 @@ export type Count =
   | { kind: "exiledTopManaValue" }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
   | { kind: "exiledFromHandThisWay" }
+  /** "For each artifact or land card exiled this way" (Canoptek Scarab Swarm): the cards this resolution exiled from graveyards so far, by their printed characteristics. */
+  | { kind: "cardsExiledThisWay"; filter?: TargetSpec }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */

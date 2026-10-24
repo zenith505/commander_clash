@@ -171,6 +171,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const controlled = /^(.+?) for as long as you control ~$/.exec(s);
   if (controlled?.[1] === "You have no maximum hand size") return ctx.spell ? null : [{ type: "noMaxHandSize", whileControlled: true }];
   if (controlled) return parseWhileTapped(controlled[1]!, "controlled", ctx);
+  // Sower of Temptation: "gain control of target creature for as long as ~ remains on the battlefield": whoever controls
+  // ~ then (CR 611.2b), ending when it leaves the battlefield.
+  const remains = /^((?:[Yy]ou )?[Gg]ain control of .+?) for as long as ~ remains on the battlefield$/.exec(s);
+  if (remains) {
+    const fx = parseWhileTapped(remains[1]!.replace(/^[Yy]ou g/, "G"), "controlled", ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" ? [{ ...fx[0]!, whileOnBattlefield: true }] : null;
+  }
   // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
   // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.
   const both = /^[Yy]ou and (target opponent|target player|that player|that opponent) each (draw|create|gain|lose|mill) (.+)$/.exec(s);

@@ -1,7 +1,7 @@
 # Roadmap
 
-23,840 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,647 of 4,988 (93%).
+23,880 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,663 of 4,988 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,12 +22,18 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 143, most played first: Encroaching Mycosynth (it changes
+00. Most played first (`npm run popular`). Out after round 144, most played first: Encroaching Mycosynth (it changes
    the types of cards in every zone and of spells), Hushbringer (no rulings model yet for "dying doesn't cause
-   abilities to trigger" with leaves-the-battlefield batches and look-back), Chaos Dragon, Swift Reconfiguration,
-   Selvala's Stampede, Mana Echoes, Unfinished Business, Champions of the Perfect, Bag of Holding, Altered Ego,
-   Tezzeret, Betrayer of Flesh, Alania, Divergent Storm, Spell Stutter, Nicol Bolas, Dragon-God; Wildfire Devils and
-   Arcane Proxy too. Smaller gaps from round 143: bots sacrifice to Scavenger's Talent only when the best creature
+   abilities to trigger" with leaves-the-battlefield batches and look-back), Tezzeret, Betrayer of Flesh (its cost
+   reduction counts mana abilities too, per the rulings), Alania, Divergent Storm, Nicol Bolas, Dragon-God, Tarrian's
+   Journal, Bronzebeak Foragers, Nazgûl Battle-Mace, Ajani's Chosen, Zur, Eternal Schemer, Firion, Felothar, Level Up,
+   Stargaze (look at twice X cards and take X: the number taken is fixed in the dig effect), Banefire ("if X is 5 or
+   more, can't be countered"); Wildfire Devils and Arcane Proxy too. Smaller gaps from round 144: behold works for
+   one creature type only, not a planeswalker type (Countersculpt's "behold a Jace") or "you may behold ... if a Dragon
+   was beheld"; bots behold a card from their hand first when it's exiled, a permanent first when it isn't, and never
+   a token or a commander; the log reads "You beholds" (like "You votes"); Champion of the Weird (blight), Champions of
+   the Shoal ("enters or becomes tapped"), Lys Alana Dignitary, Froghemoth, Rysorian Badger and Suffer the Past still
+   miss a line each. Smaller gaps from round 143: bots sacrifice to Scavenger's Talent only when the best creature
    card in their graveyard is worth more than the creatures they'd give up; what happens to Palace Jailer's
    exiled creature once the Jailer's controller has left the game isn't modeled (no rulings on it).
    Smaller gaps from round 142: mana spent only on costs that contain {X} (Elementalist's Palette,

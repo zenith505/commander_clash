@@ -105,6 +105,8 @@ export interface Ctx {
   selfCastSpell?: boolean;
   /** An exchange of life totals came before: "the life lost this way", "those players' life totals" are about it. */
   exchanged?: boolean;
+  /** After an instruction that exiles cards from graveyards: "cards exiled this way" are those (Count "cardsExiledThisWay"). */
+  exiledCards?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
   /** While counting for "each player ... that player controls" (Price of Progress): "that player" is each of them in turn (PlayerRef eachOne). */
@@ -5924,6 +5926,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
     ctx.opponentsDiscarded = last?.type === "discard" && last.who.ref === "eachOpponent" && last.n === 1 && !last.random && !last.filter;
     if (last?.type === "amass") ctx.amassed = true;
+    // "Exile target player's graveyard. For each artifact or land card exiled this way, ..." (Canoptek Scarab Swarm).
+    if ((last?.type === "exileGraveyard" && !last.library && !last.until) || (last?.type === "exile" && !last.until && last.what.ref === "target" && ctx.targets[last.what.index]?.kind === "card")) ctx.exiledCards = true;
     if (last?.type === "damage" || last?.type === "bite" || last?.type === "fight") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
@@ -6035,6 +6039,13 @@ export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   if ((m = /^mana equal to (.+)$/.exec(text))) {
     const n = parseCount(m[1]!, ctx);
     return n && typeof n === "object" ? { cost: "", generic: n } : null;
+  }
+  // Spell Stutter: "{2} plus an additional {1} for each Faerie you control", counted as it resolves.
+  if ((m = /^\{(\d+)\} plus an additional \{(\d+)\} for each (.+)$/.exec(text))) {
+    const per = parseCount(m[3]!, ctx, true);
+    const more = per && scaleAmount(Number(m[2]), per);
+    if (!more || typeof more !== "object" || more.negate) return null;
+    return { cost: "", generic: { ...more, plus: (more.plus ?? 0) + Number(m[1]) } };
   }
   if ((m = /^\{(\d+)\} for each (.+)$/.exec(text))) {
     const per = parseCount(m[2]!, ctx, true);

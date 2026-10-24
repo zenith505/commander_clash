@@ -1838,6 +1838,8 @@ export interface Resolving {
   destroyed?: { o: GameObject; ch: Characteristics; /** Put into a graveyard: it died (CR 700.4). */ died?: true }[];
   /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
   exiled?: { o: GameObject; ch: Characteristics }[];
+  /** The cards its exile instructions exiled from graveyards so far while this resolves (Count "cardsExiledThisWay"). */
+  exiledCards?: ObjectId[];
   /** The cards exiled face down so far (exileFaceDown), for Duplicity's "all other cards you own exiled with ~". */
   faceDownExiled?: ObjectId[];
   /** The cards this resolution's linked exiles took (Mimic Vat's "each other card exiled with ~"). */

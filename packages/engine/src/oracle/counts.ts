@@ -124,6 +124,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
+  // "You gain 1 life for each card exiled this way" (Titania's Command), "for each artifact or land card exiled this way"
+  // (Canoptek Scarab Swarm), "the number of creature cards exiled this way": after exiling cards from graveyards.
+  if (ctx?.exiledCards && (m = /^(?:the number of )?(?!the greatest )(?:(.+?) )?cards? exiled this way$/i.exec(p))) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (filter && filter.kind !== "card")) return null;
+    return { count: { kind: "cardsExiledThisWay", ...(filter ? { filter } : {}) } };
+  }
   if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   if (!each && (m = /^the greatest mana value among (.+?) you control$/i.exec(p))) {

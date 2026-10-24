@@ -1,7 +1,7 @@
 # Roadmap
 
-23,920 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,695 of 4,988 (94%).
+23,964 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,717 of 4,988 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,14 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 146, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 147, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth (it changes the types of cards in every zone and of spells), Hushbringer (no
    rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield batches and look-back),
-   The Legend of Roku (Avatar Roku's token has firebending 4), Amalia Benavides Aguirre, Crucible of the Spirit Dragon,
-   Alms Collector, Mirror March, Azure Beastbinder, Dawn of a New Age ("remove a counter from ~. If you do"), Tymna
-   the Weaver, Barrowgoyf, Assault Suit, Shadow of the Goblin, Elesh Norn, Norn's Decree; Thrilling Discovery and Old
-   One Eye ("you may discard two cards. If you do": no ruling on discarding with fewer in hand), Sandstone Oracle
-   ("the difference" between hands); Wildfire Devils and Arcane Proxy too. Smaller gaps from round 146: bots cast
+   Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of colors", spendable only
+   on Dragons: the mana mix needs a picker per X and the spend restriction), Benthic Anomaly, Locke, Treasure Hunter,
+   Dancer's Chakrams, Blast-Furnace Hellkite (offering), Faldorn, Dread Wolf Herald, Dance with Calamity, The
+   Millennium Calendar, Turnabout; Thrilling Discovery and Old One Eye ("you may discard two cards. If you do": no
+   ruling on discarding with fewer in hand); Wildfire Devils, Arcane Proxy, Don & Leo, Problem Solvers ("exile up to one
+   target artifact ... and up to one target creature ... Then return them") too. Smaller gaps from round 147: Alms
+   Collector's first card is drawn without offering dredge or Scion of Halaster's look; with Collectors controlled by
+   two opponents, the first in turn order applies (the drawing player doesn't choose, CR 616.1); Joust, Malamet Battle
+   Glyph and Hog-Monkey Rampage miss their middle line ("if it's a Knight", "if the creature you control entered this
+   turn", "if it has power 4 or greater"). Smaller gaps from round 146: bots cast
    Cosmic Intervention like any other instant (not in answer to a board wipe), cast Invoke Calamity's spells in the
    order offered and use Scroll of Fate only like any other ability. Smaller gaps from round 145: a Doubling Cube activated first doesn't get Tezzeret's reduction; Nicol Bolas,
    Dragon-God shares one set of exiled cards among the abilities he borrows (no supported planeswalker has linked loyalty

@@ -400,7 +400,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Cipher: encode it on the creature most likely to deal combat damage to a player.
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
-    if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
+    if (pend.kind === "pickPermanents" && pend.action === "tap") {
+      // Exactly that many ("you may tap three untapped creatures you control", Aziza, once we said yes): creatures that
+      // could still attack too, if it takes them.
+      const ids = choosePicks(s, pid, pend.options, pend.count, "tap");
+      if (pend.min === undefined && !pend.anyNumber && ids.length < pend.count) ids.push(...pend.options.filter((id) => !ids.includes(id)).slice(0, pend.count - ids.length));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     // Orzhov Advokist: the counters on our best creature, unless its controller is the only opponent we could attack.
     if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count === 1) {
       const giver = s.resolving?.item.controller;

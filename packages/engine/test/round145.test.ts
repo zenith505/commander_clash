@@ -659,3 +659,73 @@ describe("Bounty Hunter (bounty counters, as Shay Cormac's)", () => {
     expect(s.objects[b]!.zone).toBe("graveyard");
   });
 });
+
+// Cards the parser changes above made playable too.
+const aziza = card("Aziza, Mage Tower Captain", "Legendary Creature — Djinn Sorcerer", "{R}{W}", { power: "2", toughness: "2", oracleText: "Whenever you cast an instant or sorcery spell, you may tap three untapped creatures you control. If you do, copy that spell. You may choose new targets for the copy." });
+const cube = card("Gelatinous Cube", "Creature — Ooze", "{2}{B}{B}", { power: "4", toughness: "3", oracleText: "Engulf — When this creature enters, exile target non-Ooze creature an opponent controls until this creature leaves the battlefield.\nDissolve — {X}{B}: Put target creature card with mana value X exiled with this creature into its owner's graveyard." });
+const brooch = card("Null Brooch", "Artifact", "{4}", { oracleText: "{2}, {T}, Discard your hand: Counter target noncreature spell." });
+const slate = card("Slate of Ancestry", "Artifact", "{4}", { oracleText: "{4}, {T}, Discard your hand: Draw a card for each creature you control." });
+const thornbow = card("Thornbow Archer", "Creature — Elf Archer", "{B}", { power: "1", toughness: "2", oracleText: "Whenever this creature attacks, each opponent who doesn't control an Elf loses 1 life." });
+const divination = card("Test Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+describe("Also playable now", () => {
+  it("Aziza: tapping three untapped creatures copies the instant or sorcery spell", () => {
+    supported(aziza);
+    const { s: s0, ap, ids } = setup([divination]);
+    putOnBattlefield(s0, ap, aziza);
+    const bears = [1, 2, 3].map(() => putOnBattlefield(s0, ap, bear()));
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 5 && s.pending; i++) s = resolveAll(botActions(s, s.pending.player).reduce(act, s));
+    expect(bears.map((b) => s.objects[b]!.tapped)).toEqual([true, true, true]);
+    expect(s.players[ap]!.hand.length).toBe(hand + 4);
+  });
+
+  it("Gelatinous Cube: exiles an opponent's creature until it leaves; Dissolve with X puts that card into the graveyard", () => {
+    supported(cube);
+    const { s: s0, ap, opp, ids } = setup([cube]);
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, ap, card("Swamp", "Basic Land — Swamp"));
+    const b = putOnBattlefield(s0, opp, bear());
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(s);
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b }] }));
+    expect(s.objects[b]!.zone).toBe("exile");
+    s = resolveAll(run(s, planActivate(s, ap, ids[0]!, 0, [{ kind: "object", id: b }], undefined, undefined, 2)));
+    expect(s.objects[b]!.zone).toBe("graveyard");
+  });
+
+  it("Null Brooch: discard your hand to counter target noncreature spell", () => {
+    supported(brooch);
+    const { s: s0, ap, opp, ids } = setup([divination]);
+    const nb = putOnBattlefield(s0, opp, brooch);
+    for (const l of [forest, forest]) putOnBattlefield(s0, opp, l);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 4 && waitingOn(s) !== opp; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planActivate(s, opp, nb, 0, [{ kind: "stack", id: s.stack.find((x) => x.objectId === ids[0])!.id }]));
+    expect(s.players[opp]!.hand).toHaveLength(0);
+    s = resolveAll(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand).not.toContain(ids[0]);
+  });
+
+  it("Slate of Ancestry: discard your hand, then draw a card for each creature you control", () => {
+    supported(slate);
+    const { s: s0, ap } = setup([]);
+    const sl = putOnBattlefield(s0, ap, slate);
+    [1, 2, 3].forEach(() => putOnBattlefield(s0, ap, bear()));
+    const before = [...s0.players[ap]!.hand];
+    const s = resolveAll(run(s0, planActivate(s0, ap, sl, 0)));
+    expect(before.every((id) => s.objects[id]!.zone === "graveyard")).toBe(true);
+    expect(s.players[ap]!.hand).toHaveLength(3);
+  });
+
+  it("Thornbow Archer: each opponent who doesn't control an Elf loses 1 life", () => {
+    supported(thornbow);
+    const { s: s0, ap, opp } = setup([]);
+    const t = putOnBattlefield(s0, ap, thornbow);
+    const order = [1, 2, 3].map((i) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + i) % 4]!);
+    putOnBattlefield(s0, order[1]!, card("Test Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    const s = resolveAll(attack(s0, ap, [{ attacker: t, defender: opp }]));
+    expect(order.map((p) => s.players[p]!.life)).toEqual([39, 40, 39]);
+  });
+});

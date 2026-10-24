@@ -1,7 +1,7 @@
 # Roadmap
 
-23,880 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,663 of 4,988 (93%).
+23,902 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,679 of 4,988 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,13 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 144, most played first: Encroaching Mycosynth (it changes
-   the types of cards in every zone and of spells), Hushbringer (no rulings model yet for "dying doesn't cause
-   abilities to trigger" with leaves-the-battlefield batches and look-back), Tezzeret, Betrayer of Flesh (its cost
-   reduction counts mana abilities too, per the rulings), Alania, Divergent Storm, Nicol Bolas, Dragon-God, Tarrian's
-   Journal, Bronzebeak Foragers, Nazgûl Battle-Mace, Ajani's Chosen, Zur, Eternal Schemer, Firion, Felothar, Level Up,
-   Stargaze (look at twice X cards and take X: the number taken is fixed in the dig effect), Banefire ("if X is 5 or
-   more, can't be countered"); Wildfire Devils and Arcane Proxy too. Smaller gaps from round 144: behold works for
+00. Most played first (`npm run popular`). Out after round 145, most played first: Karazikar, the Eye Tyrant (no
+   rulings yet), Encroaching Mycosynth (it changes the types of cards in every zone and of spells), Hushbringer (no
+   rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield batches and look-back),
+   Evendo Brushrazer ("whenever you sacrifice a nontoken permanent", then play the exiled cards while you have this
+   turn), Invoke Calamity (cast up to two spells with total mana value 6 or less from graveyard and hand), Interplanar
+   Beacon, Scroll of Fate, Afterlife from the Loam, Emberwilde Captain, Banefire ("if X is 5 or more, can't be
+   countered"), Cosmic Intervention, Liliana's Contract; Wildfire Devils and Arcane Proxy too. Smaller gaps from round
+   145: a Doubling Cube activated first doesn't get Tezzeret's reduction; Nicol Bolas,
+   Dragon-God shares one set of exiled cards among the abilities he borrows (no supported planeswalker has linked loyalty
+   abilities yet) and doesn't follow abilities another Bolas borrowed; Ajani's Chosen asks about attaching even when the
+   Aura can't enchant the Cat (nothing moves); bots transform Tarrian's Journal only with one card or none in hand; a
+   copy's quoted "except it has" ability isn't checked for support when the card compiles (it's compiled on the copy);
+   bots use Shay Cormac's {1} like any other ability. Smaller gaps from round 144: behold works for
    one creature type only, not a planeswalker type (Countersculpt's "behold a Jace") or "you may behold ... if a Dragon
    was beheld"; bots behold a card from their hand first when it's exiled, a permanent first when it isn't, and never
    a token or a commander; the log reads "You beholds" (like "You votes"); Champion of the Weird (blight), Champions of

@@ -1,7 +1,7 @@
 # Roadmap
 
-23,982 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,730 of 4,988 (94%).
+24,008 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,745 of 4,988 (95%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,16 +22,16 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 148, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 149, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth (it changes the types of cards in every zone and of spells), Hushbringer (no
    rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield batches and look-back),
    Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of colors", spendable only
    on Dragons: the mana mix needs a picker per X and the spend restriction); Thrilling Discovery and Old One Eye ("you
    may discard two cards. If you do": no ruling on discarding with fewer in hand); Wildfire Devils, Arcane Proxy, Don &
-   Leo, Problem Solvers ("exile up to one target artifact ... and up to one target creature ... Then return them") too.
-   Next most played: Bandit's Talent, Chandra, Hope's Beacon, Realmbreaker, the Invasion Tree, Mjölnir, Hammer of Thor
-   ("double all damage equipped creature would deal", equip worthy), Subtlety, Séance Board, Neyith of the Dire Hunt,
-   Unstable Amulet, Braid of Fire, Lolth, Spider Queen, The Gitrog, Ravenous Ride, Consuming Tide, Depthshaker Titan.
+   Leo, Problem Solvers ("exile up to one target artifact ... and up to one target creature ... Then return them") too;
+   Braid of Fire (cumulative upkeep "Add {R}": a payment that adds mana, which empties at the end of the upkeep step).
+   Next most played: Lolth, Spider Queen (the emblem's "lost less than 8 life this turn"), The Gitrog, Ravenous Ride
+   (a creature that saddled it this turn), Depthshaker Titan, Baeloth Barrityl, Notorious Throng, Riveteers Ascendancy.
    Smaller gaps from round 148: bots sacrifice for offering only when they couldn't cast the spell otherwise (the
    cheapest token or low-value permanent, never a commander); bots aim Turnabout at the opponent with the most to tap
    (or untap their own) by a simple count, keep exiling for Dance with Calamity while 4 or more remain under its limit,
@@ -184,7 +184,7 @@ line blocks.
    after another, so "whenever you put counters" triggers fire once per kind; Chandra, Torch of Defiance casts the
    exiled card for its mana cost only; Celebrate the Harvest, Surveyor's Scope, Vaan,
    Land's Edge, Leonardo and Stormscale Anarch (other "if the discarded card" variants), Interdict, Bruenor's {0}
-   equip. Smaller gaps from round 102: Subtlety; Hithlain Rope (seating left and right); "can't be sacrificed"
+   equip. Smaller gaps from round 102: Hithlain Rope (seating left and right); "can't be sacrificed"
    granted to another permanent (Garland, Assault Suit, Jon Irenicus, Stilt-Man, Zurgo); Kindle the Carnage, Forbidden
    Ritual; Agatha's Soul Cauldron lends abilities after every ability-removing effect (no timestamp order against
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
@@ -418,8 +418,7 @@ line blocks.
      Dungeon Crawler, Ellywick's "differently named dungeon" count.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
      card), White Plume Adventurer ("untap a creature you control").
-   - Punishers still out: "unless they discard a nonland card" (Bandit's Talent, Compulsive Research, Wrench Mind),
-     "sacrifices a permanent unless they discard" (Possessed Portal), "another nonland permanent" (Torment of Venom),
+   - Punishers still out: "sacrifices a permanent unless they discard" (Possessed Portal), "another nonland permanent" (Torment of Venom),
      "that many permanents" (Archfiend of Spite), "any number of times" (Forbidden Ritual). Rottenmouth Viper's
      trigger works; its "sacrifice any number of nonland permanents, costs {1} less for each" additional cost doesn't
      (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless
@@ -427,7 +426,7 @@ line blocks.
    - Classes (CR 716) still out on other lines: Cleric Class's level 3 ("you gain life equal to that creature's
      toughness"), Warlock Class ("the life they lost this turn"), Paladin Class ("during your turn" cost increase),
      Fighter Class ("blocks it this combat if able"), Leader's Talent ("if it had a counter on it"), Gourmand's Talent
-     ("for the first time each turn"), Bandit's Talent, the Stormchaser Otter token ("blue and red ... with prowess").
+     ("for the first time each turn"), the Stormchaser Otter token ("blue and red ... with prowess").
      Copying a Class doesn't copy its level (716.2b); no supported card copies one yet.
    - "Unless" conditions still out: "an opponent has 10 or less life" (Vampire Lacerator) and other conditions the
      static parser doesn't read.
@@ -1062,7 +1061,7 @@ line blocks.
   Talruum Piper) or a condition (Seton's Desire).
 - Untapping during other players' untap steps with color pairs ("green and/or blue", Murkfiend Liege), a condition
   (Quest for Renewal) or granted to a land (Urban Burgeoning).
-- Top or bottom of a library for spells and graveyard cards (Aether Gust, Endless Detour, Subtlety) and for several
+- Top or bottom of a library for spells and graveyard cards (Aether Gust, Endless Detour) and for several
   objects at once (Aetherspouts).
 - "Whenever a creature is dealt damage" (Death Pits of Rath, Shriveling Rot), "becomes tapped or is dealt damage"
   (Cryoshatter). Old-Growth Troll and Harold and Bob (they return as Auras). Mayhem without a cost (a land, CR

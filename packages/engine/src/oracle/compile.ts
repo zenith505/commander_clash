@@ -2674,6 +2674,17 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
+    // Scion of Draco: "Each creature you control has vigilance if it's white, hexproof if it's blue, ...": one static
+    // ability giving each keyword to the creatures of that color (layer 6, after colors in layer 5, CR 613.1e-f).
+    const byColor = /^Each creature you control has (.+)\.$/.exec(line);
+    const colorParts = byColor ? byColor[1]!.split(/, (?:and )?/) : [];
+    if (byColor && colorParts.length > 1 && colorParts.every((p) => /^[a-z ]+ if it's (?:white|blue|black|red|green)$/.test(p))) {
+      const parts = colorParts.map((p) => /^([a-z ]+) if it's (white|blue|black|red|green)$/.exec(p)!).map((m) => parseStatic(`${capital(m[2]!)} creatures you control have ${m[1]}.`));
+      if (parts.every((st) => st && st.mods.every((m) => m.kind === "addKeywords"))) {
+        for (const st of parts) out.statics.push({ ...st!, text: line });
+        continue;
+      }
+    }
     // Jetmir: "Creatures you control also get +1/+0 and have trample as long as ...": "also" only says it adds to the line
     // before it; each line is its own static ability (CR 604.1).
     const also = /^(Creatures you control) also (get .+ as long as .+)$/.exec(line);
@@ -3187,7 +3198,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;

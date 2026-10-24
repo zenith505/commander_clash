@@ -1408,6 +1408,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const g of abilitiesOf(s, src).spellsHaveStorm ?? [])
           if (controllerOf(s, src) === ev.controller && spellMatches(s, g.filter, item))
             for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: STORM_BODY, cause: ev.stackId });
+    // Vesuvan Duplimancy: the one permanent every target of the spell names, as it was cast (rulings).
+    const onlyTarget = (() => {
+      const chosen = (item?.targets ?? []).filter((t) => t.kind !== "none");
+      const first = chosen[0];
+      if (ev.copy || first?.kind !== "object" || chosen.some((t) => t.kind !== "object" || t.id !== first.id)) return undefined;
+      const it = s.objects[first.id];
+      return it?.zone === "battlefield" ? it : undefined;
+    })();
     const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
@@ -1443,7 +1451,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
-      }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
+      }, triggers, ev.stackId, onlyTarget && (triggers ?? abilitiesOf(s, o).triggers).some((t) => t.cast?.subjectTarget) ? onlyTarget : undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     // Veyran (CR 603.2d): casting or copying an instant or sorcery spell, as the spell is.
     const instantOrSorcery = spell ? characteristics(s, spell).types.some((t) => t === "Instant" || t === "Sorcery") : ev.card.types.some((t) => t === "Instant" || t === "Sorcery");
     causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;

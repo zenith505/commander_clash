@@ -171,6 +171,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
   if (!each && ctx?.chooseResult && /^that result$/i.test(p)) return count({ kind: "rollResult" });
   if (!each && ctx?.chooseResult && /^the other result$/i.test(p)) return count({ kind: "rollOther" });
+  // Clown Car: "For each odd result, create ...", "for each even result, put ..." after "roll X six-sided dice": each die's
+  // own result (CR 706.2).
+  if (each && /^(odd|even) result$/i.test(p)) return count({ kind: "rollParity", odd: /^odd/i.test(p) });
   // "Put a +1/+1 counter on ~ for each flip you won" (Crazed Firecat).
   if (each && /^flip you won$/i.test(p)) return count({ kind: "flipsWon" });
   // Life and hands.

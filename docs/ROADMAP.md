@@ -1,7 +1,7 @@
 # Roadmap
 
-23,821 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,632 of 4,988 (92%).
+23,840 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,647 of 4,988 (93%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,11 +22,15 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 142, most played first: The Irencrag (becomes a named
-   legendary Equipment that loses its other abilities), Unable to Scream, Kefka, Dancing Mad, Elder Brain, Search for
-   Azcanta, Vesuvan Duplimancy, Clown Car, Scavenger's Talent, Encroaching Mycosynth, Minsc & Boo, Virtue of Courage,
-   Scion of Draco, Palace Jailer, Oubliette, Hushbringer, Scavenged Brawler; Wildfire Devils, Arcane Proxy and Lilypad
-   Village too. Smaller gaps from round 142: mana spent only on costs that contain {X} (Elementalist's Palette,
+00. Most played first (`npm run popular`). Out after round 143, most played first: Encroaching Mycosynth (it changes
+   the types of cards in every zone and of spells), Hushbringer (no rulings model yet for "dying doesn't cause
+   abilities to trigger" with leaves-the-battlefield batches and look-back), Chaos Dragon, Swift Reconfiguration,
+   Selvala's Stampede, Mana Echoes, Unfinished Business, Champions of the Perfect, Bag of Holding, Altered Ego,
+   Tezzeret, Betrayer of Flesh, Alania, Divergent Storm, Spell Stutter, Nicol Bolas, Dragon-God; Wildfire Devils and
+   Arcane Proxy too. Smaller gaps from round 143: bots sacrifice to Scavenger's Talent only when the best creature
+   card in their graveyard is worth more than the creatures they'd give up; what happens to Palace Jailer's
+   exiled creature once the Jailer's controller has left the game isn't modeled (no rulings on it).
+   Smaller gaps from round 142: mana spent only on costs that contain {X} (Elementalist's Palette,
    Rosheen Meanderer, Nexos) can't pay a cost with {X} asked for as a spell or ability resolves (Condescend's "unless
    its controller pays {X}") or a special action's; Unsettled Mariner doesn't trigger when a spell's target is changed
    to you or your permanent; Vivien's −2 puts the rest on the bottom in the order they were looked at; bots cast Reins

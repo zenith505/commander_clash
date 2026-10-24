@@ -345,10 +345,26 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${defOf(s, o).name} becomes saddled.`);
       }
       return;
-    case "phaseOut":
+    case "phaseOut": {
       // Only what's on the battlefield: "it" may have left (CR 702.26b).
-      phaseOut(s, objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id));
+      const ids = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id);
+      if (e.untilSourceLeaves) {
+        // Oubliette: with the source gone already, nothing happens (rulings, CR 610.3a).
+        const me = objects(s, { ref: "self" }, ctx)[0];
+        if (!me) {
+          log(s, `${src} has left the battlefield, so nothing phases out.`);
+          return;
+        }
+        phaseOut(s, ids);
+        for (const id of ids) {
+          const p = s.objects[id]!.phased;
+          if (p && !p.indirect) p.until = { id: me.id, zc: me.zoneChanges ?? 0 };
+        }
+        return;
+      }
+      phaseOut(s, ids);
       return;
+    }
     case "earthbend": {
       // CR 701.66a. Its effect lasts as long as the land stays on the battlefield (CR 611.2c, 400.7).
       const n = amountNow(s, e.n, ctx);

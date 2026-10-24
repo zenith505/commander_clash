@@ -703,6 +703,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
+  // Palace Jailer: "exile target creature an opponent controls until an opponent becomes the monarch": it returns when one
+  // of your opponents next becomes the monarch, whatever happens to the source (rulings, CR 610.3).
+  if ((m = /^Exile (target .+) until an opponent becomes the monarch$/i.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "exile", what, until: "opponentMonarch" }] : null;
+  }
   // "When ~ enters, create a 1/1 white Soldier creature token, then attach ~ to it." (Ancestral Blade, like living
   // weapon, CR 702.92a): the token just created, or the creature just manifested ("manifest dread, then attach ~ to
   // that creature"). If ~ has left the battlefield, or can't legally be attached, it
@@ -976,6 +982,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
+  }
+  // "You may sacrifice three other nonland permanents" (Scavenger's Talent): others than the source (a permanent's ability).
+  if ((m = new RegExp(`^[Ss]acrifice ${NUM} other ([a-z][^,]*?)$`).exec(s)) && !ctx.spell && num(m[1]!) > 1) {
+    const filter = pickFilter(m[2]!);
+    return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: num(m[1]!), action: "sacrifice" }] : null;
   }
   // Teferi, Temporal Pilgrim: "Target opponent chooses a permanent they control and returns it to its owner's hand": theirs,
   // chosen as it resolves, not targeted.

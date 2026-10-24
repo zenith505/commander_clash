@@ -375,6 +375,12 @@ export function parseActivateCondition(text: string): StaticCondition | null {
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
+  // Lilypad Village: "Activate only if a Bird, Frog, Otter, or Rat entered the battlefield under your control this turn."
+  const enteredAny = /^an? ((?:[A-Z][a-z]+, )+)or ([A-Z][a-z]+) entered the battlefield under your control this turn$/.exec(text);
+  if (enteredAny) {
+    const types = [...enteredAny[1]!.split(", ").filter(Boolean), enteredAny[2]!];
+    return types.every((t) => CREATURE_TYPES.has(t)) ? { kind: "amount", amount: { count: { kind: "enteredThisTurn", anySubtype: types } }, min: 1 } : null;
+  }
   return parseStaticCondition(text, self);
 }
 
@@ -467,7 +473,7 @@ export function parseUntargetable(t: string): Untargetable | null {
 
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
-  if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
     const amount = parseCount("the number of cards in your graveyard", null);
@@ -1071,6 +1077,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
   }
   if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
+  if (/^can't be turned face up$/.test(rest)) return [{ kind: "cantTurnFaceUp" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
   if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {
     const parts = [m[1]!, m[2]!, m[3]!].map((p) => parseStaticMods(p));
@@ -1282,6 +1289,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
   if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  // Unable to Scream: "As long as enchanted creature is face down, it can't be turned face up." Only a face-down
+  // permanent can be turned face up (CR 702.37e, 701.40b), so it's the same as having it always.
+  if (text === "As long as enchanted creature is face down, it can't be turned face up") return { affects: { kind: "attached" }, mods: [{ kind: "cantTurnFaceUp" }], text: line };
   // "Enchanted creature is goaded" (The Sound of Drums): by the Aura's controller, for as long as it's attached (CR 701.15a).
   if (/^Enchanted creature is goaded$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "goad" }], text: line };
   // Duplicant: its imprint exile is linked to this ability (CR 607.2a, see linkExile).

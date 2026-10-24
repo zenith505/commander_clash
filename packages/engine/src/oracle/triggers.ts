@@ -523,6 +523,16 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast a spell that targets a creature you control" (Season of Growth), "an instant or sorcery spell that
   // targets a creature" (repartee), "... that targets an opponent or a creature an opponent controls" (Danitha): what
   // one of its targets is as it's cast. "That targets only ..." isn't modeled.
+  // "A spell that targets only a single artifact or creature you control" (Vesuvan Duplimancy): every target it has is
+  // that one permanent (rulings), which "that artifact or creature" is.
+  const onlyM = / that targets only a single (.+)$/.exec(what);
+  let targetsOnly: TargetSpec | undefined;
+  if (onlyM) {
+    what = what.slice(0, onlyM.index);
+    const spec = parseTargetPhrase(onlyM[1]!);
+    if (spec?.kind !== "object") return "fail";
+    targetsOnly = { ...spec, text: onlyM[1]! };
+  }
   const tg = / that targets (.+)$/.exec(what);
   let targets: (TargetSpec | "you")[] | undefined;
   if (tg) {
@@ -580,11 +590,17 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (short && !/\bloses X life\.?$/.test(text)) return "fail";
   const thatMuch = /\bIf [^.,]+ mana was spent to cast that spell, [^.]*\bthat much\b/.test(text) && !/\bX\b/.test(text) && !m[2];
   if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
-  let body = parseBody(text, { castSpell: true, eventPlayer: true });
+  if (targetsOnly) {
+    const that = `that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`;
+    if (!text.includes(that)) return "fail";
+    // Read as the subject, whatever it is now (rulings: as it last existed, if it left).
+    text = text.replaceAll(that, "that creature");
+  }
+  let body = parseBody(text, { castSpell: true, eventPlayer: true, ...(targetsOnly ? { subject: true } : {}) });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, subjectTarget: true as const } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

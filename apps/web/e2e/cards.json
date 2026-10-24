@@ -2483,6 +2483,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9cb7f23f-322d-4a87-b6c6-15b9d446aef3",
+  "name": "Champions of the Perfect",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Elf Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warrior"
+  ],
+  "oracleText": "As an additional cost to cast this spell, behold an Elf and exile it. (Exile an Elf you control or an Elf card from your hand.)\nWhenever you cast a creature spell, draw a card.\nWhen this creature leaves the battlefield, return the exiled card to its owner's hand.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "12cc800c-c7be-4811-8207-fd01a99cc892",
   "name": "Chandra, Torch of Defiance",
   "manaCost": "{2}{R}{R}",
@@ -4209,6 +4242,40 @@
   "set": "sth",
   "releasedAt": "1998-03-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3f3b2c10-21f8-4e13-be83-4ef3fa36e123",
+  "name": "Elvish Mystic",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Elf Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Druid"
+  ],
+  "oracleText": "{T}: Add {G}.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-05-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -5975,6 +6042,37 @@
   ]
  },
  {
+  "oracleId": "546f037b-aea8-4c7a-9b66-373f1be0bac6",
+  "name": "Goldmeadow Harrier",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Kithkin Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kithkin",
+   "Soldier"
+  ],
+  "oracleText": "{W}, {T}: Tap target creature.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09ff28b1-b6c9-48e6-b12e-2f0e644f709f",
   "name": "Gravecrawler",
   "manaCost": "{B}",
@@ -7715,6 +7813,39 @@
   "set": "40k",
   "releasedAt": "2022-10-07",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "845d80ee-1cd5-437a-90a5-40dcc657d3aa",
+  "name": "Kinsbaile Aspirant",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Kithkin Citizen",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kithkin",
+   "Citizen"
+  ],
+  "oracleText": "As an additional cost to cast this spell, behold a Kithkin or pay {2}. (To behold a Kithkin, choose a Kithkin you control or reveal a Kithkin card from your hand.)\nWhenever another creature you control enters, this creature gets +1/+1 until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

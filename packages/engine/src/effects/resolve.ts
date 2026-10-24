@@ -674,12 +674,22 @@ function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[]): string
   return [...out];
 }
 
+/** The opponents of `pid` who had the highest result of the last "each player rolls" (none if `pid`'s was higher than all theirs). */
+function highestRollers(s: GameState, pid: PlayerId): PlayerId[] {
+  const each = s.resolving?.rolledEach ?? {};
+  const top = Math.max(...Object.values(each).map((v) => v ?? 0));
+  return s.turnOrder.filter((p) => p !== pid && each[p] === top);
+}
+
 export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, affected?: ObjectId): Modification[] {
   const c = { ...amountCtx(s, ctx), ...(affected !== undefined ? { affected } : {}) };
   return mods.map((m) =>
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
+      : // "Those players" (Chaos Dragon): the opponents with the highest result of the roll just made, ties included.
+      m.kind === "cantAttackPlayers"
+      ? { kind: "cantAttackPlayers", players: m.players === "highestRoll" ? highestRollers(s, ctx.controller) : m.players, ...(m.combat !== undefined ? { combat: m.combat === "this" ? s.combatsThisTurn ?? 0 : m.combat } : {}) }
       : // "Power and toughness each equal to its mana value" (Karn, the Great Creator): each affected object's own, worked
         // out in the layers (a permanent's mana value doesn't change but by a copy effect).
         (m.kind === "modifyPT" || m.kind === "setPT") && [m.power, m.toughness].some((a) => typeof a === "object" && a.count.kind === "affectedManaValue")

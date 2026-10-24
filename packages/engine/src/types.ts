@@ -1936,6 +1936,8 @@ export interface Resolving {
   commanderMv?: number;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
+  /** "Each player rolls a d20" (Chaos Dragon): each player's result. */
+  rolledEach?: Partial<Record<PlayerId, number>>;
   scratch?: {
     /** A search's cards put on top "in any order" (Goblin Recruiter) have been ordered. */
     topOrdered?: true;

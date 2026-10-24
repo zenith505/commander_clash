@@ -4978,6 +4978,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
+    // "You may put a permanent card from your hand onto the battlefield for each free vote" (Selvala's Stampede): up to
+    // that many, chosen together and entering at the same time.
+    const handVotes = /^[Yy]ou may put an? (.+? card) from your hand onto the battlefield for each ([a-z]+) vote$/.exec(s);
+    if (handVotes && ctx.vote?.options?.includes(handVotes[2]!)) {
+      const filter = parseSearchFilter(handVotes[1]!);
+      if (!filter || filter.kind !== "card") return null;
+      effects.push({ type: "putFromHand", filter, may: true, any: true, upTo: { count: { kind: "votes", option: handVotes[2]! } } });
+      continue;
+    }
     const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
@@ -5078,6 +5087,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const n = parseCount(where[2]!, ctx);
       if (prev?.type !== "choose" || prev.choice !== "creatureType" || !n) return null;
       effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], chosen: "type", text: "creature card of the chosen type" }, found: "battlefield", rest: "shuffle", n });
+      si++;
+      continue;
+    }
+    // Selvala's Stampede: "Reveal cards from the top of your library until you reveal a creature card for each wild vote.
+    // Put those creature cards onto the battlefield, then shuffle the rest into your library." As many creature cards as
+    // there were votes for that word (CR 701.38), entering together (rulings); with no such vote, none is revealed.
+    const untilVotes = /^[Rr]eveal cards from the top of your library until you reveal a creature card for each ([a-z]+) vote$/.exec(s);
+    if (untilVotes && ctx.vote?.options?.includes(untilVotes[1]!) && /^Put those creature cards onto the battlefield, then shuffle the rest into your library$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, found: "battlefield", rest: "shuffle", n: { count: { kind: "votes", option: untilVotes[1]! } } });
       si++;
       continue;
     }

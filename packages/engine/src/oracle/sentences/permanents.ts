@@ -727,6 +727,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const first = what && parseChanges(m[2]!);
     return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble", ...(m[3] === "combat" ? { combat: "this" as const } : {}) }], duration: "endOfTurn" }] : null;
   }
+  // Chaos Dragon: "If one or more opponents had the highest result, ~ can't attack those players or planeswalkers they
+  // control this combat." Ties count: an opponent with the same result as yours had the highest result (rulings).
+  if (/^If one or more opponents had the highest result, ~ can't attack those players or planeswalkers they control this combat$/.test(s))
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantAttackPlayers", players: "highestRoll", combat: "this" }], duration: "endOfTurn" }];
   // "That token attacks this combat if able" (Howlsquad Heavy): the same requirement, nothing else gained.
   if ((m = /^(That token|That creature|It) attacks this (turn|combat) if able$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);

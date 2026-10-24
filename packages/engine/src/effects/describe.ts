@@ -41,6 +41,11 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push("can't be blocked");
       continue;
     }
+    if (m.kind === "cantAttackPlayers") {
+      const who = Array.isArray(m.players) ? m.players.map((p) => player(s, p).name) : [];
+      parts.push(who.length ? `can't attack ${who.join(" or ")} or their planeswalkers${m.combat !== undefined ? " this combat" : ""}` : `can attack anyone${m.combat !== undefined ? " this combat" : ""}`);
+      continue;
+    }
     if (m.kind === "cantAttackYou") {
       parts.push(`can't attack ${player(s, controller).name} or their planeswalkers`);
       continue;

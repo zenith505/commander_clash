@@ -96,7 +96,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
@@ -1143,6 +1143,12 @@ export type Modification =
   | { kind: "cantAttackSamePlayer" }
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
   | { kind: "cantAttackYou"; /** "That combat" (Illusionist's Gambit): only in the added combat phase with this key. */ combatKey?: number }
+  /**
+   * "Can't attack those players or planeswalkers they control this combat" (Chaos Dragon): the players, worked out as the
+   * effect starts ("highestRoll": the opponents who had the highest result of the last "each player rolls", ties
+   * included), in the combat going on only (CR 508.1c).
+   */
+  | { kind: "cantAttackPlayers"; players: PlayerId[] | "highestRoll"; combat?: number | "this" }
   /** "Can't attack its owner" (Alexios): that player, not their planeswalkers or battles (rulings). */
   | { kind: "cantAttackOwner"; /** Xantcha: "or planeswalkers its owner controls" too. */ planeswalkers?: true }
   /** "Can't be sacrificed" (CR 701.21): an instruction to sacrifice it does nothing; it can't be chosen to be sacrificed, for a cost either (rulings on Alexios). */
@@ -1861,6 +1867,11 @@ export type Effect =
        * resolves, or was last attached to if it has left (rulings); each card only if it could be attached to it.
        */
       attachToEnchanted?: true;
+      /**
+       * "Attached to that creature" (Unfinished Business): the creature the instruction before put onto the battlefield.
+       * An Aura that can't enchant it stays in the graveyard; an Equipment that can't equip it enters unattached (rulings).
+       */
+      attachToCreated?: true;
       /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"). */
       faceDown?: "forest";
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
@@ -2501,7 +2512,7 @@ export type Effect =
    * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
    * and "equal to the result" read it afterwards (SpellCondition "rollIn", Count "rollResult").
    */
-  | { type: "roll"; sides: number; n?: Amount; add?: Amount; subtract?: Amount; /** "Ignore the lower roll": keep only the highest one. */ keepHighest?: true; /** "Roll two d8 and choose one result" (the Endeavors): "that result" is the one chosen, "the other result" the other (Count "rollOther"). */ chooseOne?: true }
+  | { type: "roll"; sides: number; n?: Amount; add?: Amount; subtract?: Amount; /** "Ignore the lower roll": keep only the highest one. */ keepHighest?: true; /** "Roll two d8 and choose one result" (the Endeavors): "that result" is the one chosen, "the other result" the other (Count "rollOther"). */ chooseOne?: true; /** "Each player rolls a d20" (Chaos Dragon): every player in the game, in turn order, each result kept (ResolvingInfo.rolledEach). */ eachPlayer?: true }
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount; /** "You may put that card on the bottom of that player's library" (Jace, the Mind Sculptor): as a scry of their library. */ mayBottom?: true }
@@ -4332,8 +4343,12 @@ export type AdditionalCost =
    * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.
    */
   | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean; /** "Untap a tapped creature you control" (Halo Fountain): untapped instead. */ untap?: true; /** "Tap X untapped Knights you control" (Aryel): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true }
-  /** "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. */
-  | { kind: "reveal"; filter: TargetSpec; n: number }
+  /**
+   * "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. `orControl`: "behold an Elf"
+   * (CR 701.4a): an Elf card from your hand or an Elf permanent you control. `exile`: "behold a Kithkin and exile it": the
+   * card or permanent is exiled, linked to the permanent the spell becomes (CR 607.2q).
+   */
+  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
   | {
       kind: "exileFromHand";

@@ -382,6 +382,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${m[1]} creature`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, sharesTypeWithSubject: true }) : null;
   }
+  // Mana Echoes: "the number of creatures you control that share a creature type with it", "it" the creature the trigger
+  // is about, which counts too if you control it (rulings), counted as it resolves.
+  if (/^creatures you control that share a creature type with it$/i.test(p) && ctx?.subjectIt) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: p }, sharesTypeWithSubject: true, includeSubject: true });
   // "Whenever ~ attacks, it gets +2/+0 until end of turn for each other attacking Goblin" (Goblin Piledriver): "other"
   // is the permanent itself, so only in its own abilities.
   if ((m = /^other (attacking|blocking) (.+)$/i.exec(p)) && ctx?.selfIt) {

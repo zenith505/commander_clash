@@ -140,7 +140,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;
       const notThis = c.otherThanSubject ? ctx.objects?.({ ref: "subject" })[0]?.id : undefined;
-      const types = subject && creatureTypesOf(s, subject);
+      const lk = subject && c.includeSubject && subject.zone !== "battlefield" ? s.lastKnown?.[subject.id]?.creatureTypes : undefined;
+      const types = subject && (c.includeSubject && subject.zone !== "battlefield" ? (lk === "all" ? "all" : new Set(lk ?? [])) : creatureTypesOf(s, subject));
       // Coat of Arms: the creature types of the permanent it's applied to, and of the others, as the layers have them so far.
       const typesIn = (ch: Characteristics | undefined): Set<string> | "all" => (!ch ? new Set() : ch.allCreatureTypes ? "all" : new Set(ch.subtypes.filter((t) => CREATURE_TYPES.has(t))));
       const byAffected = c.sharesTypeWithAffected || c.sameNameAsAffected;
@@ -153,7 +154,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if ((c.other && id === ctx.sourceId) || id === notThis) continue;
-        if (subject && (id === subject.id || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
+        if (subject && ((id === subject.id && !c.includeSubject) || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
         if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
         if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
         const ch = view(o);

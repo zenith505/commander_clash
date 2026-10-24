@@ -1286,6 +1286,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
       } else c.cantBeBlockedByLesserPower = true;
       return;
+    case "cantAttackPlayers":
+      if (typeof m.combat === "number" && m.combat !== (s.combatsThisTurn ?? 0)) return;
+      if (Array.isArray(m.players)) for (const pid of m.players) if (!c.cantAttackPlayers.includes(pid)) c.cantAttackPlayers.push(pid);
+      return;
     case "cantAttackYou": {
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       const you = controllerOfInst(e, chars);

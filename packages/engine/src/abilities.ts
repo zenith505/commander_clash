@@ -309,6 +309,8 @@ export type Count =
   | { kind: "sum"; of: Count[] }
   /** "Equal to the difference" after "if that creature has greater power than ~" (Conformer Shuriken): the first less the second. */
   | { kind: "difference"; of: [Count, Count] }
+  /** "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller. */
+  | { kind: "absDifference"; of: [Count, Count] }
   /** "The number of cards put into their graveyard from anywhere this turn" (Fraying Sanity): that player's. */
   | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */

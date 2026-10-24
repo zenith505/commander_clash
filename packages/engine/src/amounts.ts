@@ -301,6 +301,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return c.of.reduce((n, x) => n + evalCount(s, x, ctx), 0);
     case "difference":
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
+    case "absDifference":
+      return Math.abs(evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx));
     case "cardsToGraveyardThisTurn":
       return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
@@ -713,6 +715,8 @@ function describeCount(c: Count): string {
       return c.of.map(describeCount).join(" + ");
     case "difference":
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
+    case "absDifference":
+      return `|${describeCount(c.of[0])} - ${describeCount(c.of[1])}|`;
     case "cardsToGraveyardThisTurn":
       return "#cards put into that graveyard this turn";
     case "commanderCasts":

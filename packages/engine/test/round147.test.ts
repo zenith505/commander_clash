@@ -863,3 +863,77 @@ describe("Starfield Shepherd", () => {
     expect(s.objects[one]!.zone).toBe("hand");
   });
 });
+
+const sinew = card("Sword of Sinew and Steel", "Artifact — Equipment", "{3}", { keywords: ["Equip"], oracleText: "Equipped creature gets +2/+2 and has protection from black and from red.\nWhenever equipped creature deals combat damage to a player, destroy up to one target planeswalker and up to one target artifact.\nEquip {2}" });
+
+describe("Sword of Sinew and Steel", () => {
+  it("is fully supported; combat damage to a player destroys up to one planeswalker and up to one artifact", () => {
+    supported(sinew);
+    const { s: s0, ap } = setup([]);
+    const c = putOnBattlefield(s0, ap, bear());
+    const sw = putOnBattlefield(s0, ap, sinew);
+    s0.objects[sw]!.attachedTo = c;
+    const foe = next(s0, ap);
+    const relic = putOnBattlefield(s0, foe, card("Test Relic", "Artifact", "{1}"));
+    const other = putOnBattlefield(s0, foe, card("Test Other Relic", "Artifact", "{1}"));
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: c, defender: foe }] });
+    s = untilAsked(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "none" }, obj(relic)] }));
+    expect(s.players[foe]!.life).toBe(36);
+    expect(s.objects[relic]!.zone).toBe("graveyard");
+    expect(s.objects[other]!.zone).toBe("battlefield");
+  });
+});
+
+const jaws = card("Jaws of Defeat", "Enchantment", "{3}{B}", { oracleText: "Whenever a creature you control enters, target opponent loses life equal to the difference between that creature's power and its toughness." });
+
+describe("Jaws of Defeat", () => {
+  it("is fully supported; the larger of power and toughness less the smaller, either way round", () => {
+    supported(jaws);
+    for (const [p, t, loss] of [["1", "4", 3], ["5", "2", 3], ["2", "2", 0]] as const) {
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, jaws);
+      const c = into(s0, ap, card("Test Body", "Creature — Wall", "{1}", { power: p, toughness: t }), "hand");
+      s0.players[ap]!.manaPool.C = 1;
+      let s = run(s0, planCast(s0, ap, c));
+      s = untilAsked(s);
+      const foe = next(s, ap);
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: foe }] });
+      s = resolveAll(s);
+      expect(s.players[foe]!.life).toBe(40 - loss);
+    }
+  });
+});
+
+const airlift = card("Airlift Chaplain", "Creature — Human Cleric", "{2}{W}", { power: "1", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, mill three cards. You may put a Plains card or a creature card with mana value 3 or less from among the cards milled this way into your hand. If you don't, put a +1/+1 counter on this creature. (To mill a card, put the top card of your library into your graveyard.)" });
+
+describe("Airlift Chaplain", () => {
+  const enter = () => {
+    const { s: s0, ap } = setup([]);
+    const big = into(s0, ap, card("Test Big", "Creature — Giant", "{5}", { power: "5", toughness: "5" }), "library");
+    const plains = into(s0, ap, card("Test Plains", "Basic Land — Plains"), "library");
+    const small = into(s0, ap, bear({ name: "Test Small" }), "library");
+    const a = into(s0, ap, airlift, "hand");
+    s0.players[ap]!.manaPool.W = 3;
+    let s = run(s0, planCast(s0, ap, a));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, a, big, plains, small };
+  };
+
+  it("is fully supported; a Plains or a small creature card from among the milled cards, or else a +1/+1 counter", () => {
+    supported(airlift);
+    const { s: s0, ap, a, big, plains, small } = enter();
+    expect(s0.pending?.kind).toBe("searchLibrary");
+    const cards = s0.pending?.kind === "searchLibrary" ? s0.pending.cards : [];
+    expect(cards).toEqual(expect.arrayContaining([plains, small]));
+    expect(cards).not.toContain(big);
+    const took = resolveAll(act(s0, { type: "searchLibrary", player: ap, found: [small] }));
+    expect(took.objects[small]!.zone).toBe("hand");
+    expect(took.objects[a]!.counters["+1/+1"] ?? 0).toBe(0);
+    const none = resolveAll(act(s0, { type: "searchLibrary", player: ap, found: [] }));
+    expect(none.objects[a]!.counters["+1/+1"]).toBe(1);
+  });
+});

@@ -280,7 +280,9 @@ function parseVillainous(subject: string, rest: string, ctx: Ctx): Effect[] | nu
  * can't mean one of them. Undefined when the sentence isn't such a list.
  */
 function parseTargetList(s: string, ctx: Ctx): Effect[] | null | undefined {
-  const m = /^(Destroy|Exile|Tap|Untap|Return) ((?:up to one )?target .+?)( from your graveyard to your hand| to (?:its|their) owners?'s? hands?)?$/.exec(s);
+  // Lowercase after a trigger's condition ("Whenever equipped creature deals combat damage to a player, destroy ...", Sword
+  // of Sinew and Steel); not "exile", which a following "Then return them" would make one flicker of the last target only.
+  const m = /^(Destroy|Exile|Tap|Untap|Return) ((?:up to one )?target .+?)( from your graveyard to your hand| to (?:its|their) owners?'s? hands?)?$/.exec(s.replace(/^destroy /, "Destroy "));
   if (!m) return undefined;
   const parts = m[2]!.split(/,? (?:and\/or|and) (?=(?:up to one )?target )|, (?=(?:up to one )?target )/);
   if (parts.length < 2 || parts.some((p) => !/^(?:up to one )?target [^,]+$/.test(p) || / and /.test(p))) return undefined;

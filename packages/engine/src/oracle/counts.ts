@@ -324,6 +324,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
     return of && count({ kind, of });
   }
+  // "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller
+  // (rulings).
+  if ((m = /^the difference between (~'s|its|that creature's) power and its toughness$/i.exec(p))) {
+    const of = whoseObject(m[1]!, ctx);
+    return of && count({ kind: "absDifference", of: [{ kind: "power", of }, { kind: "toughness", of }] });
+  }
   // "Where X is ~'s loyalty" (Nissa, Ascended Animist): a planeswalker's loyalty is its loyalty counters (CR 306.5b), as
   // it last existed if it's gone (rulings).
   if (/^~'s loyalty$/.test(p)) return count({ kind: "counters", counter: "loyalty", of: { ref: "self" } });

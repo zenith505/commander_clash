@@ -2259,7 +2259,7 @@ export type Effect =
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
   /** `each`: "For each token you control, create a token that's a copy of that permanent" (Second Harvest): one copy of each object in the group `what`, as it is now. */
-  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true }
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true; /** "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): `n` for each opponent, each attacking them. */ attackingEach?: true }
   /**
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with

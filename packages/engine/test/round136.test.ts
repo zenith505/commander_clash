@@ -407,3 +407,126 @@ describe("Tidus, Yuna's Guardian: move a counter at the beginning of combat; che
     expect(s.objects[a]!.counters["+1/+1"]).toBe(2);
   });
 });
+
+describe("Mardu Siegebreaker: exile your creature until it leaves; copies of it attack each opponent", () => {
+  const siege = card("Mardu Siegebreaker", "Creature — Human Warrior", "{1}{R}{W}{B}", {
+    power: "4",
+    toughness: "4",
+    keywords: ["Deathtouch", "Haste"],
+    oracleText: "Deathtouch, haste\nWhen this creature enters, exile up to one other target creature you control until this creature leaves the battlefield.\nWhenever this creature attacks, for each opponent, create a tapped token that's a copy of the exiled card attacking that opponent. At the beginning of your next end step, sacrifice those tokens.",
+  });
+  const healer = card("Test Healer", "Creature — Human Cleric", "{1}{W}", { power: "2", toughness: "2", oracleText: "When this creature enters, you gain 2 life." });
+
+  it("is fully supported", () => supported(siege, healer));
+
+  /** Siegebreaker cast, exiling the healer. */
+  const cast = () => {
+    const { s: s0, ap, ids } = setup([siege]);
+    const h = putOnBattlefield(s0, ap, healer);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: h }] }));
+    return { s, ap, sb: ids[0]!, h };
+  };
+
+  it("one tapped copy attacking each opponent; its enters ability triggers for each; sacrificed at your end step", () => {
+    let { s, ap, sb, h } = cast();
+    expect(s.objects[h]!.zone).toBe("exile");
+    const life = s.players[ap]!.life;
+    const opps = s.turnOrder.filter((p) => p !== ap);
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: sb, defender: opps[0]! }] });
+    s = resolveAll(s);
+    const tokens = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.isToken && s.cards[o.cardId]!.name === "Test Healer");
+    expect(tokens).toHaveLength(3);
+    expect(tokens.every((t) => t.tapped)).toBe(true);
+    expect(tokens.map((t) => t.attacking).sort()).toEqual([...opps].sort());
+    expect(s.players[ap]!.life).toBe(life + 6);
+    s = resolveAll(passUntil(s, "end", ap));
+    expect(s.battlefield.some((id) => s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]!.name === "Test Healer")).toBe(false);
+    // The exiled card is still exiled while Siegebreaker stays.
+    expect(s.objects[h]!.zone).toBe("exile");
+  });
+
+  it("an exiled noncreature card: tapped copies that aren't attacking (CR 506.3a, rulings)", () => {
+    let { s, ap, sb, h } = cast();
+    // The exiled card stands in for one that was a creature only on the battlefield (an animated artifact).
+    s.cards[s.objects[h]!.cardId] = { ...s.cards[s.objects[h]!.cardId]!, typeLine: "Artifact — Test", types: ["Artifact"], subtypes: ["Test"], power: undefined, toughness: undefined, oracleText: "" };
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: sb, defender: nextOf(s, ap) }] });
+    s = resolveAll(s);
+    const tokens = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.isToken && s.cards[o.cardId]!.name === "Test Healer");
+    expect(tokens).toHaveLength(3);
+    expect(tokens.every((t) => t.tapped && t.attacking === undefined)).toBe(true);
+  });
+
+  it("when Siegebreaker leaves, the exiled card returns as a new object (CR 610.3)", () => {
+    let { s, ap, sb, h } = cast();
+    const murder = card("Test Murder", "Instant", "{1}", { oracleText: "Destroy target creature." });
+    const m = putOnBattlefield(s, ap, murder);
+    s.battlefield.splice(s.battlefield.indexOf(m), 1);
+    s.objects[m]!.zone = "hand";
+    s.players[ap]!.hand.push(m);
+    s = resolveAll(run(s, planCast(s, ap, m, [{ kind: "object", id: sb }])));
+    expect(s.objects[sb]!.zone).toBe("graveyard");
+    expect(s.objects[h]!.zone).toBe("battlefield");
+  });
+
+  it("a bot exiles its creature with an enters ability, not its commander or a bigger vanilla one", () => {
+    const { s: s0, ap, ids } = setup([siege]);
+    const h = putOnBattlefield(s0, ap, healer);
+    putOnBattlefield(s0, ap, bear({ name: "Test Big Bear", power: "3", toughness: "3" }));
+    putOnBattlefield(s0, ap, bear({ name: "Test Commander Bear", power: "5", toughness: "5" }), { commander: true });
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(botActions(s, ap)).toEqual([{ type: "chooseTargets", player: ap, targets: [{ kind: "object", id: h }] }]);
+  });
+
+  it("an exiled token ceases to exist, so attacking makes no copies (rulings)", () => {
+    const { s: s0, ap, ids } = setup([siege]);
+    const tok = putOnBattlefield(s0, ap, bear({ name: "Test Token Bear" }));
+    s0.objects[tok]!.isToken = true;
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: tok }] }));
+    expect(s.objects[tok]?.zone ?? "gone").not.toBe("battlefield");
+    s = resolveAll(act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: nextOf(s, ap) }] }));
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken)).toHaveLength(0);
+  });
+});
+
+describe("\"With counters on them\" and \"up to one other target\": the cards they also bring in", () => {
+  const angel = card("Metropolis Angel", "Creature — Angel Soldier", "{4}{W}{U}", { power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nWhenever you attack with one or more creatures with counters on them, draw a card." });
+  const werefox = card("Werefox Bodyguard", "Creature — Fox Warrior", "{1}{W}{W}", { power: "2", toughness: "2", oracleText: "Flash\nWhen this creature enters, exile up to one other target non-Fox creature until this creature leaves the battlefield.\n{1}{W}, Sacrifice this creature: You gain 2 life." });
+  const iceberg = card("Aang's Iceberg", "Enchantment", "{2}{W}", { oracleText: "Flash\nWhen this enchantment enters, exile up to one other target nonland permanent until this enchantment leaves the battlefield.\nWaterbend {3}: Sacrifice this enchantment. If you do, scry 2. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)" });
+  const constable = card("Constable of the Realm", "Creature — Giant Soldier", "{4}{W}", { power: "3", toughness: "4", oracleText: "Renown 2 (When this creature deals combat damage to a player, if it isn't renowned, put two +1/+1 counters on it and it becomes renowned.)\nWhenever one or more +1/+1 counters are put on this creature, exile up to one other target nonland permanent until this creature leaves the battlefield." });
+  const salvagers = card("Fire Nation Salvagers", "Creature — Human Soldier", "{3}{B}", { power: "3", toughness: "3", keywords: ["Menace"], oracleText: "Menace\nWhen this creature enters, put a +1/+1 counter on target creature or Vehicle you control.\nWhenever one or more creatures you control with counters on them deal combat damage to a player, put target creature or Vehicle card from that player's graveyard onto the battlefield under your control." });
+
+  it("are fully supported", () => supported(angel, werefox, iceberg, constable, salvagers));
+
+  it("Metropolis Angel: one card for attacking with creatures with counters, none without (rulings)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, angel);
+    const a = putOnBattlefield(s0, ap, bear({ name: "Test Bear A" }));
+    const b = putOnBattlefield(s0, ap, bear({ name: "Test Bear B" }));
+    const c = putOnBattlefield(s0, ap, bear({ name: "Test Bear C" }));
+    s0.objects[a]!.counters["+1/+1"] = 1;
+    s0.objects[b]!.counters["+1/+1"] = 2;
+    const hand = s0.players[ap]!.hand.length;
+    const without = resolveAll(act(passUntil(structuredClone(s0), "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: c, defender: opp }] }));
+    expect(without.players[ap]!.hand.length).toBe(hand);
+    const s = resolveAll(act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [a, b, c].map((attacker) => ({ attacker, defender: opp })) }));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+
+  it("Werefox Bodyguard: another non-Fox creature only, back when it leaves", () => {
+    const { s: s0, ap, ids, opp } = setup([werefox]);
+    const fox = putOnBattlefield(s0, opp, bear({ name: "Test Fox", typeLine: "Creature — Fox", subtypes: ["Fox"] }));
+    const foe = putOnBattlefield(s0, opp, bear({ name: "Test Foe" }));
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: fox }] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: ids[0]! }] })).toThrow();
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: foe }] }));
+    expect(s.objects[foe]!.zone).toBe("exile");
+    s = resolveAll(run(s, planActivate(s, ap, ids[0]!, 0)));
+    expect(s.objects[foe]!.zone).toBe("battlefield");
+  });
+});

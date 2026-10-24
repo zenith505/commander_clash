@@ -3076,10 +3076,12 @@ function linkExile(out: CompiledCard) {
     if (!others && exiles.length === 1) exiles[0]!.linked = true;
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
-  // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint).
+  // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint). "A copy of the exiled card" (Mardu
+  // Siegebreaker): the one its "exile ... until ~ leaves the battlefield" ability exiled, when it has no other exile.
   if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"')) && !out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
-    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const plain = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const exiles = plain.length ? plain : all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;

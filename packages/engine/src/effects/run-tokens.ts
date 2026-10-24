@@ -1,5 +1,5 @@
 import type { Effect, ObjRef, TokenSpec } from "../abilities";
-import { defOf, isPermanentCard, isType, power, toughness } from "../cards";
+import { defOf, isPermanentCard, isType, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
 import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
@@ -38,7 +38,8 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       const counters = copyEnterCounters(opts.except, (type) => isType(s.cards[key]!, type));
       moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(host ?? {}) });
       const at = opts.attackAt?.[i];
-      if (defender !== undefined && o.zone === "battlefield") o.attacking = at?.player ?? defender;
+      // A noncreature one enters, but not attacking (CR 506.3a).
+      if (defender !== undefined && o.zone === "battlefield" && objIsType(s, o, "Creature")) o.attacking = at?.player ?? defender;
       const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
       if (pw && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
       s.resolving?.created?.push(o.id);
@@ -183,6 +184,17 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         base = copiableDef(s, pick);
       }
       if (!base) return;
+      // "For each opponent, ... attacking that opponent" (Mardu Siegebreaker): one group for each of them, all created at
+      // once, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
+      if (e.attackingEach) {
+        const n = amountNow(s, e.n, ctx);
+        const fight = inCombat(s) && s.activePlayer === ctx.controller;
+        if (s.resolving) s.resolving.created = [];
+        enterTogether(s, () => {
+          for (const opp of apnap(s, opponents(s, ctx.controller))) tokenCopies(s, ctx.controller, base, n, ctx, { tapped: true, ...(fight ? { defender: opp } : {}) });
+        });
+        return;
+      }
       if (e.except?.halfPT) {
         // Half its power and toughness as it last existed on the battlefield (Saw in Half rulings, CR 608.2h).
         const it = copiedPT(s, e.what, ctx);

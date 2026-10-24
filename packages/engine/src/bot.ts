@@ -1218,6 +1218,16 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const pick = ours[0] ?? me ?? (forced ? all[0] : undefined);
     return pick ? [pick] : null;
   }
+  // Mardu Siegebreaker: the creature of ours that copies best for each opponent, the one with an enters ability first,
+  // never a commander (it would leave the game for a while, and the tokens copy the card, not the commander).
+  const ex0 = body.effects[0];
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  if (body.targets.length === 1 && body.effects.length === 1 && ex0?.type === "exile" && ex0.until && ex0.what.ref === "target" && body.targets[0]!.controller === "you" && src && allEffects(compileCard(defOf(s, src)).triggers.flatMap((tr) => tr.body.effects)).some((e) => e.type === "createTokenCopy" && e.attackingEach)) {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, botSource(s, sourceId!), sourceId).filter((t) => t.kind === "object" && t.id !== sourceId && !obj(s, t.id).isToken && !obj(s, t.id).isCommander);
+    const rank = (t: TargetChoice) => (t.kind !== "object" ? 0 : worth(s, pid, obj(s, t.id)) + (compileCard(defOf(s, obj(s, t.id))).triggers.some((tr) => tr.event === "selfEnters") ? 5 : 0));
+    const pick = [...all].sort((a, b) => rank(b) - rank(a))[0];
+    return [pick ?? { kind: "none" }];
+  }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.

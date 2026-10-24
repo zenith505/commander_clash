@@ -149,6 +149,9 @@ function thenSubject(first: string, next: string): string {
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
   // Oblation: "The owner of target nonland permanent shuffles it into their library, then draws two cards": that owner.
   if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^draws /.test(next)) return `Its owner ${next}`;
+  // Rolling Hamsphere: "create three 1/1 red Hamster creature tokens, then it deals X damage to any target": the tokens
+  // are made by you, so "it" is the source.
+  if (/^[Cc]reate [^,]+ tokens?$/.test(first) && !/\btarget\b/.test(first) && /^it deals /.test(next)) return `~${next.slice(2)}`;
   return next.charAt(0).toUpperCase() + next.slice(1);
 }
 
@@ -1404,6 +1407,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (rider) si++;
       continue;
     }
+    // Locke, Treasure Hunter: "Each player mills a card. ... Until end of turn, you may cast a spell from among those
+    // cards": one spell from among the cards that mill put into graveyards, whoever owns them, paying its costs and
+    // following its timing (rulings), only through this permission.
+    if (/^Until end of turn, you may cast a spell from among those cards\.?$/.test(s)) {
+      const mill = effects.find((e) => e.type === "mill");
+      if (!mill || effects.some((e) => e.type === "graveyardCastThisTurn")) return null;
+      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "card" }, milled: true });
+      continue;
+    }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
     // for that card, paying its costs and following the normal timing (rulings).
     const yardTarget = /^You may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
@@ -2490,6 +2502,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true, opponentExcludes: true, max: 2 });
       si += 2;
+      continue;
+    }
+    // Benthic Anomaly: "For each opponent, choose a creature that player controls. Create a token that's a copy of one of
+    // those creatures, except its power is equal to the total power of those creatures, its toughness is equal to the
+    // total toughness of those creatures, and it's a colorless Eldrazi creature." An Eldrazi creature instead of its
+    // other card types and creature types, keeping its supertypes, and colorless (rulings).
+    if (/^[Ff]or each opponent, choose a creature that player controls$/.test(s) && /^Create a token that's a copy of one of those creatures, except its power is equal to the total power of those creatures, its toughness is equal to the total toughness of those creatures, and it's a colorless Eldrazi creature\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "copyChosenPerOpponent", filter: { kind: "object", types: ["Creature"], text: "creature" }, except: { setTypes: ["Creature"], setSubtypes: ["Eldrazi"], colors: [] } });
+      si++;
+      continue;
+    }
+    // Dance with Calamity: "As many times as you choose, you may exile the top card of your library. If the total mana
+    // value of the cards exiled this way is 13 or less, you may cast any number of spells from among those cards without
+    // paying their mana costs." Cast as it resolves, or never (rulings, CR 608.2g).
+    if (/^Shuffle your library$/.test(s) && /^As many times as you choose, you may exile the top card of your library\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "shuffle", who: { ref: "you" } });
+      continue;
+    }
+    if (/^As many times as you choose, you may exile the top card of your library$/.test(s)) {
+      const then = /^If the total mana value of the cards exiled this way is (\d+) or less, you may cast any number of spells from among those cards without paying their mana costs\.?$/.exec(sentences[si + 1] ?? "");
+      if (!then) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, pushLuck: Number(then[1]) });
+      si++;
       continue;
     }
     if (/^[Ee]xile the top card of each player's library$/.test(s) && /^[Yy]ou may cast any number of spells from among those cards without paying their mana costs$/.test(sentences[si + 1] ?? "")) {
@@ -4153,15 +4188,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may destroy another target creature. If a creature is destroyed this way, you gain life equal to its toughness"
     // (Noxious Gearhulk): destroyed even if a replacement effect put it elsewhere, not if it survived (rulings); its
     // toughness as it last existed (CR 608.2h).
-    const ifDestroyed = /^If a creature is destroyed this way, (.+)$/.exec(s);
+    // Demonic Junker: "If a creature you controlled was destroyed this way, ...": controlled as it was destroyed
+    // (CR 608.2h).
+    const ifDestroyed = /^If a creature (you controlled was|is) destroyed this way, (.+)$/.exec(s);
     if (ifDestroyed) {
       const prev = effects[effects.length - 1];
       const destroy = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
       if (destroy?.type !== "destroy" || destroy.what.ref !== "target" || ctx.targets[destroy.what.index]?.types?.join() !== "Creature") return null;
-      const then = ifDestroyed[1]!.replace(/\bits\b/g, "that creature's");
+      const yours = ifDestroyed[1] !== "is";
+      if (yours && /\bits\b/.test(ifDestroyed[2]!)) return null;
+      const then = ifDestroyed[2]!.replace(/\bits\b/g, "that creature's");
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
-      effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay", ...(yours ? { you: true as const } : {}) }, effects: inner });
       continue;
     }
     // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
@@ -5317,8 +5356,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const typeChoice = new RegExp(`^Choose (${CARD_TYPE_WORD}(?:, ${CARD_TYPE_WORD})*,? or ${CARD_TYPE_WORD})$`).exec(s);
     if (typeChoice && sentences[si + 1]) {
       const options = typeChoice[1]!.split(/,? or |, /).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
-      const next = attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx));
       const asCardType = (v: unknown): unknown => (Array.isArray(v) ? v.map(asCardType) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "chosen" && x === "type" ? "cardType" : asCardType(x)])) : v);
+      // Turnabout: "Tap all untapped permanents of the chosen type target player controls, or untap all tapped
+      // permanents of that type that player controls": which one, chosen as it resolves too (rulings), after the type.
+      const turn = /^Tap all untapped permanents of the chosen type target player controls, or untap all tapped permanents of that type that player controls\.?$/.test(sentences[si + 1]!);
+      if (turn) {
+        const tap = attempt(ctx, () => parseOne("Tap all untapped permanents of the chosen type target player controls", ctx));
+        const [first] = tap ?? [];
+        if (tap?.length !== 1 || first?.type !== "tap" || first.what.ref !== "each" || first.what.filter.tapped !== false) return null;
+        const untap: Effect = { type: "untap", what: { ...first.what, filter: { ...first.what.filter, tapped: true, text: "all tapped permanents of the chosen type that player controls" } } };
+        effects.push({ type: "choose", choice: "cardType", options }, { type: "either", options: [asCardType([first]) as Effect[], asCardType([untap]) as Effect[]], labels: ["Tap all its untapped permanents of the chosen type", "Untap all its tapped permanents of the chosen type"] });
+        si++;
+        continue;
+      }
+      const next = attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx));
       if (!next || !JSON.stringify(next).includes('"chosen":"type"')) return null;
       effects.push({ type: "choose", choice: "cardType", options }, ...(asCardType(next) as Effect[]));
       si++;

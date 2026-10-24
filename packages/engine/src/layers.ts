@@ -362,8 +362,9 @@ interface Inst {
   condition?: StaticAbility["condition"];
   /** Set when it first applies (CR 613.6). */
   locked?: ObjectId[];
-  /** A static ability an effect gave its source, not one of its card's (grantedStatics). */
+  /** A static ability an effect gave its source, not one of its card's (grantedStatics): the quoted text it came from. */
   granted?: true;
+  grantedText?: string;
   /** An emblem's static ability (CR 114.4): its source is in the command zone, with `controller` its owner. */
   emblem?: true;
   /** A static ability that works from its card's graveyard (StaticAbility.zone), with `controller` its owner. */
@@ -478,6 +479,8 @@ function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   if (!e.affects || e.emblem || e.live) return true;
   const src = chars.get(e.sourceId!);
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
+  // A granted one exists only while its source still has the ability (an effect in layer 6 may take it away, CR 613.8a).
+  if (e.grantedText !== undefined && !src.grantedAbilities.includes(e.grantedText)) return false;
   if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
   if (e.affects.kind === "attached") {
     const host = s.objects[e.sourceId!]!.attachedTo;
@@ -1402,6 +1405,7 @@ function grantedStatics(s: GameState, chars: CharMap, order: number, counted: { 
           affects: st.affects,
           condition: st.condition,
           granted: true,
+          grantedText: text,
         });
       }),
     );
@@ -1424,9 +1428,11 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
   const chars: CharMap = new Map();
   for (const id of s.battlefield) chars.set(id, printed(s, s.objects[id]!));
   let insts = gather(s).sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+  // Granted static abilities already taken in (in layer 6, those that give keywords), by key.
+  const grantedKeys = new Set<string>();
   for (const layer of LAYERS) {
     if (layer === "7a") {
-      const more = grantedStatics(s, chars, insts.length, counted);
+      const more = grantedStatics(s, chars, insts.length, counted).filter((e) => !grantedKeys.has(e.key));
       if (more.length) insts = [...insts, ...more].sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
     }
     // Suspend's "it gains haste until you lose control of the spell or the permanent it becomes" (CR 702.62a): from
@@ -1444,6 +1450,17 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       rem = rem.filter((e) => e !== pick);
       if (!pick.locked && !exists(s, pick, chars)) continue; // an earlier effect in this layer removed it
       applyInLayer(s, pick, layer, chars, true);
+      // Dancer's Chakrams: 'has "Other commanders you control get +2/+2 and have lifelink"': a granted static ability that
+      // gives keywords exists once the effect granting it has applied, so it depends on that one (CR 613.8a) and joins
+      // the rest of layer 6 from then on, in timestamp order (613.8b); its later layers apply as usual.
+      if (layer === "6") {
+        const more = grantedStatics(s, chars, insts.length, counted).filter((e) => !grantedKeys.has(e.key) && modsIn(e, "6").length);
+        for (const e of more) grantedKeys.add(e.key);
+        if (more.length) {
+          insts = [...insts, ...more].sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+          rem = [...rem, ...more.filter((e) => exists(s, e, chars))].sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+        }
+      }
       // Once it applies in layer 4 it keeps applying, even if its source loses the ability in layer 6 (CR 613.6).
       if (pick.offField && layer === "4" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), chosen: s.objects[pick.sourceId]?.chosen?.type });

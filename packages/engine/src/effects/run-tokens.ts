@@ -1,6 +1,6 @@
 import type { Effect, ObjRef, TokenSpec } from "../abilities";
 import { defOf, isPermanentCard, isType, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
+import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, obj, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
 import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -9,6 +9,7 @@ import { inCombat, attackDefault, fireEvent } from "./triggers";
 import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
 import { controllerOf, invalidateCharacteristics } from "../layers";
+import { objectMatches } from "./targeting";
 import { defMv } from "../faces";
 import { compileCard } from "../oracle";
 
@@ -143,6 +144,56 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (made.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: made, mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       });
       invalidateCharacteristics(s);
+      return;
+    }
+    case "copyChosenPerOpponent": {
+      // Benthic Anomaly: you choose a creature each opponent controls, in turn order (CR 101.4, 608.2d); none for one who
+      // controls none. Then one of those is copied, its power and toughness the totals of all of them as they are now.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.perOpponent) {
+        sc.perOpponent = { picked: [] };
+        sc.queue = apnap(s, opponents(s, ctx.controller));
+        sc.chosen = {};
+      }
+      const st = sc.perOpponent;
+      // An answer to the last question: the creature chosen for the opponent at the head of the queue.
+      if (sc.chosen?.[ctx.controller]) {
+        st.picked.push(...sc.chosen[ctx.controller]!);
+        delete sc.chosen[ctx.controller];
+      }
+      const creatures = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      while (sc.queue?.length) {
+        const opp = sc.queue[0]!;
+        const options = creatures(opp);
+        if (options.length > 1) {
+          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: e.filter.text, options, count: 1, of: opp };
+          return "paused";
+        }
+        st.picked.push(...options);
+        sc.queue.shift();
+      }
+      sc.queue = undefined;
+      const those = st.picked.filter((id) => s.objects[id]?.zone === "battlefield");
+      if (!those.length) {
+        log(s, `${src}: no opponent controls a creature, so no token is created.`);
+        return;
+      }
+      if (!st.copyPick) log(s, `${player(s, ctx.controller).name} chooses ${those.map((id) => `${nameOf(s, id)} (${player(s, controllerOf(s, obj(s, id))).name}'s)`).join(", ")}.`);
+      let pick = those[0]!;
+      if (new Set(those.map((id) => copiableDef(s, obj(s, id)).oracleId)).size > 1) {
+        if (!st.copyPick) {
+          st.copyPick = true;
+          delete sc.found;
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: "one of those creatures to copy", cards: those, min: 1, max: 1, dig: { looked: those, to: "to make a token copy of", rest: "aren't copied" } };
+          return "paused";
+        }
+        pick = those.find((id) => sc.found?.includes(id)) ?? pick;
+      }
+      const totals = [those.reduce((n, id) => n + power(s, obj(s, id)), 0), those.reduce((n, id) => n + toughness(s, obj(s, id)), 0)] as const;
+      const base = copiableDef(s, obj(s, pick));
+      if (s.resolving) s.resolving.created = [];
+      enterTogether(s, () => tokenCopies(s, ctx.controller, base, 1, ctx, { except: { ...e.except, pt: [totals[0], totals[1]] } }));
       return;
     }
     case "createTokenCopy": {

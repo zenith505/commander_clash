@@ -1,7 +1,7 @@
 # Roadmap
 
-23,964 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,717 of 4,988 (94%).
+23,982 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,730 of 4,988 (94%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,15 +22,21 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 147, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 148, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth (it changes the types of cards in every zone and of spells), Hushbringer (no
    rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield batches and look-back),
    Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of colors", spendable only
-   on Dragons: the mana mix needs a picker per X and the spend restriction), Benthic Anomaly, Locke, Treasure Hunter,
-   Dancer's Chakrams, Blast-Furnace Hellkite (offering), Faldorn, Dread Wolf Herald, Dance with Calamity, The
-   Millennium Calendar, Turnabout; Thrilling Discovery and Old One Eye ("you may discard two cards. If you do": no
-   ruling on discarding with fewer in hand); Wildfire Devils, Arcane Proxy, Don & Leo, Problem Solvers ("exile up to one
-   target artifact ... and up to one target creature ... Then return them") too. Smaller gaps from round 147: Alms
+   on Dragons: the mana mix needs a picker per X and the spend restriction); Thrilling Discovery and Old One Eye ("you
+   may discard two cards. If you do": no ruling on discarding with fewer in hand); Wildfire Devils, Arcane Proxy, Don &
+   Leo, Problem Solvers ("exile up to one target artifact ... and up to one target creature ... Then return them") too.
+   Next most played: Bandit's Talent, Chandra, Hope's Beacon, Realmbreaker, the Invasion Tree, Mjölnir, Hammer of Thor
+   ("double all damage equipped creature would deal", equip worthy), Subtlety, Séance Board, Neyith of the Dire Hunt,
+   Unstable Amulet, Braid of Fire, Lolth, Spider Queen, The Gitrog, Ravenous Ride, Consuming Tide, Depthshaker Titan.
+   Smaller gaps from round 148: bots sacrifice for offering only when they couldn't cast the spell otherwise (the
+   cheapest token or low-value permanent, never a commander); bots aim Turnabout at the opponent with the most to tap
+   (or untap their own) by a simple count, keep exiling for Dance with Calamity while 4 or more remain under its limit,
+   and copy the strongest creature for Benthic Anomaly; Patron of the Nezumi and Patron of the Orochi still miss one
+   other line each (offering itself plays). Smaller gaps from round 147: Alms
    Collector's first card is drawn without offering dredge or Scion of Halaster's look; with Collectors controlled by
    two opponents, the first in turn order applies (the drawing player doesn't choose, CR 616.1); Joust, Malamet Battle
    Glyph and Hog-Monkey Rampage miss their middle line ("if it's a Knight", "if the creature you control entered this

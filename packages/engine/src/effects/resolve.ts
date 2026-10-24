@@ -965,6 +965,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "myriad":
     case "encore":
     case "createTokenCopy":
+    case "copyChosenPerOpponent":
     case "createToken":
     case "linkedExileToken":
       return runTokensEffect(s, e, ctx, src);

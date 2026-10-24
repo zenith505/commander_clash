@@ -71,6 +71,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ attacks alone, (.+)$/, "selfAttacksAlone"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  // The Millennium Calendar: the permanents you untap in your untap step's turn-based action (CR 502.3), all at once.
+  [/^Whenever you untap one or more permanents during your untap step, (.+)$/, "youUntapInUntapStep"],
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
@@ -1658,6 +1660,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const land = parseTargetPhrase("land");
     return land?.kind === "object" ? { ...t, cast: { ...t.cast, orPlaysLand: { ...land, text: "land" }, sharesTypeWithLinked: true } } : "fail";
   }
+  // Faldorn: "Whenever you cast a spell from exile or a land you control enters from exile": the cast trigger, which a
+  // land entering from exile under your control also triggers (played or put there, CR 603.6a).
+  const landFromExile = /^Whenever you cast a spell from exile or a land you control enters from exile, (.+)$/.exec(line);
+  if (landFromExile) {
+    if (/\b(it|its|that card|that spell|that land)\b/.test(landFromExile[1]!)) return "fail";
+    const t = parseTrigger(`Whenever you cast a spell from exile, ${landFromExile[1]}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
+    return { ...t, cast: { ...t.cast, orLandEntersFromExile: true } };
+  }
   const playM = /^Whenever you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
     const legendary = /legendary/.test(playM[1]!);
@@ -2144,6 +2155,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   // "When you have 30 or more life, flip ~" (Rune-Tail), "When ~ has flying, flip it" (Student of Elements).
   // "When you control seven or more Thrulls, sacrifice ~" (Endrek Sahr).
+  // The Millennium Calendar: "When there are 1,000 or more time counters on ~, sacrifice it and each opponent loses 1,000
+  // life": "1,000" is a number.
+  const many = /^When there are (\d{1,3}(?:,\d{3})*) or more ([a-z]+) counters on ~, (.+)$/.exec(line);
+  if (many) {
+    const body = parseBody(many[3]!.replace(/\b(\d{1,3}),(\d{3})\b/g, "$1$2"), { selfIt: true });
+    return body ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min: Number(many[1]!.replace(/,/g, "")) }, body } : "fail";
+  }
   const st = new RegExp(`^When (you control no .+?|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
@@ -2357,9 +2375,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && !playerDealt;
+      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;

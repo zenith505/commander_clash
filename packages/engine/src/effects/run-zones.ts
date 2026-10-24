@@ -996,6 +996,35 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
         }
       }
+      if (!sc.castAmong && e.pushLuck !== undefined) {
+        // Dance with Calamity: one card at a time, looked at before deciding to go on (rulings), a card's mana value with
+        // X as 0 (CR 202.3e). Over the limit, none can be cast and they all stay exiled.
+        const pl = (sc.pushLuck ??= { ids: [] });
+        if (pl.asked) {
+          pl.asked = undefined;
+          const yes = sc.may;
+          sc.may = undefined;
+          const top = you.library[0];
+          if (yes && top) {
+            moveObject(s, top, "exile");
+            const o = obj(s, top);
+            if (o.zone === "exile") pl.ids.push({ id: top, zc: o.zoneChanges ?? 0 });
+            log(s, `${you.name} exiles ${defOf(s, o).name} from the top of their library (total mana value ${pl.ids.reduce((n, x) => n + defMv(defOf(s, obj(s, x.id))), 0)}).`);
+          } else pl.stop = true;
+        }
+        const total = pl.ids.reduce((n, x) => n + defMv(defOf(s, obj(s, x.id))), 0);
+        if (!pl.stop && you.library.length) {
+          pl.asked = true;
+          s.pending = { kind: "chooseMay", player: you.id, prompt: `exile the top card of your library (total mana value so far: ${total}; ${e.pushLuck} or less to cast them)`, source: src };
+          return "paused";
+        }
+        if (total > e.pushLuck) {
+          log(s, `The total mana value of the cards exiled is ${total}, more than ${e.pushLuck}: ${you.name} can't cast any of them.`);
+          sc.castAmong = { ids: [], declined: [], done: true };
+          return;
+        }
+        sc.castAmong = { ids: pl.ids, declined: [] };
+      }
       if (!sc.castAmong && e.fromYard?.randomLinked) {
         // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.
         const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));

@@ -298,7 +298,7 @@ export type Count =
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
-  | { kind: "enteredThisTurn"; types?: string[]; subtype?: string }
+  | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[] }
   /** "If you sacrificed a Food this turn" (Elanor Gardner): the permanents its controller sacrificed this turn, of that subtype or card type as they last existed. */
   | { kind: "sacrificedThisTurn"; subtype?: string; type?: string }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
@@ -1609,7 +1609,8 @@ export type Effect =
   | {
       type: "exile";
       what: ObjRef;
-      until?: "sourceLeaves";
+      /** Palace Jailer: "until an opponent becomes the monarch" (`opponentMonarch`), whoever controls the source then. */
+      until?: "sourceLeaves" | "opponentMonarch";
       linked?: boolean;
       /**
        * "For as long as that card remains exiled, its owner may cast it" (Aerial Extortionist), "... may play it" (`play`),
@@ -2823,7 +2824,7 @@ export type Effect =
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
-  | { type: "phaseOut"; what: ObjRef }
+  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**

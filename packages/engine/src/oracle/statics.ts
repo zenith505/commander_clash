@@ -375,6 +375,12 @@ export function parseActivateCondition(text: string): StaticCondition | null {
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
   // Idol of Oblivion: "Activate only if you created a token this turn."
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
+  // Lilypad Village: "Activate only if a Bird, Frog, Otter, or Rat entered the battlefield under your control this turn."
+  const enteredAny = /^an? ((?:[A-Z][a-z]+, )+)or ([A-Z][a-z]+) entered the battlefield under your control this turn$/.exec(text);
+  if (enteredAny) {
+    const types = [...enteredAny[1]!.split(", ").filter(Boolean), enteredAny[2]!];
+    return types.every((t) => CREATURE_TYPES.has(t)) ? { kind: "amount", amount: { count: { kind: "enteredThisTurn", anySubtype: types } }, min: 1 } : null;
+  }
   return parseStaticCondition(text, self);
 }
 

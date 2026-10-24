@@ -1,7 +1,7 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
@@ -758,6 +758,12 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   s.monarch = pid;
   invalidateCharacteristics(s); // "as long as you're the monarch"
   log(s, `${p.name} becomes the monarch.`);
+  // Palace Jailer: what it exiled returns as one of its controller's opponents becomes the monarch (CR 610.3).
+  const due = (s.exiledUntilMonarch ?? []).filter((x) => x.controller !== pid && opponents(s, x.controller).includes(pid));
+  if (!due.length) return;
+  s.exiledUntilMonarch = s.exiledUntilMonarch!.filter((x) => !due.includes(x));
+  if (!s.exiledUntilMonarch.length) s.exiledUntilMonarch = undefined;
+  for (const x of due) returnUntilLeaves(s, x.cards, x.source, `${p.name} became the monarch`);
 }
 
 /**

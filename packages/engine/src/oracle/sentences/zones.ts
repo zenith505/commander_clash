@@ -703,6 +703,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
+  // Palace Jailer: "exile target creature an opponent controls until an opponent becomes the monarch": it returns when one
+  // of your opponents next becomes the monarch, whatever happens to the source (rulings, CR 610.3).
+  if ((m = /^Exile (target .+) until an opponent becomes the monarch$/i.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "exile", what, until: "opponentMonarch" }] : null;
+  }
   // "When ~ enters, create a 1/1 white Soldier creature token, then attach ~ to it." (Ancestral Blade, like living
   // weapon, CR 702.92a): the token just created, or the creature just manifested ("manifest dread, then attach ~ to
   // that creature"). If ~ has left the battlefield, or can't legally be attached, it

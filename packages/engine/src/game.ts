@@ -11,7 +11,7 @@ import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } fro
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
-import { untapStepPhasing, releasePhased } from "./phasing";
+import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
@@ -1067,6 +1067,7 @@ export function moveObject(
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner));
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
+  if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
 }
 
 /** A card put into its owner's graveyard: its card types there, for "if a creature card was put into your graveyard". */
@@ -1293,7 +1294,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
  * the source leave is over (askAuraReturns), since a choice can't be asked partway through one. It can't enchant
  * anything that returned at the same time, and with nothing it can enchant it stays in exile (CR 303.4g).
  */
-function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string) {
+export function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string, why = `${source} left`) {
   const back = links.filter((l) => {
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
@@ -1304,13 +1305,13 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
       const d = defOf(s, c);
       // It returns to the zone it was exiled from (CR 610.3): Kitesail Freebooter's card goes back to its owner's hand.
       if (l.hand) {
-        log(s, `${d.name} returns to its owner's hand (${source} left).`);
+        log(s, `${d.name} returns to its owner's hand (${why}).`);
         moveObject(s, c.id, "hand");
         continue;
       }
       // Idol of Endurance: to its owner's graveyard, where it was exiled from (rulings).
       if (l.graveyard) {
-        log(s, `${d.name} returns to its owner's graveyard (${source} left).`);
+        log(s, `${d.name} returns to its owner's graveyard (${why}).`);
         moveObject(s, c.id, "graveyard");
         continue;
       }
@@ -1319,7 +1320,7 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
         r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
         continue;
       }
-      log(s, `${d.name} returns to the battlefield (${source} left).`);
+      log(s, `${d.name} returns to the battlefield (${why}).`);
       moveObject(s, c.id, "battlefield", { controller: c.owner });
       r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
     }

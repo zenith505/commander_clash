@@ -86,10 +86,24 @@ export function untapStepPhasing(s: GameState, ap: PlayerId) {
   const out = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === ap && objHasKeyword(s, obj(s, id), "Phasing"));
   const back = (s.phasedOut ?? []).filter((id) => {
     const p = s.objects[id]!.phased;
-    return p && !p.indirect && (p.by === ap || p.released);
+    return p && !p.indirect && !p.until && (p.by === ap || p.released);
   });
   phaseOut(s, out);
   phaseIn(s, back);
+}
+
+/**
+ * Oubliette left the battlefield: what it phased out "until ~ leaves the battlefield" phases in now, tapped as it does
+ * (CR 610.3; rulings: becoming tapped this way triggers nothing).
+ */
+export function phaseInUntil(s: GameState, id: ObjectId, zc: number) {
+  const back = (s.phasedOut ?? []).filter((x) => {
+    const u = s.objects[x]!.phased?.until;
+    return u && u.id === id && u.zc === zc;
+  });
+  if (!back.length) return;
+  phaseIn(s, back);
+  for (const x of back) if (s.objects[x]?.zone === "battlefield") s.objects[x]!.tapped = true;
 }
 
 /** Players who left the game whose turns would have begun: what they phased out phases in at the next untap step (CR 702.26n). */

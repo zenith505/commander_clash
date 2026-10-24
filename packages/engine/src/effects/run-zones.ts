@@ -1325,13 +1325,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     case "exile": {
       // "Until ~ leaves the battlefield": if it already left, nothing is exiled (CR 610.3a-b).
-      const me = e.until ? objects(s, { ref: "self" }, ctx)[0] : undefined;
-      if (e.until && !me) {
+      const me = e.until === "sourceLeaves" ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+      const monarch = e.until === "opponentMonarch" ? { controller: ctx.controller, source: src, cards: [] as { id: ObjectId; zc: number }[] } : undefined;
+      if (monarch) (s.exiledUntilMonarch ??= []).push(monarch);
+      if (e.until === "sourceLeaves" && !me) {
         log(s, `${src} has left the battlefield, so nothing is exiled.`);
         return;
       }
       for (const o of objects(s, e.what, ctx)) {
-        log(s, `${src} exiles ${defOf(s, o).name}${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
+        log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
         const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) } : undefined;
         moveObject(s, o.id, "exile");
@@ -1340,6 +1342,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const l of newObjects(o)) {
           if (s.objects[l.id]?.zone !== "exile") continue;
           if (me) (me.exiledUntilLeaves ??= []).push(l);
+          monarch?.cards.push(l);
           // Linked to the source as it was when the ability triggered: if that object has already left, its
           // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
           if (e.linked && ctx.sourceId) {

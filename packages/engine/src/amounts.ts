@@ -287,7 +287,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "tokensCreatedThisTurn":
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
     case "enteredThisTurn":
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype))).length;
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t)))).length;
     case "sacrificedThisTurn":
       return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type))).length;
     case "attackersThisTurn":
@@ -696,7 +696,7 @@ function describeCount(c: Count): string {
     case "tokensCreatedThisTurn":
       return `#${c.subtype ? `${c.subtype} ` : ""}tokens you created this turn`;
     case "enteredThisTurn":
-      return `#${c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
+      return `#${c.anySubtype?.join("/") ?? c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
     case "sacrificedThisTurn":
       return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s you sacrificed this turn`;
     case "attackersThisTurn":

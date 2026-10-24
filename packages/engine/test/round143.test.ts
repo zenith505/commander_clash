@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, botActions, characteristics, invalidateCharacteristics, isFullySupported, moveObject, planActivate, planCast, power, toughness, turnFaceUpProblem, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, abilityProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, moveObject, objHasKeyword, planActivate, planCast, power, toughness, turnFaceUpProblem, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -431,6 +431,8 @@ describe("Virtue of Courage", () => {
 
   it("is fully supported; noncombat damage to an opponent: you may exile that many and play them this turn", () => {
     expect(isFullySupported(virtue)).toBe(true);
+    // Thor, Guardian of Midgard has the same trigger.
+    supported(card("Thor, Guardian of Midgard", "Legendary Creature — God Warrior Hero", "{3}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying\nWhenever a source you control deals noncombat damage to an opponent, you may exile that many cards from the top of your library. You may play those cards this turn." }));
     const { s: s0, ap, ids } = setup([shock]);
     s0.cards[virtue.oracleId] = virtue;
     putOnBattlefield(s0, ap, virtue);
@@ -444,5 +446,177 @@ describe("Virtue of Courage", () => {
       expect(s.objects[id]!.zone).toBe("exile");
       expect(s.objects[id]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn" });
     }
+  });
+});
+
+describe("Scion of Draco", () => {
+  const scion = card("Scion of Draco", "Artifact Creature — Dragon", "{12}", { power: "4", toughness: "4", keywords: ["Flying", "Domain"], oracleText: "Domain — This spell costs {2} less to cast for each basic land type among lands you control.\nFlying\nEach creature you control has vigilance if it's white, hexproof if it's blue, lifelink if it's black, first strike if it's red, and trample if it's green." });
+
+  it("is fully supported; each keyword by color, for your creatures only", () => {
+    supported(scion);
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, scion);
+    const wg = putOnBattlefield(s, ap, card("Test Selesnya", "Creature — Elf", "{G}{W}", { power: "2", toughness: "2" }));
+    const ub = putOnBattlefield(s, ap, card("Test Dimir", "Creature — Rogue", "{U}{B}", { power: "2", toughness: "2" }));
+    const red = putOnBattlefield(s, ap, card("Test Red", "Creature — Goblin", "{R}", { power: "1", toughness: "1" }));
+    const theirs = putOnBattlefield(s, nextOf(s, ap), card("Test Their Green", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    const has = (id: string, k: string) => objHasKeyword(s, s.objects[id]!, k);
+    expect([has(wg, "Vigilance"), has(wg, "Trample"), has(wg, "Hexproof")]).toEqual([true, true, false]);
+    expect([has(ub, "Hexproof"), has(ub, "Lifelink"), has(ub, "First strike")]).toEqual([true, true, false]);
+    expect(has(red, "First strike")).toBe(true);
+    expect(has(theirs, "Trample")).toBe(false);
+  });
+});
+
+describe("Palace Jailer", () => {
+  const jailer = card("Palace Jailer", "Creature — Human Soldier", "{2}{W}{W}", { power: "2", toughness: "2", oracleText: "When this creature enters, you become the monarch.\nWhen this creature enters, exile target creature an opponent controls until an opponent becomes the monarch." });
+
+  it("is fully supported; the creature comes back when an opponent becomes the monarch, even after the Jailer left", () => {
+    supported(jailer);
+    const { s: s0, ap, ids } = setup([jailer]);
+    const opp = nextOf(s0, ap);
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Test Their Bear" }));
+    const attacker = putOnBattlefield(s0, opp, bear({ name: "Test Their Attacker" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+      else if (s.pending) break;
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.monarch).toBe(ap);
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    // The Jailer leaving doesn't bring it back (rulings).
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    // The opponent hits the monarch and takes it: the creature returns under its owner's control.
+    s = swing(s, opp, ap, [attacker]);
+    s = resolveAll(s);
+    expect(s.monarch).toBe(opp);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(s.objects[theirs]!.controller).toBe(opp);
+  });
+});
+
+describe("Oubliette", () => {
+  const oubliette = card("Oubliette", "Enchantment", "{1}{B}{B}", { oracleText: "When this enchantment enters, target creature phases out until this enchantment leaves the battlefield. Tap that creature as it phases in this way. (Auras and Equipment phase out with it. While permanents are phased out, they're treated as though they don't exist.)" });
+  const aura = card("Test Might", "Enchantment — Aura", "{G}", { keywords: ["Enchant"], oracleText: "Enchant creature\nEnchanted creature gets +1/+1." });
+
+  it("is fully supported; phased out (with its Aura) through its untap steps, back tapped when Oubliette leaves", () => {
+    supported(oubliette);
+    const { s: s0, ap, ids } = setup([oubliette]);
+    const opp = nextOf(s0, ap);
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Test Their Bear" }));
+    const a = putOnBattlefield(s0, opp, aura);
+    s0.objects[a]!.attachedTo = theirs;
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+      else if (s.pending) break;
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[theirs]!.zone).toBe("phasedOut");
+    expect(s.objects[a]!.zone).toBe("phasedOut");
+    // Its controller's untap step doesn't bring it back.
+    s = passUntil(s, "main1", opp);
+    expect(s.objects[theirs]!.zone).toBe("phasedOut");
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(s.objects[theirs]!.tapped).toBe(true);
+    expect(s.objects[a]!.zone).toBe("battlefield");
+    expect(s.objects[a]!.attachedTo).toBe(theirs);
+  });
+
+  it("Oubliette gone before its trigger resolves: nothing phases out (rulings)", () => {
+    const { s: s0, ap, ids } = setup([oubliette]);
+    const theirs = putOnBattlefield(s0, nextOf(s0, ap), bear({ name: "Test Their Bear" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && !s.stack.some((x) => x.kind === "ability"); i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    s = resolveAll(s);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+  });
+});
+
+describe("Lilypad Village", () => {
+  const lilypad = card("Lilypad Village", "Land", "", { oracleText: "{T}: Add {C}.\n{T}: Add {U}. Spend this mana only to cast a creature spell.\n{U}, {T}: Surveil 2. Activate only if a Bird, Frog, Otter, or Rat entered the battlefield under your control this turn." });
+  const frog = card("Test Frog", "Creature — Frog", "{U}", { power: "1", toughness: "1" });
+  const human = card("Test Human", "Creature — Human", "{U}", { power: "1", toughness: "1" });
+  const island = card("Island", "Basic Land — Island", "", { oracleText: "({T}: Add {U}.)" });
+
+  it("surveils only after a Bird, Frog, Otter or Rat entered under your control this turn (CR 602.5b)", () => {
+    supported(lilypad);
+    const { s: s0, ap, ids } = setup([human, frog]);
+    const lp = putOnBattlefield(s0, ap, lilypad);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s0, ap, island);
+    const surveil = abilityIndex(s0, lp, "{U}, {T}");
+    expect(abilityProblem(s0, ap, lp, surveil)).toMatch(/can.t be activated now/);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(abilityProblem(s, ap, lp, surveil)).toMatch(/can.t be activated now/);
+    // A Frog entering under an opponent's control doesn't count.
+    putOnBattlefield(s, nextOf(s, ap), frog);
+    expect(abilityProblem(s, ap, lp, surveil)).toMatch(/can.t be activated now/);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    s = run(s, planActivate(s, ap, lp, surveil));
+    s = resolveAll(s);
+    expect(s.pending?.kind).toBe("arrangeTop");
+  });
+});
+
+describe("Scavenged Brawler", () => {
+  const brawler = card("Scavenged Brawler", "Artifact Creature — Construct", "{6}", { power: "4", toughness: "4", keywords: ["Flying", "Vigilance", "Trample", "Lifelink"], oracleText: "Flying, vigilance, trample, lifelink\n{5}, Exile this card from your graveyard: Choose target creature. Put four +1/+1 counters, a flying counter, a vigilance counter, a trample counter, and a lifelink counter on that creature. Activate only as a sorcery." });
+
+  it("exiles itself from the graveyard to put four +1/+1 counters and four keyword counters on target creature", () => {
+    supported(brawler);
+    const { s: s0, ap } = setup([]);
+    const b = into(s0, ap, brawler, "graveyard");
+    const target = putOnBattlefield(s0, ap, bear());
+    let s = resolveAll(run(s0, planActivate(s0, ap, b, abilityIndex(s0, b, "{5}"), [{ kind: "object", id: target }])));
+    expect(s.objects[b]!.zone).toBe("exile");
+    expect([power(s, s.objects[target]!), toughness(s, s.objects[target]!)]).toEqual([6, 6]);
+    for (const kw of ["Flying", "Vigilance", "Trample", "Lifelink"]) expect(objHasKeyword(s, s.objects[target]!, kw), kw).toBe(true);
+  });
+});
+
+describe("Falkenrath Aristocrat and Ebon Praetor: \"if the sacrificed creature was a Human\"", () => {
+  const aristocrat = card("Falkenrath Aristocrat", "Creature — Vampire Noble", "{2}{B}{R}", { power: "4", toughness: "1", keywords: ["Flying", "Haste"], oracleText: "Flying, haste\nSacrifice a creature: This creature gains indestructible until end of turn. If the sacrificed creature was a Human, put a +1/+1 counter on this creature." });
+  const torturer = card("Falkenrath Torturer", "Creature — Vampire", "{2}{B}", { power: "2", toughness: "1", oracleText: "Sacrifice a creature: This creature gains flying until end of turn. If the sacrificed creature was a Human, put a +1/+1 counter on this creature." });
+  const praetor = card("Ebon Praetor", "Creature — Avatar Praetor", "{4}{B}{B}", { power: "5", toughness: "5", keywords: ["First strike", "Trample"], oracleText: "First strike, trample\nAt the beginning of your upkeep, put a -2/-2 counter on this creature.\nSacrifice a creature: Remove a -2/-2 counter from this creature. If the sacrificed creature was a Thrull, put a +1/+0 counter on this creature. Activate only during your upkeep and only once each turn." });
+  const human = card("Test Human", "Creature — Human Soldier", "{W}", { power: "1", toughness: "1" });
+  const shifter = card("Test Changeling", "Creature — Shapeshifter", "{U}", { power: "1", toughness: "1", keywords: ["Changeling"], oracleText: "Changeling (This card is every creature type.)" });
+  const sac = (s: GameState, ap: PlayerId, src: string, fodder: string) => resolveAll(act(s, { type: "activateAbility", player: ap, objectId: src, index: 0, costs: { sacrifice: [fodder] } }));
+
+  it("checks the sacrificed creature's last known creature types, changelings included (rulings)", () => {
+    supported(aristocrat, torturer, praetor);
+    const { s: s0, ap } = setup([]);
+    const fa = putOnBattlefield(s0, ap, aristocrat);
+    const [h, b, c] = [putOnBattlefield(s0, ap, human), putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, shifter)];
+    let s = sac(s0, ap, fa, b);
+    expect(objHasKeyword(s, s.objects[fa]!, "Indestructible")).toBe(true);
+    expect(power(s, s.objects[fa]!)).toBe(4);
+    s = sac(s, ap, fa, h);
+    expect(power(s, s.objects[fa]!)).toBe(5);
+    s = sac(s, ap, fa, c);
+    expect(power(s, s.objects[fa]!)).toBe(6);
+  });
+
+  it("Ebon Praetor: a Thrull also adds a +1/+0 counter, during your upkeep only", () => {
+    const thrull = card("Test Thrull", "Creature — Thrull", "{B}", { power: "1", toughness: "1" });
+    const { s: s0, ap } = setup([]);
+    const ep = putOnBattlefield(s0, ap, praetor);
+    const t1 = putOnBattlefield(s0, ap, thrull);
+    expect(abilityProblem(s0, ap, ep, 0, undefined, undefined, undefined, undefined, { sacrifice: [t1] })).toMatch(/can.t be activated now/);
+    let s = passUntil(s0, "upkeep", ap);
+    for (let i = 0; i < 10 && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[ep]!.counters?.["-2/-2"]).toBe(1);
+    s = sac(s, ap, ep, t1);
+    expect(s.objects[ep]!.counters?.["-2/-2"] ?? 0).toBe(0);
+    expect([power(s, s.objects[ep]!), toughness(s, s.objects[ep]!)]).toEqual([6, 5]);
   });
 });

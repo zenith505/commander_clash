@@ -455,7 +455,7 @@ export interface GameObject {
    * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
    * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
    */
-  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true };
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true; /** Oubliette: it phases in (tapped) only when this object leaves the battlefield. */ until?: { id: ObjectId; zc: number } };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
@@ -1666,6 +1666,8 @@ export interface GameState {
    * `auras`, Auras that come back once their owner has chosen what each enchants (CR 303.4f), which can't be anything
    * in `returned`. `asking`: that one is being asked now.
    */
+  /** Palace Jailer: cards exiled "until an opponent becomes the monarch", an opponent of `controller` (CR 610.3). */
+  exiledUntilMonarch?: { controller: PlayerId; source: string; cards: { id: ObjectId; zc: number }[] }[];
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];

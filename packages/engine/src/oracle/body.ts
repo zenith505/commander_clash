@@ -614,6 +614,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
+  // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
+  // counters on that target.
+  text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
   // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
   // sacrificing player chooses anyway, CR 701.21a).
   text = text.replace(/\b(sacrifices a creature) of their choice (that dealt combat damage to you this turn)\b/, "$1 $2");
@@ -1264,6 +1267,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         { kind: "addAbility", text: `${namedGains[2]}.` },
       ];
       effects.push({ type: "may", effects: [{ type: "continuous", what: { ref: "self" }, mods, duration: "game" }], text: `have ~ become ${becomeNamed[1]}` });
+      si++;
+      continue;
+    }
+    // Oubliette: "target creature phases out until ~ leaves the battlefield. Tap that creature as it phases in this way."
+    // It doesn't phase in in its controller's untap step, but right after ~ leaves (rulings, CR 610.3); nothing if ~ has
+    // already left.
+    const phaseUntil = !ctx.spell && /^([Tt]arget creature) phases out until ~ leaves the battlefield$/.exec(s);
+    if (phaseUntil && sentences[si + 1]?.replace(/\.$/, "") === "Tap that creature as it phases in this way") {
+      const what = parseObject(phaseUntil[1]!.toLowerCase(), ctx);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "phaseOut", what, untilSourceLeaves: true });
       si++;
       continue;
     }

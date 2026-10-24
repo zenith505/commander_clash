@@ -127,6 +127,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "the chosen player") return { ref: "selfChosenPlayer" };
   // "~'s controller loses 2 life" (Xantcha): whoever controls the source, who may not be the ability's controller.
   if (x === "~'s controller") return { ref: "selfController" };
+  // Yes Man, Personal Securitron: "When ~ leaves the battlefield, its owner creates ...": whose ~ is (CR 108.3), whoever
+  // controlled it.
+  if ((x === "its owner" || x === "~'s owner") && (ctx.selfIt || ctx.selfCard) && !ctx.subjectIt && !ctx.targets.length) return { ref: "selfOwner" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   // "Whenever ~ deals combat damage to an opponent, it deals that much damage to each other opponent" (Hydra Omnivore).
@@ -448,7 +451,7 @@ function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];
 }
 
-const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+|X) (other )?|(another) |(one or two|one, two, or three|any number of) (other )?)target (.+)$/i;
+const SEVERAL_TARGETS = /^(?:(up to )?(one hundred|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (other )?|(another) |(one or two|one, two, or three|any number of) (other )?)target (.+)$/i;
 
 /**
  * "Up to two target creatures", "two target artifacts", "one or two target creatures", "another target
@@ -464,7 +467,11 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Any number of target creatures" (CR 601.2c, 115.6), "up to X target artifacts" with the spell's X (107.3a): how
   // many is announced as it's cast, so one entry stands for them all until then (TargetSpec.many).
   // "Destroy X target creatures": exactly X of them (Eliminate the Competition).
-  const many = range === "any number of" ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
+  // "Up to one hundred target creatures" (Baldin, Century Herdmaster): more than a few, so as with "any number of", no
+  // more than that many (TargetSpec.manyMax).
+  const most = upTo && count !== "X" ? (count!.toLowerCase() === "one hundred" ? 100 : num(count!)) : 0;
+  const manyMax = most > 6 ? most : undefined;
+  const many = range === "any number of" || manyMax ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
   // A spell's X, or an activated ability's {X} (CR 107.3a, 602.2b), announced before targets are chosen.
   if (count === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
@@ -514,7 +521,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const first = ctx.targets.length;
   if (many) {
     if (single || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };

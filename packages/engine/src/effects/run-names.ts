@@ -1,6 +1,6 @@
 import type { Effect } from "../abilities";
 import { defOf } from "../cards";
-import { enterTogether, log, loseLife, moveObject, obj, player } from "../game";
+import { creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
 import { currentName } from "../names";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
@@ -67,7 +67,10 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "Shares a card type with that permanent": its types as it last existed if it's gone (CR 608.2h).
       const shared = e.sharesTypeWith === undefined ? undefined : targetTypes(s, ctx, e.sharesTypeWith);
       if (shared && !shared.length) return;
-      const matches = (id: ObjectId) => printedMatches(filter, defOf(s, obj(s, id))) && (!shared || defOf(s, obj(s, id)).types.some((t) => shared.includes(t)));
+      // "Shares a creature type with it" (Heirloom Blade): the creature that died, as it last existed (rulings). With no
+      // creature type, nothing shares one: the whole library is revealed.
+      const kin = e.sharesCreatureTypeWithSubject ? subjectCreatureTypes(s, ctx) : undefined;
+      const matches = (id: ObjectId) => printedMatches(filter, defOf(s, obj(s, id))) && (!shared || defOf(s, obj(s, id)).types.some((t) => shared.includes(t))) && (!e.sharesCreatureTypeWithSubject || (!!kin && shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))));
       // "Until you reveal X land cards" (Open the Way): X of them, or as many as there are; with X = 0, none is revealed.
       const want = e.n === undefined ? 1 : Math.max(0, amountNow(s, e.n, ctx));
       const named = !(filter.chosen === "name" && ctx.chosen?.name === undefined);
@@ -126,6 +129,18 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
   }
+}
+
+/** The trigger subject's creature types: as it is on the battlefield, or as it last existed there (CR 608.2h). */
+function subjectCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string> | "all" | undefined {
+  const sub = ctx.subject;
+  const o = sub ? s.objects[sub.id] : undefined;
+  if (!sub || !o) return undefined;
+  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return creatureTypesOf(s, o);
+  // A dies trigger's subject is the card in its new zone, one zone change after it left the battlefield.
+  const lk = s.lastKnown?.[o.id];
+  if (!lk?.creatureTypes || (lk.zc !== sub.zc && lk.zc !== sub.zc - 1)) return undefined;
+  return lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes);
 }
 
 /** The card types of target `index`: as it is on the battlefield, or as it last existed there (CR 608.2h). */

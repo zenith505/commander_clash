@@ -242,6 +242,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const text = `draw ${m[2] === "a" || m[2] === "one" ? "a card" : `${m[2]} cards`}`;
     return [{ type: "punisher", who, options, effects: [m[1] ? { type: "may", effects: [draw], text } : draw], thenText: m[1] ? `may ${text}` : text.replace(/^draw/, "draws") }];
   }
+  // Indulgent Tormentor: "draw a card unless target opponent sacrifices a creature of their choice or pays 3 life": that
+  // opponent chooses as it resolves (CR 608.2d), an option they can't do not being one (CR 608.2d); you draw if they don't.
+  if ((m = new RegExp(`^(?:[Yy]ou )?[Dd]raw ${NUM} cards? unless target opponent ((?:sacrifices?|discards?|pays?) .+)$`).exec(s))) {
+    const who = parsePlayer("target opponent", ctx);
+    const options = who && parsePunisherOptions(m[2]!, ctx);
+    if (!who || !options) return null;
+    const text = `draw ${m[1] === "a" || m[1] === "one" ? "a card" : `${m[1]} cards`}`;
+    return [{ type: "punisher", who, options, effects: [{ type: "draw", who: { ref: "you" }, n: num(m[1]!) }], thenText: text.replace(/^draw/, "draws") }];
+  }
   // Athreos, God of Passage: "return it to your hand unless target opponent pays 3 life": that opponent decides as it
   // resolves (rulings); with no legal target, nothing happens.
   if ((m = /^(.+?) unless target opponent (pays? .+)$/.exec(s)) && /^return it to /i.test(m[1]!)) {

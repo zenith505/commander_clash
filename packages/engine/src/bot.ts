@@ -3472,7 +3472,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
-        if (!targets || pointlessAttach(s, body, targets, id)) continue;
+        if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
         const costs = discardX !== undefined ? discardXCosts(s, pid, o, ab, targets, discardX) : abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
@@ -3886,6 +3886,18 @@ function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId
 }
 
 /** "Attach target Equipment you control to target creature you control" (Brass Squire) where it already is, or with no Equipment chosen. */
+/**
+ * "Move a counter from target creature an opponent controls onto target creature you control" (Rikku's Steal): only a
+ * counter that helps, from one that has it, onto ours.
+ */
+function pointlessMove(s: GameState, pid: PlayerId, body: AbilityBody, targets: TargetChoice[]): boolean {
+  const e = body.effects.find((x) => x.type === "moveCounter");
+  if (e?.type !== "moveCounter" || e.from.ref !== "target" || e.to.ref !== "target") return false;
+  const [from, to] = [targets[e.from.index], targets[e.to.index]].map((t) => (t?.kind === "object" ? s.objects[t.id] : undefined));
+  if (!from || !to || controllerOf(s, to) !== pid) return true;
+  return !Object.entries(from.counters).some(([k, n]) => (n ?? 0) > 0 && (e.counter === "any" ? !harmfulCounter(k) : k === e.counter) && !harmfulCounter(k));
+}
+
 function pointlessAttach(s: GameState, body: AbilityBody, targets: TargetChoice[], sourceId: ObjectId): boolean {
   const e = body.effects.find((x) => x.type === "attach" && x.source);
   if (e?.type !== "attach" || e.source?.ref !== "target") return false;

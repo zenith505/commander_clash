@@ -499,6 +499,17 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? controllerOf(s, me) : lk && lk.zc === ctx.sourceZc ? lk.controller : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "neighbor": {
+      // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
+      const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === ctx.controller);
+      const i = seats.indexOf(ctx.controller);
+      const p = seats[(i + (ref.side === "left" ? 1 : seats.length - 1)) % seats.length];
+      return i >= 0 && p !== undefined && p !== ctx.controller ? [p] : [];
+    }
+    case "selfOwner": {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return me && !player(s, me.owner).lost ? [me.owner] : [];
+    }
     case "combatDamagedBySelf": {
       // This object as the ability's source, the same one that dealt the damage (CR 400.7).
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
@@ -700,6 +711,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
             // "Can't be blocked by creatures that player controls" (The Black Gate): the player chosen as it resolved.
             m.kind === "cantBeBlockedBy" && m.filter.controller === "chosenPlayer"
             ? { ...m, filter: (({ controller: _, ...rest }) => ({ ...rest, controlledBy: s.resolving?.chosen?.player ?? -1 }))(m.filter) }
+            : // "Can't be blocked by creatures your opponents control this turn" (Rikku): the opponents of its controller.
+              m.kind === "cantBeBlockedBy" && m.filter.controller === "opponent"
+            ? { ...m, filter: (({ controller: _, ...rest }) => ({ ...rest, notControlledBy: ctx.controller }))(m.filter) }
             : // "Can't be blocked by creatures of that color this turn" (Skrelv): the color chosen as it resolved.
               m.kind === "cantBeBlockedBy" && m.filter.chosen === "color"
             ? { ...m, filter: (({ chosen: _, ...rest }) => (s.resolving?.chosen?.color ? { ...rest, colors: [s.resolving.chosen.color] } : { ...rest, controlledBy: -1 }))(m.filter) }

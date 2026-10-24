@@ -855,6 +855,17 @@ export function compile(d: CardDef): CompiledCard {
       out.entersTapped = true;
       continue;
     }
+    // Traxos, Scourge of Kroog: "~ enters tapped and doesn't untap during your untap step": both.
+    if (/^~ enters tapped and doesn't untap during your untap step\.$/.test(line)) {
+      const st = parseStatic("~ doesn't untap during your untap step.");
+      if (!st) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.entersTapped = true;
+      out.statics.push({ ...st, text: line });
+      continue;
+    }
     // "Creatures your opponents control enter tapped." "Artifacts and lands enter tapped." "Creatures and nonbasic
     // lands your opponents control enter tapped." An ability word may come first (CR 207.2c).
     const othersTapped = /^(?:[A-Z][A-Za-z' -]+ — )?([A-Z][^.—]*?) enter tapped\.$/.exec(line);

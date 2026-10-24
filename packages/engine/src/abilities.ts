@@ -214,7 +214,7 @@ export type Count =
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
-  | { kind: "spellsCastThisTurn"; filter?: TargetSpec }
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -290,7 +290,7 @@ export type Count =
   /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
   | { kind: "mutations" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
-  | { kind: "diedThisTurn"; yours?: true }
+  | { kind: "diedThisTurn"; yours?: true; nontoken?: true }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
@@ -435,6 +435,8 @@ export interface TargetSpec {
   /** "chosenPlayer": "creatures that player controls" after "Choose a player ..." (The Black Gate), bound as it resolves (fixMods). */
   controller?: "you" | "opponent" | "eventPlayer" | "enchanted" | "chosenPlayer";
   controlledBy?: PlayerId;
+  /** "Creatures your opponents control" in an effect, bound to the effect's controller as it resolves (Rikku). */
+  notControlledBy?: PlayerId;
   /** A battle's protector (CR 310.9): "each battle they protect" after "each opponent", "battle that player protects". */
   protector?: "opponent" | "eventPlayer";
   protectedBy?: PlayerId;
@@ -626,6 +628,8 @@ export interface TargetSpec {
    * variable number of targets, announced as it's cast (CR 601.2c), any number from 0 (115.6), up to X, or exactly X. This one entry stands for all of them until then;
    * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
    */
+  /** With `many` "any": "up to one hundred target creatures" (Baldin), no more than this many. */
+  manyMax?: number;
   many?: "any" | "x" | "exactX" | /** "Another target for each time ~ was kicked" (Comet Storm): as many as times kicked, made so as it's cast (gateBody). */ "kicked";
   /**
    * "For each opponent, destroy up to one target artifact that player controls": one "up to one" target for each
@@ -854,6 +858,10 @@ export type PlayerRef =
   | { ref: "selfChosenPlayer" }
   /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
   | { ref: "selfController" }
+  /** "The player to your right" (Bucknard's Everfull Purse): the one before you in turn order, "to your left" the one after (CR 101.4). */
+  | { ref: "neighbor"; side: "left" | "right" }
+  /** "Its owner" in an ability of ~ about ~ itself (Yes Man): whose ~ is (CR 108.3). */
+  | { ref: "selfOwner" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
   | { ref: "combatDamagedBySelf" }
   /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
@@ -2161,6 +2169,8 @@ export type Effect =
       who?: PlayerRef;
       /** "A permanent card that shares a card type with that permanent" (Wild Magic Surge): target `index` as it is, or last was on the battlefield (CR 608.2h). */
       sharesTypeWith?: number;
+      /** "A creature card that shares a creature type with it" (Heirloom Blade): with the trigger's subject as it last existed (CR 608.2h). */
+      sharesCreatureTypeWithSubject?: true;
     }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
@@ -3063,7 +3073,7 @@ export type SpellCondition =
    * The source is still on the battlefield as the same object (CR 400.7), with `yours` under your control: "Sacrifice ~.
    * When you do, ..." can be done (CR 701.21a).
    */
-  | { kind: "selfHere"; yours?: true }
+  | { kind: "selfHere"; yours?: true; /** "When they do" after "target opponent gains control of ~" (Yes Man): that target player controls it. */ controlledByTarget?: number }
   /** Your library has at least `n` cards, so "mill n cards" mills them all ("Mill three cards. When you do, ..."). */
   | { kind: "libraryHas"; n: number }
   /**

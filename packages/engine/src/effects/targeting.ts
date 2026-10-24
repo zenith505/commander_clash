@@ -99,6 +99,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
+  if (spec.notControlledBy !== undefined && c.controller === spec.notControlledBy) return false;
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
@@ -550,7 +551,8 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
   const spec = body.targets[i]!;
   const room = spec.skip ? 0 : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => !(spec.notSource && t.kind === "object" && t.id === sourceId)).length;
   // Divided as you choose: no more targets than there is to divide (at least 1 each, CR 601.2d).
-  const most = spec.divided?.amount || (spec.divided && spec.many === "exactX") ? Math.min(room, spec.divided.total) : room;
+  const most0 = spec.divided?.amount || (spec.divided && spec.many === "exactX") ? Math.min(room, spec.divided.total) : room;
+  const most = spec.manyMax !== undefined ? Math.min(most0, spec.manyMax) : most0;
   // "X target creatures": exactly X, each one required (as many as there are, if fewer: it can't be cast so).
   if (spec.many === "exactX") return expandMany(body, Math.min(x, most));
   return expandMany(body, spec.many === "x" ? Math.min(x, most) : most, true);

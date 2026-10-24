@@ -509,7 +509,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "choseWord":
       return apnap(s, Object.entries(s.resolving?.chose ?? {}).filter(([, w]) => w === ref.option).map(([k]) => Number(k) as PlayerId)).filter((p) => !player(s, p).lost);
     case "choseThisWay":
-      return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost);
+      return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost && (!ref.opponents || p !== ctx.controller));
     case "notChoseThisWay": {
       const did = s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? [];
       return (ref.opponents ? opponents(s, ctx.controller) : apnap(s, s.players.map((p) => p.id))).filter((p) => !did.includes(p) && !player(s, p).lost);
@@ -906,6 +906,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ownersGainControl":
     case "exchangeControl":
     case "playerGains":
+    case "attackBanNextTurn":
     case "attach":
     case "attachAny":
     case "attachLastKnown":

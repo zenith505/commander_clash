@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, attackProblem, botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -239,5 +239,67 @@ describe("Satoru Umezawa: creature cards in your hand have ninjutsu, and ninjuts
     const s = attackUnblocked(s0, ap, [b], opp);
     const acts = botActions(s, ap);
     expect(acts.find((a) => a.type === "activateAbility" && a.objectId === ids[0])).toBeTruthy();
+  });
+});
+
+describe("The Second Doctor: each player may draw; opponents who do can't attack you during their next turn", () => {
+  const doctor = card("The Second Doctor", "Legendary Creature — Time Lord Doctor", "{2}{W}{U}", {
+    power: "2",
+    toughness: "4",
+    oracleText: "Players have no maximum hand size.\nHow Civil of You — At the beginning of your end step, each player may draw a card. Each opponent who does can't attack you or permanents you control during their next turn.",
+  });
+  const walker = card("Test Walker", "Legendary Planeswalker — Testwalker", "{3}", { loyalty: "5", oracleText: "+1: You gain 1 life." });
+
+  it("is fully supported", () => supported(doctor));
+
+  it("the opponent who drew can't attack you or your planeswalker during their next turn; the one who didn't can", () => {
+    const { s: s0, ap } = setup([]);
+    const [b, c] = [nextOf(s0, ap), nextOf(s0, nextOf(s0, ap))];
+    putOnBattlefield(s0, ap, doctor);
+    const pw = putOnBattlefield(s0, ap, walker);
+    const hands = Object.fromEntries(s0.turnOrder.map((p) => [p, s0.players[p]!.hand.length]));
+    let s = passUntil(s0, "end", ap);
+    // Starting with you, each decides in turn order (rulings on the "each player may" cards).
+    const answers: Record<number, boolean> = { [ap]: true, [b]: true, [c]: false, [nextOf(s0, c)]: true };
+    for (let i = 0; i < 20 && (s.pending || s.stack.length || s.triggerQueue.length); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseMay") {
+        if (p.player === b) expect(p.otherwise).toMatch(/can't attack .+ during your next turn/);
+        if (p.player === ap) expect(p.otherwise).toBeUndefined();
+        s = act(s, { type: "chooseMay", player: p.player, yes: answers[p.player]! });
+      } else if (p) throw new Error(`unexpected ${p.kind}`);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.players[ap]!.hand.length).toBe(hands[ap]! + 1);
+    expect(s.players[b]!.hand.length).toBe(hands[b]! + 1);
+    expect(s.players[c]!.hand.length).toBe(hands[c]!);
+    const bb = putOnBattlefield(s, b, bear({ name: "B Bear" }));
+    const cb = putOnBattlefield(s, c, bear({ name: "C Bear" }));
+    // Not yet: it's still our turn.
+    expect(attackProblem(s, s.objects[bb]!, ap)).toBeNull();
+    s = passUntil(s, "declareAttackers", b);
+    expect(attackProblem(s, s.objects[bb]!, ap)).toMatch(/can't attack/);
+    expect(attackProblem(s, s.objects[bb]!, ap, true, pw)).toMatch(/can't attack/);
+    expect(attackProblem(s, s.objects[bb]!, c)).toBeNull();
+    expect(() => act(s, { type: "declareAttackers", player: b, attacks: [{ attacker: bb, defender: ap }] })).toThrow();
+    s = passUntil(s, "declareAttackers", c);
+    expect(attackProblem(s, s.objects[cb]!, ap)).toBeNull();
+    // B's next turn after that: free again (the Doctor gone, so it doesn't ask again).
+    const d = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === "The Second Doctor")!;
+    s.battlefield.splice(s.battlefield.indexOf(d), 1);
+    s.objects[d]!.zone = "graveyard";
+    s = passUntil(passUntil(s, "upkeep", ap), "declareAttackers", b);
+    expect(attackProblem(s, s.objects[bb]!, ap)).toBeNull();
+  });
+
+  it("a bot opponent draws unless the Doctor's controller is the only opponent it has left", () => {
+    const { s: s0, ap } = setup([]);
+    const b = nextOf(s0, ap);
+    putOnBattlefield(s0, ap, doctor);
+    let s = passUntil(s0, "end", ap);
+    for (let i = 0; i < 20 && s.pending?.player !== b; i++) s = s.pending?.kind === "chooseMay" ? act(s, { type: "chooseMay", player: s.pending.player, yes: false }) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(botActions(s, b)[0]).toMatchObject({ type: "chooseMay", yes: true });
+    for (const p of s.turnOrder) if (p !== ap && p !== b) s.players[p]!.lost = true;
+    expect(botActions(s, b)[0]).toMatchObject({ type: "chooseMay", yes: false });
   });
 });

@@ -819,7 +819,7 @@ export type PlayerRef =
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
   | { ref: "opponentsAttackingEventPlayer" }
   /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
-  | { ref: "choseThisWay" }
+  | { ref: "choseThisWay"; /** "Each opponent who does" (The Second Doctor): only the opponents among them. */ opponents?: true }
   /** "Each opponent who didn't" (Kynaios and Tiro), "each player who doesn't": those not among choseThisWay, still in the game. */
   | { ref: "notChoseThisWay"; opponents?: true }
   /** The players who did none of a punisher's options (see the punisher effect). */
@@ -2924,6 +2924,11 @@ export type Effect =
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
+  /**
+   * "Each opponent who does can't attack you or permanents you control during their next turn" (The Second Doctor):
+   * see Player.attackBansNextTurn.
+   */
+  | { type: "attackBanNextTurn"; who: PlayerRef }
   | {
       type: "playerGains";
       keywords: string[];

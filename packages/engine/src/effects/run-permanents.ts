@@ -1058,6 +1058,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `Until ${e.duration === "endOfTurn" ? "end of turn" : `${player(s, ctx.controller).name}'s next turn`}, ${e.text} ${describeMods(s, e.mods, ctx.controller, true)}.`);
       return;
     }
+    case "attackBanNextTurn": {
+      for (const pid of players(s, e.who, ctx)) {
+        (player(s, pid).attackBansNextTurn ??= []).push({ player: ctx.controller });
+        log(s, `${player(s, pid).name} can't attack ${player(s, ctx.controller).name} or permanents ${player(s, ctx.controller).name} controls during their next turn.`);
+      }
+      return;
+    }
     case "playerGains": {
       // The chosen color or player filled in now (CR 608.2h); until end of turn (CR 514.2).
       const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];

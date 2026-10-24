@@ -2596,6 +2596,11 @@ function startNextTurn(s: GameState, skipping = false) {
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).
+  if (ap.attackBansNextTurn) {
+    ap.attackBansNextTurn = ap.attackBansNextTurn.flatMap((b) => (b.turn === undefined ? [{ ...b, turn: s.turn }] : []));
+    if (!ap.attackBansNextTurn.length) ap.attackBansNextTurn = undefined;
+  }
   ap.turnsTaken = (ap.turnsTaken ?? 0) + 1;
   for (const p of s.players) {
     p.landsPlayedThisTurn = 0;
@@ -7379,6 +7384,9 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+  // The Second Doctor: during the attacker's next turn, not the player or a permanent they control.
+  const hit = attacked !== undefined && s.objects[attacked] ? controllerOf(s, obj(s, attacked)) : defender;
+  if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).

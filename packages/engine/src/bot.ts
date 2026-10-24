@@ -2672,6 +2672,9 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const spare = sac?.type === "pick" && pickOptions(s, sac, pid, r.item.sourceId).some((id) => !obj(s, id).isCommander && worth(s, pid, obj(s, id)) <= 3);
     return loss >= life || loss * 4 >= life || (spare && loss >= 4);
   }
+  // The Second Doctor: "each player may draw a card. Each opponent who does can't attack you ... during their next turn":
+  // the card, unless that player is the only opponent left to attack.
+  if (r && e?.type === "eachMay" && e.each && after?.type === "attackBanNextTurn" && pid !== r.item.controller) return opponents(s, pid).length > 1;
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).

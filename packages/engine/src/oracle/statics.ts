@@ -98,6 +98,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
   }
+  // The Masamune: "As long as equipped creature is attacking, it has first strike and must be blocked if able": while it's
+  // an attacking creature (CR 506.4, 611.3a).
+  if ((m = /^As long as (enchanted|equipped) creature is attacking, it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } } };
+  }
   // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
   if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
@@ -271,6 +278,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const filter = m[2] ? parseTargetPhrase(`${m[2]}spell`) : { kind: "spell" as const, text: "spell" };
     if (!filter || filter.kind !== "spell") return "fail";
     return { costMod: { who: "you", filter: { ...filter, text: `${m[2]}spells` }, n: -Number(m[3]), nth: m[1] === "first" ? 1 : 2, text: line } };
+  }
+  // Warden of Evos Isle: "Creature spells with flying you cast cost {1} less to cast": the spell's own printed flying, not
+  // flying it would get on the battlefield (rulings).
+  if ((m = /^([A-Z][a-z]+) spells with (flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace) you cast cost (\{\d+\} (?:less|more) to cast)$/.exec(text))) {
+    const base = parseCostChange(`${m[1]} spells you cast cost ${m[3]}`);
+    if (!base || base === "fail" || !("costMod" in base)) return "fail";
+    return { costMod: { ...base.costMod, filter: { ...base.costMod.filter, keywords: [capital(m[2]!)], text: `${m[1]!.toLowerCase()} spells with ${m[2]}` }, text: line } };
   }
   if ((m = /^Spells you cast but don't own cost \{(\d+)\} less to cast$/.exec(text))) return { costMod: { who: "you", filter: { kind: "spell", text: "spells you don't own" }, n: -Number(m[1]), notOwned: true, text: line } };
   if ((m = /^~ costs \{(\d+)\} less to cast if you've cast another spell this turn$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "castAnother" } } };
@@ -531,6 +545,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
+  // "If there are thirty or more counters among artifacts and creatures you control" (Lux Artillery): every kind, added up.
+  if ((m = new RegExp(`^there are ${NUM} or more counters among (.+ you control)$`).exec(text))) {
+    const amount = parseCount(`counters among ${m[2]}`, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   // "If there are two or more ki counters on ~" (the Kamigawa flip cards).
   if ((m = new RegExp(`^there are ${NUM} or more ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
@@ -922,6 +941,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = m[2] ? parseStaticMods(m[2]) : [];
     return more ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [m[1]!] }, ...more] : null;
   }
+  // Bello, Bard of the Brambles: "is a 4/4 Elemental creature in addition to its other types and has indestructible, haste,
+  // and "..."": the card type and creature type in layer 4, the base power and toughness in 7b, the abilities in 6
+  // (CR 613.1d, 613.1f, 613.4b, 205.1b).
+  if ((m = /^is an? (\d+)\/(\d+) (?:([A-Z][a-z]+) )?creature in addition to its other types(?:,? and ((?:has|have) .+))?$/.exec(rest))) {
+    if (m[3] && !CREATURE_TYPES.has(m[3])) return null;
+    const more = m[4] ? parseStaticMods(m[4]) : [];
+    return more && [{ kind: "addTypes", types: ["Creature"], subtypes: m[3] ? [m[3]] : [] }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more];
+  }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -1266,6 +1293,16 @@ function parseStaticLine(line: string): StaticAbility | null {
     const ench = !animate[1]!.endsWith("artifact");
     const spec: TargetSpec = ench ? { kind: "object", types: ["Enchantment"], notSubtypes: ["Aura"], text: "non-Aura enchantment" } : { kind: "object", types: ["Artifact"], notTypes: ["Creature"], text: "noncreature artifact" };
     return { affects: { kind: "filter", types: [ench ? "Enchantment" : "Artifact"], spec, ...(animate[2] ? { other: true } : {}), ...(animate[3] ? { controller: "you" as const } : {}) }, mods, text: line };
+  }
+  // Bello, Bard of the Brambles: "each non-Equipment artifact and non-Aura enchantment you control with mana value 4 or
+  // greater is a 4/4 Elemental creature in addition to its other types and has ...": the group as the effect applies in
+  // layer 4, the same set for 6 and 7b (CR 613.6).
+  const animated = /^([Ee]ach (?:non-[A-Z][a-z]+ |non)?[a-z]+(?: and (?:non-[A-Z][a-z]+ |non)?[a-z]+)? you control(?: with mana value \d+ or greater)?) (is an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types.*)$/.exec(text);
+  if (animated) {
+    const affects = parseAffected(animated[1]!);
+    const mods = parseStaticMods(animated[2]!);
+    if (affects?.kind !== "filter" || !mods) return null;
+    return { affects, mods, text: line };
   }
   // Maskwood Nexus ("Creatures you control are every creature type"), Arcane Adaptation and Xenograft ("... the chosen type
   // in addition to their other types"), Conspiracy ("... the chosen type": it replaces their creature types, rulings):

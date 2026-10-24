@@ -115,6 +115,8 @@ export interface Ctx {
   chooseResult?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
   defending?: boolean;
+  /** "Whenever a source you control deals damage to a permanent or player": "that permanent or player" is the one dealt it. */
+  eventRecipient?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
   subjectLeft?: boolean;
   /**
@@ -155,8 +157,8 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack"]);
-const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
+const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
@@ -595,14 +597,14 @@ const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
 /** One ability's text to its targets and effects, or null if any of it can't be compiled. */
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
   const body = parseBodyText(text, opts);
   // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
   if (body && text.includes("each of that creature's colors") && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
@@ -655,6 +657,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.activatedAbility ? { activatedAbility: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
+    ...(opts.eventRecipient ? { eventRecipient: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
     ...(opts.ownX ? { ownX: true } : {}),
     ...(opts.sacrificedIt ? { sacrificedIt: true } : {}),
@@ -976,6 +979,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
   text = text.replace(/(^|\. )Create a token that's a copy of an? (permanent|creature|artifact) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
+  // "You may create a token that's a copy of a nonlegendary enchantment you control" (Calix, Guided by Fate): choosing
+  // one is creating it, so "you may choose ... If you do, create a token that's a copy of it."
+  text = text.replace(/(^|\. )([Yy]ou may) create a token that's a copy of an? ((?:nonlegendary )?(?:permanent|creature|artifact|enchantment)) you control\./g, "$1$2 choose a $3 you control. If you do, create a token that's a copy of it.");
+  // Sanctum of Eternity: "Return target commander you own from the battlefield to your hand": a target permanent you own
+  // (CR 115.1), so its owner's hand.
+  text = text.replace(/\b([Rr]eturn target [a-z ]+? you own) from the battlefield to your hand\./g, "$1 to its owner's hand.");
+  // Divine Reckoning: "Each player chooses a creature they control. Destroy the rest." One instruction (CR 608.2c).
+  text = text.replace(/(^|\. )(Each player chooses an? [a-z]+ they control)\. Destroy the rest\./g, "$1$2 and the rest are destroyed.");
+  // "Put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card." (Waterbender
+  // Ascension): "it" is ~.
+  text = text.replace(/(\bcounters? on ~\. Then if) it has (?=\w+ or more [a-z+\/0-9-]+ counters on it, )/g, "$1 ~ has ");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
@@ -1419,6 +1433,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const pickPrev = effects[effects.length - 1];
     if (cant && pickPrev?.type === "pick" && pickPrev.action === "sacrifice" && pickPrev.who.ref === (cant[1] === "player" ? "eachPlayer" : "eachOpponent") && !pickPrev.unless) {
       effects.push({ type: "discard", who: { ref: "couldntPick" }, n: cant[2] === "a card" ? 1 : 2, random: false });
+      continue;
+    }
+    // Transmute Artifact: "Search your library for an artifact card. If that card's mana value is less than or equal to the
+    // sacrificed artifact's mana value, put it onto the battlefield. If it's greater, you may pay {X}, where X is the
+    // difference. If you do, put it onto the battlefield. If you don't, put it into its owner's graveyard. Then shuffle."
+    // One search; the {X} is paid as it resolves, after the card is found (rulings).
+    const payDiff = /^If you do, (search your library for an? [A-Za-z ]+? card)$/.exec(s);
+    const payPrev = effects[effects.length - 1];
+    const payMv = payDiff && /^If that card's mana value is less than or equal to (the sacrificed (?:artifact|creature|enchantment|permanent)'s mana value), put it onto the battlefield$/.exec(sentences[si + 1] ?? "");
+    if (payMv && payPrev?.type === "pick" && payPrev.action === "sacrifice" && payPrev.who.ref === "you" && payPrev.n === 1 && !payPrev.unless && sentences[si + 2] === "If it's greater, you may pay {X}, where X is the difference" && sentences[si + 3] === "If you do, put it onto the battlefield" && sentences[si + 4] === "If you don't, put it into its owner's graveyard" && /^Then,? shuffle$/.test(sentences[si + 5] ?? "")) {
+      const fx = parseOne(`${capital(payDiff![1]!)}, put it onto the battlefield, then shuffle`, ctx);
+      const mv = parseCount(payMv[1]!, ctx);
+      if (!mv || fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.n !== 1 || fx[0]!.upTo || fx[0]!.others) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ ...fx[0]!, payDiff: mv }] });
+      si += 5;
       continue;
     }
     // "Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land

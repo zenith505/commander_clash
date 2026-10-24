@@ -867,7 +867,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous
   // Elegy), "... a land of each basic land type" (Global Ruin), "... a permanent they control of each permanent type"
   // (Liliana, Dreadhorde General). The choices aren't targeted, and are made as it resolves (rulings).
-  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices (?:the rest|all other creatures they control)$/.exec(s))) {
+  // Divine Reckoning: "Each player chooses a creature they control. Destroy the rest." (joined in body.ts): the rest are
+  // destroyed instead, at once.
+  if ((m = /^(.+?) chooses (.+?),? (?:then|and) (?:sacrifices (?:the rest|all other creatures they control)|the rest are destroyed)$/.exec(s))) {
+    const destroy = / the rest are destroyed$/.test(s);
     const who = parsePlayer(m[1]!, ctx);
     const what = m[2]!;
     let r: RegExpExecArray | null;
@@ -907,7 +910,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       keep = filters.map((filter) => ({ filter: filter!, n: 1 }));
     }
     if (!who || !among || among.kind !== "object" || !keep?.length || keep.some((k) => k.filter.kind !== "object")) return null;
-    return [{ type: "keepRest", who, keep, among }];
+    return [{ type: "keepRest", who, keep, among, ...(destroy ? { destroy: true as const } : {}) }];
   }
   // "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value
   // 20 or greater" (Tasha's Hideous Laughter).

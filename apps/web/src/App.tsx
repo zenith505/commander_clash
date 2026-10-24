@@ -3068,6 +3068,15 @@ function Seat({
             ☠ {p.poison}
           </span>
         )}
+        {!p.lost && !canGainLife(s, pid) && (
+          <span
+            className="poison"
+            data-no-lifegain={pid}
+            title={`${p.name} can't gain life ${p.cantGainLifeForGame ? "for the rest of the game" : p.lifeCantChange || p.lifeCantChangeTurn === s.turn ? "(their life total can't change)" : (s.noLifeGain ?? []).some((e) => e.turn === s.turn) ? "this turn" : "while a permanent says so"} (CR 119.7).`}
+          >
+            🚫♥ No life gain{p.cantGainLifeForGame ? " (game)" : ""}
+          </span>
+        )}
         {pid !== HUMAN &&
           (handRevealed(s, pid, HUMAN) || pid === YOU ? (
             <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title={pid === YOU && pid !== HUMAN ? "Your hand. Click to see it." : "This hand is revealed (Telepathy, Revelation). Click to see it."}>
@@ -5003,7 +5012,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> <RulesText text={pending.prompt.charAt(0).toUpperCase() + pending.prompt.slice(1)} />?
+          <strong>{pending.source}:</strong> <RulesText text={pending.prompt.charAt(0).toUpperCase() + pending.prompt.slice(1)} />?{pending.otherwise ? ` ${pending.otherwise}` : ""}
         </span>
         <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "chooseMay", player: HUMAN, yes: true }])}>
           Pay

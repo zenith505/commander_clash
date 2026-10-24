@@ -835,8 +835,21 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
       }
+      // Transmute Artifact: a card with a greater mana value than the sacrificed artifact's goes onto the battlefield only
+      // if the searcher pays the difference now (rulings: paid as it resolves; with X in its cost, X is 0, CR 202.3b).
+      if (e.payDiff !== undefined && searchers.length === 1 && foundBy(searchers[0]!).length === 1 && exiledFor(searchers[0]!) === undefined && sc.payDiff === undefined) {
+        const card = defOf(s, obj(s, foundBy(searchers[0]!)[0]!));
+        const diff = defMv(card) - Math.max(0, amountNow(s, e.payDiff, ctx));
+        sc.payDiff = diff > 0;
+        if (diff > 0) {
+          sc.may = undefined;
+          s.pending = { kind: "chooseMay", player: searchers[0]!, source: src, prompt: `pay {${diff}} to put ${card.name} onto the battlefield`, otherwise: `If you don't, ${card.name} is put into its owner's graveyard.`, pay: { mana: `{${diff}}` } };
+          return "paused";
+        }
+      }
+      const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).

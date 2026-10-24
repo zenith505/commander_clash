@@ -5,6 +5,7 @@ import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAb
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
+import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
 import type { AdditionalCost, SpentReq, TargetChoice } from "./abilities";
@@ -318,7 +319,7 @@ export function planCast(
   const tapping = [...(choices.teamwork ?? []), ...(choices.conspire ?? []), ...(choices.harmonize !== undefined ? [choices.harmonize] : [])];
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = poolFor(s, pid, use).pool;
-  const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
+  const rainbow = (compileCard(d).countsColors || gainsSunburst(s, pid, d)) && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
   // "If {U} was spent to cast ~", adamant: ask for those colors where its generic or hybrid mana allows, as many as can be,
   // when that helps; where it hurts (Rolling Spoil's -1/-1 to their own creatures), keep those colors off it instead.
   const hopes = compileCard(d).wantSpent && !payFromPool(cost, pool, extra, player(s, pid).life) ? hopeValues(s, pid, d) : [];
@@ -812,4 +813,13 @@ export function planPlot(s: GameState, pid: PlayerId, id: ObjectId): Action[] | 
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(cost)) : [];
   return taps ? [...taps, { type: "plot", player: pid, objectId: id }] : null;
+}
+
+/** Will this spell gain sunburst as it's cast (Lux Artillery's "Whenever you cast an artifact creature spell, it gains sunburst")? */
+function gainsSunburst(s: GameState, pid: PlayerId, d: CardDef): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) return false;
+    return abilitiesOf(s, o).triggers.some((t) => t.event === "castSpell" && t.cast?.by === "you" && !!t.cast.spell && printedMatches(t.cast.spell, d) && t.body.effects.some((e) => e.type === "spellGains" && e.mods.some((m) => m.kind === "addKeywords" && m.keywords.includes("Sunburst"))));
+  });
 }

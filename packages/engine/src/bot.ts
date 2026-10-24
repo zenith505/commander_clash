@@ -98,7 +98,7 @@ import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
-import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
+import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
@@ -206,7 +206,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A Pact's "If you don't, you lose the game": always pay when we can.
       const e = s.resolving?.body.effects[s.resolving.next];
       const orLose = e?.type === "may" && !!e.otherwise?.some((x) => x.type === "loseGame");
-      const ok = !!taps && (orLose || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
+      // Transmute Artifact: unpaid, the card found goes to the graveyard; pay when we can.
+      const orYard = !!s.resolving?.scratch?.payDiff;
+      const ok = !!taps && (orLose || orYard || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
@@ -832,7 +834,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
     if (s.step === "main2") {
       const act = chooseStation(s, pid) ?? chooseActivation(s, pid) ?? chooseCycling(s, pid);
-      if (act) return act;
+      if (act) return cubeInstead(s, pid, act) ?? act;
       // Then a spell that ends the turn (Ultima, Day's Undoing): the last thing we do this turn.
       const end = endTurnCast(s, pid);
       if (end) return end;
@@ -3345,48 +3347,63 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
 }
 
 /**
- * Doubling Cube's "{3}, {T}: Double the amount of each type of unspent mana you have" instead of paying a spell's whole
- * cost from our other sources, when that taps fewer of them (a cost of 8 or more: half of it made and the Cube's {3},
- * then doubled), the rest kept for more spells or for instants. The spell is planned again with that mana in our pool,
- * which stays there until the step ends (CR 500.4). Only a spell paid with mana abilities, colored and generic mana.
+ * Doubling Cube's "{3}, {T}: Double the amount of each type of unspent mana you have" instead of paying a spell's or an
+ * ability's whole cost from our other sources, when that taps fewer of them (a cost of 8 or more: half of it made and
+ * the Cube's {3}, then doubled), the rest kept for more spells or for instants. The doubled pool must hold as much mana
+ * as the plan's own taps make (so {X}, taxes and reductions are as they were chosen), with the colors the cost names;
+ * the same spell or ability is then paid from the pool, which keeps the mana until the step ends (CR 500.4). Only a
+ * plan paid with mana abilities; the new plan is tried on a copy of the game and kept only if it works.
  */
 function cubeInstead(s: GameState, pid: PlayerId, plan: Action[]): Action[] | null {
-  const cast = plan[plan.length - 1];
+  const last = plan[plan.length - 1];
   const taps = plan.slice(0, -1);
-  if (cast?.type !== "castSpell" || taps.length < 8 || taps.some((a) => a.type !== "activateMana")) return null;
-  const printed = parseManaCost(defOf(s, obj(s, cast.objectId)).manaCost);
-  if (printed.hasX || printed.symbols.some((x) => x.kind !== "colored" && x.kind !== "generic")) return null;
+  if ((last?.type !== "castSpell" && last?.type !== "activateAbility") || taps.length < 8 || taps.some((a) => a.type !== "activateMana")) return null;
+  if (last.type === "castSpell" && (last.convoke?.length || last.improvise?.length)) return null;
   const t = cloneState(s);
-  const pool = () => Object.values(player(t, pid).manaPool).reduce((n, k) => n + k, 0);
-  const before = pool();
+  const before = { ...player(t, pid).manaPool };
   try {
     for (const a of taps) applyInPlace(t, a);
   } catch {
     return null;
   }
-  const colored = printed.symbols.flatMap((x) => (x.kind === "colored" ? [`{${x.color}}`] : []));
-  const made = pool() - before;
-  if (made < colored.length) return null;
+  const left = { ...player(t, pid).manaPool };
+  let made = 0;
+  for (const m of Object.keys(left) as ManaType[]) {
+    left[m] -= before[m] ?? 0;
+    if (left[m] < 0) return null;
+    made += left[m];
+  }
+  // The colored mana the cost names, read from its printed symbols (a hybrid one as the color made more of; a
+  // Phyrexian or {2/W} one only if its color was made, else it was paid with life or generic); the rest is generic.
+  const printed = parseManaCost(last.type === "castSpell" ? defOf(s, obj(s, last.objectId)).manaCost : (abilitiesOf(s, obj(s, last.objectId)).activated[last.index]?.manaCost ?? ""));
+  const colored: string[] = [];
+  for (const x of printed.symbols) {
+    const want = x.kind === "colored" ? x.color : x.kind === "hybrid" ? [...x.options].sort((a, b) => left[b] - left[a])[0]! : x.kind === "phyrexian" || x.kind === "twoHybrid" ? (left[x.color] > 0 ? x.color : undefined) : undefined;
+    if (x.kind !== "generic" && x.kind !== "x" && x.kind !== "colored" && x.kind !== "hybrid" && x.kind !== "phyrexian" && x.kind !== "twoHybrid") return null;
+    if (!want) continue;
+    if (left[want] <= 0) return null;
+    left[want]--;
+    colored.push(`{${want}}`);
+  }
   const doubled = planCubeMana(s, pid, parseManaCost(colored.join("") + `{${made - colored.length}}`), 0, [], "other");
-  if (!doubled?.length) return null;
+  // The Cube itself is the last of `doubled`, tapped for nothing else.
+  if (!doubled?.length || doubled.length - 1 >= taps.length) return null;
+  const out = [...doubled, last];
   const u = cloneState(s);
+  const stack = u.stack.length;
   try {
-    for (const a of doubled) applyInPlace(u, a);
+    for (const a of out) applyInPlace(u, a);
   } catch {
     return null;
   }
-  const again = castPlan(u, pid, cast.objectId, false);
-  const last = again?.[again.length - 1];
-  if (!again || last?.type !== "castSpell" || last.objectId !== cast.objectId) return null;
-  // The Cube itself is the last of `doubled`, tapped for nothing else.
-  return doubled.length - 1 + again.length - 1 < taps.length ? [...doubled, ...again] : null;
+  return u.stack.length > stack || u.pending ? out : null;
 }
 
 /**
  * Detection Tower's "{1}, {T}: Until end of turn, your opponents and creatures your opponents control with hexproof can
  * be the targets of spells and abilities you control as though they didn't have hexproof" (CR 702.11e): with the stack
  * empty, when once it has resolved (tried on a copy of the game, everyone passing) a spell in our hand we could still
- * pay for would target an opponent or an opponent's creature that has hexproof.
+ * pay for, or an activated ability we'd use, would target an opponent or an opponent's creature that has hexproof.
  */
 function chooseHexproofSight(s: GameState, pid: PlayerId): Action[] | null {
   if (s.stack.length || (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "seeHexproof")) return null;
@@ -3418,6 +3435,9 @@ function chooseHexproofSight(s: GameState, pid: PlayerId): Action[] | null {
         const cast = castPlan(u, pid, h, false)?.find((a) => a.type === "castSpell");
         if (cast?.type === "castSpell" && cast.targets?.some(shielded)) return plan;
       }
+      // Or an ability we'd activate once our spells are cast (chooseActivation, in our second main phase).
+      const act = chooseActivation(u, pid)?.find((a) => a.type === "activateAbility");
+      if (act?.type === "activateAbility" && act.objectId !== id && act.targets?.some(shielded)) return plan;
     }
   }
   return null;

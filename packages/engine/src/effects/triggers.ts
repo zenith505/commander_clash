@@ -45,19 +45,22 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   // A spell's own triggered abilities ("When you cast ~", storm, cascade): only for "a triggered ability of a colorless
   // spell you control" (Echoes of Eternity).
   const spell = !permanent && src.zone === "stack" ? s.stack.find((x) => x.objectId === src.id && x.kind === "spell") : undefined;
-  if (!permanent && !spell) return 0;
+  // An emblem's (CR 114.4): only for The Masamune's "a triggered ability of this creature or an emblem you own".
+  const emblem = !permanent && !spell && !!src.emblem && src.zone === "command";
+  if (!permanent && !spell && !emblem) return 0;
   const statics: { id: ObjectId; again: NonNullable<CompiledCard["triggersAgain"]> }[] = [];
   for (const id of s.battlefield) {
     const o = obj(s, id);
-    const again = compileCard(defOf(s, o)).triggersAgain;
-    if (!again) continue;
     const c = characteristics(s, o);
-    if (c.hasPrintedAbilities && c.controller === controller) statics.push({ id, again });
+    // Printed, or granted (The Masamune's equipped creature).
+    const again = [...(c.hasPrintedAbilities ? (compileCard(defOf(s, o)).triggersAgain ?? []) : []), ...(c.grantedAbilities?.length ? (withGranted(NO_ABILITIES, c.grantedAbilities).triggersAgain ?? []) : [])];
+    if (again.length && c.controller === controller) statics.push({ id, again });
   }
   for (const l of s.leftTogether ?? []) {
     const o = s.objects[l.id];
-    const again = o && l.hadAbilities && o.zone !== "battlefield" ? compileCard(defOf(s, o)).triggersAgain : undefined;
-    if (again && l.controller === controller && !statics.some((x) => x.id === l.id)) statics.push({ id: l.id, again });
+    if (!o || o.zone === "battlefield") continue;
+    const again = [...(l.hadAbilities ? (compileCard(defOf(s, o)).triggersAgain ?? []) : []), ...(l.granted?.length ? (withGranted(NO_ABILITIES, l.granted).triggersAgain ?? []) : [])];
+    if (again.length && l.controller === controller && !statics.some((x) => x.id === l.id)) statics.push({ id: l.id, again });
   }
   if (!statics.length) return 0;
   // Whose ability it is: as it is, or as it last existed.
@@ -70,6 +73,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
+      if (emblem !== !!a.selfOrEmblems && !(a.selfOrEmblems && view.o.id === id)) continue;
       if (a.selfOrEquipment) {
         const host = s.objects[id]!;
         const equipped = host.zone === "battlefield" && s.battlefield.some((e) => s.objects[e]!.attachedTo === id && characteristics(s, s.objects[e]!).subtypes.includes("Equipment"));
@@ -203,6 +207,8 @@ export type TriggerSourceEvent =
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
+  /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
+  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
@@ -1000,12 +1006,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
-    const attackWatch = (w: GameObject, wc: PlayerId) => {
+    const attackWatch = (w: GameObject, wc: PlayerId, triggers?: TriggeredAbility[]) => {
       const at = attackingYou(o, wc);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
-    fromEmblems(attackWatch);
+    fromEmblems((w, wc) => attackWatch(w, wc));
+    // "Until end of turn, whenever a Kraken, ... or Serpent attacks, draw a card" (Summon: Leviathan, CR 603.7b).
+    fromFloating((src, ctrl, triggers) => attackWatch(src, ctrl, triggers));
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
     // "Whenever a creature attacks enchanted player": not one attacking a planeswalker of theirs (rulings).
@@ -1166,7 +1174,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (ev.combat)
         for (const id of s.battlefield) {
           const w = obj(s, id);
-          if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+          if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
         }
     }
   } else if (ev.type === "damagedPlayer") {
@@ -1199,6 +1207,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         return !!fromPermanent && (!t.subjectFilter || objectMatches(s, t.subjectFilter, fromPermanent, ev.player, false));
       };
       add(w, ev.player, (e, t) => e === "dealsDamageToYou" && fits(t), undefined, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
+    }
+  } else if (ev.type === "sourceDealtDamage") {
+    // "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): its
+    // controller's permanents, once for each source and recipient (rulings); the permanent is the subject.
+    const hit = ev.id ? s.objects[ev.id] : undefined;
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) !== ev.by) continue;
+      add(w, ev.by, (e, t) => e === "sourceYouControlDealsDamage" && !!t.sourceDamage && ev.amount === t.sourceDamage.exactly && !(t.sourceDamage.other && ev.source === w.id), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     }
   } else if (ev.type === "damagedCreature") {
     const o = s.objects[ev.source];
@@ -1281,7 +1298,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== dealerBy) continue;
-      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.orBattle && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.orBattle && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)), undefined, undefined, o, undefined, undefined, undefined, info);
     }
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orBattle, triggers, undefined, undefined, undefined, undefined, undefined, info), o);
     causedBy = null;
@@ -1293,7 +1310,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
-    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
+    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
     // "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature, to an opponent of
     // the watcher's controller (its own controller's watchers saw it above).
@@ -1305,7 +1322,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
-    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && objectMatches(s, t.dealer.filter, o, ctrl, false) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
+    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && ((t.dealer.orSelf && src.id === o.id) || objectMatches(s, t.dealer.filter, o, ctrl, false)) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
     causedBy = null;
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);

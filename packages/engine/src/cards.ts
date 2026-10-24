@@ -483,7 +483,7 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
       mana: [...base.mana, ...extra.flatMap((x) => x.mana)],
     };
     // Granted static abilities that aren't layer effects (grants.ts GRANTED_FIELDS); the layer ones are in layers.ts.
-    const more = <K extends "costMods" | "countMods" | "othersEnterWithCounters" | "entersWithAdditional">(k: K) => {
+    const more = <K extends "costMods" | "countMods" | "othersEnterWithCounters" | "entersWithAdditional" | "triggersAgain">(k: K) => {
       const all: unknown[] = [...(base[k] ?? []), ...extra.flatMap((x): unknown[] => x[k] ?? [])];
       if (all.length) hit![k] = all as CompiledCard[K];
     };
@@ -491,6 +491,8 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     more("countMods");
     more("othersEnterWithCounters");
     more("entersWithAdditional");
+    // The Masamune's granted "that ability triggers an additional time" (CR 603.2d).
+    more("triggersAgain");
     // Dungeon Delver's granted "Room abilities ... trigger an additional time": one more per instance (rulings).
     const rooms = (base.roomsTwice ?? 0) + extra.reduce((n, x) => n + (x.roomsTwice ?? 0), 0);
     if (rooms) hit.roomsTwice = rooms;

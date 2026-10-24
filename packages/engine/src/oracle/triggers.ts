@@ -315,6 +315,16 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
 }
 
 function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever another source you control deals exactly 1 damage to a permanent or player, ~ deals 2 damage to that
+  // permanent or player" (Ghyrson Starn): each source's damage to each permanent or player, that amount after prevention
+  // and replacement (it's the damage dealt, CR 120.4); once for each of them dealt at the same time (rulings).
+  const exact = /^Whenever (another|a) source you control deals exactly (one|two|three|\d+) damage to a permanent or player, (.+)$/.exec(line);
+  if (exact) {
+    if (/\b(it|its|that source|that creature|that player|that permanent)\b(?! or player)/.test(exact[3]!)) return "fail";
+    const body = parseBody(exact[3]!, { eventRecipient: true });
+    if (!body) return "fail";
+    return { event: "sourceYouControlDealsDamage", body, sourceDamage: { exactly: num(exact[2]!), ...(exact[1] === "another" ? { other: true as const } : {}) } };
+  }
   // "Whenever a source you control deals noncombat damage to an opponent, you draw that many cards" (Niv-Mizzet,
   // Visionary): "that player" is the opponent, "that many" the damage. Not from a graveyard (Asgardian Inspiration).
   // "Whenever a source you control deals 5 or more damage to a player" (Dragonborn Champion): one source at one time
@@ -767,7 +777,12 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature you control with deathtouch deals combat damage to a player" (Fynn, the Fangbearer): the
   // keyword as it deals the damage.
   const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+) (deals combat damage to .+)$/.exec(line);
+  // "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix, Guided by Fate): this
+  // creature, enchanted or not, or another that matches; each one that deals the damage triggers it once.
+  const orSelf = /^Whenever ~ or (an? .+? you control deals combat damage to .+)$/.exec(line);
+  if (orSelf) line = `Whenever ${orSelf[1]}`;
   const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(withKw ? `${withKw[1]} ${withKw[2]} you control ${withKw[3]}` : line);
+  if (orSelf && (!m || withKw || /\b(it|its|that creature)\b/i.test(m[4]!))) return "fail";
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
   if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
@@ -784,7 +799,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
   return {
     event: "creatureYouControlDealsCombatDamageToPlayer",
-    dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) },
+    dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
     body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
     ...(m[3] === "a player or battle" ? { orBattle: true as const } : {}),
@@ -804,7 +819,8 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
-  const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature) attacks, (.+)$/.exec(line);
+  // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
+  const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks you or a planeswalker you control" (Blood Reckoning, Isperia): one attacking this
   // permanent's controller, or a planeswalker they control (CR 506.2, 508.3a); "attacks you" alone, not a planeswalker.
   const you = m || any ? null : /^Whenever (an?) ((?:[a-z]+ )?creature(?: with(?:out)? [a-z]+| with power \d+ or (?:greater|less))?) attacks you( or a planeswalker you control)?, (.+)$/.exec(line);
@@ -1335,9 +1351,12 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
   // step after this step" (CR 500.8; rulings: an upkeep skipped doesn't trigger it, two of them make two more).
   const haze = /^At the beginning of enchanted player's first upkeep each turn, that player gets an additional upkeep step after this step\.$/.test(line);
   if (haze) return { event: "eachUpkeep", body: { targets: [], effects: [{ type: "addUpkeepStep" }], text: "That player gets an additional upkeep step after this step." }, enchantedPlayersTurn: true, firstUpkeep: true };
-  const step = /^At the beginning of enchanted (?:player|opponent)'s (upkeep|draw step|end step), (.+)$/.exec(line);
+  // "At the beginning of each of enchanted player's postcombat main phases" (Shadow of the Second Sun): every main phase
+  // of their turn but the first (CR 505.1a, rulings).
+  const step = /^At the beginning of (?:each of )?enchanted (?:player|opponent)'s (upkeep|draw step|end step|postcombat main phases), (.+)$/.exec(line);
   if (step) {
-    const event = step[1] === "upkeep" ? "eachUpkeep" : step[1] === "draw step" ? "eachDrawStep" : "eachEndStep";
+    if (/^each of /.test(line.slice("At the beginning of ".length)) !== (step[1] === "postcombat main phases")) return "fail";
+    const event = step[1] === "upkeep" ? "eachUpkeep" : step[1] === "draw step" ? "eachDrawStep" : step[1] === "end step" ? "eachEndStep" : "eachPostcombatMain";
     // "That player draws two additional cards" in their draw step: a trigger, so they just draw two more.
     const body = parseBody(theyAreThatPlayer(step[2]!).replace(/^that player draws (\w+) additional cards?\.$/, "that player draws $1 cards."), { eventPlayer: true });
     return body ? { event, body, enchantedPlayersTurn: true } : "fail";
@@ -1809,7 +1828,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
   const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};

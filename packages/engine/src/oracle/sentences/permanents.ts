@@ -73,6 +73,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "It gains rebound" (Narset Transcendent): as it resolves (CR 702.88a).
   if (ctx.castSpell && (m = /^(?:[Ii]t|[Tt]hat spell) gains (.+?)( until end of turn)?$/.exec(s)) && (ctx.spellIt || /^[Tt]hat spell/.test(s))) {
     if (m[1] === "rebound" && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: ["Rebound"] }] }];
+    // "It gains sunburst" (Lux Artillery): it works as the permanent enters from the stack (CR 702.44a), each instance
+    // apart (rulings).
+    if (m[1] === "sunburst" && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: ["Sunburst"] }] }];
     // Rivaz of the Claw: 'it gains "When this creature dies, exile it."': the permanent it becomes has it, with no end
     // (rulings), even if it stops being a creature.
     if (!m[2] && /^"[^"]+"$/.test(m[1]!)) {

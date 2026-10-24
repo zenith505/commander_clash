@@ -814,7 +814,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Each opponent loses life equal to the life they lost this turn" (Wound Reflection): each their own, counted as the
   // ability resolves, so a second one counts the first one's loss too (rulings).
-  if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses life equal to the life (?:they|that player) lost this turn$/i.exec(s))) {
+  if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses life equal to the (?:amount of )?life (?:they|that player) lost this turn$/i.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseLife", who, n: { count: { kind: "lifeLostThisTurn", who: who.ref === "eachOpponent" || who.ref === "eachPlayer" ? { ref: "eachOne" } : who } } }] : null;
   }

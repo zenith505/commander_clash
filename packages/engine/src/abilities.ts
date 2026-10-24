@@ -319,6 +319,8 @@ export type Count =
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
+  /** An "enchant player" Aura's target when the Aura helps the player it enchants (Paradox Haze): bots choose themselves. */
+  helpsEnchanted?: true;
   /**
    * "object" = a permanent, "player", "any" = creature/planeswalker/player (CR 115.4),
    * "spell" = an object on the stack, "card" = a card in a graveyard ("target creature card
@@ -852,7 +854,9 @@ export type DamageRecipient =
   | PlayerRef
   | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number }
   /** "The player or planeswalker it's attacking" (Myr Battlesphere): what the source is attacking, or was as it last existed; nothing for a battle. */
-  | { ref: "attackedBySelf"; subject?: true };
+  | { ref: "attackedBySelf"; subject?: true }
+  /** "That permanent or player" after "Whenever a source you control deals damage to a permanent or player" (Ghyrson Starn): the permanent dealt it (the subject), while it's that permanent, or the player (the event player). */
+  | { ref: "eventRecipient" };
 
 /**
  * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
@@ -1696,6 +1700,8 @@ export type Effect =
       youChoose?: true;
       /** "Each player puts a vow counter on a creature they control and sacrifices the rest" (Promise of Loyalty): one on each kept permanent first; they're "those creatures" afterwards (Resolving.created). */
       counter?: CounterKind;
+      /** Divine Reckoning: "Destroy the rest": destroyed instead of sacrificed. */
+      destroy?: true;
     }
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
   | { type: "keepDestroyRest"; filter: TargetSpec; n: number }
@@ -2819,7 +2825,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true; /** "Search your library and graveyard for five cards" (Doomsday): both zones together, no choice. */ andGraveyard?: true; /** "And exile the rest" (Doomsday): every other card in the zones searched is exiled before the found cards are put where they go. */ exileRest?: true; /** "Any number of creature cards with total mana value 6 or less" (Protean Hulk): of all the cards found. */ totalMv?: number; /** Scholar of New Horizons: "If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand": the one card found may go here instead of `dest` while `cond` holds, the searcher's choice. */ mayInstead?: { dest: SearchDest; cond: StaticCondition } }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true; /** "Search your library and graveyard for five cards" (Doomsday): both zones together, no choice. */ andGraveyard?: true; /** "And exile the rest" (Doomsday): every other card in the zones searched is exiled before the found cards are put where they go. */ exileRest?: true; /** "Any number of creature cards with total mana value 6 or less" (Protean Hulk): of all the cards found. */ totalMv?: number; /** Scholar of New Horizons: "If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand": the one card found may go here instead of `dest` while `cond` holds, the searcher's choice. */ mayInstead?: { dest: SearchDest; cond: StaticCondition }; /** Transmute Artifact: the one card found goes to `dest` if its mana value is at most this; if greater, only if the searcher pays the difference as it resolves, and into its owner's graveyard if they don't. */ payDiff?: Amount }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -3281,6 +3287,8 @@ export type TriggerEvent =
   | "selfDealsDamageToPlayer"
   /** "Whenever a source you control deals (noncombat) damage to an opponent" (Niv-Mizzet, Visionary): once for each source and player (CR 603.2c). */
   | "sourceYouControlDamagesOpponent"
+  /** "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): once for each source and recipient, the permanent dealt it the subject, the player the event player. */
+  | "sourceYouControlDealsDamage"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -3574,7 +3582,7 @@ export interface TriggeredAbility {
    */
   discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
-  dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
+  dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix): this permanent too, whatever the filter says. */ orSelf?: true; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
   attacker?: {
     filter: TargetSpec;
@@ -3607,6 +3615,8 @@ export interface TriggeredAbility {
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;
+  /** For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. */
+  sourceDamage?: { exactly: number; other?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */
@@ -4889,7 +4899,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

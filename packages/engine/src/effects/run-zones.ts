@@ -440,7 +440,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       sc.queue = [chooser];
       sc.chosen = {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(e.destroy ? { destroy: true as const } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -464,6 +464,10 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
     gone.push(...among(pid).filter((id) => !kept.has(id)));
   }
   if (e.counter && s.resolving) s.resolving.created = keptAll.filter((id) => s.objects[id]?.zone === "battlefield");
+  if (e.destroy) {
+    for (const id of gone) if (s.objects[id]?.zone === "battlefield") destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+    return;
+  }
   if (gone.length) log(s, `${src}: ${gone.map((id) => nameOf(s, id)).join(", ")} ${gone.length === 1 ? "is" : "are"} sacrificed.`);
   for (const id of gone) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "graveyard", { sacrificed: true });
 }

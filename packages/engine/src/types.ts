@@ -496,6 +496,8 @@ export interface GameObject {
   spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true }[];
   /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
   reboundGained?: true;
+  /** A spell that gained sunburst this many times (Lux Artillery): each instance works as it enters from the stack (CR 702.44a). */
+  sunburstGained?: number;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**
@@ -1939,6 +1941,8 @@ export interface Resolving {
     mayOtherwise?: string;
     /** Scholar of New Horizons (Effect search `mayInstead`): asked whether the found card goes there instead (the answer is `may`). */
     mayInstead?: boolean;
+    /** Transmute Artifact (Effect search `payDiff`): the card found costs more than the sacrificed artifact, so paying the difference was asked (the answer is `may`). */
+    payDiff?: boolean;
     castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)
     /** A vote (Effect "vote"): players still to vote in turn order, the votes left for the one voting, and their pick. */
     vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string; /** "Each player may choose ..." (Druid of Purification): one optional pick each, not a vote. */ choose?: true };

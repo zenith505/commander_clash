@@ -1253,7 +1253,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
     // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
-    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type));
+    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0);
     if (Object.keys(more).length) {
       const counters = { ...opts.counters };
       for (const [k, n] of Object.entries(more)) counters[k] = (counters[k] ?? 0) + n;
@@ -4861,7 +4861,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
   const discarded: string[] = [];
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded);
+  const costExiled: { id: ObjectId; zc: number }[] = [];
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled);
+  // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
+  if (costExiled.length && compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
@@ -5519,6 +5522,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
           ? returnCandidates(s, pid, c)
+          : c.kind === "reveal" && c.orControl
+          ? beholdCandidates(s, pid, o, c)
           : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : c.kind === "exileFromGraveyard" && c.linked
@@ -5529,6 +5534,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
         ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
         : c.kind === "tap"
         ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
+        : c.kind === "reveal" && c.orControl
+        ? `${beholdWhat(c)}${c.exile ? " and exile it" : ""}`
         : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
           ? c.filter
             ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
@@ -5536,7 +5543,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "exileFromGraveyard" && c.linked
           ? `a card exiled with ${d.name}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -5654,6 +5661,19 @@ export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
 }
 
+/** Behold (CR 701.4a): the matching cards in `pid`'s hand and the matching permanents they control, not `o` itself. */
+export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "reveal" }>): ObjectId[] {
+  const hand = player(s, pid).hand.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
+  const field = c.orControl ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.orControl!, obj(s, id), pid, false)) : [];
+  return [...field, ...hand];
+}
+
+/** "An Elf" for "behold an Elf". */
+export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
+  const kind = c.filter.subtypes?.[0] ?? c.filter.text;
+  return `${c.n === 1 ? (/^[AEIOU]/.test(kind) ? "an" : "a") : c.n} ${kind}`;
+};
+
 /**
  * What can be returned to hand for a cost. Ninjutsu wants an unblocked attacker: one that's attacking once
  * blockers have been declared and wasn't blocked (CR 509.1h, 702.49a).
@@ -5755,6 +5775,18 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     } else if (c.kind === "discard") {
       discarded?.push(...(choices.discard ?? []).map((id) => cardIdOf(obj(s, id))));
       discardCards(s, p.id, choices.discard ?? []);
+    }
+    else if (c.kind === "reveal" && c.orControl) {
+      // Behold (CR 701.4a): a card revealed from the hand or a permanent chosen; "and exile it": that card or permanent,
+      // linked to what the spell becomes (CR 607.2q).
+      for (const id of choices.reveal ?? []) {
+        const o = obj(s, id);
+        const onField = o.zone === "battlefield";
+        log(s, `${p.name} beholds ${nameOf(s, id)}${onField ? "" : " from their hand"}${c.exile ? " and exiles it" : ""}.`);
+        if (!c.exile) continue;
+        moveObject(s, id, "exile");
+        exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+      }
     }
     else if (c.kind === "reveal") {
       log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);

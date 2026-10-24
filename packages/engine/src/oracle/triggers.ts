@@ -702,6 +702,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // cards go to their owners' graveyards (CR 404.2, 700.4).
   const yours = /^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into your graveyard from the battlefield, /.exec(line);
   if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yours[1]} you own dies, ${line.slice(yours[0].length)}`;
+  // "Whenever an artifact is put into an opponent's graveyard from the battlefield" (Viridian Revel): one an opponent owns
+  // dies, whoever controlled it (CR 404.2, 700.4).
+  const theirs = /^(When(?:ever)? (?:another|an?) [a-z]+) is put into an opponent's graveyard from the battlefield, /.exec(line);
+  if (theirs) line = `${theirs[1]} an opponent owns dies, ${line.slice(theirs[0].length)}`;
   // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");

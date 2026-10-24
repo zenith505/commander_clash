@@ -124,6 +124,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
+  // "You gain 1 life for each card exiled this way" (Titania's Command), "for each artifact or land card exiled this way"
+  // (Canoptek Scarab Swarm), "the number of creature cards exiled this way": after exiling cards from graveyards.
+  if (ctx?.exiledCards && (m = /^(?:the number of )?(?!the greatest )(?:(.+?) )?cards? exiled this way$/i.exec(p))) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (filter && filter.kind !== "card")) return null;
+    return { count: { kind: "cardsExiledThisWay", ...(filter ? { filter } : {}) } };
+  }
   if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   if (!each && (m = /^the greatest mana value among (.+?) you control$/i.exec(p))) {
@@ -382,6 +389,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${m[1]} creature`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, sharesTypeWithSubject: true }) : null;
   }
+  // Mana Echoes: "the number of creatures you control that share a creature type with it", "it" the creature the trigger
+  // is about, which counts too if you control it (rulings), counted as it resolves.
+  if (/^creatures you control that share a creature type with it$/i.test(p) && ctx?.subjectIt) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: p }, sharesTypeWithSubject: true, includeSubject: true });
   // "Whenever ~ attacks, it gets +2/+0 until end of turn for each other attacking Goblin" (Goblin Piledriver): "other"
   // is the permanent itself, so only in its own abilities.
   if ((m = /^other (attacking|blocking) (.+)$/i.exec(p)) && ctx?.selfIt) {

@@ -570,7 +570,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
   // "If you didn't lose life this turn" (Luminarch Ascension), "if you lost life this turn".
-  if ((m = /^you (didn't lose|lost) life this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, ...(m[1] === "lost" ? { min: 1 } : { max: 0 }) };
+  // "As long as you've lost life this turn" (Essence Channeler).
+  if ((m = /^you(?: (didn't lose)| lost|'ve lost) life this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, ...(m[1] ? { max: 0 } : { min: 1 }) };
   // "If you gained and lost life this turn" (Lunar Convocation): both, whatever the net change (rulings).
   if (/^you gained and lost life this turn$/.test(text)) return { kind: "allOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
   // "If you created a token this turn" (Bennie Bracks, Zoologist).

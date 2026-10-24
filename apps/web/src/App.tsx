@@ -128,6 +128,8 @@ import {
   potentialAttackers,
   attackedName,
   returnCandidates,
+  beholdCandidates,
+  beholdWhat,
   linkedExileCards,
   tapCostCandidates,
   untapViaMana,
@@ -945,6 +947,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // "Tap an untapped creature you control" (Lashknife's alternative cost): clicked on the battlefield.
       if (c.kind === "tap")
         return setCostPick({ draft: d, kind: "tap", label: card.name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.convoke?.includes(id)), chosen: [] });
+      // Behold (CR 701.4a): a card from your hand or a permanent you control, picked from both together.
+      if (c.kind === "reveal" && c.orControl) {
+        const kind = beholdWhat(c);
+        return setCostPick({ draft: d, kind: "reveal", label: card.name, what: `behold ${kind}${c.exile ? " and exile it" : ""} (${kind.replace(/^an? /, "")} you control or ${kind.replace(/^an? /, "")} card from your hand)`, n: c.n, candidates: beholdCandidates(s, HUMAN, s.objects[d.objectId]!, c), chosen: [] });
+      }
       const me = s.players[HUMAN]!;
       const candidates =
         c.kind === "sacrifice"
@@ -1960,6 +1967,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "revealHand") return "reveal your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
+  if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
   if (c.kind === "mill") return `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;

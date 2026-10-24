@@ -3,11 +3,14 @@
 import type { Effect } from "../abilities";
 import { abilitiesOf } from "../cards";
 import { controllerOf } from "../layers";
-import { log, obj, player } from "../game";
+import { livingPlayers, log, obj, player } from "../game";
 import { nextRandom } from "../rng";
 import type { GameState, PlayerId } from "../types";
 import { ResolveCtx, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
+
+/** Where `pid` comes in turn order, counted from the active player. */
+const turnRank = (s: GameState, pid: PlayerId) => (s.turnOrder.indexOf(pid) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
 
 /** How many "roll that many dice plus one and ignore the lowest roll" effects apply to `pid`'s rolls (Pixie Guide). */
 function advantages(s: GameState, pid: PlayerId): number {
@@ -24,6 +27,20 @@ export function runDiceEffect(s: GameState, e: Extract<Effect, { type: "roll" }>
     sc.rollChoice = undefined;
     s.resolving!.rolled = { ...r, result: r.naturals[i]!, other: r.naturals[1 - i]! };
     log(s, `${player(s, who).name} chooses ${r.naturals[i]} (the other result is ${r.naturals[1 - i]}).`);
+    return;
+  }
+  // "Each player rolls a d20" (Chaos Dragon): one die each, in turn order from the active player (CR 101.4), each with
+  // their own advantage effects; every roll is an event of its own.
+  if (e.eachPlayer) {
+    const each: Partial<Record<PlayerId, number>> = {};
+    for (const pid of livingPlayers(s).slice().sort((a, b) => turnRank(s, a) - turnRank(s, b))) {
+      const all = Array.from({ length: 1 + advantages(s, pid) }, () => 1 + Math.floor(nextRandom(s) * e.sides));
+      const result = Math.max(...all);
+      each[pid] = result;
+      log(s, `${player(s, pid).name} rolls a d${e.sides} for ${src}: ${result}${all.length > 1 ? ` (${all.join(", ")}, ${all.length - 1} ignored)` : ""}.`);
+      fireEvent(s, { type: "diceRolled", player: pid, sides: e.sides, dice: [{ natural: result, result }], result });
+    }
+    s.resolving!.rolledEach = each;
     return;
   }
   const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);

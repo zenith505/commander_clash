@@ -3154,6 +3154,11 @@ function linkExile(out: CompiledCard) {
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)]
     .flatMap((b) => allEffects(b.effects))
     .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile)) && !("until" in e && e.until));
+  // "As an additional cost to cast this spell, behold an Elf and exile it" with "When this creature leaves the battlefield,
+  // return the exiled card to its owner's hand" (Champions of the Perfect): the card exiled to pay the cost of the spell
+  // that became this permanent (CR 607.2q, recorded as it's cast).
+  const costExile = out.additionalCosts?.filter((c) => c.kind === "reveal" && c.exile).length === 1 && !out.costOr;
+  if (costExile && !exiles.length && returns.length === 1 && returns[0]!.event === "selfLeaves" && allEffects(returns[0]!.body.effects).every((e) => e.type !== "linkedExileToken")) return;
   if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;

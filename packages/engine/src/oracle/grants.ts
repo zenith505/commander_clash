@@ -26,8 +26,9 @@ export function compileGranted(text: string): CompiledCard {
     // A quoted ability inside the granted one is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's
     // Saga): double quotes once it's an ability of its own.
     const own = innerQuotes(text);
-    // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}").
-    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : [];
+    // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}"), a crew ability to
+    // a Vehicle (Swift Reconfiguration).
+    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : [];
     hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
@@ -188,6 +189,13 @@ export function parseGrants(text: string): Modification[] | null {
     const equip = /^equip (\{\d+\})$/i.exec(w);
     if (equip) {
       out.push({ kind: "addAbility", text: `Equip ${equip[1]}` });
+      continue;
+    }
+    // "Is a Vehicle artifact with crew 5" (Swift Reconfiguration): a crew ability of its own (CR 702.122a), on top of any
+    // it has (rulings).
+    const crew = /^crew (\d+)$/i.exec(w);
+    if (crew) {
+      out.push({ kind: "addAbility", text: `Crew ${crew[1]}` });
       continue;
     }
     // "Gain all creature types" (Mirror Entity): layer 4, in addition to its other types (CR 205.3d, 613.1d); a

@@ -1336,8 +1336,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${src} exiles ${defOf(s, o).name}${e.until === "sourceLeaves" ? ` until ${src} leaves the battlefield` : e.until === "opponentMonarch" ? " until an opponent becomes the monarch" : ""}.`);
         // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
         const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) } : undefined;
+        const fromYard = o.zone === "graveyard";
         moveObject(s, o.id, "exile");
         if (before && o.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
+        if (fromYard && o.zone === "exile" && s.resolving) (s.resolving.exiledCards ??= []).push(o.id);
         // A merged permanent's cards are all exiled with it, and found by what returns it (CR 730.3c).
         for (const l of newObjects(o)) {
           if (s.objects[l.id]?.zone !== "exile") continue;
@@ -1807,7 +1809,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "Flipped": a flip card enters flipped (CR 710.1b); any other card enters as it is, the flip being impossible.
       const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : e.flipped && s.cards[o.cardId]?.layout === "flip" && s.cards[o.cardId]!.faces?.length === 2 ? 1 : undefined);
       const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
+      // Unfinished Business: the creature the instruction before returned, while it's still on the battlefield.
+      const returned = e.attachToCreated ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield" && objIsType(s, o, "Creature")) : undefined;
+      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
@@ -1851,6 +1855,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
             log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host!).name}.`);
             moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host!.id });
+            continue;
+          }
+          if (e.attachToCreated) {
+            // An Aura only onto a creature it could enchant (CR 303.4d, 303.4f), otherwise it stays in the graveyard; an
+            // Equipment that can't be attached to it (or with no creature returned) enters unattached (rulings, CR 301.5c).
+            const aura = d.subtypes.includes("Aura");
+            const enchant = aura ? compileCard(d).enchant : undefined;
+            const ok =
+              !!returned &&
+              (aura
+                ? enchant?.kind === "object" && objectMatches(s, enchant, returned, ctx.controller, false, d)
+                : d.subtypes.includes("Equipment") && !isType(d, "Creature") && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, returned, ctx.controller, false, d));
+            if (!ok && (aura || !isPermanentCard(d))) {
+              log(s, `${d.name} can't be attached to ${returned ? defOf(s, returned).name : "that creature"}, so it stays in the graveyard.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield${ok ? ` attached to ${defOf(s, returned!).name}` : ", unattached"}.`);
+            moveObject(s, o.id, "battlefield", { controller: ctx.controller, ...(ok ? { attachTo: returned!.id } : {}) });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
             continue;
           }
           if (e.attachToSubject) {
@@ -2220,6 +2243,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const o = obj(s, id);
           if (s.resolving && objIsType(s, o, "Creature")) (s.resolving.exiledPowers ??= []).push(power(s, o));
           moveObject(s, id, "exile");
+          if (o.zone === "exile" && s.resolving) (s.resolving.exiledCards ??= []).push(id);
           if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
           if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, graveyard: true });
         }

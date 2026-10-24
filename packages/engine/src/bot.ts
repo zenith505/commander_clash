@@ -21,6 +21,7 @@ import {
   dredgeAmount,
   assistedRemaining,
   returnCandidates,
+  beholdCandidates,
   attackablePermanentProblem,
   attackProblem,
   attackCost,
@@ -2493,6 +2494,16 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const fits = others.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))).sort((a, b) => mv(s, a) - mv(s, b));
       if (fits.length < c.n || others.length < c.n + 1) return null;
       out.exileFromHand = fits.slice(0, c.n);
+    } else if (c.kind === "reveal" && c.orControl) {
+      // Behold: a permanent we control (nothing is given away), or with "and exile it" a card from our hand first (it
+      // comes back when the spell's permanent leaves), else the least valuable nontoken permanent that isn't our
+      // commander (a token exiled is gone for good, CR 111.7).
+      const pool = beholdCandidates(s, pid, obj(s, id), c).filter((x) => !targeted.has(x));
+      const field = pool.filter((x) => obj(s, x).zone === "battlefield" && !(c.exile && (obj(s, x).isToken || obj(s, x).isCommander))).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+      const hand = pool.filter((x) => obj(s, x).zone === "hand").sort((a, b) => mv(s, a) - mv(s, b));
+      const fits = c.exile ? [...hand, ...field] : [...field, ...hand];
+      if (fits.length < c.n) return null;
+      out.reveal = fits.slice(0, c.n);
     } else if (c.kind === "reveal") {
       const fits = player(s, pid).hand.filter((x) => x !== id && printedMatches(c.filter, defOf(s, obj(s, x))));
       if (fits.length < c.n) return null;

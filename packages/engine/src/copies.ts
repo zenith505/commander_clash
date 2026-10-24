@@ -47,7 +47,7 @@ export interface CopyExcept {
    * replacement effect on its entering (CR 614.1c), not a copiable value, so it isn't part of the copy. `ifType`: only if
    * it is that card type as it enters, as a copy (rulings).
    */
-  enterCounters?: { counter: string; ifType?: string }[];
+  enterCounters?: { counter: string; ifType?: string; /** "Except it enters with X additional +1/+1 counters on it" (Altered Ego): the X of the spell it was, 0 if it wasn't cast (CR 107.3m). */ x?: true }[];
   /**
    * "Except their power is half that creature's power and their toughness is half that creature's toughness. Round up
    * each time." (Saw in Half): base power and toughness, half the copied creature's as it last existed (rulings), worked
@@ -190,8 +190,8 @@ export function endCopyEffects(s: GameState, ends: (e: CopyEffect) => boolean) {
  * The counters a copy enters with because of its exceptions (CopyExcept.enterCounters): "an additional +1/+1 counter on it
  * if it's a creature", as it would exist on the battlefield (`isA`: whether it has that card type then).
  */
-export function copyEnterCounters(except: CopyExcept | undefined, isA: (type: string) => boolean): Record<string, number> {
+export function copyEnterCounters(except: CopyExcept | undefined, isA: (type: string) => boolean, x = 0): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const c of except?.enterCounters ?? []) if (!c.ifType || isA(c.ifType)) out[c.counter] = (out[c.counter] ?? 0) + 1;
+  for (const c of except?.enterCounters ?? []) if ((!c.ifType || isA(c.ifType)) && (!c.x || x > 0)) out[c.counter] = (out[c.counter] ?? 0) + (c.x ? x : 1);
   return out;
 }

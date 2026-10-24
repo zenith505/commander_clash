@@ -221,6 +221,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     return [roll];
   }
+  // "Each player rolls a d20" (Chaos Dragon): every player rolls one die; see Modification "cantAttackPlayers".
+  if ((m = /^[Ee]ach player rolls a d(\d+)$/.exec(s))) return [{ type: "roll", sides: Number(m[1]), eachPlayer: true }];
   // Scry and surveil (CR 701.22, 701.25)
   // "... and you scry X" (Alibou, Ancient Witness).
   if ((m = new RegExp(`^(?:you )?(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];

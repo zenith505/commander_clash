@@ -1,6 +1,6 @@
 import type { CopyExcept } from "../copies";
 import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, StaticCondition, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, CompiledCard, EntersOption } from "../abilities";
-import { CREATURE_TYPES } from "../keywords";
+import { CREATURE_TYPES, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
 import { NUM, num, keywordOf, plainMana, sacrificeSelf, pumpSelf, BASIC_TYPES, capital, singular, singularWord } from "./words";
@@ -582,6 +582,12 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const spec = parseTargetPhrase(m[1]!);
     if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped === false) return null;
     return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[1]} you control` }, n: 1 };
+  }
+  // Behold (CR 701.4a): "behold an Elf", "behold a Kithkin and exile it" (exile an Elf you control or an Elf card from your
+  // hand). A subtype only, as yet.
+  if ((m = /^behold an? ([A-Z][a-z]+)( and exile it)?$/.exec(text)) && subtypeSet(m[1]!)) {
+    const st = m[1]!;
+    return { kind: "reveal", filter: { kind: "card", subtypes: [st], text: `${st} card` }, n: 1, orControl: { kind: "object", subtypes: [st], controller: "you", text: `${st} you control` }, ...(m[2] ? { exile: true as const } : {}) };
   }
   if ((m = /^reveal an? (.+? card) from your hand$/i.exec(text))) {
     const filter = parseSearchFilter(m[1]!);

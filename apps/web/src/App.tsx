@@ -60,6 +60,7 @@ import {
   isSummoningSick,
   legalActions,
   manaAbilitiesOn,
+  livingPlayers,
   manaOptions,
   activatedManaOptions,
   spellCost,
@@ -433,7 +434,9 @@ type XPick =
   /** `extra`: an additional cost with X in it, "pay X life" (CR 107.3a). */
   /** `min`: "X can't be 0" (Thieving Skydiver's kicker). */
   | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string; min?: number }
-  | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string };
+  | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string }
+  /** Turning a face-down permanent face up for "Disguise {X}{3}{W}" (CR 107.3d). */
+  | { mode: "faceUp"; objectId: string; way: number; label: string; cost: string; max: number; value: number; extra?: string };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
 /** How many "up to" targets in a row start at `i`. */
@@ -1029,6 +1032,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setXPick(null);
     if (!pick) return;
     if (pick.mode === "cast") continueCast({ ...pick.draft, x: pick.value });
+    else if (pick.mode === "faceUp") dispatch(planTurnFaceUp(s!, HUMAN, pick.objectId, pick.way, pick.value) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: pick.objectId, ...(pick.way ? { way: pick.way } : {}), ...(pick.value ? { x: pick.value } : {}) }]);
     else useAbility(pick.objectId, pick.index, pick.modes, pick.value);
   }
 
@@ -1198,7 +1202,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       // A Room with a locked door to unlock (CR 709.5e) has a menu too.
-      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0) || [0, 1].some((door) => unlockCost(s, o, door) !== undefined)) return setMenu(o.id);
+      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0 || !!abs[x.ability]!.toChosenPlayer) || [0, 1].some((door) => unlockCost(s, o, door) !== undefined)) return setMenu(o.id);
       const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo);
       if (plan) dispatch(plan);
     }
@@ -1501,7 +1505,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 setMixPick({ objectId: menu, ability, n, ...(extra ? { extra } : {}), ...(colors ? { colors } : {}), label: cardOf(s, menu).name, counts: {} });
               }}
-              onMana={(x) => {
+              onMana={(x, to) => {
                 setMenu(null);
                 // "{T}, Tap an untapped creature you control: Add ...": pick what to tap first.
                 const tapCost = manaAbilitiesOn(s, s.objects[menu]!)[x.ability]?.tapCost;
@@ -1510,7 +1514,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
                 }
                 const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra, x.combo);
-                if (plan) dispatch(plan);
+                // Victory Chimes: "a player of your choice adds {C}".
+                if (plan) dispatch(to === undefined ? plan : plan.map((a) => (a.type === "activateMana" && a.objectId === menu ? { ...a, to } : a)));
               }}
               onPlay={(untapped) => {
                 setMenu(null);
@@ -1565,6 +1570,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               }}
               onTurnFaceUp={(way) => {
                 setMenu(null);
+                // "Disguise {X}{3}{W}": X first, chosen as it's turned face up (CR 107.3d).
+                const up = faceUpWays(s, s.objects[menu]!)[way];
+                if (up && parseManaCost(up.cost).hasX) {
+                  const max = maxX((n) => planTurnFaceUp(s, HUMAN, menu, way, n));
+                  return setXPick({ mode: "faceUp", objectId: menu, way, label: `Turn face up (${up.kind})`, cost: up.cost, max, value: max });
+                }
                 dispatch(planTurnFaceUp(s, HUMAN, menu, way) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}) }]);
               }}
               onClose={() => setMenu(null)}
@@ -4017,7 +4028,7 @@ function AbilityMenu({
   s: GameState;
   objectId: string;
   onUse: (id: string, index: number, modes?: number[], x?: number, pick?: ManaPick) => void;
-  onMana: (x: ManaOption) => void;
+  onMana: (x: ManaOption, to?: PlayerId) => void;
   /** "Add X mana in any combination of colors" (Selvala): choose the colors (`n` mana in all). */
   onMix: (ability: number, n: number, extra?: ManaType[], colors?: Color[]) => void;
   /** For a card in hand: cast it, or play it if it's a land (`untapped`: pay life or reveal so it enters untapped). */
@@ -4296,13 +4307,25 @@ function AbilityMenu({
             .slice(0, ab.text.includes(": Add") ? ab.text.indexOf(": Add") : ab.text.indexOf(": "))
             .replace(/~/g, "it")
             .replace(/Remove (?:any number of|X) (\S+) counters/, (_, k: string) => (x.removes === 1 ? `Remove a ${k} counter` : `Remove ${x.removes === 0 ? "no" : x.removes} ${k} counters`));
-          return (
+          const button = (
             <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
               {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>
           );
+          // Victory Chimes: "a player of your choice adds {C}": you, or one of the others.
+          if (!ab.toChosenPlayer) return button;
+          return [
+            button,
+            ...livingPlayers(s)
+              .filter((pid) => pid !== HUMAN)
+              .map((pid) => (
+                <button key={`${x.ability}-${x.mana}-to${pid}`} className="ghost" data-mana-to={pid} onClick={() => onMana(x, pid)}>
+                  <RulesText text={cost} />: {s.players[pid]!.name} adds <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
+                </button>
+              )),
+          ];
         })}
       {abilitiesOf(s, o).activated.map((ab, i) => {
         // From your hand, only cycling and the like; from your graveyard, unearth; on the battlefield, everything else.
@@ -4706,7 +4729,7 @@ function Controls({
     return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const theirs = pending.of !== undefined && pending.of !== HUMAN ? s.players[pending.of]!.name : undefined;
-    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "exile" ? "exile" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : pending.action === "choose" ? "choose" : theirs ? "return to their owner's hand" : "return to your hand";
+    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "exile" ? "exile" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : pending.action === "choose" ? "choose" : pending.action === "flicker" ? "exile and return" : theirs ? "return to their owner's hand" : "return to your hand";
     // "other creature" reads "another creature".
     const an = /^other /.test(pending.what) ? `an${pending.what}` : `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
@@ -4771,7 +4794,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.action === "flicker" ? (n ? `Exile and return ${n}` : "Exile none") : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

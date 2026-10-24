@@ -231,7 +231,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
     case "joinForcesPaid":
-      return s.resolving?.joinForcesPaid ?? 0;
+      return c.whose ? refPlayers(s, c.whose, ctx).reduce((a, pid) => a + (s.resolving?.joinForcesPaidBy?.[pid] ?? 0), 0) : (s.resolving?.joinForcesPaid ?? 0);
     case "manifestedThisWay":
       return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
@@ -618,7 +618,7 @@ function describeCount(c: Count): string {
     case "tappedThisWay":
       return "#tapped";
     case "joinForcesPaid":
-      return "#mana paid";
+      return c.whose ? "#mana they paid" : "#mana paid";
     case "manifestedThisWay":
       return "#cards manifested";
     case "parleyRevealed":

@@ -1010,6 +1010,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runVotesEffect(s, e, ctx, src);
     case "may":
     case "repeatMay":
+    case "repeat":
     case "repeatIf":
     case "rollAgain":
     case "either":

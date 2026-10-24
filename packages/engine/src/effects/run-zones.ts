@@ -163,7 +163,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     sc.queue.shift();
   }
   // "Put a +1/+1 counter on a creature you control. It gains ...": "it" is the one picked, while it's that object (CR 400.7).
-  if ((e.action === "counters" || e.action === "choose") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
+  if ((e.action === "counters" || e.action === "choose" || e.action === "flicker") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
   // "Unattach an Equipment from a creature you control. If you do, tap that creature" (Akiri, Fearless Voyager): it stays
   // on the battlefield, attached to nothing (CR 701.3d); "that creature" is the one it was attached to.
   if (e.action === "unattach") {
@@ -190,6 +190,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         log(s, `${player(s, pid).name} chooses ${defOf(s, o).name}.`);
         continue;
       }
+      if (e.action === "flicker") continue; // the flicker after it says what it exiles
       if (e.action === "tap") {
         if (o.tapped) continue;
         tapPermanent(s, o);
@@ -1092,7 +1093,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // A copy: one not cast ceases to exist (CR 704.5e); the card it copied stays exiled, copied once (rulings).
         if (s.objects[st.casting]?.zone === "exile") removeCopy(s, st.casting);
         else st.cast = (st.cast ?? 0) + 1;
-        st.declined.push(st.copyOf);
+        // Mnemonic Deluge: three copies of the card, each cast or not in turn; those not cast cease to exist (rulings).
+        const made = ((st.copied ??= {})[st.copyOf] ?? 0) + 1;
+        st.copied[st.copyOf] = made;
+        if (made >= (e.copyTimes ?? 1)) st.declined.push(st.copyOf);
         st.casting = st.copyOf = undefined;
       }
       if (st.casting) {
@@ -1161,7 +1165,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const copy = newObject(s, defOf(s, obj(s, pick)), you.id, "exile");
           copy.spellCopy = true;
           you.exile.push(copy.id);
-          log(s, `${src} copies ${defOf(s, obj(s, pick)).name}.`);
+          log(s, `${src} copies ${defOf(s, obj(s, pick)).name}${e.copyTimes ? ` (copy ${(st.copied?.[pick] ?? 0) + 1} of ${e.copyTimes})` : ""}.`);
           st.casting = copy.id;
           st.copyOf = pick;
           s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src };

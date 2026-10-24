@@ -1,7 +1,7 @@
 # Roadmap
 
-23,712 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,555 of 4,988 (91%).
+23,727 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,564 of 4,988 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,16 +22,21 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 136, most played first: Victory Chimes ("{T}: A player of
-   your choice adds {C}"), Another Round, Nissa, Ascended Animist, Mnemonic Deluge, Infiltration Lens, Wizard's Staff,
-   The Sound of Drums, Court of Embereth, Garruk, Cursed Huntsman, The Necrobloom. Karazikar's "whenever an opponent
-   attacks another one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Smaller gaps
-   from round 136: Aurelia's Vindicator (up to X targets from the battlefield and/or graveyards, X its disguise cost's)
-   and Liege of the Hollows (each player's own "amount of mana they paid this way") are out; in join forces bots pay all
-   the mana they can, except an opponent's "each player mills X"; bots exile Mardu Siegebreaker's creature with an
-   enters ability (never a commander or a token), and take Angel of Serenity's targets from opponents' creatures and
-   their own graveyard only; the Second Doctor's opponents' bots draw unless its controller is the only opponent they
-   have left. Smaller gaps from round 135: bots use Doubling Cube only for a plan of eight or more land taps that ends
+00. Most played first (`npm run popular`). Out after round 137, most played first: The Necrobloom ("land cards in
+   your graveyard have dredge 2"), Court of Ardenvale, Reckoner Bankbuster, Mutable Explorer, Blacksmith's Talent,
+   Laughing Jasper Flint, Martial Impetus, Fortune Teller's Talent, Tifa, Martial Artist, Rikku, Resourceful Guardian,
+   Yes Man, Personal Securitron, Baldin, Century Herdmaster, Legion's Landing; Wildfire Devils and Arcane Proxy too.
+   Karazikar's "whenever an opponent attacks another one of your opponents" has no rulings on planeswalkers and battles,
+   so it stays out. Smaller gaps from round 137: bots never give Victory Chimes' {C} to another player; bots turn
+   Bane of the Living face up with the X that kills the most worth of opponents' creatures (their own counted 1.5
+   times), and Aurelia's Vindicator with X the number of targets they'd pick; in join forces an opponent's bot keeps
+   the mana for its dearest instant or flash card, and bots pay no more than what finds them cards (draws, their own
+   mills, basic lands), all they can for Liege of the Hollows; Mnemonic Deluge's copies are cast one after another;
+   bots flicker with Another Round only their own nontoken, noncommander creatures with an enters trigger (or face
+   down, or entering with counters) that have no counters or Auras on them. Smaller gaps from round 136: bots exile
+   Mardu Siegebreaker's creature with an enters ability (never a commander or a token), and take Angel of Serenity's
+   targets from opponents' creatures and their own graveyard only; the Second Doctor's opponents' bots draw unless its
+   controller is the only opponent they have left. Smaller gaps from round 135: bots use Doubling Cube only for a plan of eight or more land taps that ends
    in one spell or ability (not with convoke or improvise). Smaller gaps from round 134: Astarion's Thirst has no rulings
    and follows CR 608.2h and 903.9a (a commander exiled this way is still in exile as it resolves). Smaller gaps from round 133: "put your
    choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was chosen; Yennett's "if

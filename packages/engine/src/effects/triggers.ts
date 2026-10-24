@@ -53,8 +53,9 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
     const o = obj(s, id);
     const c = characteristics(s, o);
     // Printed, or granted (The Masamune's equipped creature).
-    const again = [...(c.hasPrintedAbilities ? (compileCard(defOf(s, o)).triggersAgain ?? []) : []), ...(c.grantedAbilities?.length ? (withGranted(NO_ABILITIES, c.grantedAbilities).triggersAgain ?? []) : [])];
-    if (again.length && c.controller === controller) statics.push({ id, again });
+    // Wizard's Staff's is about the creature it's attached to, whoever controls the Staff.
+    const again = [...(c.hasPrintedAbilities ? (compileCard(defOf(s, o)).triggersAgain ?? []) : []), ...(c.grantedAbilities?.length ? (withGranted(NO_ABILITIES, c.grantedAbilities).triggersAgain ?? []) : [])].filter((a) => c.controller === controller || a.ofEquipped);
+    if (again.length) statics.push({ id, again });
   }
   for (const l of s.leftTogether ?? []) {
     const o = s.objects[l.id];
@@ -74,6 +75,10 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
       if (emblem !== !!a.selfOrEmblems && !(a.selfOrEmblems && view.o.id === id)) continue;
+      if (a.ofEquipped) {
+        if (!spell && !emblem && s.objects[id]!.attachedTo === view.o.id) n++;
+        continue;
+      }
       if (a.selfOrEquipment) {
         const host = s.objects[id]!;
         const equipped = host.zone === "battlefield" && s.battlefield.some((e) => s.objects[e]!.attachedTo === id && characteristics(s, s.objects[e]!).subtypes.includes("Equipment"));
@@ -193,7 +198,7 @@ export type TriggerSourceEvent =
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
-  | { type: "turnedFaceUp"; id: ObjectId }
+  | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
   | { type: "attacksAlone"; id: ObjectId }
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
@@ -759,6 +764,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
+          // "Whenever equipped creature becomes blocked by a creature" (Infiltration Lens): once for each blocker (rulings).
+          if (bl) addHosted(o, (e) => e === "selfBlockedByCreature", undefined, bl, { player: o.attacking });
           // "Whenever your Ring-bearer becomes blocked by a creature, the blocking creature's controller sacrifices
           // it at end of combat" (CR 701.54c).
           if (bl && bearer) ringTrigger(s, you, 1, bl);
@@ -990,7 +997,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e) => e === "selfMutates");
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
+    // An X in its morph or disguise cost is the X its own abilities use (CR 702.37f, 702.168e).
+    add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp", undefined, undefined, undefined, undefined, ev.x);
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };

@@ -142,6 +142,20 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `repeat: ${e.text}`, source: src, repeat: true };
       return "paused";
     }
+    case "repeat": {
+      // Another Round: the process `n` times, worked out once (CR 608.2h); each pass's choices made anew (rulings). The
+      // scratch a pass leaves behind is cleared before the next one.
+      const sc = (s.resolving!.scratch ??= {});
+      const st = (sc.repeat ??= { left: amountNow(s, e.n, ctx), keep: Object.keys(sc) });
+      while (st.left > 0) {
+        for (st.step ??= 0; st.step < e.effects.length; st.step++) if (runEffect(s, e.effects[st.step]!, ctx) === "paused") return "paused";
+        for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (k !== "repeat" && !st.keep.includes(k)) delete sc[k];
+        st.step = undefined;
+        if (--st.left > 0) log(s, `${src} repeats the process.`);
+      }
+      sc.repeat = undefined;
+      return;
+    }
     case "repeatIf": {
       // Grist: each pass, its instructions in order, then if the card milled qualifies, `then` and another pass; it ends
       // when one misses (an empty library mills nothing). Even with ~ gone, the process goes on (rulings).
@@ -220,15 +234,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Join forces: from the controller on, in turn order, each player may pay any amount of mana (Minds Aglow; CR 101.4
       // doesn't apply, "starting with you" does), seeing what the ones before paid. Each says how much, then pays it.
       const sc = (s.resolving!.scratch ??= {});
-      const i = s.turnOrder.indexOf(ctx.controller);
-      const j = (sc.join ??= { queue: [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0 });
+      // Liege of the Hollows: from the active player on instead (rulings).
+      const i = s.turnOrder.indexOf(e.activeFirst ? s.activePlayer : ctx.controller);
+      const j = (sc.join ??= { queue: [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), paid: 0, by: {} });
       while (j.queue.length) {
         const pid = j.queue[0]!;
         if (j.asked === undefined && sc.payX === undefined) {
           const cap = Math.min(availableMana(s, pid), 40);
           if (cap > 0) {
             const options = ["none", ...Array.from({ length: cap }, (_, k) => String(k + 1))];
-            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana (${j.paid} paid so far)` };
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `Pay ${o}`)), prompt: `${src}: pay any amount of mana${e.activeFirst ? "" : ` (${j.paid} paid so far)`}` };
             return "paused";
           }
         } else if (j.asked === undefined && sc.payX !== "none") {
@@ -238,11 +253,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const pay = { mana: `{${j.asked}}` };
           s.pending = { kind: "chooseMay", player: pid, prompt: `pay ${describePay(pay)}`, source: src, pay };
           return "paused";
-        } else if (j.asked !== undefined && sc.may) j.paid += j.asked;
+        } else if (j.asked !== undefined && sc.may) {
+          j.paid += j.asked;
+          j.by[pid] = j.asked;
+        }
         sc.payX = sc.may = j.asked = undefined;
         j.queue.shift();
       }
       s.resolving!.joinForcesPaid = j.paid;
+      s.resolving!.joinForcesPaidBy = j.by;
       log(s, `${j.paid} mana was paid for ${src}.`);
       sc.join = undefined;
       return;

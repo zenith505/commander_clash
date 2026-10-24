@@ -961,6 +961,9 @@ export interface LastKnown {
   counters?: Record<string, number>;
   /** Its card types as it last existed (CR 608.2h): "a permanent that shares a card type with it" (Braids). */
   types?: string[];
+  /** Its subtypes as it last existed: "if the sacrificed creature was a Hamster" (Minsc & Boo); `allCreatureTypes`, a changeling's. */
+  subtypes?: string[];
+  allCreatureTypes?: true;
   power?: number;
   toughness?: number;
   manaValue?: number;

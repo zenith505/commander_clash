@@ -3176,6 +3176,8 @@ export type SpellCondition =
   | { kind: "sacrificedSuspected" }
   /** "If the sacrificed creature was legendary" (Nasty End): the same, legendary as it last existed (CR 608.2h). */
   | { kind: "sacrificedLegendary" }
+  /** "If the sacrificed creature was a Hamster" (Minsc & Boo): one of its creature types as it last existed. */
+  | { kind: "sacrificedSubtype"; subtype: string }
   /**
    * "If the discarded card wasn't a land card" (Grab the Prize), "was a creature card" (Moria Scavenger): the card a
    * discard cost discarded (StackItem.costDiscarded), as it is in the graveyard. Costs are paid after targets are chosen

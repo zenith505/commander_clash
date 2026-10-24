@@ -386,3 +386,63 @@ describe("Scavenger's Talent", () => {
     expect(s.pending?.kind === "chooseMay" && /sacrifice three/.test(s.pending.prompt)).toBe(false);
   });
 });
+
+describe("Minsc & Boo, Timeless Heroes", () => {
+  const minsc = card("Minsc & Boo, Timeless Heroes", "Legendary Planeswalker — Minsc", "{R}{R}{G}", { loyalty: "3", oracleText: "When Minsc & Boo enters and at the beginning of your upkeep, you may create Boo, a legendary 1/1 red Hamster creature token with trample and haste.\n+1: Put three +1/+1 counters on up to one target creature with trample or haste.\n−2: Sacrifice a creature. When you do, Minsc & Boo deals X damage to any target, where X is that creature's power. If the sacrificed creature was a Hamster, draw X cards.\nMinsc & Boo, Timeless Heroes can be your commander." });
+  const hamster = bear({ name: "Test Hamster", typeLine: "Creature — Hamster", subtypes: ["Hamster"], power: "4", toughness: "4" });
+  const minus = (sacrifice: CardDef) => {
+    const { s: s0, ap } = setup([]);
+    const m = putOnBattlefield(s0, ap, minsc);
+    s0.objects[m]!.counters.loyalty = 3;
+    const fodder = putOnBattlefield(s0, ap, sacrifice);
+    const opp = nextOf(s0, ap);
+    const hand = s0.players[ap]!.hand.length;
+    const life = s0.players[opp]!.life;
+    let s = run(s0, planActivate(s0, ap, m, abilityIndex(s0, m, "−2")));
+    s = resolveAll(s);
+    if (s.pending?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: ap, ids: [fodder] });
+    for (let i = 0; i < 10 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] });
+    s = resolveAll(s);
+    return { s, ap, opp, fodder, hand, life };
+  };
+
+  it("is fully supported; −2 with a Hamster: X damage and X cards, X its power", () => {
+    supported(minsc);
+    const { s, ap, opp, fodder, hand, life } = minus(hamster);
+    expect(s.objects[fodder]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 4);
+    expect(s.players[ap]!.hand.length).toBe(hand + 4);
+  });
+
+  it("another creature: the damage only", () => {
+    const { s, ap, opp, hand, life } = minus(bear({ name: "Test Big Bear", power: "3", toughness: "3" }));
+    expect(s.players[opp]!.life).toBe(life - 3);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+});
+
+describe("Virtue of Courage", () => {
+  const virtue = scry("adventure", [
+    { name: "Virtue of Courage", mana_cost: "{3}{R}{R}", type_line: "Enchantment", oracle_text: "Whenever a source you control deals noncombat damage to an opponent, you may exile that many cards from the top of your library. You may play those cards this turn." },
+    { name: "Embereth Blaze", mana_cost: "{1}{R}", type_line: "Instant — Adventure", oracle_text: "Embereth Blaze deals 2 damage to any target. (Then exile this card. You may cast the enchantment later from exile.)" },
+  ]);
+  const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+
+  it("is fully supported; noncombat damage to an opponent: you may exile that many and play them this turn", () => {
+    expect(isFullySupported(virtue)).toBe(true);
+    const { s: s0, ap, ids } = setup([shock]);
+    s0.cards[virtue.oracleId] = virtue;
+    putOnBattlefield(s0, ap, virtue);
+    const opp = nextOf(s0, ap);
+    const top = s0.players[ap]!.library.slice(0, 2);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    expect((s.pending as { prompt: string }).prompt).toMatch(/that many|2/);
+    s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: true }));
+    for (const id of top) {
+      expect(s.objects[id]!.zone).toBe("exile");
+      expect(s.objects[id]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn" });
+    }
+  });
+});

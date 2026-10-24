@@ -1267,6 +1267,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Virtue of Courage: "you may exile that many cards from the top of your library. You may play those cards this
+    // turn." Whether to exile them is the choice; once they're exiled, each may be played (CR 406.3, 400.7).
+    const mayExileTop = new RegExp(`^[Yy]ou may exile ${NUMX} cards from the top of your library$`).exec(s);
+    if (mayExileTop && sentences[si + 1]?.replace(/\.$/, "") === "You may play those cards this turn") {
+      effects.push({ type: "may", effects: [{ type: "impulse", n: amt(mayExileTop[1]!), until: "thisTurn" }], text: `exile ${mayExileTop[1] === "X" ? "that many" : mayExileTop[1]} cards from the top of your library` });
+      si++;
+      continue;
+    }
     // Haunting Voyage: "Choose a creature type. Return up to two creature cards of that type ...": the type chosen.
     if (/ cards? of that type\b/.test(s) && effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/( cards?) of that type\b/g, "$1 of the chosen type");
     // Lae'zel's Acrobatics: "Exile all nontoken creatures you control, then roll a d20. 1—9 | Return those cards to the
@@ -4431,6 +4439,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Tap any number of untapped artifacts you control. When you do, this Saga deals that much damage to target
       // creature" (Yotia Declares War): one damage for each one tapped.
       if (prev?.type === "tapAnyNumber") whenText = whenText.replace(/\bdeals that much damage to\b/, "deals damage equal to the number of permanents tapped this way to");
+      // Minsc & Boo: "~ deals X damage to any target, where X is that creature's power. If the sacrificed creature was a
+      // Hamster, draw X cards.": the same X in the sentence after.
+      const xLater = /^([^.]+), where X is ([^.,]+)\. (If [^.]+, )draw X cards$/.exec(whenText);
+      if (xLater) whenText = `${xLater[1]}, where X is ${xLater[2]}. ${xLater[3]}draw cards equal to ${xLater[2]}`;
       si = sentences.length;
       // What the "you may" sacrificed, if the reflexive trigger is about it.
       const sacPick = mayDo && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
@@ -5520,6 +5532,10 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
     const kind = sacPT[1] === "mana value" ? "manaValue" : (sacPT[1] as "power" | "toughness");
     return { cond: { kind: "amountNow", amount: { count: { kind, of: { ref: "sacrificed" } } }, min: Number(sacPT[2]) }, not: false, text: sacPT[3]!, noTargets: true };
   }
+  // "If the sacrificed creature was a Hamster, draw X cards" (Minsc & Boo): its creature types as it last existed (CR
+  // 608.2h), a changeling's all of them.
+  const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s);
+  if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacType[2]!, noTargets: true };
   for (const h of HOW_CAST) {
     if (h.spellOnly && !ctx.spell) continue;
     if (h.activatedOnly && !ctx.activated) continue;

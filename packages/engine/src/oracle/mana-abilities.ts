@@ -183,7 +183,15 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (!commander && (spell?.kind !== "spell" || spell.controller || spell.chosen)) return null;
       const effect = m2[2]!.replace(/^./, (c) => c.toUpperCase());
       const studyX = commander && effect === "Scry X, where X is the number of times it's been cast from the command zone this game";
-      const body = studyX ? { targets: [], effects: [{ type: "scry" as const, n: { count: { kind: "castSpellCommanderCasts" as const } } }], text: `${effect}.` } : parseBody(`${effect}.`, {});
+      // Jade Orb of Dragonkind: "it enters with an additional +1/+1 counter on it and gains hexproof until your next turn",
+      // about the spell that mana paid for: one more counter for each such mana (rulings, CR 614.1c), and hexproof on
+      // the permanent it becomes from when it enters (rulings, CR 400.7a).
+      const jade = !commander && effect === "It enters with an additional +1/+1 counter on it and gains hexproof until your next turn";
+      const body = studyX
+        ? { targets: [], effects: [{ type: "scry" as const, n: { count: { kind: "castSpellCommanderCasts" as const } } }], text: `${effect}.` }
+        : jade
+          ? { targets: [], effects: [{ type: "spellEntersWith" as const, counter: "+1/+1", n: 1 }, { type: "spellGains" as const, mods: [{ kind: "addKeywords" as const, keywords: ["Hexproof"] }], until: "yourNextTurn" as const }], text: `${effect}.` }
+          : parseBody(`${effect}.`, {});
       if (!body || body.targets.length || !body.effects.length || allEffects(body.effects).some((e) => "what" in e)) return null;
       out.spentTrigger = { ...(commander ? { commander: true as const } : { spell: spell! }), body };
     } else if ((/^Spend this mana only /.test(extra) || extra === "This mana can't be spent to pay generic mana costs.") && !out.spendOnly) {
@@ -330,6 +338,8 @@ function parseManaProduced(text: string): ManaProduce | null {
   // imprint ability exiled, linked in compile.ts); "... of the exiled cards' colors" (Pit of Offerings: the cards its
   // enters ability exiled from graveyards).
   if (text === "one mana of any of the exiled card's colors" || text === "one mana of any of the exiled cards' colors") return { kind: "colorsAmong", linked: true };
+  // "One mana of any of this creature's colors" (given by Katilda, Dawnhart Prime): its own colors as it's activated.
+  if (text === "one mana of any of ~'s colors") return { kind: "colorsAmong", self: true };
   const among = /^one mana of any color among (legendary )?(.+?) you control$/.exec(text);
   if (among) {
     const words = among[2]!.split(/ and | or /).map((w) => singular(w));

@@ -735,6 +735,24 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "counterOfKindOnIt": {
       // A kind of counter it has, chosen as it resolves (with one kind, that one); with none, nothing happens.
+      // Animation Module: a target player's counters too (CR 122.1), if the target is still legal (CR 608.2b).
+      const t = e.host !== undefined && ctx.legal[e.host] ? ctx.targets[e.host] : undefined;
+      if (t?.kind === "player") {
+        const p = player(s, t.id);
+        if (p.lost) return;
+        const kinds = (["poison", "energy", "experience", "rad"] as const).filter((k) => (p[k] ?? 0) > 0);
+        const sc = (s.resolving!.scratch ??= {});
+        if (kinds.length > 1 && sc.counterKind === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: [...kinds], labels: kinds.map((k) => `A ${k} counter`), prompt: `choose a kind of counter ${p.name} has to give them another of` };
+          return "paused";
+        }
+        const counter = (sc.counterKind ?? kinds[0]) as (typeof kinds)[number] | undefined;
+        sc.counterKind = undefined;
+        if (!counter || !kinds.includes(counter)) return;
+        const put = putPlayerCounters(s, p.id, counter, 1);
+        log(s, `${src} gives ${p.name} ${put === 1 ? "a" : put} ${counter} counter${put === 1 ? "" : "s"}.`);
+        return;
+      }
       const o = objects(s, e.what, ctx)[0];
       if (!o) return;
       const kinds = Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0);
@@ -1034,8 +1052,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "doublePT": {
       // Each one's own power and toughness as this resolves (CR 701.10b-c), so one effect for each, locked onto it.
-      // All worked out before any of them changes (the effect is one event).
-      const list = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield" && objIsType(s, o, "Creature")).map((o) => ({ o, p: e.power ? power(s, o) : 0, t: e.toughness ? toughness(s, o) : 0 }));
+      // All worked out before any of them changes (the effect is one event). Tripling adds twice them (CR 701.11b-c).
+      const k = e.triple ? 2 : 1;
+      const list = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield" && objIsType(s, o, "Creature")).map((o) => ({ o, p: e.power ? k * power(s, o) : 0, t: e.toughness ? k * toughness(s, o) : 0 }));
       for (const { o, p, t } of list) {
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "modifyPT", power: p, toughness: t }] });
         log(s, `${defOf(s, o).name} gets ${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t} until end of turn.`);
@@ -1219,7 +1238,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!host || !me) return;
       // Something that isn't an Equipment (or an Aura, for "attach target Aura") doesn't move (CR 701.3b).
       if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) return;
-      attachTo(s, me, host);
+      attachTo(s, me, host, e.asCreature);
       return;
     }
     case "attachAny": {
@@ -1415,7 +1434,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
  * it has reconfigure (CR 301.5c); an Aura to what its enchant ability allows (CR 303.4d, 702.5d); neither to something
  * with protection from it (CR 702.16c-d).
  */
-export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId): boolean {
+export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId, asCreature?: boolean): boolean {
   if (me.zone !== "battlefield") return false;
   const meChars = characteristics(s, me);
   const aura = meChars.subtypes.includes("Aura");
@@ -1432,7 +1451,9 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   if (me.attachedTo === host.id || host.id === me.id || host.zone !== "battlefield") return false;
   // An Aura or Equipment that's also a creature can't be attached, unless it has reconfigure (CR 301.5c, 303.4d).
   if (objIsType(s, me, "Creature") && !compileCard(defOf(s, me)).reconfigure) return false;
-  return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : objIsType(s, host, "Creature") && objectMatches(s, { kind: "object", text: "" }, host, who, false, meChars);
+  // "Equip planeswalker": to a planeswalker as though it were a creature (Luxior rulings).
+  const creature = objIsType(s, host, "Creature") || (!!asCreature && !aura && objIsType(s, host, "Planeswalker"));
+  return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : creature && objectMatches(s, { kind: "object", text: "" }, host, who, false, meChars);
 }
 
 /** Attach an Aura to a player (CR 701.3a): "enchant player" (CR 702.5d), with a new timestamp (701.3c). */
@@ -1452,8 +1473,8 @@ function attachToPlayer(s: GameState, me: GameObject, pid: PlayerId) {
  * nor to itself (701.3b-c); only to something it could be attached to: an Equipment to a creature (CR 301.5c), an Aura
  * to what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
  */
-export function attachTo(s: GameState, me: GameObject, host: GameObject) {
-  if (!canAttachTo(s, me, host)) return;
+export function attachTo(s: GameState, me: GameObject, host: GameObject, asCreature?: boolean) {
+  if (!canAttachTo(s, me, host, asCreature)) return;
   const was = me.attachedTo;
   me.attachedTo = host.id;
   me.attachedToPlayer = undefined;

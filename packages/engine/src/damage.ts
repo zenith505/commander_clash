@@ -303,7 +303,9 @@ type ShieldOp =
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
-  | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string };
+  | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string }
+  /** Anti-Venom's counters for damage that can't be prevented, which is dealt too (CR 615.12). */
+  | { kind: "plusOnes"; id: ObjectId; n: number; by: PlayerId; card: string };
 
 interface ShieldPlan {
   ask?: ShieldQuestion;
@@ -672,6 +674,12 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // The Mindskinner's prevention can't prevent damage that can't be prevented, but its additional effect still
       // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
       if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n, card: cardName(s, r) });
+      // Anti-Venom: "prevent that damage and put that many +1/+1 counters on ~": the counters even so (CR 615.12).
+      const thatMany = !prev(e) && "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && p.thatMany && p.to && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
+      if (thatMany && "object" in to) {
+        const src = thatMany.from ? s.objects[thatMany.from] : undefined;
+        ops.push({ kind: "plusOnes", id: to.object, n: e.n, by: thatMany.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" });
+      }
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
@@ -1066,6 +1074,9 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);
       }
+    } else if (op.kind === "plusOnes") {
+      log(s, `${op.card}: damage that can't be prevented is dealt, and the +1/+1 counters are put on it too.`);
+      plusOnesLater.push(op);
     } else if (op.kind === "betrayer") {
       // A new controller each time it applies, each one noticed (rulings: the ability triggers once each time).
       const o = obj(s, op.id);

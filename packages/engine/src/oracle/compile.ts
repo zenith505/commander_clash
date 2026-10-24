@@ -1910,6 +1910,10 @@ export function compile(d: CardDef): CompiledCard {
       out.auraLessEnchanted = (out.auraLessEnchanted ?? 0) + Number(auraLess[1]);
       continue;
     }
+    if (line === "If you would lose the game, instead exile ~ and your life total becomes 1.") {
+      out.loseGameExileSelf = true;
+      continue;
+    }
     const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
     if (lockEnd && lockEnd[1] !== lockEnd[2]) {
       if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
@@ -2614,6 +2618,21 @@ export function compile(d: CardDef): CompiledCard {
         text: line,
         equip: true,
         ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
+      });
+      continue;
+    }
+    // Luxior, Giada's Gift: "Equip planeswalker {1}" means "{1}: Attach this permanent to target planeswalker you control as
+    // though that planeswalker were a creature. Activate only as a sorcery." (rulings, CR 702.6c-d).
+    const equipWalker = /^Equip planeswalker ((?:\{[^}]+\})+)$/.exec(line);
+    if (equipWalker && d.subtypes.includes("Equipment")) {
+      out.activated.push({
+        manaCost: equipWalker[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        body: { targets: [{ kind: "object", types: ["Planeswalker"], controller: "you", text: "target planeswalker you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 }, asCreature: true }], text: "Attach to target planeswalker you control as though it were a creature." },
+        text: line,
+        equip: true,
       });
       continue;
     }

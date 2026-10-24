@@ -119,6 +119,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "affectedCounters": {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      if (c.counter === ANY_COUNTER) return Object.values(o?.counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0);
       return o?.counters[c.counter] ?? 0;
     }
     case "affectedControllerPoison": {
@@ -325,6 +326,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Object.entries(s.turnLog?.lifeLost ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "opponentsDamage":
       return Object.entries(s.damageThisTurn ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
+    case "playerDamageThisTurn":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.damageThisTurn?.[pid] ?? 0), 0);
     case "opponentsNoncombatDamage":
       return Object.entries(s.turnLog?.noncombatDamage ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":
@@ -735,6 +738,8 @@ function describeCount(c: Count): string {
       return "life your opponents lost this turn";
     case "opponentsDamage":
       return "damage dealt to your opponents this turn";
+    case "playerDamageThisTurn":
+      return "damage dealt to that opponent this turn";
     case "opponentsNoncombatDamage":
       return "noncombat damage dealt to your opponents this turn";
     case "lifeLostThisTurn":

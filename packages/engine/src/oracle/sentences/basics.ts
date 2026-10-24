@@ -25,8 +25,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.replace(/^[A-Z]/, (c) => c.toLowerCase()), ctx);
     return who && [{ type: "getRad", who, n: { count: { kind: "x" }, half: m[2] as "up" | "down" } }];
   }
-  if ((m = new RegExp(`^(.+?) gets? (?:(twice) )?(?:${NUMX}|(a number of)) rad counters?(?: equal to (.+))?$`).exec(s))) {
-    const who = parsePlayer(m[1]!.replace(/^[A-Z]/, (c) => c.toLowerCase()), ctx);
+  // "You may get two rad counters" (Tato Farmer): "get ..." once "you may" is read.
+  if ((m = new RegExp(`^(?:(.+?) gets?|Get) (?:(twice) )?(?:${NUMX}|(a number of)) rad counters?(?: equal to (.+))?$`).exec(s))) {
+    const who = parsePlayer((m[1] ?? "you").replace(/^[A-Z]/, (c) => c.toLowerCase()), ctx);
     if (!who || !!m[4] !== !!m[5]) return null;
     let n: Amount | null = m[5] ? parseCount(m[5], ctx) : /^an?$/.test(m[3]!) ? 1 : amt(m[3]!);
     if (n === null) return null;

@@ -1539,6 +1539,32 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       else {
         const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => player(s, pid).library.slice(0, n));
+        if (e.pickOne) {
+          // Siphon Insight: the actor looks at the cards and exiles the one they choose; the others go to the bottom of
+          // their owner's library (one card left, so no order to choose). Nobody else learns which went where (rulings).
+          if (!sc.faceDownPick) {
+            if (!ids.length) return;
+            if (ids.length > 1) {
+              sc.faceDownPick = true;
+              sc.faceDownLooked = ids;
+              delete sc.found;
+              s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: ids, min: 1, max: 1, dig: { looked: ids, to: "to exile face down", rest: "on the bottom of that library" } };
+              return "paused";
+            }
+            sc.found = ids;
+            sc.faceDownLooked = ids;
+          }
+          sc.faceDownPick = undefined;
+          const looked = (sc.faceDownLooked ?? ids).filter((id) => obj(s, id).zone === "library");
+          sc.faceDownLooked = undefined;
+          const chosen = (sc.found ?? []).filter((id) => looked.includes(id));
+          for (const id of looked.filter((id) => !chosen.includes(id))) {
+            const owner = player(s, obj(s, id).owner);
+            owner.library = [...owner.library.filter((x) => x !== id), id];
+          }
+          if (looked.length > chosen.length) log(s, `${p.name} puts ${looked.length - chosen.length === 1 ? "a card" : `${looked.length - chosen.length} cards`} on the bottom of ${[...new Set(looked.map((id) => player(s, obj(s, id).owner).name))].join(" and ")}'s library.`);
+          ids = chosen;
+        }
       }
       const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
       const done: ObjectId[] = [];
@@ -1810,7 +1836,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
           log(s, `${p.name} puts ${defOf(s, o).name} from their ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
+          moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
             if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);

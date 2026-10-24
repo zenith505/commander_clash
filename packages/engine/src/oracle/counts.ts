@@ -270,6 +270,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the total amount of noncombat damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsNoncombatDamage" });
   // Notorious Throng: all the damage dealt this turn to players who are your opponents, by any source (rulings).
   if (!each && /^the (?:total )?(?:amount of )?damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsDamage" });
+  // Knollspine Dragon: "the damage dealt to target opponent this turn": by any source, what was really dealt (rulings).
+  if (!each && ctx && /^the damage dealt to target opponent this turn$/i.test(p)) {
+    const i = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
+    ctx.lastPlayerTarget = i;
+    return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: i } });
+  }
   if (each ? /^1 life your opponents have lost this turn$/i.test(p) : /^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p)) return count({ kind: "opponentsLifeLost" });
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);

@@ -150,7 +150,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; thatMany?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
@@ -373,6 +373,8 @@ interface Inst {
   offField?: true;
   /** Its color change applies to every card and spell outside the battlefield too (StaticAbility.offFieldAll). */
   offFieldAll?: true;
+  /** Its type change applies to its controller's permanent spells too (StaticAbility.offFieldSpells). */
+  offFieldSpells?: true;
   /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
   live?: true;
 }
@@ -465,6 +467,7 @@ function gather(s: GameState): Inst[] {
         condition: st.condition,
         ...(st.offField ? { offField: true as const } : {}),
         ...(st.offFieldAll ? { offFieldAll: true as const } : {}),
+        ...(st.offFieldSpells ? { offFieldSpells: true as const } : {}),
       }),
     );
   }
@@ -1097,6 +1100,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "loseTypes":
       c.types = c.types.filter((t) => !m.types.includes(t));
       c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? ""));
+      // Planeswalker types (CR 205.3j) aren't in a list of their own: no longer a planeswalker, it has none (CR 205.3d).
+      if (m.types.includes("Planeswalker") && !c.types.includes("Battle")) c.subtypes = c.subtypes.filter((st) => subtypeSet(st) !== null);
       if (m.types.includes("Creature")) c.allCreatureTypes = false;
       return;
     case "setName":
@@ -1472,6 +1477,9 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
         }
       }
       // Once it applies in layer 4 it keeps applying, even if its source loses the ability in layer 6 (CR 613.6).
+      // Secret Arcade: its controller's permanent spells too.
+      if (pick.offFieldSpells && layer === "4" && pick.sourceId)
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), permanentSpells: true });
       if (pick.offField && layer === "4" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), chosen: s.objects[pick.sourceId]?.chosen?.type });
       // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
@@ -1618,12 +1626,14 @@ interface OffFieldGrant {
   chosen?: string;
   /** A color change for every card and spell outside the battlefield (Mycosynth Lattice), not only its controller's. */
   everyone?: true;
+  /** A type change for its controller's permanent spells only (Secret Arcade): card types too. */
+  permanentSpells?: true;
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
 
 /** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
-const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll));
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll || st.offFieldSpells));
 
 function offFieldGrants(s: GameState): OffFieldGrant[] {
   if (building) return building.grants;
@@ -1651,18 +1661,25 @@ const typedDefs = new Map<string, CardDef>();
  */
 export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef {
   // A phased-out permanent and a merged permanent's other cards are still on the battlefield (CR 702.26d, 730.2).
-  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" || !d.types.includes("Creature")) return d;
-  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = offFieldGrants(s).filter((g) => !g.everyone && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken));
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return d;
+  // Secret Arcade: "permanent spells you control are enchantments in addition to their other types" (CR 110.4b: a spell
+  // of a permanent card type), card types as well as subtypes.
+  const spells = o.zone === "stack" && PERMANENT_CARD_TYPES.some((t) => d.types.includes(t)) ? offFieldGrants(s).filter((g) => g.permanentSpells && o.controller === g.controller) : [];
+  if (!d.types.includes("Creature") && !spells.length) return d;
+  const gs: { timestamp: number; mods: Modification[]; chosen?: string }[] = d.types.includes("Creature") ? offFieldGrants(s).filter((g) => !g.everyone && !g.permanentSpells && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken)) : [];
   // The Tomb of Aclazotz: a creature spell cast with its permission "is a Vampire in addition to its other types" (rulings:
   // on the stack too).
-  if (o.zone === "stack") for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "addTypes")) gs.push(g);
+  if (o.zone === "stack" && d.types.includes("Creature")) for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "addTypes")) gs.push(g);
+  gs.push(...spells);
   if (!gs.length) return d;
   let subtypes = [...d.subtypes];
+  const types = [...d.types];
   let all = everyCreatureType(d);
   for (const g of [...gs].sort((a, b) => a.timestamp - b.timestamp))
     for (const m of g.mods) {
       if (m.kind === "addTypes") {
         if (m.allCreatureTypes) all = true;
+        for (const t of m.types) if (!types.includes(t)) types.push(t);
         for (const t of [...m.subtypes, ...(m.chosenType && g.chosen ? [g.chosen] : [])]) if (!subtypes.includes(t)) subtypes.push(t);
       } else if (m.kind === "setSubtypes") {
         const now = m.chosenType ? (g.chosen ? [g.chosen] : []) : m.subtypes;
@@ -1671,10 +1688,10 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
         all = false;
       }
     }
-  if (all === everyCreatureType(d) && subtypes.length === d.subtypes.length && subtypes.every((t, i) => t === d.subtypes[i])) return d;
-  const key = `${d.oracleId}|${d.name}|${all}|${subtypes.join(",")}`;
+  if (all === everyCreatureType(d) && types.length === d.types.length && subtypes.length === d.subtypes.length && subtypes.every((t, i) => t === d.subtypes[i])) return d;
+  const key = `${d.oracleId}|${d.name}|${all}|${types.join(",")}|${subtypes.join(",")}`;
   let out = typedDefs.get(key);
-  if (!out) typedDefs.set(key, (out = { ...d, subtypes, everyCreatureType: all }));
+  if (!out) typedDefs.set(key, (out = { ...d, types, subtypes, everyCreatureType: all }));
   return out;
 }
 

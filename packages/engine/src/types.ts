@@ -48,6 +48,8 @@ export interface DamageRule {
   /** The Mindskinner: only damage from a source its controller controls; and each opponent mills that much (CR 615.5). */
   sourceYours?: true;
   mill?: true;
+  /** With `mill`: its controller mills this many times the damage instead of each opponent milling it (Angel of Suffering: 2). */
+  millSelf?: number;
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -846,6 +848,8 @@ export interface StackItem {
   sacrificed?: LastKnown[];
   /** See PendingTrigger.amassed. */
   amassed?: { id: ObjectId; zc: number };
+  /** See PendingTrigger.putThisWay. */
+  putThisWay?: { id: ObjectId; zc: number }[];
   /** See PendingTrigger.fromSpell. */
   fromSpell?: true;
   /** The names of cards moved to pay its cost beyond mana: Jester's Scepter's "that card" (CR 608.2h). */
@@ -963,6 +967,8 @@ export interface PendingTrigger {
   sacrificed?: LastKnown[];
   /** A reflexive trigger after amassing: the amassed Army (CR 701.47c). */
   amassed?: { id: ObjectId; zc: number };
+  /** Gilgamesh: a reflexive trigger's "them", the permanents the ability put onto the battlefield, as they were then. */
+  putThisWay?: { id: ObjectId; zc: number }[];
   /** A reflexive trigger of an instant or sorcery spell: its source is that spell, by now gone from the stack (CR 113.7a). */
   fromSpell?: true;
   kicked?: number[];
@@ -1243,7 +1249,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | /** "You may pay any amount of life" (Necrodominance): the amount, a number in `numberRange`. */ "payLife" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | /** Nicol Bolas, Dragon-God: a card in the chooser's hand or a permanent they control, to exile. */ "exileHandOrPermanent" | "pile" | "demonstrate" | /** Effect "villainous" (CR 701.55): "0" or "1", one of the two options. */ "villainous" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | /** Effect "reselectAttack" (Misleading Signpost): what the creature (`about`) attacks now. */ "reselectAttack" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer" | /** Zada's copies: the permanent the next copy put on the stack targets. */ "copyOrder" | /** Effect "unlockDoor": `${roomId}:${door}`, a locked door to unlock (CR 709.5f). */ "unlockDoor"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | /** "You may pay any amount of life" (Necrodominance): the amount, a number in `numberRange`. */ "payLife" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | /** Nicol Bolas, Dragon-God: a card in the chooser's hand or a permanent they control, to exile. */ "exileHandOrPermanent" | "pile" | "demonstrate" | /** Effect "villainous" (CR 701.55): "0" or "1", one of the two options. */ "villainous" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | /** Effect "reselectAttack" (Misleading Signpost): what the creature (`about`) attacks now. */ "reselectAttack" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer" | /** Zada's copies: the permanent the next copy put on the stack targets. */ "copyOrder" | /** Effect "unlockDoor": `${roomId}:${door}`, a locked door to unlock (CR 709.5f). */ "unlockDoor" | /** Effect attachToChosen with `pickOne` (Gilgamesh): which of the permanents to attach, or "none". */ "attachWhich"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -2206,6 +2212,8 @@ export interface Resolving {
     attachEach?: ObjectId[];
     /** The Aura whose host is being chosen. */
     auraAsking?: ObjectId;
+    /** Effect attachToChosen with `pickOne` (Gilgamesh): the permanent chosen to attach, or "none". */
+    attachWhich?: string;
     /** "Choose artifact or enchantment": this instruction has asked its question. */
     asked?: true;
   };

@@ -309,6 +309,17 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
   return objectMatches(s, bindChosen(bindEnchanted(en.filter, o), o.chosen), entering, you, false);
 }
 
+/**
+ * "Enters from a graveyard" / "from your graveyard" (CR 603.6a), or "if it entered from your graveyard or you cast it from
+ * your graveyard" (Grist, Voracious Larva): a card is only in its owner's graveyard (CR 404.2), so "your" is its owner;
+ * the spell was cast by the player who controls the permanent it became (CR 608.3).
+ */
+function fromGraveyardMatches(s: GameState, how: NonNullable<TriggeredAbility["ifFromGraveyard"]>, entering: GameObject, you: PlayerId): boolean {
+  if (how === "any") return !!entering.enteredFromGraveyard;
+  if (entering.owner !== you) return false;
+  return !!entering.enteredFromGraveyard || (how === "yoursOrCast" && !!entering.castFromGraveyard && controllerOf(s, entering) === you);
+}
+
 /** "A creature enchanted player controls": the player the watching Aura is attached to now. */
 function bindEnchanted(spec: TargetSpec, aura: GameObject | undefined): TargetSpec {
   if (spec.controller !== "enchanted" || aura?.attachedToPlayer === undefined) return spec;
@@ -625,7 +636,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -658,10 +669,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
-    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === ctrl))), undefined, undefined, entering);
+    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, ctrl)), undefined, undefined, entering);
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     fromEmblems(entersWatch);
+    // "This turn, whenever a creature or enchantment you control enters" (Rite of Harmony; CR 603.7b).
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, src, entering, ctrl), triggers, undefined, entering));
     locked = null;
     causedBy = null;
   } else if (ev.type === "controlChanged") {
@@ -1220,8 +1233,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const o = obj(s, id);
         const you = controllerOf(s, o);
         if (!abilitiesOf(s, o).triggers.some((t) => t.event === "playerAttacksYourOpponent")) continue;
-        for (const p of s.turnOrder.filter((q) => attacked.includes(q)))
-          if (opponents(s, you).includes(p)) add(o, you, (e) => e === "playerAttacksYourOpponent", undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
+        const theirs = s.turnOrder.filter((q) => attacked.includes(q) && opponents(s, you).includes(q));
+        for (const p of theirs) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !t.anyOpponent, undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
+        // "One or more of your opponents" (Jolene): once.
+        if (theirs.length) add(o, you, (e, t) => e === "playerAttacksYourOpponent" && !!t.anyOpponent, undefined, undefined, undefined, undefined, undefined, undefined, { player: theirs[0]!, attacker: ev.controller });
       }
     }
     // "Whenever enchanted player is attacked": once, however many creatures attack them; not for a planeswalker (rulings).
@@ -2028,6 +2043,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.tapped !== undefined ? { tapped: t.tapped } : {}),
     ...(t.sacrificed ? { sacrificed: t.sacrificed } : {}),
     ...(t.amassed ? { amassed: t.amassed } : {}),
+    ...(t.putThisWay ? { putThisWay: t.putThisWay } : {}),
     ...(t.fromSpell ? { fromSpell: true as const } : {}),
     ...(t.kicked ? { kicked: t.kicked } : {}),
     ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}),

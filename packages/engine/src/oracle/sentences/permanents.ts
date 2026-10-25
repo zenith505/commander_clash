@@ -947,7 +947,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
   // "Goad all creatures you don't control" (Disrupt Decorum), "goad all suspected creatures" (Nelly Borca): the creatures
   // there as it resolves (CR 611.2c; Disrupt Decorum's ruling: creatures entering later aren't goaded).
-  if ((m = /^Goad (target .+|(?:all|each) .+)$/i.exec(s))) {
+  // "Goad up to X target creatures your opponents control" (Death Kiss): each of them.
+  if ((m = /^Goad ((?:up to (?:one|two|three|four|five|X) |any number of |two |three |X )?target .+|(?:all|each) .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" || what?.ref === "countersPutThisWay" || (what?.ref === "each" && /^(?:all|each) /i.test(m[1]!)) ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
   }

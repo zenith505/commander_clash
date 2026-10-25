@@ -699,6 +699,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "vote") return [{ type: "chooseOption", player: pid, choice: chooseVote(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
+    // Gilgamesh: which of the Equipment to attach: the one with the greatest mana value.
+    if (pend.kind === "chooseOption" && pend.what === "attachWhich") {
+      const ids = pend.options.filter((o) => o !== "none" && s.objects[o]);
+      const best = ids.sort((a, b) => defOf(s, s.objects[b]!).cmc - defOf(s, s.objects[a]!).cmc)[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
+    }
     // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.
     if (pend.kind === "chooseOption" && pend.what === "enchant") {
       const waiting = s.untilReturns?.auras[0];

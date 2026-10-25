@@ -2329,6 +2329,11 @@ export function compile(d: CardDef): CompiledCard {
       out.damageToOpponentsMills = true;
       continue;
     }
+    // Angel of Suffering (CR 615.5, 615.12): see staticRules in damage.ts.
+    if (line === "If damage would be dealt to you, prevent that damage and mill twice that many cards.") {
+      out.damageToYouMillsTwice = true;
+      continue;
+    }
     // Pariah, Palisade Giant, Martyrs of Korlis (CR 614.9): see staticRules in damage.ts.
     const redirect = /^(?:As long as ~ is untapped, a|A)ll damage that would be dealt to you( and other permanents you control)?( by artifacts)? is dealt to (~|enchanted creature|equipped creature) instead\.$/.exec(line);
     if (redirect) {
@@ -2880,8 +2885,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
-    // Glorious End's "At the beginning of your next end step, you lose the game."
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    // Glorious End's "At the beginning of your next end step, you lose the game." Rite of Harmony's "Whenever a creature or
+    // enchantment you control enters this turn, draw a card" too (CR 603.7b).
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

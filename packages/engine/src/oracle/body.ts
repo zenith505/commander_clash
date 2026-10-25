@@ -162,8 +162,8 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
-const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "body"]);
+const FLOATING_EVENTS = new Set<string>(["permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
+const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
@@ -216,6 +216,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // same as "This turn, whenever a creature dies, ..." (CR 603.7b).
   const dies = /^Whenever (an?(?: [a-z]+)? creature(?: you control| an opponent controls)?) dies this turn, (.+)$/.exec(s);
   if (dies) return floatingTrigger(`This turn, whenever ${dies[1]!} dies, ${dies[2]!}`, after, ctx);
+  // "Whenever a creature or enchantment you control enters this turn, draw a card" (Rite of Harmony): the same as "This
+  // turn, whenever a creature or enchantment you control enters, ..." (CR 603.7b).
+  const enters = /^Whenever (an?(?: [a-z]+)? (?:creature|enchantment|artifact|land|permanent)(?: or (?:creature|enchantment|artifact|land))?(?: you control)?) enters this turn, (.+)$/.exec(s);
+  if (enters) return floatingTrigger(`This turn, whenever ${enters[1]!} enters, ${enters[2]!}`, after, ctx);
   // "Whenever one or more creatures you control deal combat damage to one or more players this turn, you become the
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
@@ -3627,6 +3631,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "amountsCompare", a: digWhere!, atLeast: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }, effects: fx });
       continue;
     }
+    // Gilgamesh, Master-at-Arms: "When you put one or more Equipment onto the battlefield this way, you may attach one of
+    // them to a Samurai you control": a reflexive trigger (CR 603.12) after a look that put only Equipment cards onto the
+    // battlefield; one of them, chosen as it resolves, to one that it can legally be attached to (rulings).
+    const lastDig = effects[effects.length - 1];
+    const attachOne = !dig && lastDig?.type === "dig" && lastDig.into === "battlefield" && lastDig.filter?.subtypes?.length === 1 && lastDig.filter.subtypes[0] === "Equipment" && !lastDig.filter.types?.length && !lastDig.filter.anyOf
+      ? /^When you put one or more Equipment onto the battlefield this way, you may attach one of them to (an? (?:[A-Z][a-z]+|creature) you control)$/.exec(s)
+      : null;
+    if (attachOne) {
+      const host = parseTargetPhrase(attachOne[1]!.replace(/^an? /, ""));
+      if (host?.kind !== "object" || host.controller !== "you") return null;
+      effects.push({ type: "reflexive", putThisWay: true, body: { targets: [], effects: [{ type: "attachToChosen", source: { ref: "putThisWay" }, filter: { ...host, types: host.types?.length || host.subtypes?.length ? host.types : ["Creature"], text: attachOne[1]! }, may: true, equipmentOnly: true, pickOne: true }], text: `you may attach one of them to ${attachOne[1]!}.` } });
+      continue;
+    }
     // Armored Skyhunter: the one card put onto the battlefield, if it's an Equipment.
     if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^If an Equipment is put onto the battlefield this way, you may attach it to a creature you control$/.test(s)) {
       afterDig = [{ type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true, equipmentOnly: true }];
@@ -4211,6 +4228,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "delayed", when: "nextEndStep", each: "returned", effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }], text: "return ~ to the battlefield attached to that creature" });
       continue;
     }
+    // Gilraen, Dúnedain Protector: "Exile another target creature you control. You may return that card to the battlefield
+    // under its owner's control. If you don't, at the beginning of the next end step, return that card to the battlefield
+    // under its owner's control with a vigilance counter and a lifelink counter on it." The card exiled is held; it comes
+    // back now, or by a delayed trigger with those counters (CR 603.7, 122.1b). A token stays gone (CR 111.7).
+    const mayBack = /^You may return that card to the battlefield under its owner's control$/.test(s)
+      ? new RegExp(`^If you don't, at the beginning of the next end step, return that card to the battlefield under its owner's control with an? ${COUNTER} counter and an? ${COUNTER} counter on it\\.?$`).exec(sentences[si + 1] ?? "")
+      : null;
+    if (mayBack) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || Object.keys(prev).length !== 2 || prev.what.ref !== "target" || (prev.what.n !== undefined && prev.what.n !== 1)) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: "owner", hold: true };
+      effects.push({ type: "may", effects: [{ type: "returnHeld", under: "owner" }], otherwise: [{ type: "returnHeld", under: "owner", at: "nextEndStep", counters: [counterKind(mayBack[1]!), counterKind(mayBack[2]!)] }], text: "return that card to the battlefield under its owner's control" });
+      si++;
+      continue;
+    }
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
     // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Work): under the control of the
     // player who puts it there (CR 110.2a).
@@ -4650,6 +4682,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseOne(capital(milledRepeat[2]!), ctx);
       if (!filter || !then || then.some((e) => pauses(e)) || effects.length < 1 || effects[effects.length - 1]!.type !== "mill" || effects.some((e) => pauses(e)) || si + 1 !== sentences.length) return null;
       effects.splice(0, effects.length, { type: "repeatIf", effects: [...effects], cond: { kind: "milledIs", filter }, then });
+      continue;
+    }
+    // Grist, the Plague Swarm: "Create a 1/1 black and green Insect creature token, then mill two cards. Put a deathtouch
+    // counter on the token if a black card was milled this way.": that token, if any of the cards milled is one.
+    const tokenMill = /^Create an? [^,.]+? creature token$/.test(s) && /^[Mm]ill (?:a card|\w+ cards)$/.test(sentences[si + 1] ?? "") ? new RegExp(`^Put an? ${COUNTER} counter on the token if an? ([a-z]+ card) was milled this way\\.?$`).exec(sentences[si + 2] ?? "") : null;
+    if (tokenMill) {
+      const made = parseOne(s, ctx);
+      const milled = parseOne(capital(sentences[si + 1]!), ctx);
+      const filter = parseSearchFilter(tokenMill[2]!);
+      if (made?.length !== 1 || made[0]!.type !== "createToken" || made[0]!.n !== 1 || milled?.length !== 1 || milled[0]!.type !== "mill" || !filter) return null;
+      effects.push(made[0]!, milled[0]!, { type: "if", cond: { kind: "milledIs", filter }, effects: [{ type: "counters", what: { ref: "created" }, counter: counterKind(tokenMill[1]!), n: 1 }] });
+      si += 2;
       continue;
     }
     const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If an? ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s);
@@ -5789,6 +5833,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (effects.some((x) => x.type === "choose" && x.choice === "color")) s = s.replace(/\b(from|of) that color\b/g, "$1 the chosen color");
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".
     if (/^[Uu]ntil end of turn, /.test(s)) s = `${s.replace(/^[Uu]ntil end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
+    // "Until your next turn, creatures you control gain "{T}: Add one mana of any color."" (Song of Freyalise): the same.
+    const nextTurnGain = /^[Uu]ntil your next turn, ((?:creatures|other creatures|each creature) you control) (gains?|gets?) ([^,]+)$/.exec(s);
+    if (nextTurnGain && !/\b(?:until|whenever|this turn)\b/.test(nextTurnGain[3]!.replace(/"[^"]*"/g, ""))) s = `${capital(nextTurnGain[1]!)} ${nextTurnGain[2]!} ${nextTurnGain[3]!} until your next turn`;
     // "Target creature you control gains protection from the color of your choice until end of turn": the
     // color is chosen as it resolves (CR 608.2d), after the target was chosen on casting.
     // "Target creature gains your choice of menace or lifelink until end of turn", "... flying, vigilance, deathtouch, or

@@ -273,6 +273,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
     return { costMod: { ...base.costMod, times: c, text: line } };
   }
+  // Shadow of Mortality: the difference between your starting life total and your life total (CR 103.4, 601.2f).
+  if (/^If your life total is less than your starting life total, ~ costs \{X\} less to cast, where X is the difference$/.test(text)) return { less: { count: { kind: "lifeBelowStart" } } };
   if ((m = /^~ costs \{X\} less to cast, where X is (.+)$/.exec(text))) {
     const c = parseCount(m[1]!, null);
     return c ? { less: c } : "fail";

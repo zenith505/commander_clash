@@ -1097,6 +1097,12 @@ export function parseTargetPhrase(
     extra.anyOf = [{ kind: "object", types: ["Creature"], text: "artifact creature" }, { kind: "object", subtypes: ["Vehicle"], text: "Vehicle" }];
     p = "artifact";
   }
+  // "Saga or enchantment creature" (Satsuki, the Living Lore): every Saga is an enchantment (CR 714.1), so "enchantment" is
+  // for both: an enchantment that's a Saga or a creature.
+  if (/^[Ss]aga or enchantment creature$/.test(p) && !extra.anyOf) {
+    extra.anyOf = [{ kind: "object", subtypes: ["Saga"], text: "Saga" }, { kind: "object", types: ["Creature"], text: "enchantment creature" }];
+    p = "enchantment";
+  }
   const orKind = /^(land|artifact|enchantment) or ([a-z]+)$/.exec(p);
   if (orKind && !extra.orSubtypes && CREATURE_TYPES.has(capital(orKind[2]!))) {
     extra.orSubtypes = [capital(orKind[2]!)];

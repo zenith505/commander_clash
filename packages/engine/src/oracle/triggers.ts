@@ -1975,6 +1975,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const lost = { count: { kind: "lifeLostThisTurn", who: { ref: "eventPlayer" } }, times: -1, plus: n } as const;
     return { ...t, body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eventPlayer" }, n: lost }], text: `that player loses life equal to the difference between ${n} and the life they lost this turn.` }, ifCond: { kind: "eventPlayerLifeLost", max: n - 1 } };
   }
+  // "Whenever ~ or another creature you control enters, if it entered from your graveyard or you cast it from your
+  // graveyard, ..." (Grist, Voracious Larva; Prized Amalgam): how it entered can't change, so the intervening if (CR
+  // 603.4) is part of the event: put onto the battlefield from its owner's graveyard, or a spell its owner cast from there.
+  const yardOrCast = /^(When(?:ever)? .+? enters), if it entered from your graveyard or you cast it from your graveyard, (.+)$/.exec(line);
+  if (yardOrCast) {
+    const t = parseTrigger(`${yardOrCast[1]!}, ${yardOrCast[2]!}`);
+    return !t || t === "fail" || (t.event !== "selfEnters" && t.event !== "permanentEnters") || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "yoursOrCast" };
+  }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
@@ -2183,16 +2191,29 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your
   // opponents, ...": once for each player attacking each of your opponents (CR 508.3e); "that attacking player" is the one
   // who attacked, "that opponent" the one attacked.
-  const attacksOpp = /^Whenever a player attacks one of your opponents, (?:if that opponent has more life than another of your opponents, )?(.+)$/.exec(line);
+  // Preacher of the Schism: "Whenever this creature attacks the player with the most life or tied for most life" (as
+  // dethrone, CR 702.105a: a player, not a planeswalker or battle), "Whenever this creature attacks while you have the
+  // most life or are tied for most life": as it attacks; what happens to life totals later doesn't matter (rulings).
+  const mostLife = /^Whenever ~ attacks (the player with the most life or tied for most life|while you have the most life or are tied for most life), (.+)$/.exec(line);
+  if (mostLife) {
+    const t = parseTrigger(`Whenever ~ attacks, ${mostLife[2]!}`);
+    if (!t || t === "fail" || t.event !== "selfAttacks" || t.activeIf || t.attacksMostLife || t.ifCond) return "fail";
+    return mostLife[1]!.startsWith("the player") ? { ...t, attacksMostLife: true } : { ...t, activeIf: { kind: "youMostLife" } };
+  }
+  // Jolene, the Plunder Queen: "Whenever a player attacks one or more of your opponents": once for each declaration of
+  // attackers that attacks any of them (CR 508.3e).
+  const attacksOpp = /^Whenever a player attacks (one|one or more) of your opponents, (?:if that opponent has more life than another of your opponents, )?(.+)$/.exec(line);
   if (attacksOpp) {
-    const text = attacksOpp[1]!;
+    const text = attacksOpp[2]!;
+    const oneOrMore = attacksOpp[1] === "one or more";
+    if (oneOrMore && /, if that opponent/.test(line)) return "fail";
     if (/\bthat (?:opponent|player)\b/.test(text.replace(/\bthat attacking player\b/g, ""))) return "fail";
     const body = parseBody(text.replace(/\bthat attacking player\b/g, "that player").replace(/ and you put /, ". Put "), { eventPlayer: true });
     if (!body) return "fail";
     const json = JSON.stringify(body.effects).replaceAll('{"ref":"eventPlayer"}', '{"ref":"attackingPlayer"}');
     if (json.includes("eventPlayer")) return "fail";
     const ifCond = /, if that opponent has more life/.test(line) ? { ifCond: { kind: "eventPlayerMoreThanAnotherOpponent" as const, what: "life" as const } } : {};
-    return { event: "playerAttacksYourOpponent", ...ifCond, body: { ...body, effects: JSON.parse(json), text } };
+    return { event: "playerAttacksYourOpponent", ...ifCond, ...(oneOrMore ? { anyOpponent: true as const } : {}), body: { ...body, effects: JSON.parse(json), text } };
   }
   // Coveted Jewel: "that player draws three cards and gains control of ~. Untap it." (two instructions for that player, then
   // untapping ~).
@@ -2505,7 +2526,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && fewer) {
         // The one return of the card itself, maybe delayed to the next end step.

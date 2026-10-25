@@ -704,6 +704,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
     }
+    case "youMostLife":
+      return !s.players[you]!.lost && s.turnOrder.every((p) => s.players[p]!.lost || s.players[p]!.life <= s.players[you]!.life);
     case "attackingMostLife": {
       // Not when it attacks a planeswalker (dethrone rulings).
       if (src.attacking === undefined || src.attackingPermanent) return false;

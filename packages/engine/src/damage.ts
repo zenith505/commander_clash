@@ -301,7 +301,7 @@ type ShieldOp =
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
   | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
-  | { kind: "mill"; by: PlayerId; n: number; card: string }
+  | { kind: "mill"; by: PlayerId; n: number; card: string; /** `by` mills it themselves (Angel of Suffering). */ self?: true }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
   | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string }
   /** Anti-Venom's counters for damage that can't be prevented, which is dealt too (CR 615.12). */
@@ -344,6 +344,9 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     // The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent
     // mills that many cards."
     if (abilitiesOf(s, cover).damageToOpponentsMills) out.push({ id: `static-mill:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "opponents" }, sourceYours: true, mill: true });
+    // Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards": the cards
+    // are milled even if the damage can't be prevented (rulings, CR 615.12).
+    if (abilitiesOf(s, cover).damageToYouMillsTwice) out.push({ id: `static-millself:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "you" }, mill: true, millSelf: 2 });
     // Pariah, Palisade Giant (CR 614.9): all damage that would be dealt to its controller (and their other permanents) is
     // dealt to it or the creature it's attached to instead. Several of them: the player being dealt the damage chooses
     // which applies (CR 616.1, rulings on Palisade Giant).
@@ -673,7 +676,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     for (const e of here) {
       // The Mindskinner's prevention can't prevent damage that can't be prevented, but its additional effect still
       // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
-      if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n, card: cardName(s, r) });
+      if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n * (r.millSelf ?? 1), card: cardName(s, r), ...(r.millSelf ? { self: true as const } : {}) });
       // Anti-Venom: "prevent that damage and put that many +1/+1 counters on ~": the counters even so (CR 615.12).
       const thatMany = !prev(e) && "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && p.thatMany && p.to && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
       if (thatMany && "object" in to) {
@@ -692,7 +695,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if ((rule.gainLife || rule.dealBack || rule.tokens) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
-        if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n, card: cardName(s, rule) });
+        if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}) });
         continue;
       }
       if (prev(e) && preventedAll(s, e)) {
@@ -1068,7 +1071,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
     } else if (op.kind === "mill") {
-      for (const pid of turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
+      for (const pid of op.self ? (player(s, op.by).lost ? [] : [op.by]) : turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
         const p = player(s, pid);
         const n = millCount(s, pid, op.n);
         for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
@@ -1181,7 +1184,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice);
   });
 }
 

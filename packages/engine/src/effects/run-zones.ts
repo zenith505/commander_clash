@@ -48,7 +48,8 @@ export function suspendExiled(s: GameState, o: GameObject, n: number): void {
  * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
  * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
  */
-function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean, transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
+function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind | CounterKind[], tapped?: boolean, transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
+  const counters = counter === undefined || (Array.isArray(counter) && !counter.length) ? undefined : Object.fromEntries((Array.isArray(counter) ? counter : [counter]).map((k) => [k, 1]));
   // Returned transformed: only a double-faced card, with its back face up (CR 712.14a); anything else stays in exile.
   const back = cards.filter((c) => (transformed ? transformedFace(s, c) !== undefined : isPermanentCard(defOf(s, c))));
   const faceOf = (c: GameObject) => (transformed ? transformedFace(s, c) : undefined);
@@ -63,7 +64,7 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
         continue;
       }
       log(s, `${src} returns ${d.name} to the battlefield${tapped ? " tapped" : ""}${transformed ? " transformed" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { [counterIfCreature ? "countersIfCreature" : "counters"]: { [counter]: 1 } } : {}), ...(loyaltyIfPlaneswalker ? { countersIfPlaneswalker: { loyalty: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
+      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counters ? { [counterIfCreature ? "countersIfCreature" : "counters"]: counters } : {}), ...(loyaltyIfPlaneswalker ? { countersIfPlaneswalker: { loyalty: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
     }
   });
 }
@@ -2477,13 +2478,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const names = list.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
         addDelayed(s, "nextEndStep", ctx.controller, first, {
           targets: [],
-          effects: [{ type: "returnExiled", under: e.under, ...(list.length > 1 ? { cards: list } : {}) }],
+          effects: [{ type: "returnExiled", under: e.under, ...(list.length > 1 ? { cards: list } : {}), ...(e.counters ? { counters: e.counters } : {}) }],
           text: `Return ${names} to the battlefield under ${e.under === "owner" ? (list.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
         }, cardIdOf(first));
         return;
       }
       const back = list.map((l) => s.objects[l.id]!).filter((o) => o.zone === "exile");
-      if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src) === "paused") {
+      if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counters) === "paused") {
         sc.returningHeld = list;
         return "paused";
       }
@@ -2505,7 +2506,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);
       const back = list.map((l) => s.objects[l.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === list[i]!.zc);
       const sc = (s.resolving!.scratch ??= {});
-      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, false, e.counterIfCreature, e.loyaltyIfPlaneswalker) === "paused") {
+      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counters ? [...(e.counter ? [e.counter] : []), ...e.counters] : e.counter, e.tapped, false, e.counterIfCreature, e.loyaltyIfPlaneswalker) === "paused") {
         sc.returning ??= list.filter((l) => back.some((b) => b.id === l.id));
         return "paused";
       }

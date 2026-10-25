@@ -1,7 +1,7 @@
 # Roadmap
 
-24,253 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,917 of 4,988 (98%).
+24,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,929 of 4,988 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -54,8 +54,7 @@ line blocks.
    a chosen direction); Sunken Palace (mana that copies the spell or ability it's spent on); Mathemagics ("target player draws 2ˣ cards":
    no cap yet on a draw that size, for the engine or for bots); Dream Chisel and Kadena, Slinking Sorcerer (a face-down
    creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4); Ronin, Shadow
-   Stalker ("Sacrifice an Equipment attached to ~" as a cost); Combat Calligrapher ("attacks one of your opponents ...
-   that opponent"); Ulalek, Fused Atrocity (copy each other spell and ability you control: a copy of every kind of
+   Stalker ("Sacrifice an Equipment attached to ~" as a cost); Ulalek, Fused Atrocity (copy each other spell and ability you control: a copy of every kind of
    stack object, abilities included); Surge to Victory (the trigger it grants for the turn has to remember the exiled
    card it copies); Norman Osborn // Green Goblin (Green Goblin gives mayhem to cards in your graveyard); Zarda,
    Heroes' Advocate ("Heroes" in the plural isn't read as a creature type) and Rashel ("Auras you control have exalted"
@@ -65,11 +64,21 @@ line blocks.
    Bane of Nightmares (a planeswalker that's a creature during your turn, with ninjutsu onto its loyalty); Elenda,
    Saint of Dusk ("hexproof from instants": hexproof from a card type isn't modeled, only from colors); Xu-Ifit,
    Osteoharmonist (the creature "has no abilities" as it enters, so its own enters-tapped, enters-with-counters and "as
-   it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Next most played:
-   Tithing Blade // Consuming Sepulcher (craft with a creature), Nelly Borca, Impulsive Accuser, Wondrous Crucible,
-   Flamerush Rider, Summon: Good King Mog XII, Winota, Joiner of Forces, Faerie Artisans, Treasure Chest, Possibility
-   Storm, Toralf, God of Fury, Izzet Generatorium, Triple Triad, Zara, Renegade Recruiter; Hallowed Moonlight (Containment
-   Priest's replacement for one turn) and Infernal Offering are near.
+   it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Out after round 161:
+   Toralf, God of Fury // Toralf's Hammer (the front face's "any target other than that permanent" is easy, but the
+   Hammer grants the equipped creature an ability whose cost unattaches the Hammer and whose damage the Hammer deals,
+   rulings: an ability granted by an Equipment that names the Equipment isn't modeled). Next most played: Possibility
+   Storm, Izzet Generatorium, Triple Triad, Mm'menon, the Right Hand, Nissa, Vital Force, Arvinox, the Mind Flail, Cyber
+   Conversion, Sothera, the Supervoid, Tempt with Mayhem, Sin, Unending Cataclysm, Doors of Durin, Goldberry,
+   River-Daughter, Rydia, Summoner of Mist, Sauron's Ransom; Hallowed Moonlight (Containment Priest's replacement for one
+   turn) and Infernal Offering are near. Only 59 of the top 5,000 are left: `data/popularity.json` stops at rank 5,000
+   (`TOPS` in `tools/popularity.ts`), so it needs a deeper list before `npm run popular` runs dry.
+   Smaller gaps from round 161: craft takes one kind of material only ("craft with a creature", "with two creatures",
+   "with an Island", "with artifact"); "one or more", "creatures that share a creature type" and the like stay out
+   (Jade Seedstones also needs the mana value of the card used to craft it, Master's Guide-Mural an "activate only if"
+   condition, Dire Flail, Spring-Loaded Sawblades and Braided Net their other lines). Bots craft only in their second
+   main phase, with graveyard cards they have no use for or tokens worth 3 or less. "Tokens created with ~" (Faerie
+   Artisans) are the tokens its own abilities created as they resolved, as that object (rulings).
    Smaller gaps from round 160: when Nemata, Primeval Warden and another "exile it instead" replacement both apply to a
    dying creature, the engine applies the first one it finds rather than letting the affected creature's controller
    choose (CR 616.1); Dream Devourer's granted foretell on a card with {X} in its cost is untested (X is 0 when cast for
@@ -334,7 +343,7 @@ line blocks.
    line of its own (`npm run faces`). Still out:
    - Transformers: only Goldbug of the 15 plays; the others each have a line of their own (Starscream needs "whenever
      you become the monarch" and "if there is no monarch", Cyclonus an additional beginning phase).
-   - Transform: craft (702.167), "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic, Sephiroth, Zenos each
+   - Transform: craft (702.167) beyond one kind of material, "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic, Sephiroth, Zenos each
      need their own work).
    - Other battle cards still out: Death Kiss ("whenever a creature an opponent controls attacks one of your
      opponents", "becomes monstrous, goad up to X"). Bots don't aim spells at battles (except Portent Tracker's counters
@@ -537,7 +546,7 @@ line blocks.
      of their next upkeep").
    - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
      Vat), two destinations in one sentence (Bounty of Skemfar, Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
-     Winota, Owlbear Cub), "where X is" in the look (Ajani Outland Chaperone, Famished Worldsire, Emergent Woodwurm), the X
+     Owlbear Cub), "where X is" in the look (Ajani Outland Chaperone, Famished Worldsire, Emergent Woodwurm), the X
      of an enters or cast trigger (Knickknack Ouphe, Genesis Hydra), exiled top cards (Xenagos, Tezzeret), "that many
      cards" (Gishath), "If you put fewer than two lands" (Expand the Sphere), "land and/or legendary permanent cards"
      (Kamahl's Druidic Vow), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
@@ -600,8 +609,7 @@ line blocks.
      (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and
      Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
    - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat), "as long as ~ remains on the
-     battlefield, that creature is also goaded" (Hot Pursuit), Nelly Borca's "you and the controller of those creatures
-     each draw a card".
+     battlefield, that creature is also goaded" (Hot Pursuit).
    - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek).
    - Conditional flash still out: "five or more mana values among cards in your graveyard" (Graveyard Shift), "two or more
      instant and/or sorcery cards in your graveyard" (spell mastery: Swift Reckoning). "~ has flash as long as" on a
@@ -646,8 +654,7 @@ line blocks.
    - Dice (CR 706) work with results tables, modifiers, "ignore the lower roll", natural results, Pixie Guide-style
      advantage, "roll two and choose one result" (Wild, Reckless and Grave Endeavor; bots take the higher result) and a
      reflexive trigger using the result (Ancient Bronze Dragon) and Valiant and Arcane Endeavor; still out: "roll again" / "reroll" (Delina,
-     Pixie Guide's Wyll-style rerolls of others), Iron Mastiff, Chaos Dragon, Neverwinter Hydra, Treasure Chest
-     (conditional search), Ancient Brass Dragon, Farideh, Thunderwave ("not chosen"), planar die.
+     Pixie Guide's Wyll-style rerolls of others), Iron Mastiff, Chaos Dragon, Neverwinter Hydra, Ancient Brass Dragon, Farideh, Thunderwave ("not chosen"), planar die.
    - Abilities that work only from your graveyard work (Loathsome Troll); bots don't use them.
    - Face-down exile you may play works (Three Wishes, Outrageous Robbery, Intet, Gonti, Rev and 3 more); "mana of any
      type" doesn't cover Phyrexian symbols' life option (they still need their color or 2 life). Three Wishes' upkeep
@@ -1149,7 +1156,7 @@ line blocks.
 - Other "cast this spell only ..." restrictions (only "if you've cast another spell this turn" is supported).
 - Land types (CR 305.7): copy effects of lands under a land-type effect; Winter Orb ("players can't untap more than one land").
 - Granted flashback is only "until end of turn" with the card's mana cost (Snapcaster Mage, Past in Flames); a
-  static grant (Lier, Disciple of the Drowned) and Mission Briefing's "you may cast it this turn" are not modeled.
+  static grant (Lier, Disciple of the Drowned) is not modeled.
 
 - Mana abilities with costs other than {T} and mana (Ashnod's Altar, Phyrexian Altar and about 50 other supported
   cards) use the stack like other activated abilities; they shouldn't (CR 605.3b). Exert as a mana-ability cost

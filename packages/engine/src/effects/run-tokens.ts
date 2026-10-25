@@ -291,6 +291,13 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       });
       return;
     }
+    case "countModThisTurn": {
+      // Until end of turn: a replacement effect of the resolved ability, not of its source (CR 611.2a), so it lasts even if
+      // the source leaves.
+      s.turnCountMods = [...(s.turnCountMods ?? []).filter((x) => x.turn === s.turn), { turn: s.turn, controller: ctx.controller, mod: e.mod, source: ctx.sourceId ?? "" }];
+      log(s, `${src}: until end of turn, ${e.mod.what === "tokens" && e.mod.op === "double" ? "twice as many tokens are created" : "a replacement effect applies"}.`);
+      return;
+    }
     case "linkedExileToken": {
       // Skyclave Apparition: the leaves ability triggered after the source moved, so the object its exile ability belongs
       // to is the one before (CR 400.7, 607.2a). No exiled card, no token (rulings).

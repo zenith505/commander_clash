@@ -948,6 +948,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Valgavoth: "for the first time during each of their turns".
       if (you !== ev.player) add(o, you, (e, t) => e === "opponentLosesLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
       // "Whenever one or more opponents lose life": once for life lost at the same time (Emet-Selch), not once per player.
+      // "Each lose exactly 1 life" (Ob Nixilis): once for that event too, with what each opponent lost in it added up; it
+      // stays queued only if one of them lost exactly 1 (see processTriggerQueue).
+      if (you !== ev.player && ev.batch !== undefined)
+        add(o, you, (e, t) => {
+          if (e !== "opponentsLoseOneLife") return false;
+          const q = s.triggerQueue.find((q) => q.sourceId === o.id && q.event?.lifeEach && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text);
+          if (!q) return true;
+          q.event!.lifeEach![ev.player] = (q.event!.lifeEach![ev.player] ?? 0) + ev.amount;
+          return false;
+        }, undefined, undefined, undefined, undefined, undefined, undefined, { lifeBatch: ev.batch, lifeEach: { [ev.player]: ev.amount } });
       if (you !== ev.player)
         add(o, you, (e, t) => e === "opponentsLoseLife" && !s.triggerQueue.some((q) => q.sourceId === o.id && q.event?.lifeBatch !== undefined && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text), undefined, undefined, undefined, undefined, undefined, undefined, { ...(ev.batch !== undefined ? { lifeBatch: ev.batch } : {}) });
       else add(o, you, (e) => e === "youLoseLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
@@ -1819,6 +1829,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
  */
 export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[]): boolean {
   if (s.pending || !s.triggerQueue.length) return false;
+  // "Whenever one or more opponents each lose exactly 1 life" (Ob Nixilis): the whole event is over by now.
+  s.triggerQueue = s.triggerQueue.filter((t) => !t.event?.lifeEach || Object.values(t.event.lifeEach).includes(1));
   const rank = (pid: PlayerId) => {
     const i = turnOrderFromActive.indexOf(pid);
     return i < 0 ? 99 : i;

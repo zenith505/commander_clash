@@ -2570,6 +2570,9 @@ function advanceStep(s: GameState): void {
   // this combat only (CR 702.39a).
   if (s.step === "endCombat") {
     s.thatCombat = undefined;
+    // "Whenever that creature deals combat damage to a player this combat" (Stensian Sanguinist): this combat is over.
+    s.floatingTriggers = s.floatingTriggers?.filter((f) => f.until !== "endOfCombat");
+    if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;

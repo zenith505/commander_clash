@@ -98,6 +98,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   // types, the same as "artifact, creature, or enchantment cards".
   const TYPE = "(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)";
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
+  // Pyre of Heroes: "a creature card that shares a creature type with the sacrificed creature and has mana value equal to
+  // 1 plus that creature's mana value": the sacrificed creature as it last existed (rulings).
+  const kin = /^(.+ card) that shares a creature type with the sacrificed creature and has (mana value equal to .+)$/.exec(p);
+  if (kin) {
+    const rest = parseSearchFilter(`${kin[1]!} with ${kin[2]!.replace(/\bthat creature's\b/, "the sacrificed creature's")}`, count);
+    return rest ? { ...rest, sharesCreatureTypeWithSacrificed: true, text: p } : null;
+  }
   // "A card with mana value less than or equal to the number of lands you control" (Beseech the Queen): counted as the
   // search resolves (TargetSpec.bound).
   const bound = count && (/ with (?:mana value|power|toughness) (?:(?:less|greater) than or )?equal to .+$/i.exec(p) ?? / with (?:mana value|power|toughness) X or (?:less|greater)$/.exec(p));

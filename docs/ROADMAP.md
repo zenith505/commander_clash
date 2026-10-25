@@ -1,7 +1,7 @@
 # Roadmap
 
-24,089 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,804 of 4,988 (96%).
+24,100 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,814 of 4,988 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,7 +22,7 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 153, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 154, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
    spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
    batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
@@ -48,9 +48,14 @@ line blocks.
    Deeproot Pilgrimage ("one or more nontoken Merfolk you control become tapped": taps at the same time aren't one
    event yet); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
    last known power on a leaves trigger of its own); Aang's Journey (kicked: one search for a basic land card and a
-   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"). Next most played: Ajani, Nacatl
-   Pariah, Ob Nixilis, Captive Kingpin, Liliana, Heretical Healer, Kaya, Geist Hunter, Coiling Rebirth, Descendants'
-   Fury, Yorion, Sky Nomad.
+   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"). Next most played: Mirrormind Crown,
+   Mechtitan Core, Kalain, Reclusive Painter, The Deck of Many Things, Moonmist, Nerd Rage, Summon: Valefor.
+   Smaller gaps from round 154: "Create a token. When you do, ..." triggers once for each of those tokens created (CR
+   603.12a), except when the reflexive ability is about "that token" (Forum Filibuster, Ratonhnhaké:ton, Dáin
+   Ironfoot), which still triggers once; Ob Nixilis, Captive Kingpin triggers when at least one opponent lost exactly 1
+   life in the event, even if another opponent lost more at the same time; bots say yes to Descendants' Fury only with a
+   token among the creatures that dealt damage, and use Kaya, Geist Hunter's −2 like any other ability; Yorion is a
+   normal card, not a companion (as all companions).
    Smaller gaps from round 153: Urabrask's "the next time they would draw a card this turn, instead they exile the top
    card" applies before that player's other replacement effects for the draw, without asking them the order (CR 616.1);
    bots pick Teferi, Who Slows the Sunset's +1 targets by the usual scoring; bots sacrifice Swashbuckler Extraordinaire's

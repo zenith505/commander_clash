@@ -750,6 +750,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
+    // "If you control a red permanent other than Ajani" (Ajani, Nacatl Avenger) is "another red permanent".
+    m[2] = m[2]!.replace(/^an? ([^,]+) other than ~$/, "another $1");
     // "Seven or more lands with different names" (Field of the Dead), "ten or more Gates with different names" (Maze's End): names counted once each.
     // "Four or more Demons with different names" (Liliana's Contract).
     const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts|Gates|Demons) with (different names|the same name)$`).exec(m[2]!);

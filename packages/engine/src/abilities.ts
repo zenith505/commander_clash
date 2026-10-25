@@ -293,6 +293,8 @@ export type Count =
   | { kind: "rollParity"; odd: boolean }
   /** "If you rolled 6 exactly seven times" (Luck Bobblehead): the dice of the last roll that came up `value`. */
   | { kind: "rollEquals"; value: number }
+  /** "If you put +1/+1 counters on five Dragons this way" (Call the Spirit Dragons): the permanents this resolution put counters on. */
+  | { kind: "countersPutOnThisWay" }
   /** "For each flip you won" after "flip a coin until you lose a flip". */
   | { kind: "flipsWon" }
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
@@ -385,6 +387,8 @@ export interface TargetSpec {
   notColors?: Color[];
   /** "A card that shares a color with a legendary creature you control" (Ringsight): a color of one of them as the search is made; none if they're colorless (rulings). */
   colorOfYourLegend?: true;
+  /** "A creature card that shares a creature type with the sacrificed creature" (Pyre of Heroes): searched for as it resolves, the creature as it last existed. */
+  sharesCreatureTypeWithSacrificed?: true;
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
@@ -1691,6 +1695,8 @@ export type Effect =
    * owners creates one token, X the total mana value of all of them (rulings).
    */
   | { type: "linkedExileToken"; token: TokenSpec }
+  /** "Until end of turn, if one or more tokens would be created under your control, twice that many of those tokens are created instead" (Kaya, Geist Hunter): a replacement effect for the rest of the turn (CR 614.1a, 611.2a). */
+  | { type: "countModThisTurn"; mod: CountMod }
   /**
    * Cards exiled face down, linked to the source (CR 406.3, 607.2a): `top`, the top `n` of your library (Duplicity);
    * `hand`, all cards from your hand; `handCard`, one card you choose from your hand (Gustha's Scepter). `look`: its
@@ -2271,6 +2277,8 @@ export type Effect =
       sharesTypeWith?: number;
       /** "A creature card that shares a creature type with it" (Heirloom Blade): with the trigger's subject as it last existed (CR 608.2h). */
       sharesCreatureTypeWithSubject?: true;
+      /** "A creature card that shares a creature type with the sacrificed creature" (Descendants' Fury): as it last existed (rulings). */
+      sharesCreatureTypeWithSacrificed?: true;
     }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
@@ -2819,7 +2827,7 @@ export type Effect =
    * permanent a card put onto the battlefield became (Back for More); `target`, that target, and with `attached` only if
    * the token just created was attached to it (Curse of the Werefox). With no such object, it doesn't trigger (rulings).
    */
-  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true }
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
@@ -3561,6 +3569,7 @@ export type TriggerEvent =
   | "youPlayAnotherLand" // "When you play another land" (City of Traitors): playing a land (CR 305.1), not this one
   | "youLoseLife" // "Whenever you lose life" (Vilis, Broker of Blood): once per life-loss event, as "opponentLosesLife"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  | "opponentsLoseOneLife" // "Whenever one or more opponents each lose exactly 1 life" (Ob Nixilis, Captive Kingpin): an opponentsLoseLife event in which one of them lost exactly 1 in all
   | "opponentsLoseLife" // "Whenever one or more opponents lose life" (Emet-Selch): once for life lost at the same time
   | "youCreateToken" // "Whenever you create a token": once for each token you create (CR 111.2), whoever ends up controlling it
   /**
@@ -3690,7 +3699,8 @@ export type TriggerEvent =
  * cleanup step (CR 514.2), "until your next turn" as that turn begins (611.2b), "until the end of your next turn" in that
  * turn's cleanup step.
  */
-export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn";
+/** `endOfCombat`: "this combat" (Stensian Sanguinist), until this combat's end of combat step ends (CR 511.3). */
+export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat";
 
 export interface TriggeredAbility {
   event: TriggerEvent;

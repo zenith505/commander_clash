@@ -7,6 +7,7 @@ import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches } from "./targeting";
+import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
@@ -363,7 +364,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         about = { id: o.id, zc: o.zoneChanges ?? 0 };
       }
       const subject = about ?? item.subject;
-      s.triggerQueue.push({
+      // "Create a Food token. When you do, ...": once for each of them created (CR 603.12a).
+      const kind = e.perToken && tokenDef(e.perToken).oracleId;
+      const times = kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
+      for (let i = 0; i < times; i++) s.triggerQueue.push({
         sourceId,
         sourceCardId: cardId,
         controller: ctx.controller,

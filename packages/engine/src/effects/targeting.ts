@@ -106,6 +106,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.transformed && !isTransformed(s, o)) return false;
+  if (spec.faceDown && !o.faceDown) return false;
   if (spec.powerAboveBase && !(c.types.includes("Creature") && power(s, o) > basePowerNow(s, o))) return false;
   if (spec.basePtEither !== undefined) {
     // Its base power and toughness (see basePowerNow), from the characteristics as they are, or as the layers have them
@@ -320,7 +321,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.powerAboveBase || spec.basePtEither !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
+  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
   return true;
 }
 
@@ -666,6 +667,9 @@ const totalPart = (s: GameState, key: "manaValue" | "power", c: TargetChoice | u
  * adds up to no more than the most (CR 601.2c). Before the X it's measured against is announced, anything.
  */
 export function totalOk(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice): boolean {
+  // "With equal toughness" (V.A.T.S.): the same toughness as each other one of the group chosen.
+  if (specs[i]?.equalToughness && t.kind === "object" && s.objects[t.id])
+    if (specs.some((x, j) => j !== i && x.equalToughness && !x.skip && chosen[j]?.kind === "object" && s.objects[(chosen[j] as { id: ObjectId }).id] && toughness(s, obj(s, (chosen[j] as { id: ObjectId }).id)) !== toughness(s, obj(s, t.id)))) return false;
   const total = specs[i]?.total;
   if (!total || total.max === undefined || t.kind !== "object") return true;
   let sum = totalPart(s, total.key, t);
@@ -680,6 +684,9 @@ export function totalOk(s: GameState, specs: TargetSpec[], chosen: TargetChoice[
  * every one of them is illegal (CR 608.2b; rulings on Nethroi, Apex of Death and Reunion of the House). `legal` is changed.
  */
 export function checkTotals(s: GameState, specs: TargetSpec[], targets: TargetChoice[], legal: boolean[]) {
+  // "With equal toughness" (V.A.T.S.): those still legal no longer all the same, none of them is (rulings).
+  const equal = specs.flatMap((x, i) => (x.equalToughness && legal[i] && targets[i]?.kind === "object" ? [i] : []));
+  if (new Set(equal.map((i) => toughness(s, obj(s, (targets[i] as { id: ObjectId }).id)))).size > 1) for (const i of equal) legal[i] = false;
   const group = specs.flatMap((x, i) => (x.total && x.total.max !== undefined && legal[i] ? [i] : []));
   if (!group.length) return;
   const { key, max } = specs[group[0]!]!.total!;

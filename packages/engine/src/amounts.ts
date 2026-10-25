@@ -385,6 +385,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
+      // "Each opponent you attacked [this turn]": players (not planeswalkers or battles) attacked in any combat this turn.
+      if (c.attacked) {
+        const a = s.players[ctx.controller]?.attackedInTurn;
+        return a?.turn === s.turn ? a.players.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length : 0;
+      }
       if (c.combatDamaged) return s.players.filter((p) => !(c.opponents && p.id === ctx.controller) && p.combatDamagedTurn === s.turn).length;
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
@@ -709,7 +714,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
     case "tokensCreatedThisTurn":

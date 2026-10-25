@@ -10,7 +10,7 @@ import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
@@ -3311,7 +3311,7 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   }
   if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
   if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
-  if (o.zone === "battlefield" && o.castAlt === "warp") warped(s, o, item.controller);
+  if (o.zone === "battlefield" && (o.castAlt === "warp" || o.castAlt === "grantedWarp")) warped(s, o, item.controller);
 }
 
 /**
@@ -3906,8 +3906,8 @@ export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: Ma
  * The life an activated ability's cost asks for: "Pay 2 life", or "Pay life equal to the number of colors in your
  * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
  */
-export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility): number {
-  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0);
+export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility, o?: GameObject): number {
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0) + (ab.mana && o ? manaLifeTax(s, o) : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject) {
@@ -4090,7 +4090,7 @@ export function castProblem(
     // Paying an alternative cost that has no X, X is 0 (CR 107.3b); the Shoals' "a red card with mana value X" has one.
     const paid = altCost(d, choices.alt, s, pid)!;
     if (x && parseManaCost(d.manaCost).hasX && !parseManaCost(paid.mana).hasX && !paid.costs?.some((c) => xCost(c) || (c.kind === "exileFromHand" && c.mvX))) return "X is 0 unless the cost you pay has X";
-    if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
+    if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
@@ -4648,7 +4648,22 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   }
   // Prowl (CR 702.76a): the card's own, else one a permanent of `pid`'s gives it ("Dinosaur spells you cast have prowl").
   if (alt === "prowl") return compileCard(d).altCosts?.find((a) => a.kind === alt) ?? (s && pid !== undefined ? grantedProwl(s, pid, d) : undefined);
+  if (alt === "grantedWarp") return s && pid !== undefined ? grantedWarp(s, pid, d) : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
+}
+
+/**
+ * The warp cost a permanent `pid` controls gives this card in their hand (Tannuk, Steadfast Second; CR 702.185a), checked
+ * by the card's characteristics there. Several: the cheapest by mana value (the same mana otherwise).
+ */
+function grantedWarp(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (!["Creature", "Artifact", "Enchantment", "Planeswalker", "Battle"].some((t) => isType(d, t))) return undefined;
+  const costs = s.battlefield.flatMap((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).handWarp ?? []).filter((x) => printedMatches(x.filter, d)).map((x) => x.mana) : [];
+  });
+  const mana = costs.sort((a, b) => manaValue(parseManaCost(a)) - manaValue(parseManaCost(b)))[0];
+  return mana ? { kind: "grantedWarp", mana } : undefined;
 }
 
 /** The prowl cost a permanent `pid` controls gives this spell, checked by its characteristics as a spell (CR 702.76a). */
@@ -4715,7 +4730,8 @@ export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNull
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
   const prowl = own.some((a) => a.kind === "prowl") ? undefined : grantedProwl(s, pid, defOf(s, o));
-  return [...own, ...(prowl ? [prowl] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  const warp = o.zone === "hand" && o.owner === pid ? grantedWarp(s, pid, defOf(s, o)) : undefined;
+  return [...own, ...(prowl ? [prowl] : []), ...(warp ? [warp] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -4978,7 +4994,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.buyback = choices.buyback || undefined;
   const paidHow = s.pending?.kind === "castFree" ? s.pending.how : undefined;
   o.castAlt = madness && paidHow !== "paid" ? (paidHow === "miracle" ? "miracle" : "madness") : choices.alt;
-  if (choices.alt === "warp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
+  if (choices.alt === "warp" || choices.alt === "grantedWarp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
   // CR 702.34a, 702.133a; an aftermath half cast from a graveyard any way (702.127a).
@@ -5026,7 +5042,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt.replace(/^granted(.)/, (_, c: string) => c.toLowerCase())} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -5169,6 +5185,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const cantCastIf = abilitiesOf(s, o).opponentsCantCastYourTurnIf;
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer && (!cantCastIf || (o.zone === "battlefield" && staticConditionNow(s, cantCastIf, o.id, controllerOf(s, o)))))
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
+    if (abilitiesOf(s, o).opponentsCantCastDuringCombat && controllerOf(s, o) !== pid && inCombatPhase(s))
+      return `${characteristics(s, o).name}: opponents can't cast spells during combat`;
     // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
     const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
@@ -6121,7 +6139,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
-  const lifeCost = activatedLifeCost(s, p.id, ab);
+  const lifeCost = activatedLifeCost(s, p.id, ab, o);
   if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
   if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
@@ -6459,7 +6477,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
-  const lifeCost = activatedLifeCost(s, p.id, ab);
+  const lifeCost = activatedLifeCost(s, p.id, ab, o);
   const due = lessWaterbend(abCost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), ab, tapCreatures);
   const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
@@ -9406,20 +9424,46 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0) {
   const o = obj(s, id);
   const fd = faceUpWays(s, o)[way]!;
   spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
-  // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
-  // permanent, so nothing "enters".
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${defOf(s, { ...o, faceDown: undefined }).name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x);
+  s.passedInSuccession = [];
+}
+
+/**
+ * Turns a face-down permanent face up. Its copiable values go back to the card's, or what a copy effect made it (CR
+ * 708.8, 707.3); it's the same permanent, so nothing "enters". `megamorph`: its megamorph cost was paid (CR 702.37b).
+ */
+function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0) {
   o.faceDown = undefined;
   lockIfRoom(s, o);
   invalidateCharacteristics(s);
   const d = defOf(s, o);
-  log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`);
+  log(s, text);
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
-  if (fd.kind === "megamorph") putCounters(s, o, "+1/+1", 1);
+  if (megamorph) putCounters(s, o, "+1/+1", 1);
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
   const up = compileCard(d).faceUpCounters;
   if (up) putCounters(s, o, up.counter, up.n);
-  fireEvent(s, { type: "turnedFaceUp", id, ...(x ? { x } : {}) });
-  s.passedInSuccession = [];
+  fireEvent(s, { type: "turnedFaceUp", id: o.id, ...(x ? { x } : {}) });
+}
+
+/**
+ * An effect turns a face-down permanent face up (Ugin's Mastery), with no cost to pay. Not one that can't be turned face up
+ * (Unable to Scream); a manifested or cloaked instant or sorcery card is revealed and stays face down, and nothing
+ * triggers (CR 701.40g, 701.58g). Whether it turned face up.
+ */
+export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string): boolean {
+  if (o.zone !== "battlefield" || !o.faceDown) return false;
+  if (characteristics(s, o).cantTurnFaceUp) {
+    log(s, `${src}: that face-down permanent can't be turned face up.`);
+    return false;
+  }
+  const card = realDefOf(s, o);
+  if ((o.faceDown === "manifest" || o.faceDown === "cloak") && (isType(card, "Instant") || isType(card, "Sorcery"))) {
+    log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
+    return false;
+  }
+  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`);
+  return true;
 }
 
 /** Could `pid` cast this card right now with the mana in their pool? */

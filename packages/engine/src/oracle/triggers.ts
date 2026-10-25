@@ -783,6 +783,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const wasPT = attached ? null : new RegExp(`^if its (power|toughness) was (?:less than ${NUM}|${NUM} or less|greater than ${NUM}|${NUM} or greater), (.+)$`).exec(bodyText);
   const ptRange = wasPT && (wasPT[2] ? { max: num(wasPT[2]) - 1 } : wasPT[3] ? { max: num(wasPT[3]) } : wasPT[4] ? { min: num(wasPT[4]) + 1 } : { min: num(wasPT[5]!) });
   if (wasPT) bodyText = wasPT[6]!;
+  // Endless Evil: "When enchanted creature dies, if that creature was a Horror, ...": as it last existed (CR 603.10a), so
+  // it can't change and is part of what dies.
+  const wasType = attached?.[1] === "enchanted" && attachedM![2] === "creature" && attachedM![3] === "dies" ? /^if that creature was an? ([A-Z][a-z]+), (.+)$/.exec(bodyText) : null;
+  if (wasType && !CREATURE_TYPES.has(wasType[1]!)) return "fail";
+  if (wasType) bodyText = wasType[2]!;
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
@@ -811,7 +816,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
     // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).
     if (attached[1] === "enchanted") for (const e of allEffects(body.effects)) if ((e.type === "bounce" || e.type === "putOntoBattlefield") && e.what.ref === "self") e.what = { ref: "selfCard", moved: true };
-    const filter: TargetSpec = attachedM![2] === "creature" ? { kind: "object", types: ["Creature"], text: "creature" } : { kind: "object", text: "permanent" };
+    const filter: TargetSpec = wasType ? { kind: "object", types: ["Creature"], subtypes: [wasType[1]!], text: wasType[1]! } : attachedM![2] === "creature" ? { kind: "object", types: ["Creature"], text: "creature" } : { kind: "object", text: "permanent" };
     return { event: "permanentDies", dies: { filter, attached: true, ...(attachedM![3] !== "dies" ? { leaves: true as const, toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}) }, body };
   }
   let phrase = m![2]!;
@@ -1103,6 +1108,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     selfOrCommander = true;
     line = `Whenever you attack, ${line.slice(withCommander[0].length)}`;
   }
+  // "Whenever you attack with creatures with total power 6 or greater" (Ugin's Mastery): once for the attack, if the
+  // creatures attacking add up to that much power as they're declared.
+  let minTotalPower: number | undefined;
+  const totalPower = /^Whenever you attack with creatures with total power (\d+) or greater, /.exec(line);
+  if (totalPower) {
+    minTotalPower = Number(totalPower[1]);
+    line = `Whenever you attack, ${line.slice(totalPower[0].length)}`;
+  }
   // "Whenever one or more creatures you control with power 4 or greater attack" (The Earth King): the same group.
   line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater) attack, /, "$1 $3 $2 attack, ");
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more (.+?)|you attack), (.+)$/.exec(line))) {
@@ -1236,7 +1249,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */

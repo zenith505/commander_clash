@@ -228,8 +228,8 @@ function parsePreventionMod(text: string, line: string): StaticAbility | null {
 export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null | undefined {
   let t = text.replace(/\.$/, "");
   let until: "yourNextTurn" | undefined;
-  const u = /^[Uu]ntil your next turn, (if .+)$/.exec(t);
-  if (u) [until, t] = ["yourNextTurn", u[1]!];
+  const u = /^[Uu]ntil your next turn, (if .+|each time target .+)$/.exec(t);
+  if (u) [until, t] = ["yourNextTurn", u[1]!.replace(/^each/, "Each")];
   // "The next time a source of your choice would deal damage to you this turn, prevent half that damage, rounded down"
   // (Dark Sphere); "the next time that creature would deal combat damage this turn, it deals double that damage
   // instead" (Impulsive Maneuvers): the next damage event only.

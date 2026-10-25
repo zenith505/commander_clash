@@ -836,6 +836,12 @@ export function parseAffected(subject: string): Affects | null {
     const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
   }
+  // Serpent of Yawning Depths: "Krakens, Leviathans, Octopuses, and Serpents you control": creatures of any of those types.
+  const typeList = /^((?:[A-Z][a-z]+, )+and [A-Z][a-z]+) you control$/.exec(x);
+  if (typeList) {
+    const subtypes = typeList[1]!.split(/, (?:and )?/).map(singular);
+    return subtypes.every((t) => CREATURE_TYPES.has(t)) ? { kind: "filter", types: ["Creature"], subtypes, controller: "you" } : null;
+  }
   // On Wings of Gold: "Creatures you control that are Zombies and/or tokens": either one, a Zombie token once.
   const orToken = /^Creatures you control that are ([A-Z][a-z]+)s and\/or tokens$/.exec(x);
   if (orToken && CREATURE_TYPES.has(orToken[1]!)) {
@@ -1123,6 +1129,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];
   // "Can't be blocked except by creatures with flying or reach", "... except by black creatures", "... except by
   // Walls and/or creatures with flying" (CR 509.1b).
+  // "Can't be blocked except by Krakens, Leviathans, Octopuses, and Serpents" (Serpent of Yawning Depths): a creature of
+  // any of those types.
+  const typeList = /^can't be blocked except by ((?:[A-Z][a-z]+, )+and [A-Z][a-z]+)$/.exec(rest);
+  if (typeList) {
+    const subtypes = typeList[1]!.split(/, (?:and )?/).map(singular);
+    return subtypes.every((t) => CREATURE_TYPES.has(t)) ? [{ kind: "blockableOnlyBy", filters: [{ kind: "object", types: ["Creature"], subtypes, text: typeList[1]! }], text: typeList[1]! }] : null;
+  }
   if ((m = /^can't be blocked except by (.+)$/.exec(rest))) {
     const filters: TargetSpec[] = [];
     for (const part of m[1]!.split(" and/or ")) {

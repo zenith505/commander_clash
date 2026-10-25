@@ -335,7 +335,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -373,6 +373,8 @@ export interface TargetSpec {
   tapAbility?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
+  /** "A face-down creature you control" (Ugin's Mastery, CR 708.2): a face-down permanent. */
+  faceDown?: true;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
   powerAboveBase?: true;
   /** "With base power or toughness 1" (Sword of the Squeak): a creature whose base power or base toughness is this (see basePowerNow). */
@@ -558,6 +560,8 @@ export interface TargetSpec {
    * the X announced (`x`, made into `max` as targets are chosen, see settleDivided). Checked again as it resolves: over
    * it then, every one of them is illegal (CR 608.2b; rulings on Nethroi, Reunion of the House).
    */
+  /** "Any number of target creatures with equal toughness" (V.A.T.S.): the targets that have it all have the same toughness, as they're chosen and as it resolves (rulings: otherwise none of them is legal). */
+  equalToughness?: true;
   total?: { key: "manaValue" | "power"; max?: number; x?: true; /** The result of the roll a reflexive trigger is after (PendingTrigger.rolled), made into `max` as targets are chosen. */ rolled?: true };
   /** true: tapped; false: untapped. */
   tapped?: boolean;
@@ -817,7 +821,7 @@ export type ObjRef =
    * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
    * it's still a legal target, CR 608.2b).
    */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** "Whenever enchanted creature attacks, each other creature ..." (Martial Impetus): other than the trigger's subject, not the source. */ otherThanSubject?: true; /** "Create X 1/1 Soldier tokens. ... destroy all other creatures" (Martial Coup): all but the tokens this resolution created. */ notCreated?: true; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true }
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** "Whenever enchanted creature attacks, each other creature ..." (Martial Impetus): other than the trigger's subject, not the source. */ otherThanSubject?: true; /** "Create X 1/1 Soldier tokens. ... destroy all other creatures" (Martial Coup): all but the tokens this resolution created. */ notCreated?: true; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true; /** "Exile all creatures except those that share a creature type with a creature that convoked ~, all artifacts, and all enchantments" (Everything Comes to Dust): not a creature that is neither an artifact nor an enchantment and shares a creature type with one of the creatures tapped to convoke the resolving spell (CR 702.51a), each as it is or last was on the battlefield (CR 608.2h). */ spareConvokerTypes?: true }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -1972,6 +1976,8 @@ export type Effect =
   /** "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Teferi's Puzzle Box, Mindmoil). */
   | { type: "handToBottomDraw"; who: PlayerRef }
   | { type: "tap"; what: ObjRef }
+  /** "Turn target face-down creature face up" (CR 708.8): with no cost paid; see turnFaceUpByEffect. */
+  | { type: "turnFaceUp"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
@@ -2058,7 +2064,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** With `orCounter`: "a flying, lifelink, or +1/+1 counter" (Reluctant Role Model), more kinds to choose from. */ orCounters?: CounterKind[]; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -3839,6 +3845,8 @@ export interface TriggeredAbility {
   sourceDamage?: { exactly: number; other?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** For "creaturesYouControlAttack": "Whenever you attack with creatures with total power 6 or greater" (Ugin's Mastery): the attackers' powers as they were declared add up to at least this. */
+  minTotalPower?: number;
   /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */
   expend?: number;
   /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */
@@ -4524,7 +4532,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
 /** `lifeForMv`: Demon of Fate's Design's "by paying life equal to its mana value rather than paying its mana cost" (CompiledCard.payZero `life`). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl";
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | /** Warp a permanent gives a card in its controller's hand (Tannuk, Steadfast Second): the same as the card's own (CR 702.185a), a cost of its own beside one the card has. */ "grantedWarp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv" | "linkedFree" | "prowl";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -4629,6 +4637,11 @@ export interface CompiledCard {
   activated: ActivatedAbility[];
   /** Mana abilities (CR 605), kept apart from the others since they don't use the stack. */
   mana: ManaAbility[];
+  /**
+   * "Mana abilities of this land cost an additional 1 life to activate" (Thran Portal, CR 601.2f, 602.2b): every mana
+   * ability this object has, those of its land types and any it gains too, only its own (rulings).
+   */
+  manaAbilityLifeTax?: number;
   statics: StaticAbility[];
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
@@ -4814,6 +4827,8 @@ export interface CompiledCard {
   /** Compleated (CR 702.150a): two fewer loyalty counters for each Phyrexian symbol its caster paid with life. */
   compleated?: true;
   opponentsCantCastYourTurn?: true;
+  /** "Your opponents can't cast spells during combat" (Marisi, Breaker of the Coil): during any combat phase, whoever's turn (CR 506.1), even a spell an effect lets or tells them cast (rulings). */
+  opponentsCantCastDuringCombat?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */
   opponentsCantCastYourTurnIf?: StaticCondition;
   /**
@@ -5111,6 +5126,8 @@ export interface CompiledCard {
   spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
   /** "Dinosaur spells you cast have prowl {2}{R}" (Hunting Velociraptor), CR 702.76a: that alternative cost, for those spells. */
   spellsHaveProwl?: { filter: TargetSpec; mana: string; text: string }[];
+  /** "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): warp for those cards in its controller's hand (CR 702.185a). */
+  handWarp?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
   spellsHaveStorm?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];

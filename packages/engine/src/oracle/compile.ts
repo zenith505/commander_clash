@@ -1295,6 +1295,22 @@ export function compile(d: CardDef): CompiledCard {
       out.entersTappedChoice = parseEntersChoice(`As ~ enters, ${landTypeChoice[1]}`)!;
       continue;
     }
+    // Thran Portal: "As this land enters, choose a basic land type." on its own line, then "This land is the chosen type in
+    // addition to its other types.": it keeps its Gate type and gets the chosen one, with that type's mana ability (CR
+    // 305.6, rulings). With no type chosen, it gets none (rulings).
+    if (line === "As ~ enters, choose a basic land type." && d.types.includes("Land") && !out.entersChoose?.length) {
+      out.entersChoose = [{ what: "basicLandType" }];
+      continue;
+    }
+    if (line === "~ is the chosen type in addition to its other types." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenLandType: true }], text: raw });
+      continue;
+    }
+    const lifeTax = /^Mana abilities of ~ cost an additional (\d+) life to activate\.$/.exec(line);
+    if (lifeTax && d.types.includes("Land")) {
+      out.manaAbilityLifeTax = Number(lifeTax[1]);
+      continue;
+    }
     if (line === "~ is the chosen type." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
       out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenLandType: true }], text: raw });
       continue;
@@ -1870,6 +1886,15 @@ export function compile(d: CardDef): CompiledCard {
       const filter = parseTargetPhrase(untapLimit[4]!.split(" ").map((w, i, a) => (i === a.length - 1 ? singularWord(w) : w)).join(" "));
       if (filter?.kind !== "object" || filter.controller || filter.bound) out.unsupported.push(raw);
       else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
+      continue;
+    }
+    // "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): an alternative cost
+    // for those cards while they're in its controller's hand (CR 702.185a), their characteristics there.
+    const warpGrant = /^((?:[A-Za-z]+ )+?cards?(?: and (?:[a-z]+ )+?cards)?) in your hand have warp ((?:\{[^}]+\})+)\.$/.exec(line);
+    if (warpGrant) {
+      const f = parseTargetPhrase(`${warpGrant[1]!.toLowerCase().replace(/ cards and /, " card or ").replace(/ cards$/, " card")} from a graveyard`);
+      if (f?.kind !== "card") out.unsupported.push(raw);
+      else (out.handWarp ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${warpGrant[1]!.toLowerCase()} in your hand` }, mana: warpGrant[2]!, text: line });
       continue;
     }
     // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
@@ -2467,6 +2492,10 @@ export function compile(d: CardDef): CompiledCard {
       out.compleated = true;
       continue;
     }
+    if (line === "Your opponents can't cast spells during combat.") {
+      out.opponentsCantCastDuringCombat = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;
@@ -2556,7 +2585,8 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: counterKind(slung[1]!), n: { count: { kind: "webSlungMv" } }, ifWebSlung: true };
       continue;
     }
-    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
+    // "Jeska enters with a loyalty counter on her for each ...": on ~ too.
+    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
       // "~ enters tapped with three stun counters on it." "... if you attacked this turn" (raid), "... if a creature

@@ -92,6 +92,8 @@ const hulk = card("Hulk, Strongest There Is", "Legendary Creature — Gamma Bers
 const morlun = card("Morlun, Devourer of Spiders", "Legendary Creature — Vampire Villain", "{X}{B}{B}", {cmc: 2,power: "2",toughness: "1",keywords: ["Lifelink"],oracleText: "Lifelink\nMorlun enters with X +1/+1 counters on him.\nWhen Morlun enters, he deals X damage to target opponent."});
 const jirina = card("Jirina Kudro", "Legendary Creature — Human Soldier", "{1}{R}{W}{B}", {cmc: 4,power: "3",toughness: "3",oracleText: "When Jirina Kudro enters, create a 1/1 white Human Soldier creature token for each time you've cast a commander from the command zone this game.\nOther Humans you control get +2/+0."});
 const pipes = card("They Came from the Pipes", "Enchantment", "{4}{U}", {cmc: 5,keywords: ["Manifest","Manifest dread"],oracleText: "When this enchantment enters, manifest dread twice. (To manifest dread, look at the top two cards of your library. Put one onto the battlefield face down as a 2/2 creature and the other into your graveyard. Turn it face up any time for its mana cost if it's a creature card.)\nWhenever a face-down creature you control enters, draw a card."});
+const fontOfMagic = card("Font of Magic", "Enchantment", "{3}{U}", {cmc: 4,oracleText: "Instant and sorcery spells you cast cost {1} less to cast for each time you've cast a commander from the command zone this game."});
+const blaze = card("Test Blaze", "Sorcery", "{3}{R}", { cmc: 4, oracleText: "Test Blaze deals 4 damage to any target." });
 
 const rock = card("Test Rock", "Artifact", "{2}", { cmc: 2, oracleText: "{T}: Add {C}." });
 const golem = card("Test Golem", "Artifact Creature — Golem", "{2}", { cmc: 2, power: "3", toughness: "3" });
@@ -114,7 +116,7 @@ const faceDown = (s: GameState, id: string) => {
 
 describe("round 156 cards", () => {
   it("are fully supported", () => supported(ultron, portal, dust, tannuk, bitter, mastery, vats, evil, role, jeska, serpent, cleaver, marisi, liliana, breakOpen, alarmist, rose, wojek, skirmisher));
-  it("and these, from the same pieces", () => supported(ixidor, nosy, whisperer, threats, glitch, militant, vargus, fastForward, bertha, hulk, morlun, jirina, pipes));
+  it("and these, from the same pieces", () => supported(ixidor, nosy, whisperer, threats, glitch, militant, vargus, fastForward, bertha, hulk, morlun, jirina, pipes, fontOfMagic));
   it("but not a face-down creature spell's cost reduction yet (Dream Chisel)", () => {
     const chisel = card("Dream Chisel", "Artifact", "{2}", { cmc: 2, oracleText: "Face-down creature spells you cast cost {1} less to cast." });
     expect(isFullySupported(chisel)).toBe(false);
@@ -740,6 +742,15 @@ describe("commander casts, and counters on him or her", () => {
     s0.players[ap]!.commanderCasts[Object.keys(s0.players[ap]!.commanderCasts)[0]!] = 2;
     const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
     expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.objects[id]!.isToken)).toHaveLength(2);
+  });
+
+  it("Font of Magic: instants and sorceries cost {1} less for each time", () => {
+    const { s: s0, ap, opp, ids } = setup([blaze]);
+    putOnBattlefield(s0, ap, fontOfMagic);
+    s0.players[ap]!.commanderCasts[Object.keys(s0.players[ap]!.commanderCasts)[0]!] = 2;
+    const tapped = (st: GameState) => st.battlefield.filter((id) => st.objects[id]!.controller === ap && st.objects[id]!.tapped).length;
+    const s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    expect(tapped(s) - tapped(s0)).toBe(2);
   });
 
   it("Big Bertha and Morlun enter with X counters; Hulk's are doubled each upkeep", () => {

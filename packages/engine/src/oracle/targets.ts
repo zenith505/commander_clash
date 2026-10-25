@@ -503,7 +503,11 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (count === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
-  const [mine0, theirs] = thatPlayerControls(phrase!, ctx);
+  const [mine1, theirs] = thatPlayerControls(phrase!, ctx);
+  // Sorin, Lord of Innistrad: "up to three target creatures and/or other planeswalkers": other than the source, which
+  // is a planeswalker, unless it's a creature too (rulings).
+  const otherWalkers = !other && !another && !ctx.spell && !ctx.targets.length && /^creatures and\/or other planeswalkers$/.test(mine1);
+  const mine0 = otherWalkers ? "creatures and/or planeswalkers" : mine1;
   // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
   const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
@@ -543,7 +547,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // before it was asked to be a creature, so "other" is other than the creature the ability is on.
   const sameWord = (t: TargetSpec) => t.kind === "any" || !t.types?.length || !spec.types?.length || t.types.some((x) => spec.types!.includes(x));
   const before = ctx.targets.flatMap((t, i) => ((t.kind === "object" || t.kind === "any" || t.kind === "card") && (another || ctx.spell || t.kind !== spec.kind || sameWord(t)) ? [i] : []));
-  let notSource = false;
+  let notSource = otherWalkers;
   if (other || another) {
     if (!before.length && ctx.spell) return null; // a spell has no source on the battlefield to be other than
     notSource = !before.length;
@@ -564,6 +568,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
       ...spec,
       ...(k >= required ? { optional: true } : {}),
       ...(notSource ? { notSource } : {}),
+      ...(otherWalkers ? { notSourceUnlessCreature: true as const, text: spec.text.replace(/ or planeswalker$/, " or other planeswalker") } : {}),
       ...(distinct.length ? { distinctFrom: distinct } : {}),
       ...(single && k ? { sameGraveyardAs: group } : {}),
       ...(share && k ? { sharesCreatureTypeWith: group } : {}),

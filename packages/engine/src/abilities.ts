@@ -522,6 +522,8 @@ export interface TargetSpec {
   };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
+  /** With `notSource`: "target creatures and/or other planeswalkers" (Sorin, Lord of Innistrad): the source can be chosen while it's a creature (rulings). */
+  notSourceUnlessCreature?: true;
   /**
    * "A creature of their choice that dealt combat damage to you this turn" (Witch-king of Angmar): "you" being the resolving
    * ability's controller, whoever picks it (turnLog.combatDamagedBy, this object as it was then).
@@ -2508,7 +2510,7 @@ export type Effect =
    * control" (Necromantic Selection): one of the cards this resolution's destroy put into graveyards, chosen as it
    * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
    */
-  | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
+  | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose

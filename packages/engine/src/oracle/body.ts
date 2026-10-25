@@ -1867,6 +1867,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push(diedBack[1] ? { type: "if", cond: { kind: "xAtLeast", n: Number(diedBack[1]) }, effects: [back] } : back);
       continue;
     }
+    // Sorin, Lord of Innistrad: "Destroy up to three target creatures and/or other planeswalkers. Return each card put
+    // into a graveyard this way to the battlefield under your control." The cards the destroy put there, still there (a
+    // token isn't a card, and a commander its owner put into the command zone isn't there: CR 903.9a).
+    const lastKill = effects[effects.length - 1];
+    if (/^Return each card put into a graveyard this way to the battlefield under your control$/.test(s) && lastKill?.type === "destroy" && lastKill.what.ref === "target" && effects.filter((x) => x.type === "destroy").length === 1) {
+      effects.push({ type: "returnDiedThisWay", each: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" } });
+      continue;
+    }
     // Come Back Wrong: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the
     // battlefield under your control. Sacrifice it at the beginning of your next end step." The card the destroy put
     // there (a token isn't a card), with no chance to act in between (rulings).

@@ -546,3 +546,33 @@ describe("Mission Briefing", () => {
     expect(planCast(s, ap, d, undefined, undefined, undefined, undefined, { via: "permission" })).toBeNull();
   });
 });
+
+const sorin = card("Sorin, Lord of Innistrad", "Legendary Planeswalker — Sorin", "{2}{W}{B}", { cmc: 4, loyalty: "3", oracleText: "+1: Create a 1/1 black Vampire creature token with lifelink.\n−2: You get an emblem with \"Creatures you control get +1/+0.\"\n−6: Destroy up to three target creatures and/or other planeswalkers. Return each card put into a graveyard this way to the battlefield under your control." });
+
+describe("Sorin, Lord of Innistrad", () => {
+  it("is fully supported", () => supported(sorin));
+
+  it("−6 destroys up to three creatures and/or other planeswalkers, and each card put into a graveyard returns under your control", () => {
+    const { s: s0, ap } = setup([]);
+    const b = next(s0, ap);
+    const me = putOnBattlefield(s0, ap, sorin);
+    s0.objects[me]!.counters = { loyalty: 7 };
+    const theirs = putOnBattlefield(s0, b, bear({ name: "Their Bear" }));
+    const walker = putOnBattlefield(s0, b, { ...sorin, oracleId: "sorin-b", name: "Other Sorin" });
+    s0.objects[walker]!.counters = { loyalty: 3 };
+    const token = putOnBattlefield(s0, b, bear({ name: "Bear Token" }));
+    s0.objects[token]!.isToken = true;
+    const i = abilitiesOf(s0, s0.objects[me]!).activated.findIndex((a) => /^−6/.test(a.text ?? ""));
+    expect(i).toBeGreaterThanOrEqual(0);
+    // Not Sorin itself ("other planeswalkers").
+    expect(abilityProblem(s0, ap, me, i, [{ kind: "object", id: me }])).toBeTruthy();
+    let s = run(s0, planActivate(s0, ap, me, i, [{ kind: "object", id: theirs }, { kind: "object", id: walker }, { kind: "object", id: token }]));
+    s = resolveAll(s);
+    for (const id of [theirs, walker]) {
+      expect(zone(s, id)).toBe("battlefield");
+      expect(s.objects[id]!.controller).toBe(ap);
+    }
+    // A token isn't a card: it doesn't come back.
+    expect(s.objects[token]?.zone ?? "gone").not.toBe("battlefield");
+  });
+});

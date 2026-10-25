@@ -128,6 +128,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.impulseChoice) {
         // The cards still in the graveyard the destroy put them into (CR 400.7): a token there ceased to exist (CR 704.5d).
         const ids = (s.resolving?.destroyed ?? []).filter((x) => x.died && s.objects[x.o.id]?.zone === "graveyard" && (s.objects[x.o.id]!.zoneChanges ?? 0) === (x.o.zoneChanges ?? 0) + 1 && !s.objects[x.o.id]!.isToken && printedMatches(e.filter, defOf(s, obj(s, x.o.id)))).map((x) => x.o.id);
+        if (e.each) {
+          // Sorin, Lord of Innistrad: "Return each card put into a graveyard this way": all of them at once (CR 608.2f).
+          if (ids.length) log(s, `${player(s, ctx.controller).name} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to the battlefield under their control.`);
+          enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
+          return;
+        }
         sc.impulseChoice = { ids };
         if (ids.length > 1) {
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} put into a graveyard this way to put onto the battlefield under your control` };

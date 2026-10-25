@@ -651,7 +651,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (spec.skip) return t.kind === "none";
   if (t.kind === "none") return !!spec.optional;
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
-  if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
+  if (spec.notSource && t.kind === "object" && t.id === sourceId && !(spec.notSourceUnlessCreature && s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature"))) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.notSourceHost && t.kind === "object" && sourceId && t.id === s.objects[sourceId]?.attachedTo) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;

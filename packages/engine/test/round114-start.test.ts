@@ -210,8 +210,9 @@ describe("for each opponent, you may ... up to one target card from that player'
     expect(s.objects[db]!.zone).toBe("graveyard");
   });
 
-  it("without the exile rider the cast isn't read from an opponent's graveyard alone", () => {
-    expect(isFullySupported(card("Odd Primordial", "Creature — Avatar", "{5}{U}{U}", { power: "5", toughness: "5", oracleText: "When this creature enters, you may cast target instant card from an opponent's graveyard without paying its mana cost." }))).toBe(false);
+  // Round 159 reads this form (Memory Plunder): the spell then goes to its owner's graveyard as usual (CR 400.3).
+  it("without the exile rider the cast from an opponent's graveyard is read too", () => {
+    expect(isFullySupported(card("Odd Primordial", "Creature — Avatar", "{5}{U}{U}", { power: "5", toughness: "5", oracleText: "When this creature enters, you may cast target instant card from an opponent's graveyard without paying its mana cost." }))).toBe(true);
   });
 });
 

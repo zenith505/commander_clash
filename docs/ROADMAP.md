@@ -1,7 +1,7 @@
 # Roadmap
 
-24,195 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,875 of 4,988 (97%).
+24,227 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,896 of 4,988 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -35,11 +35,10 @@ line blocks.
    the controller's choice, not modeled); Lozhan, Dragons' Legacy ("Adventure spell", "any target that isn't a
    commander"); Helga, Skittish Seer (its mana's spend restriction); Jinnie Fay, Jetmir's Second ("if you would create one or more
    tokens, you may instead": a choice at every token creation, and tokens are created in many places, some outside a
-   resolution); Rammas Echor, Conspiracy Theorist, Cayth, Phial of
+   resolution); Conspiracy Theorist, Cayth, Phial of
    Galadriel and Shadowgrange Archfiend (a line each with no piece yet); Serum Snare (the bounced permanent's last known
    mana value), Elturel Survivors (lands the defending player controls), Within Range (creatures attacking each
-   opponent); Tidal Barracuda ("any player may cast spells as though they had flash": flash for the controller only so
-   far); Blatant Thievery ("for each opponent, gain control of target permanent that player controls": whether the
+   opponent); Blatant Thievery ("for each opponent, gain control of target permanent that player controls": whether the
    spell can be cast when an opponent controls no permanent it could target isn't settled by CR 601.2c or the
    rulings); Thieving Varmint ("spells you don't own": the mana spending rule needs the spell's owner wherever mana is
    checked and paid); Balor ("whenever ~ attacks or dies", "choose one or more. Each mode must target a different
@@ -56,9 +55,13 @@ line blocks.
    no cap yet on a draw that size, for the engine or for bots); Dream Chisel and Kadena, Slinking Sorcerer (a face-down
    creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4); Ronin, Shadow
    Stalker ("Sacrifice an Equipment attached to ~" as a cost); Combat Calligrapher ("attacks one of your opponents ...
-   that opponent"). Next most played: Trenzalore Clocktower, Ulalek, Fused Atrocity, Quick Sliver, Frodo, Adventurous
-   Hobbit, Surge to Victory, Azusa's Many Journeys, Prishe's Wanderings, Memory Plunder, Norman Osborn, Faramir, Prince
-   of Ithilien.
+   that opponent"); Ulalek, Fused Atrocity (copy each other spell and ability you control: a copy of every kind of
+   stack object, abilities included); Surge to Victory (the trigger it grants for the turn has to remember the exiled
+   card it copies); Norman Osborn // Green Goblin (Green Goblin gives mayhem to cards in your graveyard); Zarda,
+   Heroes' Advocate ("Heroes" in the plural isn't read as a creature type) and Rashel ("Auras you control have exalted"
+   on noncreature permanents). Next most played: Bonus Round, Danitha, Benalia's Hope, Vexing Radgull, Sylvan Offering,
+   Zenos yae Galvus, Avatar Roku, Firebender, Snort, Dream Devourer, Bringer of the Last Gift, Uchuulon, Taigam, Master
+   Opportunist.
    Smaller gaps from round 158: "you control a creature with the greatest power among creatures on the battlefield" works
    in triggers and as a resolution check (High Score, Éomer of the Riddermark), but as the condition of a static ability
    it would read power before the layers finish; bots using Garnet, Princess of Alexandria remove a lore counter from
@@ -486,7 +489,7 @@ line blocks.
      (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless
      Carnage, Renounce, Reprocess, Scapeshift, Malevolent Witchkite, Mana Seism and Lich-Knights' Conquest.
    - Classes (CR 716) still out on other lines: Cleric Class's level 3 ("you gain life equal to that creature's
-     toughness"), Warlock Class ("the life they lost this turn"), Paladin Class ("during your turn" cost increase),
+     toughness"), Warlock Class ("the life they lost this turn"),
      Fighter Class ("blocks it this combat if able"), Leader's Talent ("if it had a counter on it"), Gourmand's Talent
      ("for the first time each turn"), the Stormchaser Otter token ("blue and red ... with prowess").
      Copying a Class doesn't copy its level (716.2b); no supported card copies one yet.

@@ -9650,6 +9650,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "36b67014-0507-4976-ad52-a2a36676197d",
+  "name": "Memory Plunder",
+  "manaCost": "{U/B}{U/B}{U/B}{U/B}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast target instant or sorcery card from an opponent's graveyard without paying its mana cost.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "75e9ac31-5993-4039-93b2-9380ced2499a",
   "name": "Memory's Journey",
   "manaCost": "{1}{U}",

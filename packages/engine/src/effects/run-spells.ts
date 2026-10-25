@@ -190,6 +190,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       const o = id ? s.objects[id] : undefined;
+      // Faramir: "that player's next end step", the chosen opponent's (CR 603.7), who is "they" then.
+      if (e.when === "playersNextEndStep") {
+        const whose = e.whose ? players(s, e.whose, ctx)[0] : undefined;
+        if (o && whose !== undefined) {
+          addDelayed(s, e.when, ctx.controller, o, body, undefined, whose);
+          s.delayed![s.delayed!.length - 1]!.event = { player: whose };
+        }
+        return;
+      }
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
       // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.
       if (o && e.event) {

@@ -42,6 +42,7 @@ export function layerOf(m: Modification): Layer {
     case "setSubtypes":
     case "setLandTypes":
     case "loseTypes":
+    case "loseCreatureTypes":
       return "4";
     case "linkedCreature":
       return m.part === "types" ? "4" : "7b";
@@ -630,6 +631,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const is = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === b.zc && chars.get(o.id)?.controller === you && (!cond.self || o.id === sourceId);
       return is !== !!cond.not;
     }
+    case "ringTempted":
+      return (s.players[you]?.ring?.tempted ?? 0) >= cond.n;
     case "maxSpeed":
       return s.players[you]?.speed === 4;
     case "harnessed":
@@ -1110,6 +1113,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.types.includes("Planeswalker") && !c.types.includes("Battle")) c.subtypes = c.subtypes.filter((st) => subtypeSet(st) !== null);
       if (m.types.includes("Creature")) c.allCreatureTypes = false;
       return;
+    case "loseCreatureTypes":
+      c.subtypes = c.subtypes.filter((st) => subtypeSet(st) !== "Creature");
+      c.allCreatureTypes = false;
+      return;
     case "setName":
       // A text-changing effect (CR 123.6c, 613.1c): "named Legitimate Businessperson" (Witness Protection).
       c.name = m.name;
@@ -1378,7 +1385,7 @@ function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock:
  */
 // Goading too: whether a creature is goaded (CR 701.15) decides what "goaded creatures your opponents control can't block"
 // applies to (Bothersome Quasit), whatever the order the two came in.
-const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "setColors", "addColors", "loseAllAbilities", "goad"]);
+const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "loseCreatureTypes", "setColors", "addColors", "loseAllAbilities", "goad"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

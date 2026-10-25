@@ -338,6 +338,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // still takes off {2} (rulings); the exiled card is the one its imprint ability exiled (linked in compile.ts).
   if ((m = /^Spells you cast that share a card type with the exiled card cost \{(\d+)\} less to cast$/.exec(text)))
     return { costMod: { who: "you", filter: { kind: "spell", text: "spells that share a card type with the exiled card" }, n: -Number(m[1]), sharesTypeWithLinked: true, text: line } };
+  // "Spells your opponents cast during your turn cost {1} more to cast" (Paladin Class): "During your turn, ...".
+  text = text.replace(/^(\S.*? (?:you|your opponents) cast) during your turn (?=costs? \{\d+\} (?:less|more) to cast$)/, "During your turn, $1 ");
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
   // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter), "Spells you cast
@@ -618,6 +620,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you control a commander that's a creature or planeswalker$/.test(text)) return { kind: "controlCommander", types: ["Creature", "Planeswalker"] };
   if ((m = /^you (don't )?control a Ring-bearer$/.exec(text))) return { kind: "ringBearer", ...(m[1] ? { not: true as const } : {}) };
   if (/^~ is your Ring-bearer$/.test(text)) return { kind: "ringBearer", self: true };
+  // "If the Ring has tempted you two or more times this game" (CR 701.54c); Frodo, Adventurous Hobbit: "if ~ is your
+  // Ring-bearer and the Ring has tempted you two or more times this game", both.
+  if ((m = new RegExp(`^the Ring has tempted you ${NUM} or more times this game$`).exec(text))) return { kind: "ringTempted", n: num(m[1]!) };
+  if ((m = new RegExp(`^~ is your Ring-bearer and the Ring has tempted you ${NUM} or more times this game$`).exec(text))) return { kind: "allOf", conds: [{ kind: "ringBearer", self: true }, { kind: "ringTempted", n: num(m[1]!) }] };
   if (/^no opponent has more life than that player$/.test(text)) return { kind: "defenderMostLife" };
   if ((m = /^(?:~|it)(?:'s| is) (not )?paired with (another creature|a creature with soulbond)$/.exec(text)) && st.affects.kind === "self")
     return { kind: "paired", ...(m[2] === "a creature with soulbond" ? { withKeyword: "Soulbond" } : {}), ...(m[1] ? { not: true as const } : {}) };
@@ -1591,6 +1597,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     // Coat of Arms: "for each other creature on the battlefield that shares at least one creature type with it", "it"
     // each creature it affects, counted for that one.
     const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
+    // Stoneforge Masterwork: "Equipped creature gets +1/+1 for each other creature you control that shares a creature type
+    // with it": "it" is the equipped creature, each creature counted once however many types it shares (rulings).
+    const masterwork = /^other creature you control that shares a creature type with it$/.test(each[4]!) && affects.kind === "attached";
     // Moraug: "for each time it has attacked this turn", each creature it affects, counted for that one.
     const attacks = each[4] === "time it has attacked this turn" && affects.kind === "filter";
     // Toxrill: "for each slime counter on them", each creature it affects, counted for that one.
@@ -1599,7 +1608,7 @@ function parseStaticLine(line: string): StaticAbility | null {
     const attachedCounters = affects.kind === "attached" && each[4] === "counter on it";
     // Mirror Box: "for each other creature you control with the same name as that creature", "that creature" each one it affects.
     const mirror = /^other creature you control with the same name as that creature$/.test(each[4]!) && affects.kind === "filter";
-    const per = mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : attachedCounters ? { count: { kind: "affectedCounters" as const, counter: ANY_COUNTER } } : counts(parseCount(each[4]!, null, true), each[4]!);
+    const per = masterwork ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: each[4]! }, sharesTypeWithAffected: true as const } } : mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : attachedCounters ? { count: { kind: "affectedCounters" as const, counter: ANY_COUNTER } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];

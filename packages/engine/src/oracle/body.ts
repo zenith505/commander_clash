@@ -1180,6 +1180,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Until end of turn, target creature gains ([a-z]+) and gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1Target creature gains $2 until end of turn. It gets $3 until end of turn for each $4.");
   // "Until end of turn, creatures you control get +1/+1 for each Forest you control and gain trample" (Nissa, Ascended
   // Animist): two instructions about the same creatures, all of them as it resolves (CR 611.2c).
+  // Elspeth Tirel: "Destroy all other permanents except for lands and tokens": each nonland, nontoken permanent but her
+  // (rulings).
+  text = text.replace(/(^|\. )Destroy all other permanents except for lands and tokens\./, "$1Destroy all other nonland, nontoken permanents.");
+  // Wand of Orcus: "it and Zombies you control gain deathtouch until end of turn": both, at once.
+  text = text.replace(/(^|, |\. )it and ([A-Z][a-z]+s) you control gain ([a-z]+) until end of turn\./, "$1it gains $3 until end of turn. $2 you control gain $3 until end of turn.");
+  // "Until end of turn, target attacking creature gets +1/+1 for each other attacking creature and gains double strike"
+  // (Paladin Class): both until end of turn.
+  text = text.replace(/(^|\. )[Uu]ntil end of turn, (target [a-z ]*?creature) gets ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gains ([a-z ]+)\./, (_, a, t, pt, per, kw) => `${a}${t.charAt(0).toUpperCase()}${t.slice(1)} gets ${pt} until end of turn for each ${per}. It gains ${kw} until end of turn.`);
   text = text.replace(/(^|\. )Until end of turn, creatures you control get ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gain ([a-z]+)\./, "$1Creatures you control get $2 until end of turn for each $3. Creatures you control gain $4 until end of turn.");
   // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
@@ -2932,17 +2940,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
     // your graveyard, exile it instead." (Torrential Gearhulk): cast as it resolves (CR 608.2g), or not.
-    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from your graveyard) without paying its mana cost$/.exec(s);
+    // "You may cast target instant or sorcery card from an opponent's graveyard without paying its mana cost." (Memory
+    // Plunder): the same, the spell going to its owner's graveyard after; Arcane Heist: "If that spell would be put into
+    // their graveyard, exile it instead".
+    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from (your|an opponent's) graveyard) without paying its mana cost$/.exec(s);
     if (castTarget) {
+      const theirs = castTarget[2] !== "your";
       const rider = sentences[si + 1]?.replace(/\.$/, "");
-      const exileAfter = rider === "If that spell would be put into your graveyard, exile it instead" ? (true as const) : rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
+      const exileAfter = rider === `If that spell would be put into ${theirs ? "their" : "your"} graveyard, exile it instead` ? (true as const) : !theirs && rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
       const before = ctx.targets.length;
-      const what = parseCardTarget(castTarget[1]!, ctx, "you");
+      const what = parseCardTarget(castTarget[1]!, ctx, theirs ? undefined : "you");
       const t = ctx.targets[before];
       // A land card can't be cast (CR 305.9).
-      if (!what || !exileAfter || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
-      effects.push({ type: "castTargetFree", what, exileAfter });
-      si++;
+      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || t.owner !== (theirs ? "opponent" : "you") || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "castTargetFree", what, ...(exileAfter ? { exileAfter } : {}) });
+      if (exileAfter) si++;
       continue;
     }
     // "You may search your library and/or graveyard for a card named Ajani, Valiant Protector, reveal it, and put it into
@@ -3377,6 +3389,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectType[1]!], text: subjectType[1]! };
       const pick: Effect = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...one, n: num(subjectType[2]!) }], otherwise: [one] };
       effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
+      continue;
+    }
+    // Aunt May: "Whenever another creature you control enters, you gain 1 life. If it's a Spider, put a +1/+1 counter on
+    // it.": the creature as it is when this resolves (CR 608.2c), or as it last existed (608.2h).
+    const subjectIs = ctx.subjectIt && !subjectType && effects.length ? /^If it's an? ([A-Z][a-z]+), ([a-z].+)$/.exec(s) : null;
+    if (subjectIs && CREATURE_TYPES.has(subjectIs[1]!) && !/\b(?:instead|otherwise)\b/.test(subjectIs[2]!) && !/^(?:Otherwise|If)\b/.test(sentences[si + 1] ?? "")) {
+      const before = ctx.targets.length;
+      const inner = parseSentence(capital(subjectIs[2]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectIs[1]!], text: subjectIs[1]! } }, effects: inner });
       continue;
     }
     // Ajani's Chosen: "Whenever an enchantment you control enters, create a 2/2 white Cat creature token. If that enchantment
@@ -4931,7 +4953,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "You may collect evidence 3. When you do, put a +1/+1 counter on target creature you control": a reflexive
     // trigger (CR 603.12), with targets of its own chosen as it's put on the stack. The rest of the ability is its.
-    const whenDo = /^When you do, (.+)$/.exec(s);
+    // "Search your library for a basic land card or Town card, put it onto the battlefield tapped, then shuffle. When you
+    // search your library this way, ..." (Prishe's Wanderings): the search happens whenever the spell resolves, found
+    // card or not (CR 701.23a), so it always triggers.
+    const searched = /^When you search your library this way, (.+)$/.exec(s);
+    const whenDo = /^When you do, (.+)$/.exec(s) ?? (searched && effects.length === 1 && effects[0]!.type === "search" && !effects[0]!.who ? searched : null);
     if (whenDo) {
       const prev = effects[effects.length - 1];
       // "Roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result"
@@ -4966,7 +4992,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // revealing any number too, so it always triggers (rulings).
       // "Tap any number of untapped creatures you control. When you do, ..." (Teferi Akosa of Zhalfir, Yotia Declares War):
       // tapping none is doing it too, so it always triggers (rulings), with X the number tapped.
-      const always = (prev?.type === "amass" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
+      const always = (whenDo === searched || prev?.type === "amass" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
       if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Its own "where X is ..." goes with it.
       let whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
@@ -5809,6 +5835,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
       effects.push({ type: "choose", choice: "opponent", ...(/^[Cc]hoose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
       ctx.chosenOpponent = true;
+      continue;
+    }
+    // Faramir, Prince of Ithilien: "Choose an opponent. At the beginning of that player's next end step, you draw a card if
+    // they didn't attack you that turn. Otherwise, create three 1/1 ... tokens.": a delayed trigger (CR 603.7) at the
+    // chosen player's end step, which checks as it resolves whether they attacked you with a creature that turn (not your
+    // planeswalkers or battles, rulings).
+    const theirEnd = ctx.chosenOpponent ? /^At the beginning of that player's next end step, (you [a-z][^,]+?) if they didn't attack you that turn$/.exec(s) : null;
+    const theirElse = theirEnd ? /^Otherwise, ([a-z].+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (theirEnd && theirElse && si + 2 === sentences.length) {
+      const sub: Ctx = { ...ctx, chosenOpponent: false, targets: [] };
+      const yes = parseSentence(capital(theirEnd[1]!.replace(/^you (\w+)s? /, (_, v: string) => `${v} `)), sub);
+      const no = parseSentence(capital(theirElse[1]!), sub);
+      if (!yes || !no || sub.targets.length) return null;
+      effects.push({ type: "delayed", when: "playersNextEndStep", whose: { ref: "chosenPlayer" }, effects: [{ type: "if", cond: { kind: "eventPlayerAttackedYou", not: true }, effects: yes, otherwise: no }], text: `${theirEnd[1]!} if they didn't attack you that turn. Otherwise, ${theirElse[1]!}` });
+      si = sentences.length;
       continue;
     }
     // "Choose artifact or enchantment. Destroy all permanents of the chosen type" (Season of Gathering): a card type,
@@ -6778,8 +6819,16 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
     const scaled = scaleEffect(e, { count: { ...count.count, who } });
     return scaled ? [scaled] : null;
   }
-  const per = parseCount(phrase, ctx, true);
+  // "Target attacking creature gets +1/+1 until end of turn for each other attacking creature" (Paladin Class): other than
+  // that target, so with one attacker it gets nothing (rulings).
+  const e1 = fx[0]!;
+  const ofTarget = /^other (attacking creatures?)$/.exec(phrase) && e1.type === "continuous" && e1.what.ref === "target" && !e1.what.n ? e1.what.index : undefined;
+  const per = parseCount(ofTarget !== undefined ? phrase.slice("other ".length) : phrase, ctx, true);
   if (!per) return null;
+  if (ofTarget !== undefined) {
+    if (per.count.kind !== "permanents" || per.count.other) return null;
+    per.count = { ...per.count, otherThanTarget: ofTarget, filter: { ...per.count.filter, text: phrase } };
+  }
   const scaled = scaleEffect(fx[0]!, per);
   return scaled ? [scaled] : null;
 }

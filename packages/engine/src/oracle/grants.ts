@@ -168,7 +168,8 @@ export function parseGrants(text: string): Modification[] | null {
     }
     // Myriad too: several instances each trigger (CR 702.116b); prowess the same (CR 702.108b): "Other creatures you
     // control have prowess" (Bria, Riptide Rogue).
-    if (/^(?:myriad|prowess)$/i.test(w)) {
+    // Dethrone (CR 702.105b) and exalted (702.83b) too: "Other creatures you control have dethrone" (Marchesa, the Black Rose).
+    if (/^(?:myriad|prowess|dethrone|exalted)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }

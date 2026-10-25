@@ -2188,14 +2188,16 @@ export function compile(d: CardDef): CompiledCard {
       (out.flashOwned ??= []).push({ kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards you own" });
       continue;
     }
-    const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
+    // "Any player may cast Sliver spells as though they had flash" (Quick Sliver), "... spells ..." (Tidal Barracuda): every
+    // player, not only its controller (CR 702.8a).
+    const flashFor = /^(You|Any player) may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       // "Aura and Equipment spells" (Sigarda's Aid): each of them.
       // "Colorless spells and artifact spells" (Liberator): either kind.
-      const parts = flashFor[1]!.split(/ spells and /).map((x, i, all) => (i < all.length - 1 ? `${x} ` : x));
+      const parts = flashFor[2]!.split(/ spells and /).map((x, i, all) => (i < all.length - 1 ? `${x} ` : x));
       const specs = parts.map((part) => parseTargetPhrase(`${part.replace(/ and /g, " or ")}spell`));
       if (specs.every((spec) => spec?.kind === "spell" && !spec.controller)) {
-        specs.forEach((spec, i) => (out.flashFor ??= []).push({ ...spec!, text: `${parts[i]}spells` } as typeof spec & {}));
+        specs.forEach((spec, i) => (flashFor[1] === "You" ? (out.flashFor ??= []) : (out.flashForAll ??= [])).push({ ...spec!, text: `${parts[i]}spells` } as typeof spec & {}));
         continue;
       }
     }
@@ -2356,6 +2358,12 @@ export function compile(d: CardDef): CompiledCard {
     // Angel of Suffering (CR 615.5, 615.12): see staticRules in damage.ts.
     if (line === "If damage would be dealt to you, prevent that damage and mill twice that many cards.") {
       out.damageToYouMillsTwice = true;
+      continue;
+    }
+    // The Wanderer (CR 615.1): see staticRules in damage.ts.
+    const toYou = /^Prevent all (combat |noncombat )?damage that would be dealt to you( and other permanents you control)?\.$/.exec(line);
+    if (toYou) {
+      out.preventToYou = { ...(toYou[1] ? { combat: toYou[1] === "combat " ? ("only" as const) : ("non" as const) } : {}), ...(toYou[2] ? { others: true as const } : {}) };
       continue;
     }
     // Pariah, Palisade Giant, Martyrs of Korlis (CR 614.9): see staticRules in damage.ts.

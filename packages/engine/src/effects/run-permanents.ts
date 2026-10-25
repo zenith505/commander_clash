@@ -1371,7 +1371,25 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // "For each Aura and Equipment you control" (Inventory Management): each of those there as it resolves, one at a
       // time, each attached as its creature is chosen.
       const each = e.source.ref === "each";
-      const all = each ? (sc.attachEach ??= objects(s, e.source, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id)) : objects(s, e.source, ctx).filter((o) => o.zone === "battlefield").slice(0, 1).map((o) => o.id);
+      let all = each ? (sc.attachEach ??= objects(s, e.source, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id)) : objects(s, e.source, ctx).filter((o) => o.zone === "battlefield").slice(0, 1).map((o) => o.id);
+      // Gilgamesh: "you may attach one of them to a Samurai you control": which one first, among those that could be
+      // attached to one (rulings: not one that can't legally be attached).
+      if (e.pickOne && !each) {
+        const fits = (me: GameObject) => (!e.equipmentOnly || characteristics(s, me).subtypes.includes("Equipment")) && s.battlefield.some((x) => objectMatches(s, e.filter, obj(s, x), ctx.controller, false) && canAttachTo(s, me, obj(s, x)));
+        const options = objects(s, e.source, ctx).filter((o) => o.zone === "battlefield" && fits(o));
+        if (sc.attachWhich === undefined) {
+          if (!options.length) return;
+          if (options.length > 1 || e.may) {
+            const choices = [...options.map((o) => o.id), ...(e.may ? ["none"] : [])];
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attachWhich", options: choices, labels: choices.map((x) => (x === "none" ? "Don't attach" : defOf(s, obj(s, x)).name)), prompt: `choose one of them to attach to ${e.filter.text.replace(/^an? /, "a ")}${e.may ? ", or none" : ""}` };
+            return "paused";
+          }
+          sc.attachWhich = options[0]!.id;
+        }
+        if (sc.attachWhich === "none") return;
+        all = options.some((o) => o.id === sc.attachWhich) ? [sc.attachWhich] : [];
+      }
+      const may = e.may && !e.pickOne;
       for (const id of all) {
         const me = s.objects[id];
         if (!me || me.zone !== "battlefield" || hosts[id] === "done") continue;
@@ -1383,11 +1401,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
             .filter((x) => objectMatches(s, e.filter, obj(s, x), ctx.controller, false) && canAttachTo(s, me, obj(s, x)) && (!each || me.attachedTo !== x))
             .sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)));
           if (!options.length) continue;
-          if (options.length > 1 || e.may) {
+          if (options.length > 1 || may) {
             sc.auraAsking = me.id;
-            const choices = [...options, ...(e.may ? ["none"] : [])];
+            const choices = [...options, ...(may ? ["none"] : [])];
             const labels = choices.map((x) => (x === "none" ? (each && me.attachedTo ? "Leave it where it is" : "Don't attach it") : `${defOf(s, obj(s, x)).name}${controllerOf(s, obj(s, x)) === ctx.controller ? "" : ` (${player(s, controllerOf(s, obj(s, x))).name})`}`));
-            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${e.may ? ", or none" : ""}` };
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${may ? ", or none" : ""}` };
             return "paused";
           }
           hosts[me.id] = options[0]!;

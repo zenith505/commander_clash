@@ -1,7 +1,7 @@
 # Roadmap
 
-24,148 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,841 of 4,988 (97%).
+24,166 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,854 of 4,988 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -54,9 +54,14 @@ line blocks.
    damage prevented); Aminatou, the Fateshifter (−6: each player gains control of the next player's nonland permanents in
    a chosen direction); Sunken Palace (mana that copies the spell or ability it's spent on); Mathemagics ("target player draws 2ˣ cards":
    no cap yet on a draw that size, for the engine or for bots); Dream Chisel and Kadena, Slinking Sorcerer (a face-down
-   creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4). Next most played:
-   Gilgamesh, Master-at-Arms, Satsuki, the Living Lore, Gilraen, Dúnedain Protector, Rite of Harmony, Death Kiss, Grist,
-   Voracious Larva, Freya Crescent, Song of Freyalise, Angel of Suffering.
+   creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4); Ronin, Shadow
+   Stalker ("Sacrifice an Equipment attached to ~" as a cost); Combat Calligrapher ("attacks one of your opponents ...
+   that opponent"). Next most played: Phyrexian Scriptures, Garnet, Princess of Alexandria, Displaced Dinosaurs,
+   Radagast of Rhosgobel, Cartographer's Hawk, Theater of Horrors, Olórin's Searing Light, Felisa, Fang of Silverquill,
+   The Raven Man, Marshal's Anthem.
+   Smaller gaps from round 157: Angel of Suffering's prevention is always applied first, ahead of other prevention
+   shields, rather than being the player's choice of order (CR 616.1); bots choosing which Equipment Gilgamesh,
+   Master-at-Arms attaches take the one with the highest mana value.
    Smaller gaps from round 156: bots never cast a card for warp that Tannuk, Steadfast Second gives it; bots casting
    Everything Comes to Dust convoke with whatever autopay picks, not to spare their own creature types.
    Smaller gaps from round 155: bots activate Mechtitan Core only in a main phase with an empty stack, and only when the

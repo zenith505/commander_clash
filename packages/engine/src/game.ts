@@ -7355,6 +7355,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "attachWhich") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of them, or none");
+    (r.scratch ??= {}).attachWhich = choice;
+    log(s, `${p.name} chooses ${choice === "none" ? "not to attach any of them" : `to attach ${defOf(s, obj(s, choice)).name}`} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});

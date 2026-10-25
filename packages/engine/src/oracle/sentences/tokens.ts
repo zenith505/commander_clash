@@ -5,6 +5,7 @@ import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
 import { NUMX, X, amt, singularWord, isGroup, BASIC_TYPES } from "../words";
 import { parsePlayer, parseObject } from "../targets";
+import { parseSearchFilter } from "../search";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
 import { parseSentence } from "../sentence";
 import { halfX, parseCount } from "../counts";
@@ -159,6 +160,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // target player controls, create a token that's a copy of that creature" (Clone Legion): one copy of each of them.
   // "For each creature token you control that entered this turn, create a tapped and attacking token that's a copy of that
   // token" (Redoubled Stormsinger): each one attacking whom its controller chooses (CR 508.4, rulings).
+  // "For each creature card in your graveyard, create a token that's a copy of it, except it's a 1/1 black and green
+  // Insect" (Grist, the Plague Swarm): of each of those cards as it is there (CR 707.2), all at once.
+  if ((m = /^[Ff]or each ([a-z]+) card in your graveyard, create a token that's a copy of it(?:, except (.+))?$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[1]!} card`);
+    const except = m[2] ? parseCopyExcept(m[2]) : undefined;
+    if (!filter || except === null) return null;
+    return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "yourGraveyard", filter }, each: true, ...(except ? { except } : {}) }];
+  }
   if ((m = /^[Ff]or each (.+?), create a (tapped and attacking )?token that's a copy of (?:that (?:creature|permanent|artifact|token)|it)(?:, except (.+))?$/.exec(s))) {
     const what = parseObject(`each ${m[1]!}`, ctx);
     const except = m[3] ? parseCopyExcept(m[3]) : undefined;

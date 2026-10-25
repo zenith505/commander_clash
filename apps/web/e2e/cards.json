@@ -6098,6 +6098,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c9432e87-38f6-4889-8f07-ae7cd045e532",
+  "name": "Gilgamesh, Master-at-Arms",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Samurai",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Samurai"
+  ],
+  "oracleText": "Whenever Gilgamesh enters or attacks, look at the top six cards of your library. You may put any number of Equipment cards from among them onto the battlefield. Put the rest on the bottom of your library in a random order. When you put one or more Equipment onto the battlefield this way, you may attach one of them to a Samurai you control.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "696363c9-e8a7-4c65-b65c-4a94891ec43d",
   "name": "Gisa, the Hellraiser",
   "manaCost": "{3}{B}{B}",
@@ -9120,6 +9153,32 @@
    "R"
   ],
   "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ca204b66-8d0c-431a-8d34-282f7c2d17da",
+  "name": "Lightning Greaves",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature has haste and shroud. (It can't be the target of spells or abilities.)\nEquip {0}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
   "commanderLegal": "legal",
   "set": "msc",
   "releasedAt": "2026-06-26",

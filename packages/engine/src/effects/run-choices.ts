@@ -364,6 +364,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         about = { id: o.id, zc: o.zoneChanges ?? 0 };
       }
       const subject = about ?? item.subject;
+      // Gilgamesh: "When you put one or more Equipment onto the battlefield this way": only if any are there now.
+      const put = e.putThisWay ? (s.resolving!.created ?? []).flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : [])) : undefined;
+      if (put && !put.length) return;
       // "Create a Food token. When you do, ...": once for each of them created (CR 603.12a).
       const kind = e.perToken && tokenDef(e.perToken).oracleId;
       const times = kind ? (s.resolving!.created ?? []).filter((id) => s.objects[id]?.cardId === kind).length : 1;
@@ -391,6 +394,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),
         ...(e.sacrificed && s.resolving!.sacrificedThisWay ? { sacrificed: s.resolving!.sacrificedThisWay } : {}),
+        ...(put ? { putThisWay: put } : {}),
       });
       return;
     }

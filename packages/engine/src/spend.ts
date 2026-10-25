@@ -12,7 +12,7 @@ import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSp
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** Whether its total cost has {X} (CR 601.2f): its mana or alternative cost, or a kicker; unset, its mana cost. */ xCost?: boolean; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** Its activation cost has {X} (Elementalist's Palette's mana). */ xCost?: true; /** A Class's level ability (CR 716.2a): "to gain a Class level". */ classLevel?: true; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true; /** An equip ability (CR 702.6a), for "activate an equip ability" (Freya Crescent). */ equip?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
 export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
@@ -20,7 +20,7 @@ export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): 
   const anyColor = !!s && !!ab.borrowed && o.zone === "battlefield" && !!abilitiesOf(s, o).borrows?.anyColor && characteristics(s, o).hasPrintedAbilities;
   // "To gain a Class level": its level ability, "~'s level becomes N" (CR 716.2a).
   const level = ab.activateIf?.kind === "classLevel" && ab.body.effects.some((e) => e.type === "classLevel") ? { classLevel: true as const } : {};
-  const x = /\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {};
+  const x = { ...(/\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {}), ...(ab.equip ? { equip: true as const } : {}) };
   return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [], ...level, ...x, ...(anyColor ? { anyColor } : {}) } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}) };
 }
 
@@ -76,6 +76,7 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
   if (use === "other") return !!only.other;
   if ("spell" in use) return !!only.spells && printedMatches(only.spells, use.spell);
   if (only.classLevel && use.classLevel) return true;
+  if (only.equipAbilities && use.equip) return true;
   if (only.abilities === "any") return true;
   if (!only.abilities) return false;
   // "Activate abilities of artifacts": of artifact permanents (CR 109.2), so only on the battlefield. A card in

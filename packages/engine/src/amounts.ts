@@ -10,7 +10,7 @@ import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
-import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
+import { STARTING_LIFE, type Chosen, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
 import { defMv, sameName } from "./faces";
 import { creatureTypesOf, shareCreatureType } from "./game";
 import { CREATURE_TYPES } from "./keywords";
@@ -276,6 +276,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "life":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
+    case "lifeBelowStart":
+      return Math.max(0, STARTING_LIFE - (s.players[ctx.controller]?.life ?? STARTING_LIFE)); // CR 103.4: 40 in Commander (CR 903.7)
     case "experience":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.experience ?? 0), 0);
     case "rad":
@@ -703,6 +705,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":
       return "life";
+    case "lifeBelowStart":
+      return "life below starting";
     case "experience":
       return "experience counters";
     case "rad":

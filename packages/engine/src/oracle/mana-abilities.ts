@@ -290,8 +290,8 @@ function parseManaProduced(text: string): ManaProduce | null {
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };
   if (text === "one mana of ~'s last noted type") return { kind: "noted" };
-  const could = /^one mana of any (color|type) that a (land|Gate) (you control|an opponent controls) could produce$/.exec(text);
-  if (could) return { kind: "landsCouldProduce", whose: could[3] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}), ...(could[2] === "Gate" ? { subtype: "Gate" } : {}) };
+  const could = /^one mana of any (color|type) that a (land|Gate|basic land) (you control|an opponent controls) could produce$/.exec(text);
+  if (could) return { kind: "landsCouldProduce", whose: could[3] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}), ...(could[2] === "Gate" ? { subtype: "Gate" } : {}), ...(could[2] === "basic land" ? { basic: true as const } : {}) };
   // "one mana of the chosen color", "{B} or one mana of the chosen color" (chosen as it entered).
   const chosen = /^(?:(\{[WUBRGC]\}) or )?one mana of the chosen color$/.exec(text);
   if (chosen) return { kind: "chosenColor", ...(chosen[1] ? { also: sym(chosen[1])! } : {}) };
@@ -402,6 +402,8 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
       only.spells = spec;
     } else if (part === "cast spells" && !only.spells) only.spells = { kind: "spell", text: "spells" };
     else if ((part === "activate abilities" || part === "activate an ability") && !only.abilities) only.abilities = "any";
+    // "Activate an equip ability" (Freya Crescent), "activate equip abilities" (Ronin, Shadow Stalker): CR 702.6a.
+    else if ((part === "activate an equip ability" || part === "activate equip abilities") && !only.equipAbilities) only.equipAbilities = true;
     // "Activate an ability of a source of the chosen type" (Eclipsed Realms): a permanent or a card anywhere with that
     // creature type (rulings).
     else if (part === "activate an ability of a source of the chosen type" && !only.abilities) {

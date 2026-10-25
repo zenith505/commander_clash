@@ -180,6 +180,8 @@ export type Count =
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   | { kind: "life"; who: PlayerRef }
+  /** "The difference" between your starting life total and your life total when it is less (Shadow of Mortality); 0 otherwise. */
+  | { kind: "lifeBelowStart" }
   /** "The number of experience counters you have" (CR 122.1). */
   | { kind: "experience"; who: PlayerRef }
   /** "For each card type among cards discarded this way" (Kefka, Court Mage): every card discarded while this resolves. */
@@ -785,6 +787,10 @@ export type ObjRef =
   | { ref: "created" }
   /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
   | { ref: "amassed" }
+  /** "One of them" in a reflexive trigger (Gilgamesh): the permanents the ability that made it put onto the battlefield (PendingTrigger.putThisWay) that are still those objects. */
+  | { ref: "putThisWay" }
+  /** "For each creature card in your graveyard" (Grist, the Plague Swarm): the cards in the controller's graveyard that fit, by their printed characteristics (CR 404.2), as it resolves. */
+  | { ref: "yourGraveyard"; filter: TargetSpec }
   /**
    * "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). `exiledCost`: "the
    * exiled creature" for an "Exile a creature you control" cost (Food Chain), likewise. `revealedCost`: "the revealed
@@ -1524,6 +1530,8 @@ export type StaticCondition =
   | { kind: "phase"; phase: "main" | "combat"; yours?: true; first?: true }
   /** "If it's attacking the player with the most life or tied for most life" (Scourge of the Throne; dethrone's test, CR 702.105a). */
   | { kind: "attackingMostLife" }
+  /** "While you have the most life or are tied for most life" (Preacher of the Schism). */
+  | { kind: "youMostLife" }
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   | { kind: "castAnother" }
   /**
@@ -1998,14 +2006,14 @@ export type Effect =
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
    * 603.7). `thenExile`: "then exile them again", the new objects (CR 400.7) held in their place.
    */
-  | { type: "returnHeld"; under: "owner" | "you"; at?: "nextEndStep"; thenExile?: true }
+  | { type: "returnHeld"; under: "owner" | "you"; at?: "nextEndStep"; thenExile?: true; /** "With a vigilance counter and a lifelink counter on it" (Gilraen): each enters with one of each (CR 122.6). */ counters?: CounterKind[] }
   /** "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice." (Liliana of the Veil, CR 700.3). */
   | { type: "permanentPiles"; who: PlayerRef }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
   | { type: "blockLimitThisCombat"; who: PlayerRef; n: number }
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** One of each of these as well (Gilraen). */ counters?: CounterKind[]; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -2392,7 +2400,7 @@ export type Effect =
    * it resolves, not targeted (CR 608.2d), among those it could be attached to (CR 701.3a-b, 301.5c). `equipmentOnly`:
    * nothing happens unless it's an Equipment; `may`: attaching it to none is a choice too.
    */
-  | { type: "attachToChosen"; source: ObjRef; filter: TargetSpec; may?: true; equipmentOnly?: true }
+  | { type: "attachToChosen"; source: ObjRef; filter: TargetSpec; may?: true; equipmentOnly?: true; /** "Attach one of them" (Gilgamesh): with more than one of `source`, which one is chosen first (with `may`, or none). */ pickOne?: true }
   /**
    * "Exile them, then meld them into [the combined back face]" (CR 701.42): ~ and a permanent of this card type named its
    * counterpart, if you both own and control them (and both are attacking, `attacking`: then it enters tapped and
@@ -2833,7 +2841,7 @@ export type Effect =
    * permanent a card put onto the battlefield became (Back for More); `target`, that target, and with `attached` only if
    * the token just created was attached to it (Curse of the Werefox). With no such object, it doesn't trigger (rulings).
    */
-  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
@@ -3959,11 +3967,13 @@ export interface TriggeredAbility {
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
   /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
-  ifFromGraveyard?: "any" | "yours";
+  ifFromGraveyard?: "any" | "yours" | /** "If it entered from your graveyard or you cast it from your graveyard". */ "yoursOrCast";
   /** "When ~ enters from your hand" (Thousand-Faced Shadow): it came from its owner's hand (CR 603.6a). */
   ifFromHand?: true;
   /** "When ~ enters untapped" (Mystic Sanctuary): only if it entered untapped, part of the trigger event. */
   ifEnteredUntapped?: true;
+  /** "Whenever a player attacks one or more of your opponents" (Jolene): once for the declaration, not once for each opponent attacked. */
+  anyOpponent?: true;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
   ifCast?: true;
   /**
@@ -4185,7 +4195,7 @@ export type ManaProduce =
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
    */
-  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean; /** "That a Gate you control could produce" (Gond Gate). */ subtype?: string; /** "Add three mana of that type instead" (Incubation Druid). */ n?: number }
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean; /** "That a Gate you control could produce" (Gond Gate). */ subtype?: string; /** "That a basic land you control could produce" (Star Compass). */ basic?: true; /** "Add three mana of that type instead" (Incubation Druid). */ n?: number }
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
   | { kind: "combos"; options: ManaType[][] }
   /**
@@ -4358,6 +4368,8 @@ export interface ManaSpend {
   uncounterable?: true;
   /** "Or to gain a Class level" (Sorcerer Class): a Class's level ability, which makes it gain a level (CR 716.2a). */
   classLevel?: true;
+  /** "Or activate an equip ability" (Freya Crescent): any equip ability (CR 702.6a), whatever its source. */
+  equipAbilities?: true;
   /** "This mana can't be spent to pay generic mana costs" (Jegantha): spent on anything, but only on colored, hybrid or Phyrexian symbols' colored mana. */
   notGeneric?: true;
   /**
@@ -4804,6 +4816,8 @@ export interface CompiledCard {
   betrayer?: true;
   /** The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards." (CR 615.5) */
   damageToOpponentsMills?: true;
+  /** Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards" (CR 615.5, 615.12). */
+  damageToYouMillsTwice?: true;
   /**
    * "All damage that would be dealt to you is dealt to enchanted creature instead" (Pariah, CR 614.9): `to` is where it
    * goes (this permanent, or the creature it's attached to); `others`: "you and other permanents you control" (Palisade

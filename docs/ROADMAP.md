@@ -1,7 +1,7 @@
 # Roadmap
 
-24,077 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,795 of 4,988 (96%).
+24,089 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,804 of 4,988 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,7 +22,7 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 152, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 153, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
    spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
    batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
@@ -48,9 +48,15 @@ line blocks.
    Deeproot Pilgrimage ("one or more nontoken Merfolk you control become tapped": taps at the same time aren't one
    event yet); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
    last known power on a leaves trigger of its own); Aang's Journey (kicked: one search for a basic land card and a
-   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"). Next most played: Birthing Ritual,
-   Swashbuckler Extraordinaire, Senu, Keen-Eyed Protector, You Find Some Prisoners, Luck Bobblehead, Rundvelt
-   Hordemaster.
+   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"). Next most played: Ajani, Nacatl
+   Pariah, Ob Nixilis, Captive Kingpin, Liliana, Heretical Healer, Kaya, Geist Hunter, Coiling Rebirth, Descendants'
+   Fury, Yorion, Sky Nomad.
+   Smaller gaps from round 153: Urabrask's "the next time they would draw a card this turn, instead they exile the top
+   card" applies before that player's other replacement effects for the draw, without asking them the order (CR 616.1);
+   bots pick Teferi, Who Slows the Sunset's +1 targets by the usual scoring; bots sacrifice Swashbuckler Extraordinaire's
+   Treasures by a simple rule (token Treasures only, one for each attacker with power 2 or more and no double strike);
+   bots send Senu, Keen-Eyed Protector at the first player offered; Agility, Endurance and Perception Bobblehead are
+   still out (a line each); Vance's Blasting Cannons still lacks its "third spell" transform line.
    Smaller gaps from round 152: bots never use Luxior's "Equip planeswalker"; bots get Tato Farmer's rad counters only
    with 20 or more cards in the library and 12 or more life; bots discard their hand to draw (Knollspine Dragon, Clive)
    only when it draws more cards than they hold; Phyrexian Vindicator's reflexive trigger still doesn't happen for
@@ -146,7 +152,7 @@ line blocks.
    and Glorious Protector ask what to exile even when they've already left the battlefield (nothing is exiled then); bots
    give Xantcha and Captive Audience to the opponent with the least life; goading is handled as a layer 6 effect, so
    "goaded creatures" (Bothersome Quasit) waits on the goad as a dependency (CR 613.8). Smaller gaps from round 123:
-   "unless you waterbend" (Waterbending Lesson), waterbend {X} costs, "whenever you waterbend" (Avatar Aang), Watery Grasp
+   waterbend {X} costs, "whenever you waterbend" (Avatar Aang), Watery Grasp
    and Aang's Iceberg (other lines) are out; you don't pick what waterbend taps: autopay pays mana first, then taps what
    makes no mana, noncreatures, then the smallest creatures (as for improvise), for ward—waterbend and spells too; bots
    don't waterbend with creatures that could still attack this turn; a draw an opponent's Notion Thief replaces isn't

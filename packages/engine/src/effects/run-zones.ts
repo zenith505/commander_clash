@@ -1908,6 +1908,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
       // Unfinished Business: the creature the instruction before returned, while it's still on the battlefield.
       const returned = e.attachToCreated ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield" && objIsType(s, o, "Creature")) : undefined;
+      // "Put it onto the battlefield attacking" (Senu): only during combat, attacking what its controller chooses as it
+      // enters (CR 508.4, rulings); outside combat it just enters (CR 506.3d).
+      const attackOptions = e.attacking && inCombat(s) && entering.some((o) => isType(defOf(s, o), "Creature")) ? attackChoices(s, ctx.controller, ctx.sourceId) : [];
+      const sc = (s.resolving!.scratch ??= {});
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, entering.find((o) => isType(defOf(s, o), "Creature"))!).name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted || e.attachToCreated ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
@@ -1993,8 +2002,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${d.name} has nothing to enchant, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
             continue;
           }
-          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? (e.flipped ? " flipped" : " and transformed") : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          const attacks = attack !== undefined && isType(d, "Creature");
+          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? (e.flipped ? " flipped" : " and transformed") : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${attacks ? ` and attacking ${attack!.label}` : ""}.`);
           moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? { entersAs: e.entersAs.mods } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          // Attacking as it enters, before its enters abilities trigger (CR 508.4).
+          if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
+            o.attacking = attack!.player;
+            if (attack!.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack!.planeswalker);
+          }
           // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
@@ -2705,7 +2720,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
           for (const id of ids) moveObject(s, id, "exile");
           sc.impulseChoice = { ids };
-          if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
+          if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library.`);
           if (ids.length > 1) {
             s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose one of them; you may play it${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of your next turn" : ""}` };
             return "paused";
@@ -2716,9 +2731,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const id = st.pick ?? st.ids[0];
         const o = id ? s.objects[id] : undefined;
         if (!o || o.zone !== "exile") return;
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) };
         if (s.resolving) (s.resolving.impulsed ??= []).push(o.id);
-        log(s, `${p.name} chooses ${defOf(s, o).name} and may play it${e.until === "thisTurn" ? " this turn" : ""}.`);
+        log(s, `${p.name} chooses ${defOf(s, o).name} and may play it${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : ""}.`);
         return;
       }
       const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));

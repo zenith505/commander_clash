@@ -362,6 +362,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   let hosting: GameObject | null = null;
   // While set, `add` is looking at the abilities of a card in a graveyard that work there (CR 113.6m).
   let fromYard = false;
+  let fromExile = false;
   // Torpor Orb: while set, the controllers whose abilities the event can't trigger.
   let locked: ((controller: PlayerId) => boolean) | null = null;
   // While set, what the event is for "triggers an additional time" (Panharmonicon, Teysa Karlov, Isshin; CR 603.2d) and
@@ -395,7 +396,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     triggers.forEach((t, index) => {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
       if (hosting ? !t.host : t.host === "attached") return;
-      if ((t.zone === "graveyard") !== fromYard) return;
+      if ((t.zone === "graveyard") !== fromYard || (t.zone === "exile") !== fromExile) return;
       // In the command zone, only an eminence ability works (CR 113.6).
       if (o.zone === "command" && !o.emblem && !t.eminence && !triggersIn) return;
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
@@ -435,7 +436,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         s.triggerQueue.push(queued);
         // "That ability triggers an additional time" (CR 603.2d): only a permanent's (or one leaving's) own abilities.
         // Not delayed triggered abilities (CR 603.2d).
-        const again = !fromYard && !floating ? triggersAgain(s, o, controller, causedBy) : 0;
+        const again = !fromYard && !fromExile && !floating ? triggersAgain(s, o, controller, causedBy) : 0;
         attackCaused(queued);
         entersCaused(queued);
         for (let n = again; n > 0; n--) {
@@ -454,7 +455,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
    * trigger goes on the stack just above that ability (rulings), which becomes its `cause` once it's there.
    */
   const attackCaused = (q: PendingTrigger) => {
-    if (fromYard || floating || hosting || causedBy?.event !== "attacks" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
+    if (fromYard || fromExile || floating || hosting || causedBy?.event !== "attacks" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
     const creature = s.objects[q.sourceId];
     if (creature?.zone !== "battlefield" || !objIsType(s, creature, "Creature") || controllerOf(s, creature) !== q.controller) return;
     for (const id of s.battlefield) {
@@ -476,7 +477,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
    * ability (rulings), which becomes its `cause` once it's there.
    */
   const entersCaused = (q: PendingTrigger) => {
-    if (fromYard || floating || hosting || causedBy?.event !== "enters" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
+    if (fromYard || fromExile || floating || hosting || causedBy?.event !== "enters" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
     const creature = s.objects[q.sourceId];
     if (creature?.zone !== "battlefield" || !objIsType(s, creature, "Creature")) return;
     const owner = controllerOf(s, creature);
@@ -524,6 +525,25 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           f(o, pid);
         } finally {
           fromYard = false;
+        }
+      }
+    }
+  };
+  /**
+   * The face-up cards in exile with abilities that work there ("if this card is exiled", CR 113.6k), each with its
+   * owner, who controls those abilities (CR 113.8); `f` adds the ones that trigger.
+   */
+  const fromExiled = (f: (o: GameObject, owner: PlayerId) => void) => {
+    for (const pid of s.turnOrder) {
+      if (player(s, pid).lost) continue;
+      for (const id of player(s, pid).exile) {
+        const o = obj(s, id);
+        if (o.faceDown || o.owner !== pid || !compileCard(defOf(s, o)).triggers.some((t) => t.zone === "exile")) continue;
+        fromExile = true;
+        try {
+          f(o, pid);
+        } finally {
+          fromExile = false;
         }
       }
     }
@@ -804,6 +824,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
       // "Whenever ~ attacks and isn't blocked": no creature was declared to block it (rulings).
       if (o.attacking !== undefined && !o.blockedBy) {
+        // Senu: "When a legendary creature you control attacks and isn't blocked, if this card is exiled": only a card
+        // already in exile as blockers are declared (rulings), once for each such creature.
+        fromExiled((w, owner) => owner === you && add(w, owner, (e, t) => e === "creatureYouControlAttacksUnblocked" && !!t.attacker && objectMatches(s, t.attacker.filter, o, owner, false), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking }));
         add(o, you, (e, t) => e === "selfAttacksUnblocked" && (!t.attacksPlayer || !o.attackingPermanent), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
       }

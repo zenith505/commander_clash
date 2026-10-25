@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, objectMatches, printedMatches, sayBound } from "./targeting";
+import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
@@ -28,6 +28,16 @@ function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "nextDrawExile":
+      // Urabrask, Heretic Praetor: a replacement effect for that player's next draw this turn (CR 614.1a), used up by the
+      // draw it replaces (see draw in game.ts).
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        if (p.lost) continue;
+        (p.nextDrawExiles ??= []).push({ turn: s.turn, source: src });
+        log(s, `The next time ${p.name} would draw a card this turn, they exile the top card of their library instead and may play it this turn (${src}).`);
+      }
+      return;
     case "revealUntilLandToGraveyard":
       // Consuming Aberration: each one reveals until a land card, then puts all of them, that one too, into their
       // graveyard; with no land card, the whole library (rulings). Revealing, not milling (CR 701.20a, 701.17a).
@@ -1119,9 +1129,44 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       if (from === undefined || player(s, from).lost) return;
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      if (!sc.looked) {
-        sc.looked = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
-        if (!sc.looked.length) return;
+      if (!sc.looked || (e.sacrificeFirst && !sc.digSacrificed)) {
+        if (!sc.looked) {
+          sc.looked = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
+          if (!sc.looked.length && !e.sacrificeFirst) return;
+          if (e.sacrificeFirst) log(s, `${p.name} looks at the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library.`);
+        }
+        // Birthing Ritual: "Then you may sacrifice a creature. If you do, you may put a creature card with mana value X or
+        // less from among those cards onto the battlefield": knowing the cards (CR 608.2c), even with none to look at.
+        if (e.sacrificeFirst && !sc.digSacrificed) {
+          if (sc.queue?.length === 0 && sc.chosen) {
+            for (const id of sc.chosen[pid] ?? []) {
+              const o = s.objects[id];
+              if (o?.zone !== "battlefield") continue;
+              const ch = characteristics(s, o);
+              log(s, `${p.name} sacrifices ${defOf(s, o).name}.`);
+              // As it last existed (CR 608.2h): "1 plus the sacrificed creature's mana value".
+              (r.sacrificedThisWay ??= []).push({ id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types], subtypes: [...ch.subtypes] });
+              moveObject(s, id, "graveyard", { sacrificed: true });
+            }
+            sc.queue = sc.chosen = undefined;
+            sc.digSacrificed = true;
+          } else {
+            const can = pickOptions(s, { filter: e.sacrificeFirst, action: "sacrifice" }, pid, ctx.sourceId, ctx.sourceZc);
+            if (!can.length) sc.digSacrificed = true;
+            else {
+              sc.queue = [pid];
+              sc.chosen = {};
+              s.pending = { kind: "pickPermanents", player: pid, source: src, action: "sacrifice", what: e.sacrificeFirst.text, options: can, count: 1, min: 0, looked: [...sc.looked], prompt: `you may sacrifice ${/^[aeiou]/i.test(e.sacrificeFirst.text) ? "an" : "a"} ${e.sacrificeFirst.text}; if you do, you may put ${/^[aeiou]/i.test(e.filter?.text ?? "") ? "an" : "a"} ${(e.filter?.text ?? "card").replace(/ X or less$/, " up to 1 more than its mana value")} from among the cards you looked at onto the battlefield` };
+              return "paused";
+            }
+          }
+          if (!sc.looked.length) return;
+          if (!r.sacrificedThisWay?.length) {
+            // Not sacrificed: nothing is put onto the battlefield; the rest still go to the bottom.
+            sc.found = [];
+            return dig(s, e, ctx, src, pid);
+          }
+        }
         // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or an amount counted now
         // (TargetSpec.bound: Hatchery Spider's "where X is the number of creature cards in your graveyard").
         // "Of the chosen type" (Icon of Ancestry): the choice made as the permanent entered; none chosen, none matches.
@@ -1134,7 +1179,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const count = e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.countIfYard?.has.every(yardHas) ? e.countIfYard.count : e.count;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
-        log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
+        if (!e.sacrificeFirst) log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.

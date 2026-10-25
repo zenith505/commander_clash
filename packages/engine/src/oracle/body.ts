@@ -1321,6 +1321,52 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // Swashbuckler Extraordinaire: "you may sacrifice one or more Treasures. When you do, up to that many target creatures
+    // gain double strike until end of turn." Any number, none too; the reflexive trigger (CR 603.12) has up to as many
+    // targets as were sacrificed, chosen as it's put on the stack.
+    const sacMany = /^[Yy]ou may sacrifice one or more ([A-Z][a-z]+s)$/.exec(s);
+    const sacWhen = sacMany && /^When you do, up to (?:that many|X) (target .+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (sacMany && sacWhen) {
+      const filter = parseTargetPhrase(`${sacMany[1]!.replace(/s$/, "")} you control`);
+      const reflexive = filter?.kind === "object" ? reflexiveBody(`up to X ${sacWhen[1]}`, ctx, false, false, true) : null;
+      if (!reflexive || filter?.kind !== "object") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, text: sacMany[1]!.replace(/s$/, "") }, n: 99, action: "sacrifice", anyNumber: true });
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, xSacrificed: true }] });
+      si++;
+      continue;
+    }
+    // Teferi, Who Slows the Sunset: "Choose up to one target artifact, up to one target creature, and up to one target
+    // land. Untap the chosen permanents you control. Tap the chosen permanents you don't control." Each target by who
+    // controls it as this resolves; an illegal one is left alone (rulings).
+    const chooseUpTo = /^Choose (up to one target [a-z]+(?:, up to one target [a-z]+)*,? and up to one target [a-z]+)$/.exec(s);
+    if (chooseUpTo && sentences[si + 1]?.replace(/\.$/, "") === "Untap the chosen permanents you control" && sentences[si + 2]?.replace(/\.$/, "") === "Tap the chosen permanents you don't control") {
+      const before = ctx.targets.length;
+      const untaps = parseOne(`Untap ${chooseUpTo[1]}`, ctx);
+      if (!untaps || untaps.length !== ctx.targets.length - before || untaps.some((e) => e.type !== "untap" || e.what.ref !== "target")) return null;
+      for (const e of untaps) {
+        if (e.type !== "untap" || e.what.ref !== "target") return null;
+        effects.push({ type: "if", cond: { kind: "targetWasYours", index: e.what.index }, effects: [e], otherwise: [{ type: "tap", what: e.what }] });
+      }
+      si += 2;
+      continue;
+    }
+    // Urabrask, Heretic Praetor, at the beginning of each opponent's upkeep: "the next time they would draw a card this
+    // turn, instead they exile the top card of their library. They may play it this turn." That player's next draw.
+    if (ctx.eventPlayer && /^[Tt]he next time (?:they|that player) would draw a card this turn, instead they exile the top card of their library$/.test(s) && /^They may play (?:it|that card) this turn$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "nextDrawExile", who: { ref: "eventPlayer" } });
+      si++;
+      continue;
+    }
+    // Luck Bobblehead: "If you rolled 6 exactly seven times, you win the game." The dice of this ability's roll only, an
+    // ignored roll not counting (rulings, CR 706.6).
+    const rolledN = effects.some((e) => e.type === "roll" && !e.eachPlayer && !e.chooseOne) ? new RegExp(`^If you rolled (\\d+) exactly ${NUM} times, (.+)$`).exec(s) : null;
+    if (rolledN) {
+      const inner = parseOne(capital(rolledN[3]!), ctx);
+      if (!inner) return null;
+      const n = num(rolledN[2]!);
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "rollEquals", value: Number(rolledN[1]) } }, min: n, max: n }, effects: inner });
+      continue;
+    }
     // Vivien, Champion of the Wilds: "Look at the top three cards of your library. Exile one face down and put the rest on
     // the bottom of your library in any order. For as long as it remains exiled, you may cast it if it's a creature
     // spell." One must be exiled, creature or not; it may be looked at while exiled (rulings).
@@ -2180,10 +2226,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Tectonic Giant: "Exile the top two cards of your library. Choose one of them. Until the end of your next turn, you may
     // play that card." The same, the card chosen as it resolves (rulings).
-    const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top (${NUM}) cards of your library$`).exec(s);
-    const playChosen = exChoose2 && /^Choose one of them\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))\.?$/.exec(sentences[si + 2] ?? "") : null;
+    // You Find Some Prisoners: "Exile the top three cards of target opponent's library. Choose one of them. Until the end
+    // of your next turn, you may play that card, and you may spend mana as though it were mana of any color to cast it."
+    // The same from that library, a spell cast with mana of any type (CR 609.4b); the rest stay exiled (rulings).
+    const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top ${NUM} cards of (your|target opponent's) library$`).exec(s);
+    const playChosen = exChoose2 && /^Choose one of them\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))(, and you may spend mana as though it were mana of any color to cast it)?\.?$/.exec(sentences[si + 2] ?? "") : null;
     if (exChoose2 && playChosen) {
-      effects.push({ type: "impulse", n: amt(exChoose2[1]!), until: /next turn/.test(playChosen[0]) ? "nextTurn" : "thisTurn", choose: true });
+      const who = exChoose2[2] === "your" ? undefined : parsePlayer("target opponent", ctx);
+      if (who === null) return null;
+      effects.push({ type: "impulse", n: amt(exChoose2[1]!), until: /next turn/.test(playChosen[0]) ? "nextTurn" : "thisTurn", choose: true, ...(who ? { who } : {}), ...(playChosen[3] ? { anyType: true as const } : {}) });
       si += 2;
       continue;
     }
@@ -2327,6 +2378,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
+    // Rundvelt Hordemaster: "Exile the top card of your library. If it's a Goblin creature card, you may cast that card
+    // until the end of your next turn." Vance's Blasting Cannons: "If it's a nonland card, you may cast that card this
+    // turn." The card as it is in exile, face up (CR 406.3); only a card like that gets the permission.
+    const castIfIs = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If it's an? (.+? card), you may cast (?:that card|it) (this turn|until the end of your next turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (castIfIs) {
+      const castFilter = parseSearchFilter(castIfIs[1]!);
+      if (!castFilter) return null;
+      effects.push({ type: "impulse", n: 1, until: castIfIs[2] === "this turn" ? "thisTurn" : "nextTurn", castOnly: true, castFilter });
+      si++;
+      continue;
+    }
     // Neyali, Suns' Vanguard: "During any turn you attacked with a token, you may play that card." For as long as it stays
     // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
     if (exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you attacked with a token, you may play that card") {
@@ -3438,6 +3500,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Stargaze: "Look at twice X cards from the top of your library" (the X it was cast with).
     if (!dig && ctx.spell && /^Look at twice X cards from the top of your library$/.test(s)) {
       dig = { type: "dig", n: { ...X, times: 2 }, reveal: false };
+      continue;
+    }
+    // Birthing Ritual: "look at the top seven cards of your library. Then you may sacrifice a creature. If you do, you may
+    // put a creature card with mana value X or less from among those cards onto the battlefield, where X is 1 plus the
+    // sacrificed creature's mana value. Put the rest on the bottom of your library in a random order." The sacrifice is
+    // chosen knowing the cards; its mana value as it last existed (rulings); the rest go to the bottom either way.
+    const lookSac: RegExpExecArray | null = dig ? null : new RegExp(`^[Ll]ook at the top ${NUM} cards of your library$`).exec(s);
+    const sacThen: RegExpExecArray | null = lookSac && /^Then you may sacrifice an? (creature|artifact)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const sacPut: RegExpExecArray | null = sacThen && /^If you do, you may put (an? .+?) with mana value X or less from among those cards onto the battlefield, where X is (.+)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "");
+    if (lookSac && sacThen && sacPut) {
+      const def = parseCount(sacPut[2]!, ctx);
+      if (!def) return null;
+      dig = { type: "dig", n: num(lookSac[1]!), reveal: false, sacrificeFirst: { kind: "object", types: [capital(sacThen[1]!)], notTypes: [], notColors: [], controller: "you", text: sacThen[1]! } };
+      digWhere = def;
+      sentences.splice(si + 1, 2, `You may put ${sacPut[1]} with mana value X or less from among them onto the battlefield`);
       continue;
     }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
@@ -6361,7 +6438,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
-    if (o.type === "reflexive" && o.xExcess) return false;
+    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed)) return false;
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;

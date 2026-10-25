@@ -1120,7 +1120,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|, )[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+)\. (Creatures you control) gain that ability until end of turn\.$/, (_, pre: string, opts: string, who: string) => `${pre}${pre ? who.toLowerCase() : who} gain your choice of ${opts} until end of turn.`);
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
-  text = text.replace(/(^|\. )Create a token that's a copy of an? (permanent|creature|artifact) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
+  text = text.replace(/(^|\. )[Cc]reate a token that's a copy of an? (permanent|creature|artifact|non-Saga token) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
+  // "Whenever you cast a noncreature spell this turn, ..." (Summon: Good King Mog XII): a delayed triggered ability for
+  // the rest of the turn (CR 603.7c), the same as "Until end of turn, whenever you cast a noncreature spell, ...".
+  text = text.replace(/^Whenever you cast an? (noncreature|creature|instant or sorcery) spell this turn, /, "Until end of turn, whenever you cast a $1 spell, ");
   // "You may create a token that's a copy of a nonlegendary enchantment you control" (Calix, Guided by Fate): choosing
   // one is creating it, so "you may choose ... If you do, create a token that's a copy of it."
   text = text.replace(/(^|\. )([Yy]ou may) create a token that's a copy of an? ((?:nonlegendary )?(?:permanent|creature|artifact|enchantment)) you control\./g, "$1$2 choose a $3 you control. If you do, create a token that's a copy of it.");

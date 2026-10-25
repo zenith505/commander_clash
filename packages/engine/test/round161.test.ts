@@ -447,3 +447,41 @@ describe("Faerie Artisans", () => {
     expect(tokens()).toContain(second);
   });
 });
+
+const mog = card("Summon: Good King Mog XII", "Enchantment Creature — Saga Moogle", "{4}{W}", { cmc: 5, power: "4", toughness: "4", keywords: ["Flying", "Lifelink"], oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI — Create two 1/2 white Moogle creature tokens with lifelink.\nII, III — Whenever you cast a noncreature spell this turn, create a token that's a copy of a non-Saga token you control.\nIV — Put two +1/+1 counters on each other Moogle you control.\nFlying, lifelink" });
+
+describe("Summon: Good King Mog XII", () => {
+  it("is fully supported", () => supported(mog));
+
+  it("chapter II: this turn, each noncreature spell you cast copies a non-Saga token you control, chosen as it resolves", () => {
+    const { s: s0, ap } = setup([]);
+    const m = putOnBattlefield(s0, ap, mog);
+    s0.objects[m]!.counters = { lore: 1 };
+    const moogle = putOnBattlefield(s0, ap, card("Moogle Token", "Token Creature — Moogle", "", { power: "1", toughness: "2", keywords: ["Lifelink"], oracleText: "Lifelink" }));
+    s0.objects[moogle]!.isToken = true;
+    const rockToken = putOnBattlefield(s0, ap, card("Treasure Token", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." }));
+    s0.objects[rockToken]!.isToken = true;
+    let s = passUntil(passUntil(s0, "end", ap), "main1", ap);
+    s = resolveAll(s);
+    expect(s.objects[m]!.counters?.lore).toBe(2);
+    const named = (n: string) => s.battlefield.filter((id) => s.objects[id]!.isToken && nameOf(s, id) === n).length;
+    const d = into(s, ap, divination, "hand");
+    s = run(s, planCast(s, ap, d));
+    for (let i = 0; i < 10 && !s.pending && s.triggerQueue.length + s.stack.length > 1; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ player: ap });
+    expect(JSON.stringify(s.pending)).toContain(moogle);
+    expect(JSON.stringify(s.pending)).not.toContain(m);
+    expect(botActions(s, ap).length).toBeGreaterThan(0);
+    s = act(s, s.pending!.kind === "pickPermanents" ? { type: "pickPermanents", player: ap, ids: [moogle] } : { type: "chooseOption", player: ap, choice: moogle });
+    s = resolveAll(s);
+    expect(named("Moogle Token")).toBe(2);
+    // A creature spell doesn't trigger it.
+    const b = into(s, ap, bear(), "hand");
+    s = resolveAll(run(s, planCast(s, ap, b)));
+    expect(named("Moogle Token")).toBe(2);
+    // It lasts until the turn ends (CR 603.7c).
+    expect(s.floatingTriggers?.some((t) => t.sourceId === m)).toBe(true);
+    s = passUntil(passUntil(s, "end", ap), "upkeep", next(s, ap));
+    expect(s.floatingTriggers?.some((t) => t.sourceId === m) ?? false).toBe(false);
+  });
+});

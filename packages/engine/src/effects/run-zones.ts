@@ -2228,6 +2228,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...hosts.get(id) })));
         return;
       }
+      if (e.dest === "castThisTurn") {
+        // Mission Briefing: a permission for that card only (CR 400.7), until the turn ends, at its normal timing (rulings).
+        for (const id of found) {
+          const o = obj(s, id);
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true, ...(e.exileAfter ? { exileAfter: true as const } : {}) };
+          log(s, `${p.name} chooses ${defOf(s, o).name} in their graveyard and may cast it this turn.`);
+        }
+        return;
+      }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));

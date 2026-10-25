@@ -3085,6 +3085,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Mission Briefing: "choose an instant or sorcery card in your graveyard. You may cast it this turn. If that spell would
+    // be put into your graveyard, exile it instead." Chosen as it resolves, not targeted (a card just surveilled there
+    // too, never this spell, still on the stack: rulings); then a permission at its normal timing (rulings).
+    const briefing = /^[Cc]hoose an? (instant or sorcery card|instant card|sorcery card) in your graveyard$/.exec(s);
+    if (briefing && /^You may cast it this turn$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(briefing[1]!);
+      if (!filter) return null;
+      const rider = sentences[si + 2]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead";
+      effects.push({ type: "chooseFromGraveyard", n: 1, filter, dest: "castThisTurn", ...(rider ? { exileAfter: true as const } : {}) });
+      si += rider ? 2 : 1;
+      continue;
+    }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
     // counter on it" (Cauldron's Gift): one choice and one move, nothing in between (rulings), and not targeted.
     const yardPick = /^You may choose an? (.+? card) in your graveyard$/.exec(s);

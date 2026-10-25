@@ -507,3 +507,42 @@ describe("Combat Calligrapher", () => {
     expect(ink.attacking).toBe(b);
   });
 });
+
+const briefing = card("Mission Briefing", "Instant", "{U}{U}", { cmc: 2, keywords: ["Surveil"], oracleText: "Surveil 2, then choose an instant or sorcery card in your graveyard. You may cast it this turn. If that spell would be put into your graveyard, exile it instead. (To surveil 2, look at the top two cards of your library, then put any number of them into your graveyard and the rest on top of your library in any order.)" });
+
+describe("Mission Briefing", () => {
+  it("is fully supported", () => supported(briefing));
+
+  it("surveils, then you choose an instant or sorcery card in your graveyard to cast this turn; it's exiled afterwards", () => {
+    const { s: s0, ap, ids } = setup([briefing]);
+    const d = into(s0, ap, divination, "graveyard");
+    const land = into(s0, ap, islandCard, "graveyard");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && s.pending?.kind !== "searchLibrary"; i++) s = s.pending ? act(s, botActions(s, ap)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, fromGraveyard: "castThisTurn", min: 1, max: 1 });
+    const cards = s.pending!.kind === "searchLibrary" ? s.pending.cards : [];
+    expect(cards).toContain(d);
+    expect(cards).not.toContain(land);
+    // Mission Briefing itself is still on the stack (rulings).
+    expect(cards).not.toContain(ids[0]);
+    expect(botActions(s, ap).length).toBe(1);
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [d] }));
+    expect(zone(s, d)).toBe("graveyard");
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+    const hand = s.players[ap]!.hand.length;
+    s = resolveAll(run(s, planCast(s, ap, d, undefined, undefined, undefined, undefined, { via: "permission" })));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(zone(s, d)).toBe("exile");
+  });
+
+  it("the permission ends with the turn", () => {
+    const { s: s0, ap, ids } = setup([briefing]);
+    const d = into(s0, ap, divination, "graveyard");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && s.pending?.kind !== "searchLibrary"; i++) s = s.pending ? act(s, botActions(s, ap)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [d] }));
+    expect(planCast(s, ap, d, undefined, undefined, undefined, undefined, { via: "permission" })).not.toBeNull();
+    s = passUntil(passUntil(s, "end", ap), "main1", ap);
+    expect(planCast(s, ap, d, undefined, undefined, undefined, undefined, { via: "permission" })).toBeNull();
+  });
+});

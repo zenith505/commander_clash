@@ -16,6 +16,8 @@ function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source
     const o = s.objects[id]!;
     for (const mod of abilitiesOf(s, o).countMods ?? []) out.push({ mod, controller: controllerOf(s, o), source: id });
   }
+  // Kaya, Geist Hunter: those a resolved ability made for this turn.
+  for (const x of s.turnCountMods ?? []) if (x.turn === s.turn) out.push({ mod: x.mod, controller: x.controller, source: x.source });
   return out;
 }
 

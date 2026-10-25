@@ -173,11 +173,16 @@ const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "attac
 function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null | undefined {
   // "Choose target creature you control. Whenever that creature deals combat damage to a player or planeswalker this
   // turn, draw that many cards." (Hunter's Insight): a delayed trigger about that creature (CR 603.7b-c), this turn.
-  const that = ctx?.lastObjectTarget !== undefined ? /^Whenever (?:that creature|it) (deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s) : null;
+  // Stensian Sanguinist: "Whenever you attack, target creature gains deathtouch until end of turn. Whenever that creature
+  // deals combat damage to a player this combat, this creature becomes prepared": until this combat ends, "this creature"
+  // being the source of the ability that made it (CR 603.7d).
+  const that = ctx?.lastObjectTarget !== undefined ? /^Whenever (?:that creature|it) (deals combat damage to a player(?: or planeswalker)?) this (turn|combat), (.+)$/.exec(s) : null;
   if (that) {
-    const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${[that[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    const rest = [that[3]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
+    if (that[2] === "combat" && !/^(?:this creature|~) becomes prepared$/.test(rest)) return null;
+    const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${rest}.`);
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
-    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
+    return { type: "floatingTrigger", trigger, until: that[2] === "combat" ? "endOfCombat" : "endOfTurn", about: ctx!.lastObjectTarget! };
   }
   // "Choose target opponent. Whenever a creature you control deals combat damage to that player this turn, create a tapped
   // Treasure token." (Great Train Heist): a delayed trigger this turn, only for combat damage to that player.
@@ -851,6 +856,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\bif you control an? ((?:white|blue|black|red|green) (?:permanent|creature)) other than ~\./g, "if you control another $1.");
   // Ral, Monsoon Mage: "If you win the flip, you may exile ~. If you do, return ~ to the battlefield transformed under ~'s
   // owner's control": one choice, exiling it and returning it (a blink, CR 712.14a); if it's gone by then, nothing happens.
+  // Pyre of Heroes: "Search your library for a creature card .... Put that card onto the battlefield, then shuffle." is
+  // the one instruction "search ..., put that card onto the battlefield, then shuffle".
+  text = text.replace(/\b(Search your library for an? [^.,]+? card [^.,]+)\. Put that card onto the battlefield, then shuffle\./g, "$1, put that card onto the battlefield, then shuffle.");
+  // Kaya, Geist Hunter: "Exile all cards from all graveyards" is exiling all graveyards.
+  text = text.replace(/\b([Ee])xile all cards from all graveyards\b/g, "$1xile all graveyards");
   // Sorin of House Markov: "exile ~, then return ~ to the battlefield transformed under ~'s owner's control" ("him").
   text = text.replace(/\bexile ~, then return ~ to the battlefield transformed under ~'s owner's control\b/g, "exile ~, then return it to the battlefield transformed under its owner's control");
   text = text.replace(/If you win the flip, you may exile ~\. If you do, return ~ to the battlefield transformed under (?:its|~'s) owner's control\./, "If you win the flip, you may exile ~, then return it to the battlefield transformed under its owner's control.");
@@ -1357,6 +1367,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Call the Spirit Dragons: "For each color, put a +1/+1 counter on a Dragon you control of that color. If you put +1/+1
+    // counters on five Dragons this way, you win the game." One Dragon chosen for each color in turn as it resolves, not
+    // targeted; a Dragon of two colors can be chosen for each (rulings); it wins only with five different Dragons.
+    const perColor = /^[Ff]or each color, put a \+1\/\+1 counter on a ([A-Z][a-z]+) you control of that color$/.exec(s);
+    if (perColor && CREATURE_TYPES.has(perColor[1]!)) {
+      const win = new RegExp(`^If you put \\+1\\/\\+1 counters on ${NUM} ${perColor[1]!}s this way, (you win the game)$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const st = perColor[1]!;
+      for (const [c, word] of [["W", "white"], ["U", "blue"], ["B", "black"], ["R", "red"], ["G", "green"]] as const)
+        effects.push({ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [st], colors: [c], controller: "you", text: `${word} ${st} you control` }, n: 1, action: "counters", counter: { kind: "+1/+1", n: 1 } });
+      if (win) {
+        const inner = parseOne(capital(win[2]!), ctx);
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "countersPutOnThisWay" } }, min: num(win[1]!) }, effects: inner });
+        si++;
+      }
+      continue;
+    }
     // Luck Bobblehead: "If you rolled 6 exactly seven times, you win the game." The dice of this ability's roll only, an
     // ignored roll not counting (rulings, CR 706.6).
     const rolledN = effects.some((e) => e.type === "roll" && !e.eachPlayer && !e.chooseOne) ? new RegExp(`^If you rolled (\\d+) exactly ${NUM} times, (.+)$`).exec(s) : null;
@@ -1631,6 +1658,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(anyExile[2]!);
       if (!filter) return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
+      continue;
+    }
+    // Yorion, Sky Nomad: "exile any number of other nonland permanents you own and control. Return those cards to the
+    // battlefield at the beginning of the next end step": chosen as it resolves (rulings), exiled together, and returned
+    // together by one delayed trigger (CR 603.7) under your control (CR 110.2a); a token doesn't come back (rulings).
+    const anyUntilEnd = !ctx.spell ? /^[Ee]xile any number of (other )?(.+?) you own and control$/.exec(s) : null;
+    if (anyUntilEnd && /^Return those cards to the battlefield at the beginning of the next end step$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = pickFilter(`${anyUntilEnd[2]!} you control`);
+      if (filter?.kind !== "object") return null;
+      si++;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: { ...filter, owner: "you", ...(anyUntilEnd[1] ? { notSource: true } : {}), text: `${anyUntilEnd[1] ?? ""}${anyUntilEnd[2]!} you own and control` }, n: 1, action: "flicker", anyNumber: true }, { type: "flicker", what: { ref: "created" }, under: "you", at: "nextEndStep" });
       continue;
     }
     // Another Round: "Exile any number of creatures you control, then return them to the battlefield under their owner's
@@ -3310,6 +3348,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // artifact creature." The target still on the battlefield, checked as it resolves (CR 608.2c).
     // Splash Portal: "Exile target creature you control, then return it .... If that creature is a Bird, Frog, Otter, or Rat,
     // draw a card": the permanent it returned as, as it is now (rulings); a token doesn't come back.
+    // Liliana, Heretical Healer: "exile ~, then return her to the battlefield transformed under her owner's control. If you
+    // do, create a 2/2 black Zombie creature token": only if she came back (a single-faced copy stays in exile, CR
+    // 712.14a), so only the first of several of these abilities to resolve makes a Zombie (rulings).
+    const ifReturned = /^If you do, (.+)$/.exec(s);
+    const flick = effects[effects.length - 1];
+    if (ifReturned && flick?.type === "flicker" && flick.transformed && flick.what.ref === "self" && !flick.at && !flick.hold) {
+      const fx = parseOne(capital(ifReturned[1]!), ctx);
+      if (!fx) return null;
+      effects.push({ type: "if", cond: { kind: "flickeredIs", filter: { kind: "object", types: [], text: "permanent" } }, effects: fx });
+      continue;
+    }
     const ifBack = /^If (?:that creature|it) is an? ([A-Z][a-z]+(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+|[A-Z][a-z]+), (.+)$/.exec(s);
     const lastFx = effects[effects.length - 1];
     if (ifBack && lastFx?.type === "flicker" && !lastFx.at && !lastFx.hold) {
@@ -4612,6 +4661,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(insteadTwo[2]!) }], otherwise: [last] };
       continue;
     }
+    // Coiling Rebirth: "Return target creature card from your graveyard to the battlefield. Then if the gift was promised and
+    // that creature isn't legendary, create a token that's a copy of that creature, except it's 1/1": the permanent it
+    // returned as, as it is now (CR 608.2c, 400.7).
+    const giftNotLegend = /^(?:Then )?if the gift was promised and that creature isn't legendary, (create a token that's a copy of that creature.*)$/i.exec(s);
+    if (giftNotLegend) {
+      const last = effects[effects.length - 1];
+      const inner = parseOne(capital(giftNotLegend[1]!), ctx);
+      if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.what.n || !ctx.spell || inner?.length !== 1 || inner[0]!.type !== "createTokenCopy" || inner[0]!.what.ref !== "created") return null;
+      effects.push({ type: "if", cond: { kind: "gift" }, effects: [{ type: "if", cond: { kind: "putThisWayIs", filter: { kind: "object", types: ["Creature"], notSupertypes: ["Legendary"], text: "nonlegendary creature" } }, effects: inner }] });
+      continue;
+    }
     // Yenna, Redtooth Regent: "Create a token that's a copy of it, except it isn't legendary. If the token is an Aura, untap
     // ~, then scry 2": the token as it is now.
     const tokenIs = /^If the token is an? ([A-Z][a-z]+), (.+)$/.exec(s);
@@ -4795,8 +4855,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const ifHas = counted ? new RegExp(`^if it has ${NUM} or more ${COUNTER} counters on it, (.+)$`).exec(whenText) : null;
       const ifHasCond = ifHas ? parseStaticCondition(`~ has ${ifHas[1]!} or more ${ifHas[2]!} counters on it`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
       if (ifHas && !ifHasCond) return null;
-      const reflexive = reflexiveBody(ifHas ? ifHas[3]! : whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned);
+      // "Create a 2/1 white Cat Warrior creature token. When you do, if you control a red permanent other than Ajani, he
+      // deals ..." (Ajani, Nacatl Avenger): an intervening "if" (CR 603.4), checked as the reflexive ability triggers and
+      // again as it resolves; "he" is the source.
+      const ifControl = created ? /^if (you control [^,]+), (.+)$/.exec(whenText) : null;
+      const ifControlCond = ifControl ? parseStaticCondition(ifControl[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+      if (ifControl && !ifControlCond) return null;
+      const reflexive = reflexiveBody(ifHas ? ifHas[3]! : ifControl ? ifControl[2]!.replace(/^(?:he|she) deals /, "~ deals ") : whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned);
       if (!reflexive) return null;
+      // "Create a Food token. When you do, ...": each token of that kind created is doing it, so with a doubler it triggers
+      // once for each (CR 603.12a; rulings on Ajani, Nacatl Avenger), and not for tokens a replacement made instead
+      // (Divine Visitation's Angels). Not when it's about "that token" (which one would be ambiguous).
+      const perToken = created && prev.n === 1 && !JSON.stringify(reflexive).includes('"ref":"created"') ? { perToken: prev.token } : {};
+      if (ifControlCond) {
+        reflexive.effects = [{ type: "if", cond: { kind: "state", cond: ifControlCond }, effects: reflexive.effects }];
+        effects.push({ type: "if", cond: { kind: "state", cond: ifControlCond }, effects: [{ type: "reflexive", body: reflexive, ...perToken }] });
+        continue;
+      }
       if (ifHasCond) {
         reflexive.effects = [{ type: "if", cond: { kind: "state", cond: ifHasCond }, effects: reflexive.effects }];
         effects.push({ type: "if", cond: { kind: "selfHere" }, effects: [{ type: "if", cond: { kind: "state", cond: ifHasCond }, effects: [{ type: "reflexive", body: reflexive }] }] });
@@ -4826,7 +4901,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       if (created || always) {
-        effects.push({ type: "reflexive", body: reflexive });
+        effects.push({ type: "reflexive", body: reflexive, ...perToken });
         continue;
       }
       effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });

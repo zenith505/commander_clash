@@ -5,7 +5,7 @@ import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
 import { NUMX, X, amt, singularWord, isGroup, BASIC_TYPES } from "../words";
 import { parsePlayer, parseObject } from "../targets";
-import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept } from "../tokens";
+import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
 import { parseSentence } from "../sentence";
 import { halfX, parseCount } from "../counts";
 import type { Ctx } from "../body";
@@ -13,6 +13,14 @@ import type { Ctx } from "../body";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+
+  // Kaya, Geist Hunter: "Until end of turn, if one or more tokens would be created under your control, twice that many of
+  // those tokens are created instead": a token doubler for the rest of the turn (CR 614.1a, 611.2a). (The body moves a
+  // leading "until end of turn" to the end.)
+  if ((m = /^Until end of turn, (if one or more .+ instead)$/.exec(s) ?? /^(If one or more .+ instead) until end of turn$/.exec(s))) {
+    const mod = parseCountMod(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)}.`);
+    return mod?.what === "tokens" && mod.who === "you" && (mod.op === "double" || mod.op === "triple") ? [{ type: "countModThisTurn", mod }] : null;
+  }
 
   // "Create twice X 1/1 black and green Pest creature tokens" (Pest Infestation): 2X of them (X counting 0 off the stack,
   // CR 107.3).

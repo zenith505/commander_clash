@@ -98,6 +98,7 @@ import {
   deciderOf,
   landsAllowed,
   landUntappedOffer,
+  creatureTypesOf,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -2752,6 +2753,11 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   if (action === "attach") return attachPicks(s, pid, options);
   // Akiri, Fearless Voyager: save our best creature (it's tapped and indestructible).
   if (action === "unattach") return [...options].sort((a, b) => worth(s, pid, obj(s, obj(s, b).attachedTo!)) - worth(s, pid, obj(s, obj(s, a).attachedTo!))).slice(0, count);
+  // Call the Spirit Dragons: "if you put +1/+1 counters on five Dragons this way, you win": a Dragon not given one yet first.
+  if (action === "counters" && s.resolving && JSON.stringify(s.resolving.body.effects).includes('"countersPutOnThisWay"')) {
+    const given = new Set((s.resolving.countersPutThisWay ?? []).map((c) => c.id));
+    return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  }
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one
@@ -2876,6 +2882,16 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const e = r?.body.effects[r.next];
   // "You may get two rad counters" (Tato Farmer): milling ourselves, while the library and life can take it.
   if (e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "getRad" && x.who.ref === "you")) return player(s, pid).library.length >= 20 && player(s, pid).life >= 12;
+  // Descendants' Fury: "you may sacrifice one of them. If you do, reveal cards ... until you reveal a creature card that
+  // shares a creature type with the sacrificed creature": only a token of the group that has a creature type, which costs
+  // little (our library's contents aren't known to us).
+  const next = r?.body.effects[r.next + 1];
+  if (r && e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "pick" && e.effects[0]!.fromGroup && e.effects[0]!.action === "sacrifice" && next?.type === "if" && next.effects.some((x) => x.type === "revealUntil" && x.sharesCreatureTypeWithSacrificed))
+    return (r.item.event?.group ?? []).some((g) => {
+      const o = s.objects[g.id];
+      const kin = o?.zone === "battlefield" && o.isToken ? creatureTypesOf(s, o) : undefined;
+      return kin === "all" || (!!kin && kin.size > 0);
+    });
   // "You may discard your hand, then draw cards equal to ..." (Knollspine Dragon, Clive, Ifrit's Dominant): when it's
   // more cards than the hand.
   const [dis, draw] = e?.type === "may" && e.effects.length === 2 ? e.effects : [];

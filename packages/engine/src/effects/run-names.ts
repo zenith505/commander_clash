@@ -2,6 +2,7 @@ import type { Effect } from "../abilities";
 import { defOf } from "../cards";
 import { creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
 import { currentName } from "../names";
+import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, printedMatches } from "./targeting";
@@ -69,8 +70,10 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (shared && !shared.length) return;
       // "Shares a creature type with it" (Heirloom Blade): the creature that died, as it last existed (rulings). With no
       // creature type, nothing shares one: the whole library is revealed.
-      const kin = e.sharesCreatureTypeWithSubject ? subjectCreatureTypes(s, ctx) : undefined;
-      const matches = (id: ObjectId) => printedMatches(filter, defOf(s, obj(s, id))) && (!shared || defOf(s, obj(s, id)).types.some((t) => shared.includes(t))) && (!e.sharesCreatureTypeWithSubject || (!!kin && shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))));
+      // Descendants' Fury: the creature sacrificed this way, as it last existed (rulings).
+      const sacked = e.sharesCreatureTypeWithSacrificed ? s.resolving!.sacrificedThisWay?.[s.resolving!.sacrificedThisWay.length - 1] : undefined;
+      const kin = e.sharesCreatureTypeWithSubject ? subjectCreatureTypes(s, ctx) : sacked ? (sacked.allCreatureTypes ? ("all" as const) : new Set((sacked.subtypes ?? []).filter((t) => CREATURE_TYPES.has(t)))) : undefined;
+      const matches = (id: ObjectId) => printedMatches(filter, defOf(s, obj(s, id))) && (!shared || defOf(s, obj(s, id)).types.some((t) => shared.includes(t))) && (!(e.sharesCreatureTypeWithSubject || e.sharesCreatureTypeWithSacrificed) || (!!kin && shareCreatureType(kin, creatureTypesOf(s, obj(s, id)))));
       // "Until you reveal X land cards" (Open the Way): X of them, or as many as there are; with X = 0, none is revealed.
       const want = e.n === undefined ? 1 : Math.max(0, amountNow(s, e.n, ctx));
       const named = !(filter.chosen === "name" && ctx.chosen?.name === undefined);

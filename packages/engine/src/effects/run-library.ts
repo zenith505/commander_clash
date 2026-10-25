@@ -16,6 +16,7 @@ import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
 import { characteristics } from "../layers";
 import type { TargetSpec } from "../abilities";
+import { CREATURE_TYPES } from "../keywords";
 
 /** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
 function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec {
@@ -746,7 +747,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (sc.topOrdered) return; // the cards it put on top have been ordered: done
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       // Its text says the number (sayBound).
-      const filter0 = e.filter && { ...bindBound(s, e.filter, amountCtx(s, ctx)), text: sayBound(s, e.filter.text, e.filter, amountCtx(s, ctx)) };
+      const filter00 = e.filter && { ...bindBound(s, e.filter, amountCtx(s, ctx)), text: sayBound(s, e.filter.text, e.filter, amountCtx(s, ctx)) };
+      // Pyre of Heroes: "that shares a creature type with the sacrificed creature", as it last existed (rulings): a card
+      // with one of its creature types (none: nothing fits).
+      const filter0 = filter00?.sharesCreatureTypeWithSacrificed ? sacrificedKin(s, ctx, filter00) : filter00;
       const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
       const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
@@ -1479,4 +1483,12 @@ function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: P
     ...(DEST_RANK[to.zone]! > (rest ? DEST_RANK[rest.zone]! : 2.5) ? { helps: true as const } : {}),
   };
   return "paused";
+}
+
+/** "A creature card that shares a creature type with the sacrificed creature": the filter with that creature's creature types, as it last existed. */
+function sacrificedKin(s: GameState, ctx: ResolveCtx, f: TargetSpec): TargetSpec {
+  const { sharesCreatureTypeWithSacrificed: _, ...rest } = f;
+  const lk = ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1);
+  const kin = !lk ? [] : lk.allCreatureTypes ? [...CREATURE_TYPES] : (lk.subtypes ?? []).filter((t) => CREATURE_TYPES.has(t));
+  return { ...rest, subtypes: kin.length ? kin : ["(none)"] };
 }

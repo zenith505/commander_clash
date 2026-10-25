@@ -975,6 +975,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "copyChosenPerOpponent":
     case "createToken":
     case "linkedExileToken":
+    case "countModThisTurn":
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
     case "castSearched":

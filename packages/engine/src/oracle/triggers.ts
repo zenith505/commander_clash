@@ -88,6 +88,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
   // Emet-Selch: once for life lost at the same time, however many opponents lost it.
   [/^Whenever one or more opponents lose life, (.+)$/, "opponentsLoseLife"],
+  // Ob Nixilis, Captive Kingpin: the same, only if one of them lost exactly 1 life in that event (all the combat damage
+  // dealt to a player at once added up, rulings).
+  [/^Whenever one or more opponents each lose exactly 1 life, (.+)$/, "opponentsLoseOneLife"],
   [/^Whenever an opponent gains life, (.+)$/, "opponentGainsLife"],
   [/^Whenever you lose life, (.+)$/, "youLoseLife"],
   // Playing a land (CR 305.1), not putting one onto the battlefield with an effect (rulings on Burgeoning).
@@ -1163,6 +1166,25 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (back && singularWord(back[1]!) === singularWord(phrase!.split(/\s+/).pop()!)) {
       returnOne = true;
       bodyText = bodyText.slice(0, back.index).trim();
+    }
+    // Descendants' Fury: "you may sacrifice one of them. If you do, reveal cards from the top of your library until you
+    // reveal a creature card that shares a creature type with the sacrificed creature. Put that card onto the battlefield
+    // and the rest on the bottom of your library in a random order." One of the creatures that dealt it, chosen as it
+    // resolves; the sacrificed creature as it last existed (rulings).
+    if (phrase === "creatures" && m[2] === "a player" && /^you may sacrifice one of them\. If you do, reveal cards from the top of your library until you reveal a creature card that shares a creature type with the sacrificed creature\. Put that card onto the battlefield and the rest on the bottom of your library in a random order\.$/.test(bodyText)) {
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      const card: TargetSpec = { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" };
+      return {
+        event,
+        body: {
+          targets: [],
+          effects: [
+            { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: creature, n: 1, action: "sacrifice", fromGroup: true }], text: "sacrifice one of them" },
+            { type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "revealUntil", filter: card, found: "battlefield", rest: "bottom", sharesCreatureTypeWithSacrificed: true }] },
+          ],
+          text: bodyText,
+        },
+      };
     }
     // Combat damage to a player always goes to an opponent here: attacks only go to opponents. "That opponent" is that
     // player, "each other opponent" each opponent but them (Parapet Thrasher).

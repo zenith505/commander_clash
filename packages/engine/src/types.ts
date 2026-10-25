@@ -1,4 +1,4 @@
-import type { AbilityBody, GraveCastRider, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
+import type { AbilityBody, GraveCastRider, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, CountMod, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -1563,6 +1563,8 @@ export interface GameState {
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
+  /** "Until end of turn, if one or more tokens would be created under your control, twice that many ..." (Kaya, Geist Hunter): replacements made by a resolved ability, for the turn they were made in (CR 614.1a). */
+  turnCountMods?: { turn: number; controller: PlayerId; mod: CountMod; source: ObjectId }[];
   /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */
   turnRules?: TurnRule[];
   /**
@@ -1802,6 +1804,8 @@ export interface TriggerEventInfo {
   amount?: number;
   /** "One or more opponents lose life": the life loss event it triggered on (lifeLost's batch). */
   lifeBatch?: number;
+  /** "One or more opponents each lose exactly 1 life" (Ob Nixilis): what each of them lost in that event, added up as it's lost. */
+  lifeEach?: Record<number, number>;
   /** A cast or play-a-land trigger: the spell or land, as the object it was (TriggeredAbility cast.sharesTypeWithLinked). */
   played?: { id: ObjectId; zc: number };
   /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */

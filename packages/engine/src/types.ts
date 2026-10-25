@@ -1972,6 +1972,8 @@ export interface Resolving {
   countersPutThisWay?: { id: ObjectId; zc: number; kind?: string }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
+  /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
+  returnedNontoken?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
   digTook?: boolean;
   /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */

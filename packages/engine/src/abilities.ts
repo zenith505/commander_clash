@@ -1999,7 +1999,7 @@ export type Effect =
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
   | { type: "blockLimitThisCombat"; who: PlayerRef; n: number }
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -3248,6 +3248,8 @@ export type SpellCondition =
   | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
   | { kind: "bouncedThisWay"; subtype: string; another: true }
+  /** "If you return four or more nontoken permanents you control this way" (Flood of Tears): this resolution's "return all ..." returned at least `n` of them, counting one a replacement sent elsewhere (rulings). */
+  | { kind: "returnedYoursAtLeast"; n: number }
   /** "You may put a land card from among them onto the battlefield tapped. If you don't, ..." (Planar Genesis): its last dig took a card. */
   | { kind: "digTook" }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
@@ -4686,7 +4688,7 @@ export interface CompiledCard {
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; text: string }[];
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** n for each mana from a Treasure (Kalain, Reclusive Painter) or an artifact source (Coin of Mastery) spent to cast the entering creature (CR 106.3; none if it wasn't cast). */ perSpentFrom?: "treasure" | "artifact"; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; /** Counted as it enters: "for each instant and sorcery spell you've cast this turn" (Ral, Leyline Prodigy). */ n: Amount }[];
   entersTappedUnless?: EntersCondition;

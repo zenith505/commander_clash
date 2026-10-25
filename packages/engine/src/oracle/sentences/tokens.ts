@@ -85,6 +85,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // same as with the name last.
   // "... token named Lightning Rager with trample, haste, and "..."" (Rite of the Raging Storm) likewise.
   if ((m = /^(.+? creature tokens?) named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) with (.+)$/.exec(s))) return parseSentence(`${m[1]} with ${m[3]} named ${m[2]}`, ctx);
+  // "... creature token with trample that's all colors" (Mechtitan Core, Reliquary Dragon): white, blue, black, red and
+  // green (CR 105.1), whatever its other words say.
+  if ((m = /^((?:.+? creates|(?:You )?[Cc]reate) .+? creature tokens?(?: with [^"]+?)?(?: named [^"]+?)?) that's all colors$/.exec(s))) {
+    const fx = parseSentence(m[1]!, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    return tok?.type === "createToken" && !tok.token.back ? [{ ...tok, token: { ...tok.token, colors: ["W", "U", "B", "R", "G"] } }] : null;
+  }
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
     // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.

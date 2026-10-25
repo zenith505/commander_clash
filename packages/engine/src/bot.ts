@@ -911,9 +911,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const dig = chooseUnearth(s, pid);
       if (dig) return dig;
     }
-    // Crew Vehicles and saddle Mounts before combat.
+    // Crew Vehicles and saddle Mounts before combat; make Mechtitan (it has haste).
     if (s.step === "main1") {
-      const crew = chooseCrew(s, pid) ?? chooseSaddle(s, pid);
+      const crew = chooseActivation(s, pid, makesTitan) ?? chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -3551,6 +3551,9 @@ function bestGroupTarget(s: GameState, pid: PlayerId, pool: ChosenTarget[], grou
 /** How many times a bot activates one ability in a turn at most, so it can't go round a loop forever. */
 const BOT_LOOP_LIMIT = 8;
 
+/** Mechtitan Core's ability: this permanent and other permanents exiled to make a 10/10 or bigger token. */
+const makesTitan = (ab: ActivatedAbility) => !!ab.exileSelf && ab.body.effects.some((e) => e.type === "createToken" && (e.token.power ?? 0) >= 10) && !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile && c.other);
+
 function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -3581,9 +3584,15 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const xTarget = !!ab.energyX && ab.body.targets.some((t) => t.xRange?.key === "manaValue");
       const energyTargetX = xTarget ? Math.min(player(s, pid).energy ?? 0, 15) : 0;
       if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
-      if (ab.exileSelf || (freeCost && !necro) || ab.station) continue;
+      // Mechtitan Core: itself and four others exiled for a 10/10, in our main phase with the stack empty (and only when
+      // those four have less total power than the token, below).
+      const titan = makesTitan(ab) && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
+      if ((ab.exileSelf && !titan) || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
+      // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
+      // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
+      if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
       if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
@@ -3655,6 +3664,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (!targets || pointlessAttach(s, body, targets, id) || pointlessMove(s, pid, body, targets)) continue;
         const costs = discardX !== undefined ? discardXCosts(s, pid, o, ab, targets, discardX) : abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
+        if (titan && (costs?.sacrifice ?? []).reduce((a, c) => a + Math.max(0, power(s, obj(s, c))), 0) >= 10) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
         // Tree of Perdition, Tree of Redemption: only to lower an opponent's life total, or raise ours.
         const swap = body.effects.find((e) => e.type === "exchangeLifeWithSelf");
@@ -4236,7 +4246,8 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .map((x) => obj(s, x))
         .filter((x) => controllerOf(s, x) === pid && x.id !== o.id && x.id !== keep && !x.isCommander && !targeted.has(x.id) && !out.sacrifice?.includes(x.id))
         .filter((x) => objectMatches(s, c.filter, x, pid, false))
-        .filter((x) => (objIsType(s, x, "Land") ? lands(s, pid) >= 8 : x.isToken && worth(s, pid, x) <= 3))
+        // Mechtitan Core's four others: any of ours, the least valuable (chooseActivation weighs them against the token).
+        .filter((x) => (objIsType(s, x, "Land") ? lands(s, pid) >= 8 : (x.isToken && worth(s, pid, x) <= 3) || (c.exile && makesTitan(ab))))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       // "Sacrifice a Swamp and a Forest" (Jarad): one for each, the least valuable that fits.
       if (c.oneOfEach) {

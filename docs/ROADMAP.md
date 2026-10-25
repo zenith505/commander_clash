@@ -1,7 +1,7 @@
 # Roadmap
 
-24,100 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,814 of 4,988 (96%).
+24,115 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,825 of 4,988 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,7 +22,7 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 154, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 155, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
    spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
    batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
@@ -48,8 +48,17 @@ line blocks.
    Deeproot Pilgrimage ("one or more nontoken Merfolk you control become tapped": taps at the same time aren't one
    event yet); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
    last known power on a leaves trigger of its own); Aang's Journey (kicked: one search for a basic land card and a
-   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"). Next most played: Mirrormind Crown,
-   Mechtitan Core, Kalain, Reclusive Painter, The Deck of Many Things, Moonmist, Nerd Rage, Summon: Valefor.
+   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"); Mirrormind Crown and Moonlit
+   Meditation ("the first time you would create one or more tokens each turn, you may instead create copies": the same
+   choice at token creation as Jinnie Fay); Sokrates, Athenian Teacher (a granted prevention whose draws count the
+   damage prevented); Aminatou, the Fateshifter (−6: each player gains control of the next player's nonland permanents in
+   a chosen direction); Sunken Palace (mana that copies the spell or ability it's spent on). Next most played: Ultron,
+   Artificial Malevolence, Thran Portal, Everything Comes to Dust, Tannuk, Steadfast Second, Bitter Work, Ugin's
+   Mastery, V.A.T.S., Endless Evil.
+   Smaller gaps from round 155: bots activate Mechtitan Core only in a main phase with an empty stack, and only when the
+   four permanents exiled have total power under 10; bots roll The Deck of Many Things only with three or fewer cards
+   in hand; Mechtitan Core's "Exile ... four other" cost button reads "Exile and activate" now (the cost picker said
+   "Sacrifice and activate" for every exile-instead cost, Food Chain's too).
    Smaller gaps from round 154: "Create a token. When you do, ..." triggers once for each of those tokens created (CR
    603.12a), except when the reflexive ability is about "that token" (Forum Filibuster, Ratonhnhaké:ton, Dáin
    Ironfoot), which still triggers once; Ob Nixilis, Captive Kingpin triggers when at least one opponent lost exactly 1

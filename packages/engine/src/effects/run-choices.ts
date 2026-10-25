@@ -529,6 +529,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
             : e.cond.kind === "noneAttackedYou"
             ? ctx.event?.amount === 0
+            : e.cond.kind === "returnedYoursAtLeast"
+            ? (s.resolving!.returnedNontoken ?? []).filter((c) => c === ctx.controller).length >= (e.cond as { n: number }).n
             : e.cond.kind === "rollIn"
             ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"

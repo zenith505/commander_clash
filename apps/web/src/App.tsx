@@ -426,6 +426,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
   untap?: true;
   /** Offering when it can't be cast now without it: no skipping. */
   required?: true;
+  /** "Exile four other artifact creatures you control" (Mechtitan Core): a sacrifice-kind cost that exiles instead. */
+  exile?: true;
   what: string;
   n: number;
   candidates: string[];
@@ -802,8 +804,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
-      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`;
-      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [] });
+      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}`;
+      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}) });
     }
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}) };
     dispatch(
@@ -984,7 +986,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setCostPick({ draft: d, kind: "discard", label: card.name, what: `discard ${/^[aeiou]/i.test(c.oneOf.text) ? "an" : "a"} ${c.oneOf.text} and another card`, n: c.n, candidates: me.hand.filter((id) => id !== d.objectId), chosen: [], oneOf: c.oneOf });
       const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
       const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile from your graveyard";
-      return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
+      return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}) });
     }
     // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
     if (d.casualty === undefined && compiled.casualty !== undefined) {
@@ -1971,9 +1973,12 @@ const ALT_NOTES: Record<AltCostKind, string> = {
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", turnPermission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
 
+/** "creature" to "creatures"; a text that is plural already ("other artifact creatures and/or Vehicles") stays. */
+const plural = (what: string) => (/s$/.test(what) ? what : `${what}s`);
+
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
-  const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${what}s`);
+  const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${plural(what)}`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
   if (c.kind === "forage") return "forage (exile three cards from your graveyard or sacrifice a Food)";
   if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${c.oneOfEach ? `a ${c.filter.text}` : n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
@@ -2289,7 +2294,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>

@@ -1505,7 +1505,9 @@ function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = [])
         // Giada: "for each Angel you already control", the entering one aside, Giada included (rulings).
         // Arwen: its toughness as the creature enters (rulings), none if 0 or less.
         // Master Biomancer: its power, likewise.
-        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : 1;
+        // Kalain, Coin of Mastery: the mana from Treasures or artifact sources spent to cast it, kept as the spell became
+        // this permanent (none for one not cast, or a token copy of a spell, CR 707.10).
+        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : r.perSpentFrom ? (o.spent?.from?.[r.perSpentFrom] ?? 0) : 1;
         if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
         if (r.asSubtype && !subtypes.includes(r.asSubtype)) subtypes.push(r.asSubtype);
       }
@@ -5961,6 +5963,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
         log(s, `${p.name} exiles ${nameOf(s, id)}.`);
         moveObject(s, id, "exile");
+        // "Cards exiled with ~" (Mechtitan Core): the cards it became in exile (CR 400.7); a token is gone (CR 704.5d).
+        if (o.zone === "exile") exiled?.push({ id, zc: o.zoneChanges ?? 0 });
       }
     } else if (c.kind === "sacrifice") {
       for (const id of choices.sacrifice ?? []) {

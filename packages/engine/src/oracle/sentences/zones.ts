@@ -430,8 +430,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", who, youChoose: true, filter, ...(m[3] ? { tapped: true as const } : {}) }];
   }
   // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): the same,
-  // under your control.
-  if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from a graveyard onto the battlefield under your control$/.exec(s))) {
+  // under your control; "from any graveyard" (The Deck of Many Things) the same.
+  if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from (?:a|any) graveyard onto the battlefield under your control$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     if (!filter) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", anyGraveyard: true, filter }];

@@ -1102,6 +1102,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card." (Waterbender
   // Ascension): "it" is ~.
   text = text.replace(/(\bcounters? on ~\. Then if) it has (?=\w+ or more [a-z+\/0-9-]+ counters on it, )/g, "$1 ~ has ");
+  // Strixhaven Stadium: "Then if it has ten or more point counters on it, remove them all and that player loses the game":
+  // the point counters on ~, then the player its trigger is about (checked only as it resolves, rulings).
+  text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more ([a-z]+) counters on it, )remove them all and (that player loses the game)\./g, "$1remove all $2 counters from ~, then $3.");
   // The Emperor of Palamecia: "Then if it has three or more +1/+1 counters on it, transform it": ~, as it is then.
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\./g, "$1transform ~.");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
@@ -1233,11 +1236,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Not before "meld them into": meld (CR 701.42a) is one instruction with the exile (sentences/zones.ts).
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
-    // of Denial) is all conditional.
+    // of Denial) is all conditional; "Then if it has ten or more point counters on it, remove them all and that player loses
+    // the game" (Strixhaven Stadium) likewise.
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
     // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1882,6 +1886,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (s === "You may roll again") {
       if (!row || sentences[si + 1] !== undefined && !sentences[si + 1]!.startsWith(ROW_MARK) || effects.filter((e) => e.type === "roll").length !== 1) return null;
       effects.push({ type: "rollAgain" });
+      continue;
+    }
+    // Flood of Tears: "Return all nonland permanents to their owners' hands. If you return four or more nontoken permanents
+    // you control this way, you may put a permanent card from your hand onto the battlefield."
+    const returnedFour = new RegExp(`^If you return ${NUM} or more nontoken permanents you control this way, (.+)$`).exec(s);
+    if (returnedFour && last?.type === "bounce" && last.what.ref === "each") {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(returnedFour[2]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "returnedYoursAtLeast", n: num(returnedFour[1]!) }, effects: inner });
+      continue;
+    }
+    // "Roll a d20 and subtract the number of cards in your hand. If the result is 0 or less, discard your hand." (The Deck
+    // of Many Things): the result after the modifier (CR 706.2, rulings), before the results table.
+    const resultIs = /^If the result is (\d+) or (less|greater), (.+)$/.exec(s);
+    if (resultIs && !row && effects.some((e) => e.type === "roll")) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(resultIs[3]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      const n = Number(resultIs[1]);
+      effects.push({ type: "if", cond: { kind: "rollIn", ...(resultIs[2] === "less" ? { max: n } : { min: n }) }, effects: inner });
       continue;
     }
     if (s.startsWith(ROW_MARK)) {
@@ -3073,6 +3098,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = pickFilter(`${eachChooses[1]} permanent`);
       if (filter?.kind !== "object") return null;
       effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, bounce: true });
+      si++;
+      continue;
+    }
+    // Summon: Valefor: "Each opponent chooses a creature with the greatest mana value among creatures they control. Return
+    // those creatures to their owners' hands." In turn order, then all at once (rulings), as a pick does.
+    const greatestMv = /^(Each opponent|Each player) chooses a creature with the greatest mana value among creatures they control$/.exec(s);
+    if (greatestMv && sentences[si + 1]?.replace(/\.$/, "") === "Return those creatures to their owners' hands") {
+      const who = parsePlayer(greatestMv[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "bounce", greatest: "manaValue" });
       si++;
       continue;
     }
@@ -5700,6 +5735,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const [made, faceDown] = [effects[effects.length - 1], effects[effects.length - 2]];
       if (made?.type !== "createToken" || faceDown?.type !== "exileFaceDown" || faceDown.from !== "top" || faceDown.n !== undefined || faceDown.play) return null;
       effects.push({ type: "delayed", when: "leaves", each: "created", effects: [{ type: "returnFaceDownExiled" }], text: "put the exiled card into your hand" });
+      continue;
+    }
+    // Mechtitan Core: "Create Mechtitan, a legendary 10/10 Construct ... token .... When that token leaves the battlefield,
+    // return all cards exiled with ~ except ~ to the battlefield tapped under their owners' control." A delayed trigger for
+    // the token (CR 603.7c), about the cards this ability's cost exiled (CR 607.2a), still in exile; ~ itself stays there.
+    if (s === "When that token leaves the battlefield, return all cards exiled with ~ except ~ to the battlefield tapped under their owners' control") {
+      const made = effects[effects.length - 1];
+      if (made?.type !== "createToken" || ctx.spell) return null;
+      effects.push({ type: "delayed", when: "leaves", each: "created", effects: [{ type: "returnExiled", under: "owner", tapped: true, fromCost: true }], text: "return all cards exiled with ~ except ~ to the battlefield tapped under their owners' control" });
+      continue;
+    }
+    // The Deck of Many Things: "Put a creature card from any graveyard onto the battlefield under your control. When that
+    // creature dies, its owner loses the game." A delayed trigger about the permanent it became, for the rest of the game
+    // (CR 603.7c, 400.7); the card's owner, whoever controlled it (CR 108.3).
+    if (s === "When that creature dies, its owner loses the game") {
+      const put = effects[effects.length - 1];
+      if (put?.type !== "chooseFromGraveyard" || put.dest !== "battlefield" || !put.anyGraveyard || put.n !== 1 || put.milled) return null;
+      effects.push({ type: "delayed", when: "dies", of: { ref: "created" }, effects: [{ type: "loseGame", who: { ref: "subjectOwner" } }], text: "its owner loses the game" });
       continue;
     }
     // "Choose a color. Another target creature you control gains ... hexproof from that color until end of turn. It can't

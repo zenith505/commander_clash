@@ -912,7 +912,7 @@ export function compile(d: CardDef): CompiledCard {
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, ...(byToughness[3] === "power" ? { perSourcePower: true as const } : { perSourceToughness: true as const }), ...(sub ? { asSubtype: sub } : {}), text: line });
       continue;
     }
-    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control)?\\.$`).exec(line);
+    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control| for each mana from (?:a Treasure|an artifact source) spent to cast it)?\\.$`).exec(line);
     if (othersExtra) {
       // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
       const that = /^creature you control that's an? ([A-Z]\w+) or an? ([A-Z]\w+)$/.exec(othersExtra[2]!);
@@ -924,20 +924,24 @@ export function compile(d: CardDef): CompiledCard {
       if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || !chosenOk) out.unsupported.push(raw);
       else {
         // "For each Angel you already control" (Giada, Font of Hope): a creature type, counted as each one enters.
-        const per = othersExtra[5] ? / for each ([A-Z][a-z]+) you already control$/.exec(othersExtra[5])![1]! : undefined;
+        // "For each mana from an artifact source spent to cast it" (Coin of Mastery): see perSpentFrom.
+        const spentFrom = othersExtra[5] && / for each mana from /.test(othersExtra[5]) ? (/Treasure/.test(othersExtra[5]) ? "treasure" : "artifact") : undefined;
+        const per = othersExtra[5] && !spentFrom ? / for each ([A-Z][a-z]+) you already control$/.exec(othersExtra[5])![1]! : undefined;
         if (per && !CREATURE_TYPES.has(per)) out.unsupported.push(raw);
-        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), text: line });
+        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), text: line });
       }
       continue;
     }
     // Master Chef's granted "Other creatures you control enter with an additional +1/+1 counter on them": Renata's ability
     // in the plural. "This creature enters with an additional +1/+1 counter on it": a replacement effect on itself
     // entering (CR 614.1c), which applies as it would exist on the battlefield (CR 614.12, rulings on Master Chef).
-    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them\\.$`).exec(line);
+    // Kalain, Reclusive Painter: "... for each mana from a Treasure spent to cast them" (see perSpentFrom).
+    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them)?\\.$`).exec(line);
     if (othersPlural) {
       const g = parseGroup(`each ${othersPlural[1]!.replace(/s you control$/, " you control")}`);
+      const spentFrom = othersPlural[4] ? (/Treasure/.test(othersPlural[4]) ? "treasure" : "artifact") : undefined;
       if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
-      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), text: line });
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), text: line });
       continue;
     }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
@@ -3360,6 +3364,8 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     if (o.ref === "costExiled" && !handExileCost) bad = true;
+    // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
+    if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");

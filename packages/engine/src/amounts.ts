@@ -289,6 +289,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, STARTING_LIFE - (s.players[ctx.controller]?.life ?? STARTING_LIFE)); // CR 103.4: 40 in Commander (CR 903.7)
     case "experience":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.experience ?? 0), 0);
+    case "poison":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.poison ?? 0), 0);
     case "rad":
       return (c.who ? refPlayers(s, c.who, ctx) : s.players.filter((p) => !p.lost).map((p) => p.id)).reduce((n, pid) => n + (s.players[pid]!.rad ?? 0), 0);
     case "speed":
@@ -531,6 +533,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
       }).length;
     }
+    case "attachedToHost": {
+      const host = selfObject(s, ctx)?.attachedTo;
+      if (!host || !s.battlefield.includes(host)) return 0;
+      return s.battlefield.filter((id) => {
+        const o = s.objects[id]!;
+        return o.attachedTo === host && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
+      }).length;
+    }
     case "graveyardCardTypes": {
       const types = new Set<string>();
       for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) types.add(t);
@@ -722,6 +732,8 @@ function describeCount(c: Count): string {
       return "life below starting";
     case "experience":
       return "experience counters";
+    case "poison":
+      return "poison counters";
     case "rad":
       return "rad counters";
     case "speed":
@@ -774,6 +786,7 @@ function describeCount(c: Count): string {
       return "devotion";
     case "attachedToSelf":
     case "attachedToAffected":
+    case "attachedToHost":
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";

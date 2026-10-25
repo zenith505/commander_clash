@@ -63,6 +63,8 @@ export function parseToken(power: number, toughness: number, desc: string, withT
     // "1/1 green Forest Dryad land creature" (Awaken the Woods): a basic land type gives it "{T}: Add {G}" (CR 305.6).
     else if (lw === "land") types.unshift("Land");
     else if (CREATURE_TYPES.has(w) || (BASIC_TYPES.includes(w) && /\bland\b/.test(desc))) subtypes.push(w);
+    // "A 1/1 colorless Shrine enchantment creature token" (Go-Shintai of Life's Origin): an enchantment type (CR 205.3h).
+    else if (w === "Shrine" && /\benchantment\b/.test(desc)) subtypes.push(w);
     else return null;
   }
   // 'with "Sacrifice ~: Add {C}."': an ability of its own (CR 111.3); 'with flying, haste, and "When this creature dies,

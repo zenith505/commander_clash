@@ -66,6 +66,8 @@ export interface UnlessPays {
   sacrifice?: { n: number; filter: TargetSpec };
   /** "Ward—Waterbend {4}" (CR 701.67a): up to this much of the cost's generic mana may be paid by tapping untapped artifacts and creatures they control, {1} each. */
   waterbend?: number;
+  /** "Unless its controller discards their hand" (Perplex): all of it, even with no cards in hand (rulings). */
+  discardHand?: true;
 }
 
 /**
@@ -186,6 +188,8 @@ export type Count =
   | { kind: "lifeBelowStart" }
   /** "The number of experience counters you have" (CR 122.1). */
   | { kind: "experience"; who: PlayerRef }
+  /** "For each poison counter your opponents have" (Phyrexian Swarmlord): all of theirs together (CR 122.1f). */
+  | { kind: "poison"; who: PlayerRef }
   /** "For each card type among cards discarded this way" (Kefka, Court Mage): every card discarded while this resolves. */
   | { kind: "discardedTypes" }
   /** "For each card drawn this way": the cards drawn in this resolution's draw before (Struggle for Project Purity). */
@@ -218,6 +222,8 @@ export type Count =
   | { kind: "attachedToSelf"; subtypes: string[] }
   /** "Enchanted creature gets +1/+1 for each Aura and Equipment attached to it" (Mantle of the Ancients): attached to the permanent the static ability's effect is applied to. */
   | { kind: "attachedToAffected"; subtypes: string[] }
+  /** "Equipped creature has double strike as long as two or more Equipment are attached to it" (Brass Knuckles): attached to the permanent the source is attached to. */
+  | { kind: "attachedToHost"; subtypes: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
@@ -1223,6 +1229,8 @@ export type Modification =
   | { kind: "assignsToughness"; ifGreater?: true }
   /** "Can attack as though it didn't have defender" (CR 702.3b). */
   | { kind: "attackDespiteDefender"; /** Only players who attacked you during their last turn (Weathered Sentinels). */ vsAttackedYou?: true }
+  /** "Enchanted creature can attack as though it had haste" (Instill Energy): it may attack while summoning sick (CR 302.6); its {T} abilities still can't be activated. */
+  | { kind: "attackAsThoughHaste" }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
   | { kind: "mustBlock" }
   /**
@@ -1360,7 +1368,7 @@ export type StaticCondition =
    * "... more cards in hand than you": any one opponent.
    */
   /** `subjectController`: "if that player controls more lands than you", that player being the entering land's controller. */
-  | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand"; subjectController?: true; /** "That player" is the active player, an opponent (Keeper of the Accord). */ activePlayer?: true }
+  | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand"; subjectController?: true; /** "That player" is the active player, an opponent (Keeper of the Accord). */ activePlayer?: true; /** "If defending player controls more lands than you" (Aerial Surveyor): the trigger's event player. */ eventPlayer?: true }
   /** "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's event player. */
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
   /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */

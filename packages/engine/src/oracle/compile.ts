@@ -344,7 +344,9 @@ export function normalizeSelf(d: CardDef): string {
   // "Sliver" for "Sliver Queen").
   const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+$/.exec(full)?.[1] : undefined;
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
-  const short = ofThe ?? first ?? comma;
+  // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
+  const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
+  const short = ofThe ?? first ?? regnal ?? comma;
   if (short && short !== full) {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
     // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
@@ -1943,7 +1945,8 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
-    const handGrant = /^Each ([a-z]+) card in your hand has (ninjutsu (?:\{[^}]+\})+)\.$/.exec(line);
+    // "Each creature card in your hand has cycling {1}{U}" (Rhet-Tomb Mystic): the same (CR 702.29a).
+    const handGrant = /^Each ([a-z]+) card in your hand has ((?:ninjutsu|cycling) (?:\{[^}]+\})+)\.$/.exec(line);
     if (handGrant) {
       // The card's kind read as a graveyard card's, without the graveyard.
       const f = parseTargetPhrase(`${handGrant[1]} card from a graveyard`);

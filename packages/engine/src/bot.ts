@@ -240,6 +240,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const searching = s.resolving?.body.effects[s.resolving.next];
     if (pend.kind === "chooseMay" && searching?.type === "search" && searching.mayInstead?.dest.zone === "graveyard") return [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
+    // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
+    if (pend.kind === "payUnless" && pend.discardHand) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length <= 1 }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting. Life only while we have that much (CR 119.4),

@@ -49,6 +49,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
   // Outbreak): each creature's own controller's (Count affectedControllerPoison).
   if (each && /^poison counter its controller has$/i.test(p)) return { count: { kind: "affectedControllerPoison" } };
+  // Phyrexian Swarmlord: "for each poison counter your opponents have", together.
+  if ((each && /^poison counter your opponents have$/i.test(p)) || /^the number of poison counters your opponents have$/i.test(p)) return { count: { kind: "poison", who: { ref: "eachOpponent" } } };
   // "For each Urza's land you control" (Urza's Workshop): the land type Urza's (CR 205.3i), not a possessive.
   if ((m = /^(?:the number of )?(Urza's lands? you control)$/.exec(p))) {
     const g = parseGroup(m[1]!.replace(/land you/, "lands you"), true);

@@ -145,8 +145,10 @@ export interface Ctx {
  * discarding, "that player"; "each player draws ..., then discards ..." each of them.
  */
 function thenSubject(first: string, next: string): string {
-  const who = /^(Target player|Target opponent|That player|Each player|Each opponent) /.exec(first);
-  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
+  // "At the beginning of each player's draw step, that player draws an additional card, then discards a card" (Anvil of
+  // Bogardan): lowercase after the trigger.
+  const who = /^(Target player|Target opponent|That player|that player|Each player|Each opponent) /.exec(first);
+  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
   // Oblation: "The owner of target nonland permanent shuffles it into their library, then draws two cards": that owner.
   if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^draws /.test(next)) return `Its owner ${next}`;
   // Rolling Hamsphere: "create three 1/1 red Hamster creature tokens, then it deals X damage to any target": the tokens
@@ -1205,6 +1207,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Elspeth Tirel: "Destroy all other permanents except for lands and tokens": each nonland, nontoken permanent but her
   // (rulings).
   text = text.replace(/(^|\. )Destroy all other permanents except for lands and tokens\./, "$1Destroy all other nonland, nontoken permanents.");
+  // Suspended Sentence: "Destroy target creature an opponent controls. That player loses 3 life.": that player is the
+  // creature's controller, as it last existed on the battlefield (CR 608.2h).
+  text = text.replace(/(^|\. )(Destroy|Exile) target creature an opponent controls\. That player (loses|gains) /, "$1$2 target creature an opponent controls. Its controller $3 ");
   // Wand of Orcus: "it and Zombies you control gain deathtouch until end of turn": both, at once.
   text = text.replace(/(^|, |\. )it and ([A-Z][a-z]+s) you control gain ([a-z]+) until end of turn\./, "$1it gains $3 until end of turn. $2 you control gain $3 until end of turn.");
   // "Until end of turn, target attacking creature gets +1/+1 for each other attacking creature and gains double strike"
@@ -1229,6 +1234,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
   text = text.replace(/\bUntil your next turn, it gains ([a-z ]+)\./g, "It gains $1 until your next turn.");
+  // Sylvan Awakening: "Until your next turn, all lands you control become 2/2 Elemental creatures with reach,
+  // indestructible, and haste." The same as with the duration last; the lands it affects are those there as it resolves
+  // (rulings, CR 611.2c).
+  text = text.replace(/(^|\. )Until your next turn, (all lands you control become [^.]+)\./, "$1$2 until your next turn.");
+  // Nissa, Vital Force: "Untap target land you control. Until your next turn, it becomes a 5/5 Elemental creature with
+  // haste. It's still a land." The same.
+  text = text.replace(/(^|\. )Until your next turn, it becomes (an? \d+\/\d+ [^.]+)\. It's still a land\./, "$1It becomes $2 until your next turn. It's still a land.");
   // "Enchanted player mills X cards, where X is the number of cards put into their graveyard ..." (Fraying Sanity).
   text = text.replace(/\b(enchanted player) mills X cards, where X is the number of cards put into their graveyard/g, "$1 mills X cards, where X is the number of cards put into enchanted player's graveyard");
   // Liliana of the Veil's two sentences are one effect: the piles, then the sacrifice of the chosen one (CR 700.3).
@@ -4158,6 +4170,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can
     // be targeted, and its color is checked as it resolves (rulings).
     const ifColor = /^(.+) if it's (white|blue|black|red|green)$/.exec(s);
+    // Ring of Valkas: "put a +1/+1 counter on equipped creature if it's red": the creature it's attached to, as it resolves.
+    if (ifColor && /^put an? \S+ counter on equipped creature$/i.test(ifColor[1]!)) {
+      const fx = parseOne(ifColor[1]!, ctx);
+      if (!fx || fx.length !== 1 || fx[0]!.type !== "counters" || fx[0]!.what.ref !== "attached") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[ifColor[2]!]!], text: `${ifColor[2]} creature` } } }, effects: fx });
+      continue;
+    }
     if (ifColor) {
       const fx = parseOne(ifColor[1]!, ctx);
       const i = ctx.targets.length - 1;
@@ -6955,6 +6974,14 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
   const theirs = /^(.+) they control$/.exec(phrase);
   if (theirs) {
     const e = fx[0]!;
+    // "Whenever ~ deals combat damage to a player, create a Treasure token for each artifact they control" (Hoard Hauler):
+    // the player the trigger is about.
+    if (e.type === "createToken" && (ctx.eventPlayer || ctx.defending) && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent) {
+      const count = parseCount(`${theirs[1]} on the battlefield`, ctx, true);
+      if (!count || count.count.kind !== "permanents" || count.times || count.plus) return null;
+      const scaled = scaleEffect(e, { count: { ...count.count, whose: { ref: "eventPlayer" } } });
+      return scaled ? [scaled] : null;
+    }
     if (e.type !== "loseLife" && e.type !== "gainLife" && e.type !== "draw") return null;
     // "That player gains 2 life for each creature they control" (Benevolent Offering): the chosen opponent.
     const whose: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : e.who.ref === "eventPlayer" || (e.who.ref === "chosenPlayer" && e.who.nth === undefined) ? e.who : null;

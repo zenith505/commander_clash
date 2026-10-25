@@ -688,8 +688,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
   // A plural noun is a group; a singular one only after "each" ("each creature", but not "all creature").
-  // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word.
-  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))) || (!!all && SAME_PLURAL.has(w)));
+  // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word; so is a static
+  // ability's subject, "Other Merfolk get +1/+1" (Lord of Atlantis), whose verb is plural.
+  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)));
   if (!plural && !(all && all[1]!.toLowerCase() === "each")) return null;
   head = words
     .map((w) => PLURAL_TYPES[w.toLowerCase()] ?? (/^[A-Z]/.test(w) && w !== "Plains" && CREATURE_TYPES.has(singular(w)) ? singular(w) : w))

@@ -117,7 +117,7 @@ function colorsAmong(s: GameState, o: GameObject, p: Extract<ManaProduce, { kind
     const yard = new Set(cards.flatMap((d) => d.colors));
     return COLORS.filter((c) => yard.has(c));
   }
-  const from = p.linked ? linkedExileCards(s, o) : s.battlefield.filter((id) => objectMatches(s, p.filter!, obj(s, id), pid, false));
+  const from = p.self ? [o.id] : p.linked ? linkedExileCards(s, o) : s.battlefield.filter((id) => objectMatches(s, p.filter!, obj(s, id), pid, false));
   const colors = new Set(from.flatMap((id) => characteristics(s, obj(s, id)).colors));
   return COLORS.filter((c) => colors.has(c));
 }

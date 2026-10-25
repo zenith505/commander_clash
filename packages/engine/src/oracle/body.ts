@@ -162,7 +162,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
+const FLOATING_EVENTS = new Set<string>(["youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -215,6 +215,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
+  // "Whenever you gain life this turn, each opponent loses that much life" (Vizkopa Guildmage): the same as "This turn,
+  // whenever you gain life, ..." (CR 603.7b), each life gain event once (CR 119.10).
+  const gain = /^Whenever you gain life this turn, (.+)$/.exec(s);
+  if (gain) return floatingTrigger(`This turn, whenever you gain life, ${gain[1]!}`, after, ctx);
   // "Whenever you attack this turn, create two 1/1 red Warrior creature tokens that are tapped and attacking" (Dalkovan
   // Encampment): once for each declaration of attackers this turn (CR 508.1, 603.7b).
   const attack = /^Whenever you attack this turn, (.+)$/.exec(s);
@@ -413,6 +417,9 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   if (andLook) return { effect: { type: "exileFaceDown", from: "top", look: true }, next: at + 1 };
   const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
   const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
+  // Siphon Insight: "Look at the top two cards of target opponent's library. Exile one of them face down and put the other
+  // on the bottom of that library."
+  const lookPick = look && !lookThen && look[1] === "two cards" && /^Exile one of them face down and put the other on the bottom of that library$/.test(sentences[at + 1] ?? "");
   const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
   // "Whenever a creature deals combat damage to one of your opponents, its controller looks at the top card of that
   // opponent's library and exiles it face down. They may play that card ..." (Gonti, Night Minister): the creature's
@@ -426,9 +433,9 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
     const effect: Effect = { type: "exileFaceDown", from: "top", who: { ref: "eventPlayer" }, actor: { ref: "subjectController" }, play: { until: "exiled", ...(anyType ? { anyType: true as const } : {}) } };
     return { effect, next: at + (anyType ? 3 : 2) };
   }
-  if (!head && !lookThen && !they) return null;
-  let next = at + (lookThen ? 2 : 1);
-  const m = head ?? (lookThen ? look : null);
+  if (!head && !lookThen && !lookPick && !they) return null;
+  let next = at + (lookThen || lookPick ? 2 : 1);
+  const m = head ?? (lookThen || lookPick ? look : null);
   const count = m ? m[1]! : they![2]!;
   const n = count === "card" ? 1 : amt(new RegExp(`^${NUMX} cards$`).exec(count)![1]!);
   // Not yet: whose library is read last, after the permission is known to be there (it may add a target).
@@ -437,13 +444,14 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   let play: FaceDownPlay | undefined;
   let upkeepGraveyard = false;
   let endStepHand = false;
-  const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any type to cast (?:it|them|that spell|those spells))";
+  // "As though it were mana of any color": colored symbols paid with any mana, {C} still only with colorless (CR 609.4b).
+  const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any (?:type|color) to cast (?:it|them|that spell|those spells))";
   for (;;) {
     const t = sentences[next];
     if (t === undefined) break;
     if (/^You may look at (?:it|that card|those cards|them) for as long as (?:it remains|they remain) exiled$/.test(t)) seen = true;
     else {
-      const may = new RegExp(`^You may (look at and )?(play|cast) (?:it|that card|those cards|them)( without paying (?:its mana cost|their mana costs))? (for as long as (?:it remains|they remain) exiled|this turn|for as long as ~ remains on the battlefield)(?:, and ${ANY})?$`).exec(t);
+      const may = new RegExp(`^You may (look at and )?(play|cast) (?:it|that card|those cards|them|${lookPick ? "the exiled card" : "it"})( without paying (?:its mana cost|their mana costs))? (for as long as (?:it remains|they remain) exiled|this turn|for as long as ~ remains on the battlefield)(?:, and ${ANY})?$`).exec(t);
       const until = /^Until your next turn, you may play (?:it|that card|those cards|them)$/.exec(t);
       if ((may || until) && !play) {
         play = { until: until ? "yourNextTurn" : /this turn/.test(may![4]!) ? "thisTurn" : /~ remains/.test(may![4]!) ? "source" : "exiled" };
@@ -466,7 +474,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   // A face-down card nobody may look at: Duplicity's, without the look (read as a plain sentence).
   const who = parsePlayer(whose, ctx);
   if (!who) return "fail";
-  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}), ...(endStepHand ? { endStepHand: true as const } : {}) };
+  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}), ...(endStepHand ? { endStepHand: true as const } : {}), ...(lookPick ? { pickOne: true as const } : {}) };
   return { effect, next };
 }
 
@@ -669,6 +677,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking that player\./, "$1 a tapped and attacking that player token that's a copy of $2.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
   text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
+  // Captain N'ghathrod: "choose target artifact or creature card in an opponent's graveyard that was put there from their
+  // library this turn. Put it onto the battlefield under your control."
+  text = text.replace(/\bchoose (target [a-z ]+? card in an opponent's graveyard that was put there from their library this turn)\. Put it onto the battlefield under your control\./, "put $1 onto the battlefield under your control.");
+  // Animation Module: "Choose a counter on target permanent or player. Give that permanent or player another counter of
+  // that kind."
+  text = text.replace(/\b[Cc]hoose a counter on target permanent or player\. Give that permanent or player another counter of that kind\./, "Put another counter of a kind already on target permanent or player on it.");
   // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
   // then look at the next five; then shuffle the rest and put the last five looked at on top in any order (rulings).
   if (text.trim() === LIM_DULS_VAULT) return { targets: [], effects: [{ type: "vault", n: 5, life: 1 }], text };
@@ -3452,6 +3466,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
       if (done === "more") continue;
+      // Flow State: "If there is an instant card and a sorcery card in your graveyard, instead put two of them into your
+      // hand and the rest on the bottom of your library in any order": the same look, more cards taken, checked as it
+      // resolves.
+      const yardInstead = done.into === "hand" && !done.upTo && !done.filter && done.rest === "bottom" && !done.random && !done.kickedCount && !done.countX
+        ? /^If there is an? (instant|sorcery|creature|artifact|enchantment|land) card and an? (instant|sorcery|creature|artifact|enchantment|land) card in your graveyard, instead put (two|three) of them into your hand and the rest on the bottom of your library in any order\.?$/.exec(sentences[si + 1] ?? "")
+        : null;
+      if (yardInstead) {
+        const has = [yardInstead[1]!, yardInstead[2]!].map((w) => ({ kind: "card" as const, types: [capital(w)], text: `${w} card` }));
+        done.countIfYard = { has, count: num(yardInstead[3]!) };
+        si++;
+      }
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
       else effects.push(done);
       effects.push(...afterDig);
@@ -5261,6 +5286,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "putFromHand", filter, may: true, any: true, upTo: { count: { kind: "votes", option: handVotes[2]! } } });
       continue;
     }
+    // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
+    // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
+    if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
     const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you

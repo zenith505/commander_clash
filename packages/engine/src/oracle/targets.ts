@@ -917,9 +917,11 @@ export function parseTargetPhrase(
   const inWith = / in (your|a|an opponent's) graveyard( with mana value (?:\d+|x)(?: or (?:greater|less))?)$/i.exec(p);
   if (inWith) p = `${p.slice(0, inWith.index)}${inWith[2]} in ${inWith[1]} graveyard`;
   // "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester), "... from anywhere this turn".
-  const putThere = / (?:from|in) (?:your|a|an opponent's) graveyard( that was put there (?:from anywhere )?this turn)$/.exec(p);
+  const putThere = / (?:from|in) (?:your|a|an opponent's) graveyard( that was put there (?:from anywhere )?this turn| that was put there from their library this turn| that was milled this turn)$/.exec(p);
   if (putThere) {
-    extra.putThereThisTurn = true;
+    if (/from their library/.test(putThere[1]!)) extra.fromLibraryThisTurn = true;
+    else if (/milled/.test(putThere[1]!)) extra.milledThisTurn = true;
+    else extra.putThereThisTurn = true;
     p = p.slice(0, putThere.index + putThere[0].length - putThere[1]!.length);
   }
   const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p) ?? / exiled with (?:~|it)$/.exec(p);

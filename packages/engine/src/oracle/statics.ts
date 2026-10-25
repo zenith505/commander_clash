@@ -1,4 +1,5 @@
 import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
+import { ANY_COUNTER } from "../abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
@@ -124,6 +125,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[2]!);
     return mods ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } } : null;
   }
+  // Luxior, Giada's Gift: "Equipped permanent isn't a planeswalker and is a creature in addition to its other types": one
+  // type-changing effect (layer 4, CR 613.1d); losing the planeswalker type, it loses its planeswalker subtypes (CR
+  // 205.3d). Its loyalty abilities can still be activated (CR 606.3), and with no power or toughness of its own it's a
+  // 0/0 (rulings).
+  if (text === "Equipped permanent isn't a planeswalker and is a creature in addition to its other types")
+    return { affects: { kind: "attached" }, mods: [{ kind: "loseTypes", types: ["Planeswalker"] }, { kind: "addTypes", types: ["Creature"], subtypes: [] }], text: line };
   // Aerial Modification: "As long as enchanted permanent is a Vehicle, it's a creature in addition to its other types."
   // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
   if ((m = /^As long as (?:enchanted|equipped) permanent is an? (Vehicle), it's a creature in addition to its other types$/.exec(text)))
@@ -1371,6 +1378,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const type = becomeLands[1] === "creatures" ? "Creature" : "Artifact";
     return { affects: { kind: "filter", types: [type], controller: "you", spec: { kind: "object", types: [type], token: false, text: `nontoken ${becomeLands[1]!.slice(0, -1)}` } }, mods: [{ kind: "addTypes", types: ["Land"], subtypes: becomeLands[2] ? [becomeLands[2]] : [] }], text: line };
   }
+  // Secret Arcade: "Nonland permanents you control and permanent spells you control are enchantments in addition to their
+  // other types" (layer 4, CR 613.1d): its controller's permanent spells on the stack too (offFieldSpells), not their
+  // cards elsewhere.
+  if (/^Nonland permanents you control and permanent spells you control are enchantments in addition to their other types$/.test(text))
+    return { affects: { kind: "filter", types: [], controller: "you", spec: { kind: "object", notTypes: ["Land"], text: "nonland permanent" } }, mods: [{ kind: "addTypes", types: ["Enchantment"], subtypes: [] }], text: line, offFieldSpells: true };
   // Mycosynth Lattice: "All permanents are artifacts in addition to their other types" (layer 4), "All cards that aren't on
   // the battlefield, spells, and permanents are colorless" (layer 5, everywhere: offFieldAll); Thran Lens: "All
   // permanents are colorless".
@@ -1432,6 +1444,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // creature for each 1 damage prevented this way." A prevention effect with an additional effect (CR 615.5).
   const vigor = /^If damage would be dealt to (another creature you control|other creatures you control), prevent that damage\. Put a \+1\/\+1 counter on that creature for each 1 damage prevented this way$/.exec(text);
   if (vigor) return { affects: { kind: "filter", types: ["Creature"], controller: "you", other: true }, mods: [{ kind: "preventDamage", to: true, plusOnes: true }], text: line };
+  // Anti-Venom, Horrifying Healer: "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on
+  // ~": that damage's amount, so also when it can't be prevented (then it's dealt too, CR 615.12).
+  if (text === "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on ~") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
   // Phyrexian Vindicator: "If damage would be dealt to ~, prevent that damage. When damage is prevented this way, ~ deals
   // that much damage to any other target." The prevention's reflexive trigger (CR 603.12), once for each damage event.
   if (/^If damage would be dealt to ~, prevent that damage\. When damage is prevented this way, ~ deals that much damage to any other target$/.test(text)) {
@@ -1555,9 +1570,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const attacks = each[4] === "time it has attacked this turn" && affects.kind === "filter";
     // Toxrill: "for each slime counter on them", each creature it affects, counted for that one.
     const ownCounters = affects.kind === "filter" ? new RegExp(`^${COUNTER} counter on (?:it|them)$`).exec(each[4]!) : null;
+    // Luxior, Giada's Gift: "Equipped creature gets +1/+1 for each counter on it": "it" is the equipped creature, every kind.
+    const attachedCounters = affects.kind === "attached" && each[4] === "counter on it";
     // Mirror Box: "for each other creature you control with the same name as that creature", "that creature" each one it affects.
     const mirror = /^other creature you control with the same name as that creature$/.test(each[4]!) && affects.kind === "filter";
-    const per = mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : counts(parseCount(each[4]!, null, true), each[4]!);
+    const per = mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : attachedCounters ? { count: { kind: "affectedCounters" as const, counter: ANY_COUNTER } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];

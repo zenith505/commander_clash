@@ -462,6 +462,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // One opponent's slot of "for each opponent, ... from that player's graveyard" (TargetSpec.perOpponent): their card.
     if (spec.controlledBy !== undefined && o.owner !== spec.controlledBy) return false;
     if (spec.putThereThisTurn && o.toGraveyardTurn !== s.turn) return false;
+    if (spec.fromLibraryThisTurn && o.fromLibraryTurn !== s.turn) return false;
+    if (spec.milledThisTurn && o.milledTurn !== s.turn) return false;
     return printedMatches(spec, defOf(s, o));
   }
   if (spec.kind === "any") {

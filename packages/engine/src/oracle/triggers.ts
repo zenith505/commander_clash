@@ -2069,7 +2069,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
   const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};
@@ -2350,7 +2350,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ enters, if you cast it, ..." (Geological Appraiser): an intervening if (CR 603.4) on how it got there.
       let ifCast = false;
       // "If it was cast" (Wedding Ring): the same, a permanent spell resolving under its caster's control (CR 608.3).
-      const wasCast = /^if (?:you cast it|it was cast), (.+)$/i.exec(body0);
+      // "If he was cast" (Anti-Venom, Horrifying Healer), read as "if ~ was cast": the same.
+      const wasCast = /^if (?:you cast it|it was cast|~ was cast), (.+)$/i.exec(body0);
       if (wasCast) {
         if (event !== "selfEnters") return "fail" as const;
         ifCast = true;

@@ -218,6 +218,10 @@ export interface GameObject {
   enteredTurn?: number;
   /** Turn number it was last put into a graveyard ("a card from a graveyard that was put there this turn", Abyssal Harvester). */
   toGraveyardTurn?: number;
+  /** The turn it was last put into a graveyard from a library ("put there from their library this turn", Captain
+   * N'ghathrod), and by a mill instruction ("milled this turn", Tato Farmer, CR 701.17a). */
+  fromLibraryTurn?: number;
+  milledTurn?: number;
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;
@@ -506,7 +510,7 @@ export interface GameObject {
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
-  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true }[];
+  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true; until?: "yourNextTurn" }[];
   /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
   reboundGained?: true;
   /** A spell that gained sunburst this many times (Lux Artillery): each instance works as it enters from the stack (CR 702.44a). */
@@ -2138,8 +2142,9 @@ export interface Resolving {
      * "You may cast any number of spells ... from among them" (Primeval Spawn): the exiled cards, the total mana value
      * still allowed, the card last offered, the cards not cast when offered, and the card picked ("none" to stop).
      */
-    /** exileFaceDown: a hand card is being chosen. */
+    /** exileFaceDown: a hand card is being chosen, or with `pickOne` one of these cards from the top of a library. */
     faceDownPick?: true;
+    faceDownLooked?: ObjectId[];
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
     linkedCopyPick?: true;

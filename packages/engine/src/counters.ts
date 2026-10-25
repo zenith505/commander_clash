@@ -3,6 +3,7 @@
 
 import type { CountMod, TokenSpec } from "./abilities";
 import { PREDEFINED_TOKENS } from "./oracle/tokens";
+import { CREATURE_TYPES } from "./keywords";
 import { abilitiesOf } from "./cards";
 import { controllerOf, characteristics, invalidateCharacteristics, keywordOfCounter } from "./layers";
 import type { GameObject, GameState, PlayerId } from "./types";
@@ -68,14 +69,14 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   if (countersBanned(s, o)) return 0;
   const owner = controllerOf(s, o);
   const putter = putterNow ?? owner;
-  const { types, subtypes } = characteristics(s, o);
+  const { types, subtypes, allCreatureTypes } = characteristics(s, o);
   const isCreature = types.includes("Creature");
   const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet")));
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
       if (mod.what !== "counters" || "onPlayer" in mod || ((("other" in mod && mod.other) || entering) && source === o.id)) return false;
       if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter) && (!mod.putOn || (owner === controller && (mod.putOn === "permanentYouControl" || isCreature || types.includes("Planeswalker"))));
-      return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (mod.who === "any" || controller === owner);
+      return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (!mod.subtypes || mod.subtypes.some((st) => subtypes.includes(st) || (!!allCreatureTypes && CREATURE_TYPES.has(st)))) && (mod.who === "any" || controller === owner);
     })
     .map(({ mod }) => mod.op);
   return apply(n, ops, kind === "-1/-1" || kind === "stun");

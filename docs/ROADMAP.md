@@ -1,7 +1,7 @@
 # Roadmap
 
-24,060 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,779 of 4,988 (95%).
+24,077 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,795 of 4,988 (96%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,7 +22,7 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 151, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 152, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
    spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
    batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
@@ -41,8 +41,20 @@ line blocks.
    opponent); Tidal Barracuda ("any player may cast spells as though they had flash": flash for the controller only so
    far); Blatant Thievery ("for each opponent, gain control of target permanent that player controls": whether the
    spell can be cast when an opponent controls no permanent it could target isn't settled by CR 601.2c or the
-   rulings). Next most played: Secret Arcade, Siphon Insight, Animation Module, Luxior, Giada's Gift, Tato Farmer,
-   Flow State.
+   rulings); Thieving Varmint ("spells you don't own": the mana spending rule needs the spell's owner wherever mana is
+   checked and paid); Balor ("whenever ~ attacks or dies", "choose one or more. Each mode must target a different
+   player", "discards three cards at random"); New Blood (changing a creature type in a card's text, CR 612); Guff
+   Rewrites History (one target for each player, then each of them exiles until a nonland card and may cast it);
+   Deeproot Pilgrimage ("one or more nontoken Merfolk you control become tapped": taps at the same time aren't one
+   event yet); Syr Vondam, Sunstar Exemplar ("when ~ dies or is put into exile while its power is 4 or greater": its
+   last known power on a leaves trigger of its own); Aang's Journey (kicked: one search for a basic land card and a
+   Shrine card); Tasha, the Witch Queen (page counters, "a spell you don't own"). Next most played: Birthing Ritual,
+   Swashbuckler Extraordinaire, Senu, Keen-Eyed Protector, You Find Some Prisoners, Luck Bobblehead, Rundvelt
+   Hordemaster.
+   Smaller gaps from round 152: bots never use Luxior's "Equip planeswalker"; bots get Tato Farmer's rad counters only
+   with 20 or more cards in the library and 12 or more life; bots discard their hand to draw (Knollspine Dragon, Clive)
+   only when it draws more cards than they hold; Phyrexian Vindicator's reflexive trigger still doesn't happen for
+   damage that can't be prevented (Anti-Venom's counters do, CR 615.12).
    Smaller gaps from round 151: bots always put Dina's Guidance's card into their hand; bots pick Kitesail Larcenist's
    targets among opponents' permanents by the usual removal scoring, never their own.
    Smaller gaps from round 150: bots pay life for Necrodominance by a simple rule (up to five cards in hand, keeping 15

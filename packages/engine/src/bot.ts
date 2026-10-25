@@ -1,5 +1,5 @@
 import { playerProtectedFrom, playerProtection } from "./effects/targeting";
-import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
@@ -2852,6 +2852,16 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // "You may get two rad counters" (Tato Farmer): milling ourselves, while the library and life can take it.
+  if (e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "getRad" && x.who.ref === "you")) return player(s, pid).library.length >= 20 && player(s, pid).life >= 12;
+  // "You may discard your hand, then draw cards equal to ..." (Knollspine Dragon, Clive, Ifrit's Dominant): when it's
+  // more cards than the hand.
+  const [dis, draw] = e?.type === "may" && e.effects.length === 2 ? e.effects : [];
+  if (r && dis?.type === "discard" && dis.hand && dis.who.ref === "you" && draw?.type === "draw" && draw.who.ref === "you") {
+    const targets = r.item.targets ?? [];
+    const players = (ref: PlayerRef) => (ref.ref === "you" ? [pid] : ref.ref === "target" ? targets.slice(ref.index, ref.index + 1).flatMap((t) => (t.kind === "player" ? [t.id] : [])) : []);
+    return evalAmount(s, draw.n, { controller: pid, sourceId: r.item.sourceId, players }) > player(s, pid).hand.length;
+  }
   // The Chain cards' copy (Chain of Vapor): only with a target of an opponent's worth it, and for a land only with lands
   // to spare (each copy can go on back and forth, so this ends it).
   if (r && e?.type === "eachMay" && e.chain) {
@@ -3543,6 +3553,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
+      // "Equip planeswalker" (Luxior): bots keep their planeswalkers planeswalkers.
+      if (ab.equip && ab.body.effects.some((e) => e.type === "attach" && e.asCreature)) continue;
       // "Sacrifice X Squirrels" (Chatterfang): bots don't weigh how many permanents to give up. "Discard X cards" (Gix):
       // the cards in hand we can do without (discardXCount).
       // "Pay X {E}: Draw X cards" (Sphinx of the Revelation): all our energy, leaving cards in the library.

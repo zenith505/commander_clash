@@ -993,6 +993,8 @@ export function moveObject(
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.toGraveyardTurn = to === "graveyard" ? s.turn : undefined;
+  o.fromLibraryTurn = to === "graveyard" && fromZone === "library" ? s.turn : undefined;
+  o.milledTurn = to === "graveyard" && fromZone === "library" && opts.milled ? s.turn : undefined;
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
@@ -1048,7 +1050,7 @@ export function moveObject(
     for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
     o.extraCounters = undefined;
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
-    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : "endOfTurn", affected: [o.id], mods: g.mods });
+    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : (g.until ?? "endOfTurn"), ...(g.until ? { turnOf: g.controller } : {}), affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
     // Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has the ability for good.
     if (o.entersGaining && (fromZone === "stack" || fromZone === "graveyard")) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: "Serra Paragon", duration: "game", affected: [o.id], mods: [{ kind: "addAbility", text: o.entersGaining }] });
@@ -8924,6 +8926,18 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   const p = player(s, pid);
   if (p.lost) return false;
   if (!conceded && gameEndBlocked(s, pid, "lose")) return false;
+  // The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1" (CR 614.1a). Several:
+  // one applies, its controller's choice, and they're all the same (CR 616.1). The life it takes is gained or lost
+  // (CR 119.5), so a player who can't might still be at 0 and lose at the next check (rulings).
+  const throne = conceded ? undefined : s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).loseGameExileSelf);
+  if (throne) {
+    log(s, `${p.name} would lose the game (${reason}), but exiles ${nameOf(s, throne)} instead and their life total becomes 1.`);
+    moveObject(s, throne, "exile");
+    if (p.life < 1 && canGainLife(s, pid)) gainLife(s, pid, 1 - p.life);
+    else if (p.life > 1 && canLoseLife(s, pid)) loseLife(s, pid, p.life - 1);
+    invalidateCharacteristics(s);
+    return true;
+  }
   p.lost = true;
   p.lossReason = reason;
   log(s, `${p.name} loses the game (${reason}).`);

@@ -2,7 +2,7 @@
 
 import type { AmountExpr, Count, Effect, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
-import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
+import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
@@ -64,11 +64,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "doublePT", what, power: m[1] !== "toughness", toughness: m[1] !== "power" }];
   }
   // "Double ~'s power until end of turn" (Tifa Lockhart), "double target creature's power and toughness": the same, for
-  // one creature.
-  if ((m = /^[Dd]ouble (~'s|target creature's|that creature's|its) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
-    const what = parseObject(m[1] === "its" ? "it" : m[1]!.slice(0, -2), ctx);
+  // one creature. "Triple target creature's power and toughness" (Tifa's Limit Break): +X/+Y, twice each (CR 701.11b-c).
+  if ((m = /^([Dd]ouble|[Tt]riple) (~'s|target creature's|that creature's|its) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
+    const what = parseObject(m[2] === "its" ? "it" : m[2]!.slice(0, -2), ctx);
     if (!what || isGroup(what)) return null;
-    return [{ type: "doublePT", what, power: m[2] !== "toughness", toughness: m[2] !== "power" }];
+    return [{ type: "doublePT", what, power: m[3] !== "toughness", toughness: m[3] !== "power", ...(/^t/i.test(m[1]!) ? { triple: true as const } : {}) }];
   }
   // "Until end of turn, ~'s base power becomes equal to the number of Towns you control" (PuPu UFO): its power set in
   // layer 7b (CR 613.4b), the number counted as it resolves (rulings).
@@ -610,6 +610,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), n: 1 }] : null;
   }
+  // Dusty Parlor: "put a number of +1/+1 counters equal to that spell's mana value on up to one target creature", counted
+  // as it resolves.
+  if ((m = new RegExp(`^Put a number of ${COUNTER} counters equal to (.+?) on ((?:up to one )?target [a-z ]+)$`, "i").exec(s))) {
+    const n = parseCount(m[2]!, ctx);
+    const what = n && parseObject(m[3]!, ctx);
+    return n && what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), n }] : null;
+  }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
@@ -662,6 +669,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       { type: "untap", what: { ref: "self" } },
       { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
     ];
+  if (s === "Put another counter of a kind already on target permanent or player on it") {
+    const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
+    return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host }];
+  }
   if ((m = /^Put another counter of a kind already on (target [a-z ]+?) on it$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "counterOfKindOnIt", what }] : null;

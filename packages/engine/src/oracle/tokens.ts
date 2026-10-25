@@ -134,6 +134,9 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Ozolith, the Shattered Spire: "on an artifact or creature you control".
   m = /^If one or more \+1\/\+1 counters would be put on (another|an?) (creature|permanent|artifact or creature)( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature|that permanent) instead\.$/.exec(line);
   if (m) return { what: "counters", counter: "+1/+1", on: m[2] === "artifact or creature" ? "artifactOrCreature" : (m[2] as "creature" | "permanent"), who: m[3] ? "you" : "any", op: m[4] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
+  // Mauhúr, Uruk-hai Captain: "on an Army, Goblin, or Orc you control" (creature types, so a changeling counts).
+  m = /^If one or more \+1\/\+1 counters would be put on an? ([A-Z][a-z]+), ([A-Z][a-z]+), or ([A-Z][a-z]+) you control, that many plus one \+1\/\+1 counters are put on it instead\.$/.exec(line);
+  if (m && [m[1]!, m[2]!, m[3]!].every((st) => CREATURE_TYPES.has(st))) return { what: "counters", counter: "+1/+1", on: "permanent", who: "you", op: "plusOne", subtypes: [m[1]!, m[2]!, m[3]!] };
   // Winding Constrictor: counters of any kind (each kind one more, rulings).
   if (line === "If one or more counters would be put on an artifact or creature you control, that many plus one of each of those kinds of counters are put on that permanent instead.")
     return { what: "counters", on: "artifactOrCreature", who: "you", op: "plusOne" };

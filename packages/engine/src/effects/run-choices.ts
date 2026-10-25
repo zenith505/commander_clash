@@ -381,7 +381,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ...(item.cause ? { cause: item.cause } : {}),
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
         // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
-        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
+        // "Up to that many target creatures" after "you may sacrifice one or more Treasures" (Swashbuckler Extraordinaire).
+        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),

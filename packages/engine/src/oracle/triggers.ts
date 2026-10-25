@@ -1842,6 +1842,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(eminence[1]!)) return "fail";
     return { ...t, eminence: true, ...(/This ability triggers only/.test(line) ? {} : { ifCond: { kind: "selfCommandOrBattlefield" as const } }) };
   }
+  // Senu: "When a legendary creature you control attacks and isn't blocked, if this card is exiled, put it onto the
+  // battlefield attacking." An ability of the face-up card in exile (CR 113.6k), controlled by its owner (CR 113.8),
+  // with an intervening if (CR 603.4). It was never declared as an attacker (CR 508.4; rulings).
+  const exiledAttack = /^When(?:ever)? (an? (.+?) you control) attacks and isn't blocked, if (?:this card|~) is exiled, put it onto the battlefield attacking\.$/.exec(line);
+  if (exiledAttack) {
+    const filter = parseTargetPhrase(exiledAttack[2]!);
+    if (!filter || filter.kind !== "object" || !filter.types?.includes("Creature")) return "fail";
+    const text = "put it onto the battlefield attacking";
+    return { event: "creatureYouControlAttacksUnblocked", zone: "exile", ifCond: { kind: "selfInExile" }, attacker: { filter: { ...filter, controller: "you", text: exiledAttack[1]!.replace(/^an? /, "") } }, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attacking: true }], text } };
+  }
   // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {1}{B}{B}. If you do, return it to your hand"
   // (Pyre Zombie), "... with a creature card directly above it" (Krovikan Horror, Death Spark): an ability of the card
   // in the graveyard (CR 113.6b) with an intervening if (CR 603.4), so it does nothing if the card has left by then

@@ -423,6 +423,20 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "pickPermanents", player: pid, ids: giver === pid || others.length ? choosePicks(s, pid, pend.options, 1, "counters", pend.counter) : [] }];
     }
     if (pend.kind === "pickPermanents" && pend.action === "flicker") return [{ type: "pickPermanents", player: pid, ids: chooseFlickers(s, pid, pend.options) }];
+    // Birthing Ritual: sacrifice a creature (never a commander) for a better one among the cards looked at, one with
+    // mana value 1 more (or a token for one with mana value 1 or less), the cheapest such creature first.
+    if (pend.kind === "pickPermanents" && pend.looked && pend.action === "sacrifice") {
+      const creatures = pend.looked.map((id) => defOf(s, obj(s, id))).filter((d) => isType(d, "Creature"));
+      const pick = pend.options
+        .map((id) => obj(s, id))
+        .filter((o) => !o.isCommander)
+        .filter((o) => {
+          const mv = o.isToken ? 0 : defMv(defOf(s, o));
+          return creatures.some((d) => defMv(d) <= mv + 1 && (defMv(d) > mv || (o.isToken && defMv(d) >= 1)));
+        })
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+      return [{ type: "pickPermanents", player: pid, ids: pick ? [pick.id] : [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {
@@ -2791,6 +2805,14 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
   const here = r?.body.effects[r.next];
   if (here?.type === "pick" && here.anyNumber) {
     const next = r!.body.effects[r!.next + 1];
+    // Swashbuckler Extraordinaire: a Treasure for each of our attackers with power 2 or more that lacks double strike.
+    if (next?.type === "if" && next.effects.some((e) => e.type === "reflexive" && e.xSacrificed)) {
+      const strikers = s.battlefield.filter((id) => {
+        const o = obj(s, id);
+        return o.attacking !== undefined && controllerOf(s, o) === pid && power(s, o) >= 2 && !objHasKeyword(s, o, "Double strike");
+      }).length;
+      return ok.filter((o) => o.isToken).slice(0, strikers).map((o) => o.id);
+    }
     if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
     // "Exile any number of ... until ~ leaves the battlefield" (Abdel Adrian, Glorious Protector): the nontoken ones that
     // come back with an enters ability, and, when a token is made for each, cheap tokens.

@@ -1608,6 +1608,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "37a5ab64-12e4-4aad-9a09-46a26fe9953b",
+  "name": "Birthing Ritual",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your end step, if you control a creature, look at the top seven cards of your library. Then you may sacrifice a creature. If you do, you may put a creature card with mana value X or less from among those cards onto the battlefield, where X is 1 plus the sacrificed creature's mana value. Put the rest on the bottom of your library in a random order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff387264-31da-4f6b-88c6-2843f56acbda",
   "name": "Bite Down on Crime",
   "manaCost": "{3}{G}",
@@ -12932,6 +12958,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bf2dc318-7b51-451e-ac4d-0f1b756dc860",
+  "name": "Senu, Keen-Eyed Protector",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Bird Scout",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Scout"
+  ],
+  "oracleText": "Flying, vigilance\n{T}, Exile Senu: You gain 2 life and scry 2.\nWhen a legendary creature you control attacks and isn't blocked, if this card is exiled, put it onto the battlefield attacking.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Scry",
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "480454a0-fb10-432b-a963-8b0c0ffc6680",
   "name": "Sepulchral Primordial",
   "manaCost": "{5}{B}{B}",
@@ -14207,6 +14270,47 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "66f0f43c-829d-44d6-adda-d8885bfbfbaf",
+  "name": "Swashbuckler Extraordinaire",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Dragon Rogue Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon",
+   "Rogue",
+   "Warrior"
+  ],
+  "oracleText": "When this creature enters, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nWhenever you attack, you may sacrifice one or more Treasures. When you do, up to that many target creatures gain double strike until end of turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -16114,6 +16218,36 @@
   "commanderLegal": "legal",
   "set": "ogw",
   "releasedAt": "2016-01-22",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3d28886c-46bf-4d2e-a257-cb9016cc3573",
+  "name": "Waterbending Lesson",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery — Lesson",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [
+   "Lesson"
+  ],
+  "oracleText": "Draw three cards. Then discard a card unless you waterbend {2}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

@@ -2198,6 +2198,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.millMore ??= []).push(millMore[2] ? { plus: num(millMore[2]) } : { twice: true });
       continue;
     }
+    // Teferi, Who Slows the Sunset's emblem: a card drawn in each opponent's draw step, right after their own draw, with
+    // no priority in between (rulings, CR 504.1).
+    if (line === "You draw a card during each opponent's draw step.") {
+      out.drawsInOpponentsDrawStep = true;
+      continue;
+    }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
       continue;
@@ -3328,6 +3334,14 @@ function checkCastingLinks(out: CompiledCard) {
       const was = canSac;
       canSac = true;
       visit(o.body);
+      canSac = was;
+      return;
+    }
+    // Birthing Ritual: the dig's own sacrifice, "1 plus the sacrificed creature's mana value" in its filter.
+    if (o.type === "dig" && o.sacrificeFirst) {
+      const was = canSac;
+      canSac = true;
+      visit(o.filter);
       canSac = was;
       return;
     }

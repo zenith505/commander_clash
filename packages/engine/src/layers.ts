@@ -537,6 +537,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
+    case "selfInExile": // Senu's intervening if (CR 603.4): the same object, face up in its owner's exile
+      return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
     case "selfCommandOrBattlefield":
       return src.zone === "command" || src.zone === "battlefield";
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)

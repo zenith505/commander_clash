@@ -1420,7 +1420,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (phyTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, mana: phyTax[2]!, ...(phyTax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   // "Untap ~ during each other player's untap step", "Untap all permanents you control during ..." (Seedborn Muse):
   // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
-  const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);
+  // "During each opponent's untap step" (Teferi, Who Slows the Sunset's emblem): every other player is an opponent in a
+  // free-for-all game (CR 102.3), so the same.
+  const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each (?:other player's|opponent's) untap step$/.exec(text);
   if (untaps) {
     // "All green and/or blue creatures you control" (Murkfiend Liege): either color, or both.
     const all = untaps[2]?.replace(/^(\w+) and\/or (\w+) /, "$1 or $2 ");

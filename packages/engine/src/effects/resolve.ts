@@ -1033,6 +1033,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "piles":
     case "dig":
     case "vault":
+    case "nextDrawExile":
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":
     case "revealUntil":

@@ -1974,6 +1974,28 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       log(s, `${player(s, pid).name} can't draw more than one card each turn (${nameOf(s, narset)}).`);
       break;
     }
+    // Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their
+    // library. They may play it this turn." The draw doesn't happen (CR 614.6), so an empty library loses nothing. With
+    // other replacements for the same draw, this one applies first (the drawing player's choice, CR 616.1, isn't asked).
+    const urabrask = player(s, pid).nextDrawExiles?.findIndex((x) => x.turn === s.turn) ?? -1;
+    if (urabrask >= 0) {
+      const p = player(s, pid);
+      const { source } = p.nextDrawExiles!.splice(urabrask, 1)[0]!;
+      p.nextDrawExiles = p.nextDrawExiles!.filter((x) => x.turn === s.turn);
+      if (!p.nextDrawExiles.length) p.nextDrawExiles = undefined;
+      if (made.length) made.shift();
+      else n--;
+      const top = p.library[0];
+      if (top === undefined) {
+        log(s, `${p.name} would draw a card; ${source} replaces it, and their library is empty.`);
+        continue;
+      }
+      moveObject(s, top, "exile");
+      const o = obj(s, top);
+      o.mayPlay = { player: pid, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+      log(s, `${p.name} exiles ${nameOf(s, top)} from the top of their library instead of drawing, and may play it this turn (${source}).`);
+      continue;
+    }
     // Notion Thief: this draw is skipped and its controller draws instead.
     const thief = notionThief(s, pid);
     if (thief) {
@@ -2168,7 +2190,7 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
     more = [pend.left + 1, []];
   }
   if (!draw(s, p.id, more[0], pend.after, more[1], true)) return;
-  if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  if (pend.after === "drawStep") drawStepDrawn(s);
   else if (s.resolving) continueResolution(s);
 }
 
@@ -2372,10 +2394,30 @@ function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", sou
   return rest;
 }
 
+/**
+ * The draw step after the active player's draw (CR 504.1): "you draw a card during each opponent's draw step" (Teferi,
+ * Who Slows the Sunset's emblem) for each other player with one, in turn order, right after it with no priority in
+ * between (rulings); then "at the beginning of the draw step" triggers (CR 504.2). A player's draws happen once, however
+ * often a draw pauses on the way (dredge and the like resume here).
+ */
+export function drawStepDrawn(s: GameState) {
+  const ap = s.activePlayer;
+  const order = s.turnOrder.slice(s.turnOrder.indexOf(ap) + 1).concat(s.turnOrder.slice(0, s.turnOrder.indexOf(ap)));
+  for (const pid of order) {
+    if (player(s, pid).lost || s.turnLog?.drawStepDraws?.includes(pid)) continue;
+    const n = [...s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid), ...liveEmblems(s).filter((o) => o.owner === pid)].filter((o) => abilitiesOf(s, o).drawsInOpponentsDrawStep).length;
+    if (!n) continue;
+    ((s.turnLog ??= {}).drawStepDraws ??= []).push(pid);
+    log(s, `${player(s, pid).name} draws ${n === 1 ? "a card" : `${n} cards`} during ${player(s, ap).name}'s draw step.`);
+    if (!draw(s, pid, n, "drawStep")) return;
+  }
+  fireEvent(s, { type: "step", step: "draw", active: ap });
+}
+
 /** The draws left after one was replaced, then whatever was drawing: the draw step, or a resolving spell or ability. */
 export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
   if (!draw(s, pid, left, after, made, true)) return;
-  if (after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  if (after === "drawStep") drawStepDrawn(s);
   else if (s.resolving) continueResolution(s);
 }
 
@@ -2417,7 +2459,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     made.unshift(pend.archive - 1, pend.archive - 1);
   } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
   if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made, true)) return;
-  if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  if (pend.after === "drawStep") drawStepDrawn(s);
   else if (s.resolving) continueResolution(s);
 }
 
@@ -2918,7 +2960,7 @@ function beginStep(s: GameState, step: Step): void {
         return advanceStep(s);
       }
       if (!draw(s, ap, 1, "drawStep")) return; // CR 504.1 (no one skips in multiplayer, CR 103.8c); dredge may replace it
-      fireEvent(s, { type: "step", step: "draw", active: ap }); // "at the beginning of the draw step" triggers after it (CR 504.2)
+      drawStepDrawn(s); // "at the beginning of the draw step" triggers after it (CR 504.2)
       break;
     case "end":
       // "Until your next end step, you may play that card" (Yasmin Khan): over as that player's next end step begins; one

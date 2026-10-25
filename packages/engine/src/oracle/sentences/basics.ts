@@ -232,6 +232,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // Waterbending Lesson: "Then discard a card unless you waterbend {2}." You choose as it resolves whether to pay {2},
+  // tapping artifacts and creatures you control for its generic mana (CR 701.67a, rulings), or to discard.
+  if ((m = new RegExp(`^[Dd]iscard ${NUM} cards? unless you waterbend \\{(\\d+)\\}$`).exec(s))) {
+    const n = Number(m[2]);
+    return [{ type: "punisher", who: { ref: "you" }, options: [{ pay: { cost: `{${n}}`, waterbend: n } }], effects: [{ type: "discard", who: { ref: "punished" }, n: num(m[1]!), random: false }] }];
+  }
   // "Its controller may draw up to two cards" (Arcane Denial), "each opponent may draw up to three cards": each chooses how
   // many, none to that many (rulings).
   if ((m = new RegExp(`^(?:(.+?) (?:may )?draws?|(?:You may )?[Dd]raw) up to ${NUM} cards$`).exec(s))) {

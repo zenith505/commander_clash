@@ -731,6 +731,11 @@ export interface Player {
   drewInDrawStep?: number;
   /** The turn this player last would have drawn a card: "the first time you would draw a card each turn" (Scion of Halaster). */
   firstWouldDraw?: number;
+  /**
+   * Urabrask, Heretic Praetor: "the next time they would draw a card this turn, instead they exile the top card of their
+   * library. They may play it this turn." One entry for each, in turn `turn`; each replaces one draw (CR 614.1a).
+   */
+  nextDrawExiles?: { turn: number; source: string }[];
   /** The turn this player was last dealt combat damage, and the turns their current and previous turns began (s.turn), for "if you haven't been dealt combat damage since your last turn". */
   combatDamagedTurn?: number;
   turnBegan?: number;
@@ -1245,7 +1250,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[] }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[] }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
@@ -1300,6 +1305,8 @@ export interface TurnLog {
   saddledBy?: Record<string, string[]>;
   /** End steps begun this turn: more than one with additional end steps (Y'shtola Rhul's "the first end step of the turn"). */
   endSteps?: number;
+  /** The players who drew in this turn's draw step for "you draw a card during each opponent's draw step" (Teferi, Who Slows the Sunset's emblem). */
+  drawStepDraws?: PlayerId[];
   /** Upkeep steps begun this turn (Paradox Haze's "first upkeep each turn"). */
   upkeeps?: number;
   /** Each permanent sacrificed this turn: who sacrificed it, and its card types and subtypes as it last existed (Elanor Gardner). */
@@ -2106,6 +2113,8 @@ export interface Resolving {
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
+    /** Birthing Ritual: the sacrifice after looking has been chosen (Effect dig `sacrificeFirst`). */
+    digSacrificed?: true;
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
     copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true; /** Twinning Staff's additional copies still to make (CR 614.1a), and the opponent's copies left. */ extra?: number; oppLeft?: number; /** Copy "eachOther" (Zada): the permanent each copy still to make targets, in order; who controls them; whether the next one's has been chosen. */ each?: ObjectId[]; by?: PlayerId; picked?: true }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */

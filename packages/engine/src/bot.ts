@@ -52,6 +52,7 @@ import {
   player,
   potentialAttackers,
   foretoldCast,
+  foretellCostOf,
   combatDamageOf,
   spellCost,
   graveyardWay,
@@ -1816,7 +1817,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
   const paidAs = free ? madnessCastOf(s, pid, id) : undefined;
-  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via, pid)?.mana ?? altCost(d, alt, s, pid)?.mana ?? d.manaCost);
+  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via, pid)?.mana ?? altCost(d, alt, s, pid, obj(s, id))?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free && !paidAs) return null;
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
@@ -2066,9 +2067,10 @@ function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
  * most on a later turn.
  */
 function chooseForetell(s: GameState, pid: PlayerId): Action[] | null {
-  const saving = (id: string) => mv(s, id) - manaValue(parseManaCost(compileCard(defOf(s, obj(s, id))).foretell ?? ""));
+  const saving = (id: string) => mv(s, id) - manaValue(parseManaCost(foretellCostOf(s, obj(s, id)) ?? ""));
+  // Foretell from Dream Devourer: only a card it makes cheaper by the {2} paid now (rulings: generic mana only).
   const options = player(s, pid)
-    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).foretell)
+    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).foretell || (foretellCostOf(s, obj(s, id)) !== undefined && saving(id) >= 2))
     .sort((a, b) => saving(b) - saving(a));
   for (const id of options) {
     const plan = planForetell(s, pid, id);
@@ -2943,6 +2945,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       const sub = r.item.subject && s.objects[r.item.subject.id];
       return !!sub && !objIsType(s, sub, "Creature");
     }
+    // Star Athlete: "its controller may sacrifice it. If they don't, ~ deals 5 damage to that player": a cheap
+    // permanent, or everything when the damage would leave us low.
+    const sac = e.effects.length === 1 && e.effects[0]!.type === "sacrifice" && e.effects[0]!.what.ref === "target" ? r.item.targets?.[e.effects[0]!.what.index] : undefined;
+    if (sac?.kind === "object" && s.objects[sac.id]) return life <= 10 || worth(s, pid, s.objects[sac.id]!) <= 2;
     return allEffects(after.effects).some((x) => x.type === "damage" || x.type === "loseLife") ? life <= 15 : false;
   }
   // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each ..."

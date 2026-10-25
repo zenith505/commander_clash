@@ -121,6 +121,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       const grant = parseGrants(m[1]!);
       return grant?.length && grant.every((x) => x.kind === "addAbility") ? [{ type: "spellGains", mods: grant, forever: true }] : null;
     }
+    // Judith, Carnage Connoisseur: "That spell gains deathtouch and lifelink": what the spell has as a source of damage
+    // (CR 702.2b, 702.15b) while it's that spell.
+    if (!m[2] && /^[Tt]hat spell/.test(s)) {
+      const mods = parseGrants(m[1]!);
+      return mods?.length && mods.every((x) => x.kind === "addKeywords" && x.keywords.every((k) => k === "Deathtouch" || k === "Lifelink")) ? [{ type: "spellGains", mods, whileSpell: true }] : null;
+    }
     const mods = m[2] ? parseGrants(m[1]!) : null;
     return mods?.length && mods.every((x) => x.kind === "addKeywords") ? [{ type: "spellGains", mods }] : null;
   }

@@ -438,6 +438,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${m[1]} creature`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, sharesTypeWithSubject: true }) : null;
   }
+  // Hateful Eidolon: "draw a card for each Aura you controlled that was attached to it", after "an enchanted creature dies".
+  if (/^Auras? you controlled that (?:was|were) attached to it$/.test(p) && ctx?.subjectIt) return count({ kind: "aurasYouControlledAttached" });
+  // Titan of Littjara: "for each other creature you control that shares a creature type with it", "it" being ~.
+  if (/^other creatures? you control that shares? a creature type with (?:it|~)$/i.test(p) && ctx?.selfIt) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: p }, other: true, sharesTypeWithSource: true });
   // Mana Echoes: "the number of creatures you control that share a creature type with it", "it" the creature the trigger
   // is about, which counts too if you control it (rulings), counted as it resolves.
   if (/^creatures you control that share a creature type with it$/i.test(p) && ctx?.subjectIt) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: p }, sharesTypeWithSubject: true, includeSubject: true });

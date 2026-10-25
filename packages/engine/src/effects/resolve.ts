@@ -1206,7 +1206,10 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
   // A spell's reflexive trigger: its source is the spell, gone from the stack, so as it last existed there (CR 113.7a).
-  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
+  // "That spell gains deathtouch and lifelink" (Judith): keywords it gained while on the stack.
+  const gained = spell?.zone === "stack" ? (spell.spellGains ?? []).flatMap((g) => g.mods.flatMap((m) => (m.kind === "addKeywords" ? m.keywords : []))) : [];
+  const base = cardSource(ctx.sourceDef, ctx.controller, ref);
+  return { ...base, ...(gained.length ? { keywords: [...new Set([...base.keywords, ...gained])] } : {}), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
 }
 
 /**

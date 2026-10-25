@@ -467,6 +467,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.putThereThisTurn && o.toGraveyardTurn !== s.turn) return false;
     if (spec.fromLibraryThisTurn && o.fromLibraryTurn !== s.turn) return false;
     if (spec.milledThisTurn && o.milledTurn !== s.turn) return false;
+    if (spec.fromBattlefieldThisTurn && o.fromBattlefieldTurn !== s.turn) return false;
     return printedMatches(spec, defOf(s, o));
   }
   if (spec.kind === "any") {

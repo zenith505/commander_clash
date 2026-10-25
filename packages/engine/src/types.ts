@@ -224,6 +224,8 @@ export interface GameObject {
    * N'ghathrod), and by a mill instruction ("milled this turn", Tato Farmer, CR 701.17a). */
   fromLibraryTurn?: number;
   milledTurn?: number;
+  /** The turn it was last put into a graveyard from the battlefield ("put there from the battlefield this turn", Brought Back). */
+  fromBattlefieldTurn?: number;
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;
@@ -360,6 +362,8 @@ export interface GameObject {
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
     free?: true;
+    /** Foretold with the foretell a permanent gave it in hand (Dream Devourer): its foretell cost is its mana cost (the face cast's, rulings) less this much generic mana, though it doesn't have foretell any more (rulings). */
+    foretellReduce?: number;
     /** With `free`: it may be cast paying its costs instead (Ignite the Future, rulings), as it is when X isn't 0. */
     orPay?: true;
     /** "During any turn you attacked with a token" (Neyali): only in a turn its player declared a token as an attacker (Player.tokenAttackedTurn). */
@@ -512,7 +516,7 @@ export interface GameObject {
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
-  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true; until?: "yourNextTurn" }[];
+  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true; until?: "yourNextTurn"; whileSpell?: true }[];
   /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
   reboundGained?: true;
   /** A spell that gained sunburst this many times (Lux Artillery): each instance works as it enters from the stack (CR 702.44a). */
@@ -1010,6 +1014,8 @@ export interface LastKnown {
   commander?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
+  /** Who controlled each Aura attached to it as it last existed, one entry per Aura (Hateful Eidolon, CR 603.10a). */
+  auraControllers?: PlayerId[];
   /** The Equipment attached to it as it last existed (Zack Fair: "an Equipment that was attached to ~"). */
   equipment?: { id: ObjectId; zc: number }[];
   /**
@@ -2159,6 +2165,8 @@ export interface Resolving {
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
     castFromHand?: string;
+    /** The same from the graveyard (Sword of Once and Future): the card being cast, to exile it instead of its going back. */
+    castFromYard?: ObjectId;
     /**
      * "You may cast any number of spells ... from among them" (Primeval Spawn): the exiled cards, the total mana value
      * still allowed, the card last offered, the cards not cast when offered, and the card picked ("none" to stop).

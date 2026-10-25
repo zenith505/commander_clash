@@ -403,6 +403,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Storm of Saruman: "copy it, except the copy isn't legendary" (CR 707.9b; a permanent spell's copy becomes a
   // nonlegendary token, CR 608.3f).
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?(, except the copy isn't legendary)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
+  // Bonus Round: "that player copies it and may choose new targets for the copy": the caster copies it and controls the
+  // copy (rulings, CR 707.10).
+  if (ctx.castSpell && /^[Tt]hat player copies (?:it|that spell) and may choose new targets for the copy$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, byController: true }];
   // Unbound Flourishing: "Whenever you cast a permanent spell with a mana cost that contains {X}, double the value of X":
   // the X of that spell while it's on the stack (CR 107.3a); no more mana is paid (rulings).
   if (ctx.castSpell && /^[Dd]ouble the value of X$/.test(s)) return [{ type: "doubleX" }];

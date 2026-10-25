@@ -486,6 +486,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Rr]eturn each Aura card from your graveyard to the battlefield$/.test(s)) {
     return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura card" } }];
   }
+  // Bringer of the Last Gift: "Then each player returns all creature cards from their graveyard that weren't put there
+  // this way to the battlefield": each player's own, under their control (CR 110.2a), all at once, but not the cards the
+  // sacrifice before it put there.
+  if ((m = /^(?:Then )?[Ee]ach player returns all creature cards from their graveyard that weren't put there this way to the battlefield$/.exec(s))) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card that wasn't put there this way" }, owners: true, notSacrificedThisWay: true }];
+  }
   // "Return all creature cards with mana value 2 or less from your graveyard to the battlefield" (Raise the Past).
   if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
     m[1] = m[1]!.replace(/ cards( with mana value (?:X|\d+) or less)?$/, "$1");
@@ -556,8 +562,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "You may put a land card from your hand or graveyard onto the battlefield" (Bonny Pall): one card, from either zone.
   // "... with a finality counter on it" (Kastral, the Windcrested): it enters with that counter (CR 122.6).
   const finality = / with a finality counter on it$/.test(s);
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : s))) {
+  // "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to ~" (Danitha,
+  // Benalia's Hope): only to the source permanent (see Effect putFromHand's `attachToSelf`).
+  const toSelf = / attached to ~$/.test(s);
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : toSelf ? s.replace(/ attached to ~$/, "") : s))) {
     const orYard = !!m[4];
+    if (toSelf && (ctx.spell || m[2] === "any number of" || m[5] || m[6])) return null;
     if (finality && (m[2] === "any number of" || m[6])) return null;
     m.splice(4, 1);
     if (orYard && (m[2] === "any number of" || m[5])) return null;
@@ -575,7 +585,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;
     const filter = filter0 && (lesser || equal) ? { ...filter0, text: m[3]! } : filter0;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}) }];
   }
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
@@ -621,7 +631,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what?.ref === "target" && ctx.targets[i]?.linkedExile ? [{ type: "putInGraveyard", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.

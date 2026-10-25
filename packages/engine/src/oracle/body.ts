@@ -758,6 +758,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
   text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
+  // Brought Back: "Choose up to two target permanent cards in your graveyard that were put there from the battlefield this
+  // turn. Return them to the battlefield tapped." is one instruction; they return at the same time.
+  text = text.replace(/^[Cc]hoose (up to (?:one|two|three) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
   // can't be the targets of blue or black spells this turn": two instructions.
   text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
@@ -855,6 +858,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b([Ii]f) (it|~) has (power|toughness) (\w+) or (greater|less),/g, (_, i: string, w: string, st: string, n: string, c: string) => `${i} ${w === "~" ? "~'s" : "its"} ${st} is ${n} or ${c},`);
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
   text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
+  // Benevolent Offering: "You gain 2 life for each creature you control and that player gains 2 life for each creature they
+  // control." is two instructions, you first.
+  text = text.replace(/\bYou gain (\d+) life for each creature you control and that player gains \1 life for each creature they control\./g, "You gain $1 life for each creature you control. That player gains $1 life for each creature they control.");
+  // Intellectual Offering: "Untap all nonland permanents you control and all nonland permanents that player controls."
+  // Untapping one group then the other can't be told from untapping both at once (nothing waits on the event between).
+  text = text.replace(/\bUntap all nonland permanents you control and all nonland permanents that player controls\./g, "Untap all nonland permanents you control. Untap all nonland permanents that player controls.");
+  // Taigam, Master Opportunist: "copy it, then exile the spell you cast with four time counters on it." is two
+  // instructions, the copy first.
+  text = text.replace(/^[Cc]opy it, then (exile the spell you cast with \w+ time counters? on it\.)/, (_, rest: string) => `Copy it. ${capital(rest)}`);
+  // Vexing Radgull: "that player gets two rad counters if they don't have any rad counters. Otherwise, proliferate."
+  text = text.replace(/(^|\. )[Tt]hat player gets (\w+) rad counters if they don't have any rad counters\. Otherwise,/, (_, lead: string, n: string) => `${lead}If that player has no rad counters, that player gets ${n} rad counters. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // Ral, Leyline Prodigy: "Draw a card if you control a blue permanent other than ~": another blue permanent.
   text = text.replace(/\bif you control an? ((?:white|blue|black|red|green) (?:permanent|creature)) other than ~\./g, "if you control another $1.");
@@ -2180,6 +2194,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // "Choose up to one target nonland permanent. Its controller may sacrifice it. If they don't, ~ deals 5 damage to that
+    // player." (Star Athlete): its controller decides as it resolves; with no target nothing happens (rulings).
+    const athleteChoose = /^[Cc]hoose (up to one )?target ([^.]+)$/.exec(s);
+    const athleteThen = athleteChoose && sentences[si + 1]?.replace(/\.$/, "") === "Its controller may sacrifice it" ? /^If they don't, (~ deals \d+ damage) to that player$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;
+    if (athleteChoose && athleteThen) {
+      const spec = parseTargetPhrase(athleteChoose[2]!);
+      if (spec?.kind !== "object") return null;
+      const index = addTarget(ctx, { ...spec, ...(athleteChoose[1] ? { optional: true } : {}), text: `${athleteChoose[1] ?? ""}target ${athleteChoose[2]!}` });
+      const dmg = parseOne(`${athleteThen[1]!} to each opponent`, ctx);
+      if (dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
+      effects.push(
+        { type: "eachMay", who: { ref: "targetController", index }, effects: [{ type: "sacrifice", what: { ref: "target", index }, byController: true }], text: `sacrifice the targeted ${athleteChoose[2]!}; if you don't, ${athleteThen[1]!} to you` },
+        { type: "if", cond: { kind: "theyChose", not: true }, effects: [{ ...dmg[0]!, to: { ref: "targetController", index } }] },
+      );
+      si += 2;
+      continue;
+    }
     // "Whenever a player casts their first spell each turn, choose another target player. ~ deals damage equal to that
     // spell's mana value to the chosen player." (The Lord of Pain): a player other than the caster (rulings).
     const another = ctx.eventPlayer && /^[Cc]hoose another target player$/.test(s) ? /^(.+) to the chosen player$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
@@ -2943,6 +2974,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may cast target instant or sorcery card from an opponent's graveyard without paying its mana cost." (Memory
     // Plunder): the same, the spell going to its owner's graveyard after; Arcane Heist: "If that spell would be put into
     // their graveyard, exile it instead".
+    // Sword of Once and Future: "Then you may cast an instant or sorcery spell with mana value 2 or less from your graveyard
+    // without paying its mana cost. If that spell would be put into your graveyard, exile it instead.": one card there,
+    // picked and cast as this resolves, or none (rulings).
+    const castYard = /^(?:Then )?[Yy]ou may cast (an? .+? spell with mana value \d+ or less) from your graveyard without paying its mana cost$/.exec(s);
+    if (castYard && sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead") {
+      const fx = parseOne(`You may cast ${castYard[1]!} from your hand without paying its mana cost`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "castFromHand") return null;
+      effects.push({ ...fx[0]!, fromGraveyard: true });
+      si++;
+      continue;
+    }
     const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from (your|an opponent's) graveyard) without paying its mana cost$/.exec(s);
     if (castTarget) {
       const theirs = castTarget[2] !== "your";
@@ -4926,13 +4968,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "chooseFromGraveyard", n: 1, milled: true, ...(filter ? { filter } : {}) });
       continue;
     }
+    // Snort: "Each player may discard their hand and draw five cards. Then ~ deals 5 damage to each opponent who discarded
+    // their hand this way": those who chose to, an empty hand too (rulings).
+    const wheeled = /^(?:Then )?~ deals (\d+) damage to each opponent who discarded their hand this way$/.exec(s);
+    if (wheeled) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "eachMay" || prev.wheel === undefined) return null;
+      effects.push({ type: "damage", amount: Number(wheeled[1]), to: { ref: "choseThisWay", opponents: true } });
+      continue;
+    }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
       // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
       // "If your life total is greater than your starting life total, draw a card. Otherwise, you gain 2 life." (Cosmos Elixir).
       // "If you control a Demon, each opponent loses 2 life and you gain 2 life. Otherwise, you lose 2 life." (Unholy Annex).
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control");
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad");
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -5319,6 +5370,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: mayThen ? [{ type: "may", effects: inner, text: mayThen[1]! }] : inner });
         continue;
       }
+      // Uchuulon: "Exile up to one target creature card from an opponent's graveyard. If you do, create a token that's a copy
+      // of ~": only if a card was exiled (none chosen, or the target gone, and it wasn't).
+      if (ifDid[1] === "do" && prev?.type === "exile" && !prev.until && !prev.linked && !prev.ownerMay && !prev.youMay && prev.what.ref === "target" && !prev.what.n && ctx.targets[prev.what.index]?.kind === "card") {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsExiledThisWay" } }, min: 1 }, effects: inner });
+        continue;
+      }
       // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent
       // controls" (Masked Vandal): whether a card was exiled.
       if (!mustSac && (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay))) return null;
@@ -5475,6 +5534,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
+      continue;
+    }
+    // Vexing Radgull: "If that player has no rad counters, that player gets two rad counters. Otherwise, proliferate.":
+    // the trigger's player, checked as it resolves.
+    const noRad = ctx.eventPlayer ? /^If that player has no rad counters, (.+)$/.exec(s) : null;
+    if (noRad) {
+      const inner = parseOne(capital(noRad[1]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "eventPlayerNoRad" } }, effects: inner });
       continue;
     }
     // Fevered Visions: "If the player is your opponent and has four or more cards in hand, ~ deals 2 damage to that
@@ -5832,6 +5900,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
     // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").
     if (/^[Cc]hoose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
+      // The Offerings: a spell's second paragraph starting "Choose an opponent." again, its own choice (rulings on
+      // Sylvan Offering: the same opponent or a different one, chosen as it resolves).
+      if (ctx.chosenOpponent && ctx.spell && s === "Choose an opponent" && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined) {
+        effects.push({ type: "choose", choice: "opponent", again: true });
+        continue;
+      }
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
       effects.push({ type: "choose", choice: "opponent", ...(/^[Cc]hoose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
       ctx.chosenOpponent = true;
@@ -6115,6 +6189,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       last.noRegen = true;
       // "Destroy target nonblack creature and target land. They can't be regenerated.": both.
       if (/^They\b/.test(s)) for (let i = effects.length - 2, e = effects[i]; e?.type === "destroy"; e = effects[--i]) e.noRegen = true;
+      continue;
+    }
+    // Taigam, Master Opportunist: "copy it, then exile the spell you cast with four time counters on it. If it doesn't have
+    // suspend, it gains suspend.": the spell that triggered it, if it's still on the stack, exiled (not countered, so even
+    // one that can't be countered) and suspended (CR 702.62b).
+    const exileCast = ctx.castSpell ? new RegExp(`^(?:[Tt]hen )?[Ee]xile the spell you cast with ${NUM} time counters? on it$`).exec(s) : null;
+    if (exileCast && /^If it doesn't have suspend, it gains suspend\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "counterSpell", index: -1, cause: true, exileSpell: true, suspend: Number(amt(exileCast[1]!)) });
+      si++;
       continue;
     }
     // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
@@ -6800,7 +6883,8 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
   if (theirs) {
     const e = fx[0]!;
     if (e.type !== "loseLife" && e.type !== "gainLife" && e.type !== "draw") return null;
-    const whose: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : e.who.ref === "eventPlayer" ? e.who : null;
+    // "That player gains 2 life for each creature they control" (Benevolent Offering): the chosen opponent.
+    const whose: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : e.who.ref === "eventPlayer" || (e.who.ref === "chosenPlayer" && e.who.nth === undefined) ? e.who : null;
     const count = whose && parseCount(`${theirs[1]} on the battlefield`, ctx, true);
     if (!count || count.count.kind !== "permanents" || count.times || count.plus) return null;
     const scaled = scaleEffect(e, { count: { ...count.count, whose } });

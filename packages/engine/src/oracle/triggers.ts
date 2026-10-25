@@ -76,6 +76,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you untap one or more permanents during your untap step, (.+)$/, "youUntapInUntapStep"],
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
+  [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you scry or surveil, (.+)$/, "youScryOrSurveil"],
   [/^Whenever you scry, (.+)$/, "youScry"],
@@ -1131,6 +1132,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!draw) return "fail";
     const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
     return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
+  } else if ((m = /^Whenever a player attacks, add (one|two|three|four|five|six|seven|eight|nine|ten) \{R\}\. Until end of combat, you don't lose this mana as steps end\.?$/.exec(line))) {
+    // Avatar Roku, Firebender: any player's declaration of attackers (CR 508.1), red mana for this ability's controller
+    // that stays in their pool until end of combat (as firebending's does, CR 702.189a, 500.4).
+    return { event: "creaturesYouControlAttack", body: { targets: [], effects: [{ type: "addCombatMana", n: num(m[1]!) }], text: m[0].replace(/^[^,]+, /, "") }, anyoneAttacks: true };
   } else if ((m = /^Whenever a player attacks, if one or more players being attacked are poisoned, (the attacking player draws a card)\.?$/.exec(line))) {
     // Norn's Decree: any player's attack (CR 508.3d), checked as it triggers and as it resolves (CR 603.4).
     const draw = parseBody("That player draws a card.", { eventPlayer: true });

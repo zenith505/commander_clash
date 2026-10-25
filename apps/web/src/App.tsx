@@ -117,6 +117,7 @@ import {
   planPlot,
   planForetell,
   foretellProblem,
+  foretellCostOf,
   foretoldCast,
   plotProblem,
   plotCost,
@@ -1205,7 +1206,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer)) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).foretell || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || foretellCostOf(s, o) || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
     // A card with several faces to cast or play it as (a split card's halves, an Adventure, a modal double-faced card's
     // back): choose which.
     if ((o.zone === "hand" || o.zone === "command" || (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) || (o.zone === "exile" && mayPlayFromExile(s, o, HUMAN) && o.mayPlay?.until !== "adventure")) && (castableFaces(s, o).length || landFaces(s, o).some((f) => f !== 0))) return setMenu(o.id);
@@ -3280,7 +3281,7 @@ function ZoneViewer({
               >
                 <CardFace d={d} />
                 {view.zone === "exile" && s.objects[id]!.foretold && (
-                  <span className="zone-tag" title={`Foretold: only you can see it. On a later turn, cast it for ${compileCard(d).foretell ?? "its foretell cost"}.`}>
+                  <span className="zone-tag" title={`Foretold: only you can see it. On a later turn, cast it for ${foretellCostOf(s, s.objects[id]!, d) ?? "its foretell cost"}.`}>
                     foretold
                   </span>
                 )}
@@ -4101,9 +4102,9 @@ function AbilityMenu({
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? plotCost(s, HUMAN, d) : undefined;
-  const foretell = o.zone === "hand" ? compileCard(d).foretell : undefined;
+  const foretell = o.zone === "hand" ? foretellCostOf(s, o, d) : undefined;
   // A foretold card: cast only for its foretell cost (CR 702.143a).
-  const foretold = foretoldCast(s, HUMAN, o) ? compileCard(d).foretell : undefined;
+  const foretold = foretoldCast(s, HUMAN, o) ? foretellCostOf(s, o, d) : undefined;
   // A manifested card with morph can be turned face up either way (CR 701.40c).
   const upWays = o.zone === "battlefield" ? faceUpWays(s, o) : [];
   const inYard = o.zone === "graveyard";

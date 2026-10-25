@@ -1,7 +1,7 @@
 # Roadmap
 
-24,227 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,896 of 4,988 (98%).
+24,253 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,917 of 4,988 (98%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -59,9 +59,22 @@ line blocks.
    stack object, abilities included); Surge to Victory (the trigger it grants for the turn has to remember the exiled
    card it copies); Norman Osborn // Green Goblin (Green Goblin gives mayhem to cards in your graveyard); Zarda,
    Heroes' Advocate ("Heroes" in the plural isn't read as a creature type) and Rashel ("Auras you control have exalted"
-   on noncreature permanents). Next most played: Bonus Round, Danitha, Benalia's Hope, Vexing Radgull, Sylvan Offering,
-   Zenos yae Galvus, Avatar Roku, Firebender, Snort, Dream Devourer, Bringer of the Last Gift, Uchuulon, Taigam, Master
-   Opportunist.
+   on noncreature permanents). Out after round 160: Zenos yae Galvus // Shinryu (a creature chosen as it enters,
+   remembered on the permanent; "as this transforms, choose an opponent"; "when the chosen player loses the game, you
+   win"); Filigree Vector (two "any number of target" slots in one ability: only one per ability is modeled); Kaito,
+   Bane of Nightmares (a planeswalker that's a creature during your turn, with ninjutsu onto its loyalty); Elenda,
+   Saint of Dusk ("hexproof from instants": hexproof from a card type isn't modeled, only from colors); Xu-Ifit,
+   Osteoharmonist (the creature "has no abilities" as it enters, so its own enters-tapped, enters-with-counters and "as
+   it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Next most played:
+   Tithing Blade // Consuming Sepulcher (craft with a creature), Nelly Borca, Impulsive Accuser, Wondrous Crucible,
+   Flamerush Rider, Summon: Good King Mog XII, Winota, Joiner of Forces, Faerie Artisans, Treasure Chest, Possibility
+   Storm, Toralf, God of Fury, Izzet Generatorium, Triple Triad, Zara, Renegade Recruiter; Hallowed Moonlight (Containment
+   Priest's replacement for one turn) and Infernal Offering are near.
+   Smaller gaps from round 160: when Nemata, Primeval Warden and another "exile it instead" replacement both apply to a
+   dying creature, the engine applies the first one it finds rather than letting the affected creature's controller
+   choose (CR 616.1); Dream Devourer's granted foretell on a card with {X} in its cost is untested (X is 0 when cast for
+   the foretell cost, CR 107.3); bots facing Star Athlete sacrifice a permanent only when it's cheap (worth 2 or less)
+   or at 10 life or less.
    Smaller gaps from round 158: "you control a creature with the greatest power among creatures on the battlefield" works
    in triggers and as a resolution check (High Score, Éomer of the Riddermark), but as the condition of a static ability
    it would read power before the layers finish; bots using Garnet, Princess of Alexandria remove a lore counter from

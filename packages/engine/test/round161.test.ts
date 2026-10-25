@@ -485,3 +485,25 @@ describe("Summon: Good King Mog XII", () => {
     expect(s.floatingTriggers?.some((t) => t.sourceId === m) ?? false).toBe(false);
   });
 });
+
+const calligrapher = card("Combat Calligrapher", "Creature — Bird Cleric", "{3}{W}", { cmc: 4, power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nInklings can't attack you or planeswalkers you control.\nWhenever a player attacks one of your opponents, that attacking player creates a tapped 2/1 white and black Inkling creature token with flying that's attacking that opponent." });
+
+describe("Combat Calligrapher", () => {
+  it("is fully supported", () => supported(calligrapher));
+
+  it("a player attacking one of your opponents gets a tapped Inkling attacking that opponent; attacking you gives nothing", () => {
+    const { s: s0, ap } = setup([]);
+    const [b, c] = [next(s0, ap), next(s0, next(s0, ap))];
+    putOnBattlefield(s0, c, calligrapher);
+    const x = putOnBattlefield(s0, ap, bear());
+    const y = putOnBattlefield(s0, ap, bear());
+    let s = attack(s0, ap, [{ attacker: x, defender: b }, { attacker: y, defender: c }]);
+    s = resolveAll(s);
+    const inklings = s.battlefield.filter((id) => s.objects[id]!.isToken && nameOf(s, id).startsWith("Inkling"));
+    expect(inklings.length).toBe(1);
+    const ink = s.objects[inklings[0]!]!;
+    expect(ink.controller).toBe(ap);
+    expect(ink.tapped).toBe(true);
+    expect(ink.attacking).toBe(b);
+  });
+});

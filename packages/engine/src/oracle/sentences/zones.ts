@@ -623,7 +623,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere |from the battlefield )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }

@@ -936,6 +936,10 @@ export type PlayerRef =
   | { ref: "choseWord"; option: string }
   /** "Each opponent who lost 3 or more life this turn" (Davros, Dalek Creator): paid life counts too (CR 119.4). */
   | { ref: "opponentsLostLife"; n: number }
+  /** "Each opponent with no cards in hand" (Tinybones, Trinket Thief): as it resolves (rulings). */
+  | { ref: "opponentsEmptyHanded" }
+  /** "Each of its controller's opponents" (Bounty Board): every other player than the subject's controller (CR 102.2, 800.4), as it last existed. */
+  | { ref: "subjectControllerOpponents" }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
   | { ref: "opponentsControllingNo"; filter: TargetSpec }
   /** "Each opponent who didn't discard a nonland card this way" (Kroxa): opponents none of whose cards discarded in this resolution match `filter` (printed characteristics), those who discarded nothing too. */
@@ -1345,7 +1349,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending"; not?: true }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1431,7 +1435,7 @@ export type StaticCondition =
   /** "If an opponent lost life this turn". */
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
   /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
-  | { kind: "discardedThisTurn" }
+  | { kind: "discardedThisTurn"; /** "If an opponent discarded a card this turn" (Tinybones, Trinket Thief): an opponent of `you`. */ opponent?: true }
   | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
@@ -1557,7 +1561,7 @@ export type StaticCondition =
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
    */
-  | { kind: "phase"; phase: "main" | "combat"; yours?: true; first?: true }
+  | { kind: "phase"; phase: "main" | "combat" | "end"; yours?: true; first?: true }
   /** "If it's attacking the player with the most life or tied for most life" (Scourge of the Throne; dethrone's test, CR 702.105a). */
   | { kind: "attackingMostLife" }
   /** "While you have the most life or are tied for most life" (Preacher of the Schism). */
@@ -1915,7 +1919,7 @@ export type Effect =
    */
   /** Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control" (CR 903.3, 110.2a): every player's. */
   | { type: "commandersOntoBattlefield" }
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[] }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true }
   /**
@@ -3302,6 +3306,8 @@ export type SpellCondition =
   | { kind: "returnedYoursAtLeast"; n: number }
   /** "You may put a land card from among them onto the battlefield tapped. If you don't, ..." (Planar Genesis): its last dig took a card. */
   | { kind: "digTook" }
+  /** "Search your library for a card, put it into your graveyard, then shuffle. If it's an instant or sorcery card, ..." (Oriq Loremage): the card its last search found is this. */
+  | { kind: "searchFound"; filter: TargetSpec }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
   | { kind: "excessDealt"; /** "To a creature this way" (Vikya): only excess dealt to a creature counts. */ creature?: true; /** "If the creature the opponent controls is dealt excess damage this way" after a fight (The Last Agni Kai): only that target's. */ target?: number }
   /**
@@ -5359,6 +5365,8 @@ export interface CompiledCard {
   landsFromGraveyard?: boolean;
   /** "You may play Forests from your graveyard." (Titania, Nature's Force): only lands with one of these subtypes. */
   landsFromGraveyardOf?: string[];
+  /** Glacierwood Siege's "• Sultai — You may play lands from your graveyard.": the same as `landsFromGraveyard`, only while this holds. */
+  landsFromGraveyardIf?: StaticCondition;
   /**
    * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
    * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).

@@ -2984,6 +2984,7 @@ function takeSkip(s: GameState, pid: PlayerId, what: SkipWhat): boolean {
 /** Enter a step, perform its turn-based actions, and give the active player priority if the step has priority. */
 function beginStep(s: GameState, step: Step): void {
   s.step = step;
+  invalidateCharacteristics(s); // "during your turn", "during your end step": statics that hold only in some steps
   s.passedInSuccession = [];
   s.priority = s.activePlayer;
   const ap = s.activePlayer;
@@ -3658,7 +3659,11 @@ function landsFromGraveyardNow(s: GameState, pid: PlayerId, o: GameObject): bool
     const of = abilitiesOf(s, obj(s, id)).landsFromGraveyardOf;
     return !!of && of.some((st) => characteristics(s, o).subtypes.includes(st));
   };
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
+  const anchored = (id: ObjectId) => {
+    const cond = abilitiesOf(s, obj(s, id)).landsFromGraveyardIf;
+    return !!cond && staticConditionNow(s, cond, id, pid);
+  };
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && (abilitiesOf(s, obj(s, id)).landsFromGraveyard || typed(id) || anchored(id))) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
 /** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */

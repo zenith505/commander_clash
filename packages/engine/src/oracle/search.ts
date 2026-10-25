@@ -123,6 +123,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     if (head === null || !amount || amount.plus !== undefined || amount.times !== undefined) return null;
     return { ...(head ?? { kind: "card" }), bound: { key: "manaValue", at: "most", amount: { ...amount, plus: -1, signed: true } }, text: p };
   }
+  // Transit Mage: "an artifact card with mana value 4 or 5": either one, a range of two.
+  const twoMv = / with mana value (\d+) or (\d+)$/.exec(p);
+  if (twoMv && Number(twoMv[2]) === Number(twoMv[1]) + 1) {
+    const head = parseSearchFilter(p.slice(0, twoMv.index));
+    return head === null || head?.manaValue ? null : { ...(head ?? { kind: "card" }), manaValue: { min: Number(twoMv[1]), max: Number(twoMv[2]) }, text: p };
+  }
   // "A creature card with an even mana value" (Gyruda, Doom of Depths; zero is even, X counts 0 off the stack, CR 202.3e).
   const parity = / with an? (even|odd) mana value$/.exec(p);
   if (parity) {

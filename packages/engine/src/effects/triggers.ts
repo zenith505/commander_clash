@@ -1476,7 +1476,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const wc = controllerOf(s, w);
-      if (wc !== dealerBy && ev.player !== wc) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      // Brood Sliver's "to a player": to the watcher's controller too.
+      if (wc !== dealerBy) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && !(t.toOpponent && ev.player === wc) && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
     }
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
@@ -1497,19 +1498,26 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const item = s.stack.find((x) => x.id === ev.stackId);
     const spell = item?.objectId ? s.objects[item.objectId] : undefined;
     // "When you next cast ... this turn": once, for the first such spell (CR 603.7c).
+    let nextCastCascade = false;
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
       if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       s.nextCast = s.nextCast!.filter((x) => x !== d);
       // "Has cascade": the spell's own cascade ability triggers (CR 702.85a).
       if (d.uncounterable) {
         if (spell) spell.uncounterableCast = true;
-      } else if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      } else if (d.cascade && spell) {
+        nextCastCascade = true;
+        s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      }
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
-    if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+    const granted = spell && item && !ev.copy ? grantedCascades(s, item, spell, ev.controller) : [];
+    // "Whenever you cast a spell with cascade" (Aurora Phoenix): printed, or given to it as it was cast.
+    const hasCascade = !!spell && (defOf(s, spell).keywords.includes("Cascade") || nextCastCascade || granted.length > 0);
+    if (spell && item && !ev.copy) for (const _ of granted) for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
     // Storm a permanent or an emblem gives the spells its controller casts (Prismari, Ral's emblem): the spell's own (CR 702.40a).
     if (spell && item && !ev.copy)
       for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)])
@@ -1562,7 +1570,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
-        if (t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
+        if (t.cast.keyword === "Cascade" ? !hasCascade : t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);

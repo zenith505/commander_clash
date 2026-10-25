@@ -547,6 +547,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return opponents(s, ctx.controller).filter((p) => !(s.resolving?.discardedAll ?? []).some((id) => s.objects[id]?.owner === p && printedMatches(ref.filter, defOf(s, s.objects[id]!))));
     case "opponentsLostLife":
       return opponents(s, ctx.controller).filter((p) => (s.turnLog?.lifeLost?.[p] ?? 0) >= ref.n);
+    case "subjectControllerOpponents": {
+      const ctl = players(s, { ref: "subjectController" }, ctx)[0];
+      return ctl === undefined ? [] : apnap(s, livingPlayers(s).filter((p) => p !== ctl));
+    }
+    case "opponentsEmptyHanded":
+      return opponents(s, ctx.controller).filter((p) => !player(s, p).hand.length);
     case "choseWord":
       return apnap(s, Object.entries(s.resolving?.chose ?? {}).filter(([, w]) => w === ref.option).map(([k]) => Number(k) as PlayerId)).filter((p) => !player(s, p).lost);
     case "choseThisWay":

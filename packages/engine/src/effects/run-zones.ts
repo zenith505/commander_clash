@@ -2301,8 +2301,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
       if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
       enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) })));
+      const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
+      // Storm of Souls: "Each of them is a 1/1 Spirit with flying ...", for good (CR 611.2c).
+      if (e.alsoMods && entered.length) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: entered, mods: e.alsoMods });
+        invalidateCharacteristics(s);
+      }
       // "They gain haste until end of turn" (Wake the Past): the permanents they became.
-      (s.resolving!.created ??= []).push(...ids.filter((id) => obj(s, id).zone === "battlefield"));
+      (s.resolving!.created ??= []).push(...entered);
       return;
     }
     case "returnFaceDownExiled": {

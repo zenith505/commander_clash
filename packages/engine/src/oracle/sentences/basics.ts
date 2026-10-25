@@ -182,6 +182,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const may: Effect = { type: "eachMay", who: { ref: "subjectController" }, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] };
     return m[1] ? [{ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: "power", greatest: true } }, effects: [may] }] : [may];
   }
+  // Brood Sliver: "its controller may create a 1/1 colorless Sliver creature token": the creature's controller decides,
+  // and the token is theirs.
+  if ((ctx.subjectIt || ctx.subject) && (m = /^[Ii]ts controller may create (.+)$/.exec(s))) {
+    const fx = parseSentence(`Create ${m[1]!}`, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "createToken" || fx[0]!.who.ref !== "you") return null;
+    return [{ type: "eachMay", who: { ref: "subjectController" }, text: `create ${m[1]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
+  }
   // Scheming Symmetry: "Choose two target players. Each of them searches their library for a card, then shuffles and
   // puts that card on top." The targets, then each player's search in APNAP order (CR 101.4); each shuffles before
   // putting the card on top, one action (rulings on Vampiric Tutor).

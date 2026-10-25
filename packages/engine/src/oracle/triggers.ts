@@ -589,7 +589,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (pw) what = what.slice(0, pw.index);
   // "A spell that has convoke" (Joyful Stormsculptor), "a creature spell with flying", "with infect": the spell as it
   // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
-  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect)$/.exec(what) : null;
+  // "A spell with cascade" (Aurora Phoenix): printed or given to it as it's cast (effects/triggers.ts hasCascade).
+  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect|cascade)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
   // "A spell with {X} in its mana cost", "a permanent spell with a mana cost that contains {X}" (Unbound Flourishing): the
   // mana symbol {X} in the mana cost of the spell (the half cast, for a split card), not another X.
@@ -863,6 +864,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(any[1]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
+  }
+  // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
+  // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.
+  const anySliver = /^Whenever a ([A-Z][a-z]+) deals combat damage to a player, (.+)$/.exec(line);
+  if (anySliver && CREATURE_TYPES.has(anySliver[1]!)) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(anySliver[2]!)) return "fail";
+    const body = parseBody(anySliver[2]!, { subjectIt: true, eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anySliver[1]!], text: anySliver[1]! }, anyone: true }, body };
   }
   // "Whenever a creature you control deals combat damage during your turn, put that many +1/+1 counters on it" (Quilled
   // Greatwurm): to anything, all its combat damage of the step at once (CR 510.2), "that many" being that total.

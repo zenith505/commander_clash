@@ -96,7 +96,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
@@ -924,6 +924,8 @@ export type PlayerRef =
   | { ref: "opponentsLostLife"; n: number }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
   | { ref: "opponentsControllingNo"; filter: TargetSpec }
+  /** "Each opponent who didn't discard a nonland card this way" (Kroxa): opponents none of whose cards discarded in this resolution match `filter` (printed characteristics), those who discarded nothing too. */
+  | { ref: "opponentsNotDiscarded"; filter: TargetSpec }
   /** "Each player who controls an artifact or enchantment" (Fade from History): as this instruction is carried out. */
   | { ref: "playersControlling"; filter: TargetSpec };
 
@@ -1074,6 +1076,8 @@ export type Modification =
    */
   | { kind: "setLandTypes"; subtypes: string[] }
   | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
+  /** Layer 4, "loses all creature types" (Amoeboid Changeling): its creature types go, changeling's too; ones gained later come back (rulings, CR 613.7). */
+  | { kind: "loseCreatureTypes" }
   /** `chosen`: "becomes the color of your choice", the color chosen as it resolved. */
   | { kind: "setColors"; colors: Color[]; chosen?: true } // layer 5
   | { kind: "addColors"; colors: Color[] } // layer 5, "is blue in addition to its other colors"
@@ -1388,6 +1392,8 @@ export type StaticCondition =
   | { kind: "fullParty" }
   /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */
   | { kind: "ringBearer"; not?: true; self?: true }
+  /** "If the Ring has tempted you two or more times this game" (Frodo, Adventurous Hobbit; CR 701.54c): `n` or more. */
+  | { kind: "ringTempted"; n: number }
   /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
   | { kind: "maxSpeed" }
   /** "∞ — [Ability]": as long as this permanent is harnessed (CR 702.186b). */
@@ -2137,7 +2143,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3283,6 +3289,8 @@ export type SpellCondition =
   | { kind: "rollIn"; min?: number; max?: number; event?: true }
   /** "If none of those creatures attacked you" (Firemane Commando): the attack trigger's event counted none attacking its controller. */
   | { kind: "noneAttackedYou" }
+  /** "If they didn't attack you that turn" (Faramir, Prince of Ithilien): the event player attacked you (not your planeswalkers or battles, rulings) with a creature this turn; `not`: didn't. */
+  | { kind: "eventPlayerAttackedYou"; not?: true }
   /** "If an artifact card was discarded this way" (Reckless Handling): one of the cards this resolution discarded, by its card (CR 701.9). */
   | { kind: "discardedThisWayIs"; filter: TargetSpec }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
@@ -4832,6 +4840,8 @@ export interface CompiledCard {
   damageToOpponentsMills?: true;
   /** Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards" (CR 615.5, 615.12). */
   damageToYouMillsTwice?: true;
+  /** "Prevent all noncombat damage that would be dealt to you and other permanents you control." (The Wanderer, CR 615.1): see staticRules in damage.ts. */
+  preventToYou?: { combat?: "only" | "non"; others?: true };
   /**
    * "All damage that would be dealt to you is dealt to enchanted creature instead" (Pariah, CR 614.9): `to` is where it
    * goes (this permanent, or the creature it's attached to); `others`: "you and other permanents you control" (Palisade
@@ -5287,6 +5297,8 @@ export interface CompiledCard {
    * controller may cast spells like these any time they could cast an instant.
    */
   flashFor?: TargetSpec[];
+  /** "Any player may cast Sliver spells as though they had flash" (Quick Sliver, CR 702.8a): every player may, not only its controller. */
+  flashForAll?: TargetSpec[];
   /** "The first creature spell you cast each turn ... can be cast as though it had flash" (Radagast of Rhosgobel): only while you've cast none of these this turn. */
   flashForFirst?: TargetSpec[];
   /**

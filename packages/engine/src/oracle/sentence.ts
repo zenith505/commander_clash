@@ -335,6 +335,8 @@ export function parseChanges(text: string): Modification[] | null {
       if (!k) return null;
       out.push(...k);
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
+    // Amoeboid Changeling: "loses all creature types" (layer 4).
+    else if (/^loses? all creature types$/i.test(p)) out.push({ kind: "loseCreatureTypes" });
     // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
     // can't give them back either (rulings).
     else if ((m = /^loses? (.+?) and can't have (?:or gain )?(.+)$/i.exec(p))) {

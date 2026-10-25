@@ -1331,15 +1331,17 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere(?: other than the battlefield)?), (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere(?: other than the battlefield)?)( during your turn)?, (.+)$/.exec(line))) {
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
-    // leaves your graveyard": once for each card (CR 603.2c).
+    // leaves your graveyard": once for each card (CR 603.2c). Kishla Skimmer: "Whenever a card leaves your graveyard
+    // during your turn".
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
     const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
     // Bloodchief Ascension: "a card is put into an opponent's graveyard from anywhere", "that player" being its owner.
     batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : {}), each: true };
-    rest = m[3]!;
+    yourTurn = !!m[3];
+    rest = m[4]!;
     eachOwner = true;
   } else if ((m = /^Whenever you create one or more (creature )?tokens( for the first time each turn)?, (.+)$/.exec(line))) {
     // Staff of the Storyteller: once for each event in which you create any (CR 111.2, 603.2c), whoever controls them.

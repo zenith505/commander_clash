@@ -4827,6 +4827,8 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
     const o = obj(s, id);
     // Teferi, Mage of Zhalfir: the card's owner's Teferi, whoever casts it.
     if (owner !== undefined && controllerOf(s, o) === owner && abilitiesOf(s, o).flashOwned?.some((spec) => printedMatches(spec, d))) return true;
+    // Quick Sliver: any player, whoever controls it.
+    if (abilitiesOf(s, o).flashForAll?.some((spec) => printedMatches(spec, d))) return true;
     if (controllerOf(s, o) !== pid) return false;
     // Radagast: the first creature spell you cast this turn, those cast before it was on the battlefield counted (rulings).
     const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, s.cards[c.card]!));

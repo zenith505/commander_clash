@@ -5,6 +5,7 @@ import type { Color } from "../types";
 import { num, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
 import { Ctx, addTarget } from "./body";
 import { parseBoundCount, parseCount } from "./counts";
+import { parseSearchFilter } from "./search";
 
 /** Creature types with a hyphen, by how they read lowercased ("assembly-worker"). */
 const HYPHENATED = new Map([...CREATURE_TYPES].filter((ty) => ty.includes("-")).map((ty) => [ty.toLowerCase(), ty]));
@@ -134,6 +135,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     const spec = parseTargetPhrase(without[1]!);
     if (spec?.kind === "object" && !spec.controller && !spec.bound) return { ref: "opponentsControllingNo", filter: spec };
     return null;
+  }
+  // Kroxa: "each opponent discards a card, then each opponent who didn't discard a nonland card this way loses 3 life":
+  // those who discarded a land card or nothing (rulings).
+  const notDiscarded = ctx.opponentsDiscarded ? /^each opponent who didn't discard an? (.+? card) this way$/.exec(x) : null;
+  if (notDiscarded) {
+    const filter = parseSearchFilter(notDiscarded[1]!);
+    return filter ? { ref: "opponentsNotDiscarded", filter } : null;
   }
   // "Choose an opponent. That player sacrifices a creature of their choice."
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };

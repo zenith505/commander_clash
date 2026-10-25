@@ -347,6 +347,9 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     // Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards": the cards
     // are milled even if the damage can't be prevented (rulings, CR 615.12).
     if (abilitiesOf(s, cover).damageToYouMillsTwice) out.push({ id: `static-millself:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "you" }, mill: true, millSelf: 2 });
+    // The Wanderer: "Prevent all noncombat damage that would be dealt to you and other permanents you control."
+    const pv = abilitiesOf(s, cover).preventToYou;
+    if (pv) out.push({ id: `static-prevent:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, ...(pv.combat ? { combat: pv.combat } : {}), to: { players: "you", ...(pv.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" }, notObject: id } : {}) } });
     // Pariah, Palisade Giant (CR 614.9): all damage that would be dealt to its controller (and their other permanents) is
     // dealt to it or the creature it's attached to instead. Several of them: the player being dealt the damage chooses
     // which applies (CR 616.1, rulings on Palisade Giant).
@@ -391,7 +394,7 @@ function ruleCovers(s: GameState, r: DamageRule, to: Rec): boolean {
   if (r.redirect && "object" in r.redirect && "object" in to && r.redirect.object === to.object) return false;
   if ("player" in to) return t.player === to.player || t.players === "all" || (t.players === "you" && to.player === r.controller) || (t.players === "opponents" && to.player !== r.controller);
   const o = s.objects[to.object];
-  if (!o || o.zone !== "battlefield") return false;
+  if (!o || o.zone !== "battlefield" || t.notObject === o.id) return false;
   if (t.object && t.object.id === o.id && t.object.zc === (o.zoneChanges ?? 0)) return true;
   return !!t.objects && objectMatches(s, t.objects, o, r.controller, false);
 }
@@ -1184,7 +1187,7 @@ export function shieldChoicesPossible(s: GameState): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);
-    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills || a.damageToYouMillsTwice || a.preventToYou);
   });
 }
 

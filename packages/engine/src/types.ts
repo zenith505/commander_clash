@@ -31,7 +31,7 @@ export interface DamageRule {
   /** The card that made it, a key into `cards`: its name for the log, and the source of the damage `dealBack` deals. */
   cardId: string;
   combat?: "only" | "non";
-  to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; object?: { id: ObjectId; zc: number }; player?: PlayerId };
+  to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; object?: { id: ObjectId; zc: number }; player?: PlayerId; /** "Other permanents you control" (The Wanderer): not this one. */ notObject?: ObjectId };
   /**
    * `chosen`: the source chosen (CR 609.7a), as the object it was then; `spell`: it was a spell, so the permanent it
    * becomes is that source too. `filter`: what the source has to be when it would deal the damage (CR 609.7b).

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, abilityProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, abilityProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, moveObject, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -402,5 +402,48 @@ describe("Nelly Borca, Impulsive Accuser", () => {
     const before = s.players[ap]!.hand.length + s.players[b]!.hand.length;
     s = resolveAll(passUntil(s, "endCombat", ap));
     expect(s.players[ap]!.hand.length + s.players[b]!.hand.length).toBe(before);
+  });
+});
+
+const artisans = card("Faerie Artisans", "Creature — Faerie Artificer", "{3}{U}", { cmc: 4, power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying\nWhenever a nontoken creature an opponent controls enters, create a token that's a copy of that creature except it's an artifact in addition to its other types. Then exile all other tokens created with this creature." });
+
+describe("Faerie Artisans", () => {
+  it("is fully supported", () => supported(artisans));
+
+  it("copies an opponent's nontoken creature as an artifact, then exiles the other tokens it created, not another Artisans'", () => {
+    const { s: s0, ap } = setup([]);
+    const b = next(s0, ap);
+    const mine = putOnBattlefield(s0, ap, artisans);
+    let s = s0;
+    const enter = (pid: PlayerId, def: CardDef) => {
+      const id = into(s, pid, def, "hand");
+      moveObject(s, id, "battlefield");
+      s = resolveAll(s);
+      return id;
+    };
+    const tokens = () => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap);
+    enter(b, bear({ name: "First Bear" }));
+    expect(tokens().map((id) => nameOf(s, id))).toEqual(["First Bear"]);
+    const first = tokens()[0]!;
+    expect(characteristics(s, s.objects[first]!).types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    // Its own creature or a token entering doesn't trigger it.
+    enter(ap, bear({ name: "Own Bear" }));
+    expect(tokens()).toEqual([first]);
+    // The next one: the first token is exiled, the new one stays.
+    enter(b, bear({ name: "Second Bear" }));
+    expect(tokens().map((id) => nameOf(s, id))).toEqual(["Second Bear"]);
+    expect(s.objects[first]?.zone ?? "gone").not.toBe("battlefield");
+    // A token another source created isn't "created with" it.
+    const other = putOnBattlefield(s, ap, { ...artisans, oracleId: "artisans2" });
+    s.objects[other]!.controller = ap;
+    const second = tokens()[0]!;
+    // The legend rule doesn't apply (not legendary); the second Artisans' copy leaves the first one's token alone.
+    s.battlefield.splice(s.battlefield.indexOf(mine), 1);
+    s.objects[mine]!.zone = "graveyard";
+    s.players[ap]!.graveyard.push(mine);
+    invalidateCharacteristics(s);
+    enter(b, bear({ name: "Third Bear" }));
+    expect(tokens().map((id) => nameOf(s, id)).sort()).toEqual(["Second Bear", "Third Bear"]);
+    expect(tokens()).toContain(second);
   });
 });

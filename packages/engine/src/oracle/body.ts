@@ -1146,6 +1146,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   // "Loses two times X life" (Debt to the Deathless) is "loses twice X life".
   text = text.replace(/\bloses two times X life\b/g, "loses twice X life");
+  // "A token that's a copy of that creature except it's an artifact ..." (Faerie Artisans): the usual comma.
+  text = text.replace(/\b(a token that's a copy of that creature) except it's /g, "$1, except it's ");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Search your library for two cards. Put one into your hand and the other into your graveyard. Then shuffle." (Final
   // Parting): one search, as Cultivate's.
@@ -2758,6 +2760,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, randomLinked: true } });
       si += 2;
+      continue;
+    }
+    // Faerie Artisans: "Then exile all other tokens created with this creature": those its abilities created, as that
+    // object (rulings), not the one just created.
+    if (/^(?:Then )?[Ee]xile all other tokens created with (?:~|this creature)$/.test(s)) {
+      effects.push({ type: "exile", what: { ref: "tokensCreatedWithSelf" } });
       continue;
     }
     // Wondrous Crucible: "exile a nonland card at random from your graveyard. Copy it. You may cast the copy without paying

@@ -233,6 +233,8 @@ export interface GameObject {
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** A token: the permanent whose ability created it, as that object ("tokens created with ~", Faerie Artisans). */
+  createdWith?: { id: ObjectId; zc: number };
   /** An emblem in its owner's command zone (CR 114): neither a card nor a permanent, its abilities working there (114.4). */
   emblem?: true;
   /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */

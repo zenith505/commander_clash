@@ -790,6 +790,8 @@ export type ObjRef =
    * graveyard it went to from the battlefield then or since, while it's still there (rulings); `yours`: "from your
    * graveyard", only if that's its controller's (rulings on Screams from Within).
    */
+  /** "All other tokens created with ~" (Faerie Artisans): the tokens on the battlefield this object's abilities created, not those created as this resolves (rulings: each Artisans only its own). */
+  | { ref: "tokensCreatedWithSelf" }
   | { ref: "selfCard"; moved?: true; yours?: true; /** Craft's "Return this card" (CR 702.167a): the card its own cost exiled, still in exile and still that object (CR 400.7j). */ exiledAsCost?: true }
   /** "Create a 0/0 Fractal creature token. Put X +1/+1 counters on it": the token(s) this ability just created. */
   | { ref: "created" }

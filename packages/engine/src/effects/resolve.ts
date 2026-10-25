@@ -329,6 +329,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     }
     return out;
   }
+  if (ref.ref === "tokensCreatedWithSelf")
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.createdWith?.id === ctx.sourceId && o.createdWith?.zc === ctx.sourceZc && !s.resolving?.created?.includes(o.id));
   if (ref.ref === "selfCard") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // An Aura's card in the graveyard it went to from the battlefield, as its creature died or since (Angelic Destiny

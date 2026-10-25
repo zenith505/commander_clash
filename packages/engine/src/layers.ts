@@ -642,6 +642,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.max === undefined || s.players[eventPlayer]!.hand.length <= cond.max) && (cond.min === undefined || s.players[eventPlayer]!.hand.length >= cond.min);
     case "eventPlayerOpponent":
       return eventPlayer !== undefined && eventPlayer !== you;
+    case "eventPlayerNoRad":
+      return eventPlayer !== undefined && !s.players[eventPlayer]!.rad;
     case "eventPlayerLifeLost":
       return eventPlayer !== undefined && (s.turnLog?.lifeLost?.[eventPlayer] ?? 0) <= cond.max;
     case "defenderMostLife": {
@@ -749,6 +751,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "life": {
       const fits = (life: number) => (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
       if (cond.opponent) return s.players.some((p) => p.id !== you && !p.lost && fits(p.life));
+      if (cond.everyone) return s.players.every((p) => p.lost || fits(p.life));
       return fits(s.players[you]?.life ?? 0);
     }
     case "discardedThisTurn":

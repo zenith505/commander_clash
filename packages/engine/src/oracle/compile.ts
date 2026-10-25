@@ -1357,6 +1357,16 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, linked: true, ...(life ? { gainLife: Number(life[1]) } : {}), ...(token ? { token } : {}) };
       continue;
     }
+    // Nemata, Primeval Warden: "If a creature an opponent controls would die, exile it instead. When you do, create a 1/1
+    // green Saproling creature token.": the replacement (CR 614.1a), and a reflexive trigger when it's applied (CR 603.12).
+    const exileWhen = /^If an? (.+?) would die, exile it instead\. When you do, (.+)\.$/.exec(line);
+    if (exileWhen) {
+      const filter = parseTargetPhrase(exileWhen[1]!);
+      const body = parseBody(`${capital(exileWhen[2]!)}.`, {});
+      if (filter?.kind !== "object" || filter.combat || !body || body.targets.length || /\b(?:it|that creature|that card)\b/.test(exileWhen[2]!)) out.unsupported.push(raw);
+      else out.exileInsteadOfDying = { filter, reflexive: body };
+      continue;
+    }
     // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)
     const exileDies = /^If (~|a|an|another) (.+? )?would die, exile it instead\.$/.exec(line);
     if (exileDies) {
@@ -1672,6 +1682,10 @@ export function compile(d: CardDef): CompiledCard {
       out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
       continue;
     }
+    if (line === "Your life total can't change.") {
+      out.lifeCantChange = true;
+      continue;
+    }
     if (line === "If a player would gain life, that player gains no life instead.") {
       out.gainsNoLife = true;
       continue;
@@ -1802,6 +1816,10 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    if (line === "If a nontoken creature would enter and it wasn't cast, exile it instead.") {
+      out.exileUncastCreatures = true;
+      continue;
+    }
     if (line === "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead.") {
       out.exileUnlessCastWithMana = true;
       continue;
@@ -1915,6 +1933,13 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${warpGrant[1]!.toLowerCase().replace(/ cards and /, " card or ").replace(/ cards$/, " card")} from a graveyard`);
       if (f?.kind !== "card") out.unsupported.push(raw);
       else (out.handWarp ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${warpGrant[1]!.toLowerCase()} in your hand` }, mana: warpGrant[2]!, text: line });
+      continue;
+    }
+    // Dream Devourer: "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana
+    // cost reduced by {2}." Foretell for those cards while they're in its controller's hand (CR 702.143a).
+    const foretellGrant = /^Each nonland card in your hand without foretell has foretell\. Its foretell cost is equal to its mana cost reduced by \{(\d+)\}\.$/.exec(line.replace(/ \(During your turn, [^)]*\)$/, ""));
+    if (foretellGrant) {
+      (out.handForetell ??= []).push({ reduce: Number(foretellGrant[1]), text: line });
       continue;
     }
     // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
@@ -2974,7 +2999,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
       // Trouble in Pairs: "Whenever an opponent attacks you with two or more creatures, draws their second card each
       // turn, or casts their second spell each turn, you draw a card": three triggers (rulings: each can trigger).
-      /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line);
+      /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line) ??
+      // Norin the Wary: "When a player casts a spell or a creature attacks, ...": a cast and an attack are never one event.
+      /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast ~ and whenever/.test(line)
@@ -2999,6 +3026,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ ${twice[2]}, ${effect}`]
+            : /^When a player casts a spell or a creature attacks, /.test(line)
+              ? [`Whenever ${twice[1]}, ${effect}`, `Whenever ${twice[2]}, ${effect}`]
             : twice.length === 5
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)

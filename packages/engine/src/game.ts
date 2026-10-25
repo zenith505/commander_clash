@@ -728,6 +728,16 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of entering: ${fromZone === "stack" && !o.spellCopy ? "no mana was spent to cast it" : "it wasn't cast"}.`);
     to = "exile";
   }
+  // Containment Priest: "If a nontoken creature would enter and it wasn't cast, exile it instead" (CR 614.1a): from a
+  // permanent already on the battlefield (not one entering with it, rulings), for a card that would be a creature there
+  // (CR 614.12: a noncreature card entering as a creature too, rulings). A spell resolving was cast; a copy is a token.
+  if (to === "battlefield" && fromZone !== "battlefield" && fromZone !== "stack" && fromZone !== "phasedOut" && fromZone !== "merged" && !o.isToken && !o.spellCopy) {
+    const priest = s.battlefield.find((b) => b !== id && abilitiesOf(s, obj(s, b)).exileUncastCreatures);
+    if (priest && entersAsCreature(s, o, opts.controller ?? o.controller, opts.faceDown)) {
+      log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} is exiled instead of entering: it wasn't cast (${characteristics(s, obj(s, priest)).name}).`);
+      to = "exile";
+    }
+  }
   // Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
   // instead" (CR 614.1a), with a delayed trigger to return it (below). With other replacements that would exile it, its
   // controller applies this one first (CR 616.1), the one that brings it back.
@@ -786,6 +796,9 @@ export function moveObject(
       createExtraTokens(s, you, extra);
       if (same) log(s, `${player(s, you).name} creates ${same === 1 ? "a" : same} ${x.token.name} token${same > 1 ? "s" : ""}.`);
     }
+    // Nemata: "When you do, ...": a reflexive trigger of that permanent's (CR 603.12), also if it's leaving at the same time.
+    const from = s.objects[by];
+    if (x.reflexive && from) s.triggerQueue.push({ sourceId: by, sourceCardId: cardIdOf(from), controller: you, index: -1, sourceZc: from.zoneChanges ?? 0, body: x.reflexive });
   }
   // Darksteel Colossus: "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's
   // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
@@ -861,6 +874,9 @@ export function moveObject(
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
   if (snapshot) snapshot.lastAttachments = attachments;
+  // An Aura or Equipment that left at the same time was attached to it as it last existed too (CR 603.10a; rulings on
+  // Hateful Eidolon).
+  if (fromZone === "battlefield") for (const l of s.leftTogether ?? []) if (l.attachedTo === id && l.id !== id && !attachments.includes(l.id)) attachments.push(l.id);
   o.exiledUntilLeaves = undefined;
   const from = zoneList(s, o);
   if (from) {
@@ -994,6 +1010,7 @@ export function moveObject(
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.toGraveyardTurn = to === "graveyard" ? s.turn : undefined;
   o.fromLibraryTurn = to === "graveyard" && fromZone === "library" ? s.turn : undefined;
+  o.fromBattlefieldTurn = to === "graveyard" && fromZone === "battlefield" ? s.turn : undefined;
   o.milledTurn = to === "graveyard" && fromZone === "library" && opts.milled ? s.turn : undefined;
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
@@ -1050,7 +1067,7 @@ export function moveObject(
     for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
     o.extraCounters = undefined;
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
-    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : (g.until ?? "endOfTurn"), ...(g.until ? { turnOf: g.controller } : {}), affected: [o.id], mods: g.mods });
+    for (const g of fromZone === "stack" ? (o.spellGains ?? []).filter((g) => !g.whileSpell) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : (g.until ?? "endOfTurn"), ...(g.until ? { turnOf: g.controller } : {}), affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
     // Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has the ability for good.
     if (o.entersGaining && (fromZone === "stack" || fromZone === "graveyard")) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: "Serra Paragon", duration: "game", affected: [o.id], mods: [{ kind: "addAbility", text: o.entersGaining }] });
@@ -1622,6 +1639,26 @@ export function entersRulesOf(s: GameState, pid: PlayerId, id: ObjectId): Compil
   }
 }
 
+/** Would this card be a creature on the battlefield under `pid`, face down as `faceDown` says (CR 614.12)? */
+function entersAsCreature(s: GameState, o: GameObject, pid: PlayerId, faceDown?: FaceDownKind): boolean {
+  if (o.zone === "battlefield") return objIsType(s, o, "Creature");
+  const was = { zone: o.zone, controller: o.controller, timestamp: o.timestamp, faceDown: o.faceDown };
+  o.zone = "battlefield";
+  o.controller = pid;
+  o.timestamp = s.nextTimestamp;
+  if (faceDown) o.faceDown = faceDown;
+  s.battlefield.unshift(o.id);
+  invalidateCharacteristics(s);
+  try {
+    return objIsType(s, o, "Creature");
+  } finally {
+    s.battlefield.shift();
+    Object.assign(o, was);
+    if (was.faceDown === undefined) delete o.faceDown;
+    invalidateCharacteristics(s);
+  }
+}
+
 /**
  * Can this land enter untapped by its "you may pay 2 life / reveal a card" choice right now?
  * Paying life needs at least that much life (CR 119.4); revealing needs a matching card in hand
@@ -1675,8 +1712,11 @@ const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.tur
 
 /** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
 export function canLoseLife(s: GameState, pid: PlayerId): boolean {
-  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange && player(s, pid).lifeCantChangeTurn !== s.turn;
+  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange && player(s, pid).lifeCantChangeTurn !== s.turn && !lifeLocked(s, pid);
 }
+
+/** "Your life total can't change" (Platinum Emperion, CR 119.7-8): a permanent of this player's says so. */
+const lifeLocked = (s: GameState, pid: PlayerId) => s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).lifeCantChange && controllerOf(s, obj(s, id)) === pid);
 
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
 export function halfLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility): number {
@@ -1690,7 +1730,7 @@ export function payableLife(s: GameState, pid: PlayerId): number {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
-  if (player(s, pid).lifeCantChange || player(s, pid).lifeCantChangeTurn === s.turn || player(s, pid).cantGainLifeForGame) return false;
+  if (player(s, pid).lifeCantChange || player(s, pid).lifeCantChangeTurn === s.turn || player(s, pid).cantGainLifeForGame || lifeLocked(s, pid)) return false;
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
   return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
@@ -4082,7 +4122,7 @@ export function castProblem(
     return choices?.alt === "citadel" ? `nothing lets you pay life rather than ${d.name}'s mana cost` : `cast ${d.name} from the top of your library by paying life equal to its mana value`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
-    if (!altCost(d, choices.alt, s, pid))
+    if (!altCost(d, choices.alt, s, pid, o))
       return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "omniscience" ? "you don't control a permanent that lets you cast spells from your hand without paying their mana costs" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
@@ -4105,10 +4145,10 @@ export function castProblem(
     if (((via && !permissionWay(via)) || free || plotted) && choices.alt !== "prototype") return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (via && (choices.alt === "foretell" || choices.alt === "citadel" || choices.alt === "omniscience" || choices.alt === "miracle")) return `${d.name} can't be cast for its ${choices.alt} cost from a graveyard`;
     // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
-    const cond = altCost(d, choices.alt, s, pid)?.if;
+    const cond = altCost(d, choices.alt, s, pid, o)?.if;
     if (cond && !staticConditionNow(s, cond, id, pid)) return `${d.name}'s alternative cost can't be paid now`;
     // Paying an alternative cost that has no X, X is 0 (CR 107.3b); the Shoals' "a red card with mana value X" has one.
-    const paid = altCost(d, choices.alt, s, pid)!;
+    const paid = altCost(d, choices.alt, s, pid, o)!;
     if (x && parseManaCost(d.manaCost).hasX && !parseManaCost(paid.mana).hasX && !paid.costs?.some((c) => xCost(c) || (c.kind === "exileFromHand" && c.mvX))) return "X is 0 unless the cost you pay has X";
     if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
@@ -4397,7 +4437,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // From a graveyard with a permission that names no cost, an alternative cost replaces the mana cost (CastFromGraveyard).
   const way = graveyardWay(s, o, how.via, pid);
   const wayMana = way && !(how.alt && permissionWay(way)) ? way.mana : undefined;
-  const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
+  const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid, o)?.mana ?? airbent ?? d.manaCost);
   const mana = anyType(lessColored(parseManaCost(base + kickCost)));
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
@@ -4637,8 +4677,11 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 }
 
 /** A card's own alternative cost of that kind; with `s` and the caster, Fist of Suns' {W}{U}{B}{R}{G} too (CR 118.9). */
-export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
-  if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
+export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId, /** The card being cast: a foretold one's cost from Dream Devourer. */ o?: GameObject): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  if (alt === "foretell") {
+    const mana = s && o ? foretellCostOf(s, o, d, pid) : compileCard(d).foretell;
+    return mana ? { kind: "foretell", mana } : undefined;
+  }
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
   // Omniscience: nothing at all, for a spell cast from the hand (checked in castProblem).
   if (alt === "omniscience") return s && pid !== undefined && controlsPayWUBRG(s, pid, "castFromHandFree") ? { kind: "omniscience", mana: "", text: "without paying its mana cost" } : undefined;
@@ -9296,7 +9339,7 @@ export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): stri
   const o = s.objects[id];
   if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be foretold";
   const d = defOf(s, o);
-  if (!compileCard(d).foretell) return `${d.name} doesn't have foretell`;
+  if (!compileCard(d).foretell && grantedForetell(s, pid, o) === undefined) return `${d.name} doesn't have foretell`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (s.activePlayer !== pid) return "you can only foretell during your own turn";
   if (!canPayFromPool(s, pid, parseManaCost("{2}"), "other")) return `not enough mana to foretell ${d.name} ({2})`;
@@ -9312,13 +9355,50 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const d = defOf(s, o);
+  // Dream Devourer's foretell: the card keeps the foretell cost it was given, not the ability (rulings).
+  const reduce = compileCard(d).foretell ? undefined : grantedForetell(s, p.id, o);
   spendFromPool(s, p.id, parseManaCost("{2}"), "other");
   moveObject(s, id, "exile");
   o.foretold = true;
-  o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn };
+  o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn, ...(reduce !== undefined ? { foretellReduce: reduce } : {}) };
   log(s, `${p.name} foretells a card.`);
-  log(s, `(You foretold ${d.name}: cast it on a later turn for ${compileCard(d).foretell}.)`, p.id);
+  log(s, `(You foretold ${d.name}: cast it on a later turn for ${foretellCostOf(s, o, d) ?? "its foretell cost"}.)`, p.id);
   s.passedInSuccession = [];
+  fireEvent(s, { type: "foretold", player: p.id });
+}
+
+/**
+ * The foretell a permanent `pid` controls gives this nonland card without foretell in their hand (Dream Devourer, CR
+ * 702.143a): how much generic mana its foretell cost is less than its mana cost. The least of several reductions is
+ * no use, so the greatest.
+ */
+function grantedForetell(s: GameState, pid: PlayerId, o: GameObject): number | undefined {
+  const d = defOf(s, o);
+  if (o.zone !== "hand" || o.owner !== pid || isType(d, "Land") || compileCard(d).foretell) return undefined;
+  const all = s.battlefield.flatMap((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid ? (abilitiesOf(s, p).handForetell ?? []).map((x) => x.reduce) : [];
+  });
+  return all.length ? Math.max(...all) : undefined;
+}
+
+/**
+ * A card's foretell cost: its own (CR 702.143a), or, for one in hand with foretell from Dream Devourer or foretold with
+ * it, `d`'s mana cost (the face it's cast as, rulings) less that much generic mana, never colored mana (rulings). A card
+ * with no mana cost has none to reduce: no foretell cost to pay (CR 118.6).
+ */
+export function foretellCostOf(s: GameState, o: GameObject, d: CardDef = defOf(s, o), pid: PlayerId = o.owner): string | undefined {
+  const own = compileCard(d).foretell;
+  if (own) return own;
+  const reduce = o.zone === "exile" && o.mayPlay?.until === "foretell" ? o.mayPlay.foretellReduce : grantedForetell(s, pid, o);
+  if (reduce === undefined || !d.manaCost) return undefined;
+  let left = reduce;
+  const cost = d.manaCost.replace(/\{(\d+)\}/g, (_, n: string) => {
+    const k = Math.max(0, Number(n) - left);
+    left = Math.max(0, left - Number(n));
+    return k ? `{${k}}` : "";
+  });
+  return cost || "{0}";
 }
 
 /**

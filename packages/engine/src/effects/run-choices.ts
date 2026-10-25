@@ -432,6 +432,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const r = s.resolving!;
       if (e.choice === "opponent") {
         // "Choose an opponent" (CR 608.2d): one still in the game (CR 800.4a); with one, there's nothing to ask.
+        // Sylvan Offering's second "Choose an opponent": a new choice (the same opponent allowed, rulings).
+        const sc = (r.scratch ??= {});
+        if (e.again && !sc.asked) {
+          sc.asked = true;
+          if (r.chosen) r.chosen = { ...r.chosen, player: undefined };
+        }
         if (r.chosen?.player !== undefined) return;
         const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
         const most = Math.max(...living.map((x) => player(s, x).life));

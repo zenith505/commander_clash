@@ -140,6 +140,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;
+      // The source's creature types now, or as it last existed (CR 608.2h).
+      const src = c.sharesTypeWithSource && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const srcLk = src && src.zone !== "battlefield" ? s.lastKnown?.[src.id]?.creatureTypes : undefined;
+      const srcTypes = c.sharesTypeWithSource ? (!src ? new Set<string>() : src.zone === "battlefield" ? creatureTypesOf(s, src) : srcLk === "all" ? "all" : new Set(srcLk ?? [])) : undefined;
       const notThis = c.otherThanSubject ? ctx.objects?.({ ref: "subject" })[0]?.id : c.otherThanTarget !== undefined ? ctx.objects?.({ ref: "target", index: c.otherThanTarget })[0]?.id : undefined;
       const lk = subject && c.includeSubject && subject.zone !== "battlefield" ? s.lastKnown?.[subject.id]?.creatureTypes : undefined;
       const types = subject && (c.includeSubject && subject.zone !== "battlefield" ? (lk === "all" ? "all" : new Set(lk ?? [])) : creatureTypesOf(s, subject));
@@ -156,6 +160,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[id]!;
         if ((c.other && id === ctx.sourceId) || id === notThis) continue;
         if (subject && ((id === subject.id && !c.includeSubject) || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
+        if (srcTypes && (id === ctx.sourceId || !shareCreatureType(srcTypes, creatureTypesOf(s, o)))) continue;
         if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
         if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
         const ch = view(o);
@@ -422,6 +427,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const a = s.players[ctx.controller]?.attackedPlayers;
       return a?.turn === s.turn ? a.players.filter((pid) => pid !== ctx.controller).length : 0;
     }
+    case "aurasYouControlledAttached":
+      return (ctx.lki?.auraControllers ?? []).filter((pid) => pid === ctx.controller).length;
     case "devoured": {
       // "For each creature it devoured" (CR 702.82b): the source, also after it left the battlefield (CR 608.2h).
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

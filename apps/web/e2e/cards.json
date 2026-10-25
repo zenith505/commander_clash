@@ -3792,6 +3792,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "43b5dbe9-41f7-4082-944b-ea9d6292c6fd",
+  "name": "Danitha, Benalia's Hope",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "First strike, vigilance, lifelink\nWhen Danitha enters, you may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to Danitha.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Vigilance",
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1e6f2997-a84b-4302-9d8b-ca4928961d24",
   "name": "Daring Buccaneer",
   "manaCost": "{R}",
@@ -4318,6 +4355,37 @@
   "commanderLegal": "legal",
   "set": "5dn",
   "releasedAt": "2004-06-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0ff7440b-b831-40a9-81c4-99d77bf93b8d",
+  "name": "Dream Devourer",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Demon Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon",
+   "Cleric"
+  ],
+  "oracleText": "Each nonland card in your hand without foretell has foretell. Its foretell cost is equal to its mana cost reduced by {2}. (During your turn, you may pay {2} and exile it from your hand face down. Cast it on a later turn for its foretell cost.)\nWhenever you foretell a card, this creature gets +2/+0 until end of turn.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14401,6 +14469,40 @@
   "commanderLegal": "legal",
   "set": "aer",
   "releasedAt": "2017-01-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fb03befb-b4e4-4ae9-908d-a16d5b03b054",
+  "name": "Star Athlete",
+  "manaCost": "{1}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "Menace\nWhenever this creature attacks, choose up to one target nonland permanent. Its controller may sacrifice it. If they don't, this creature deals 5 damage to that player.\nBlitz {3}{R} (If you cast this spell for its blitz cost, it gains haste and \"When this creature dies, draw a card.\" Sacrifice it at the beginning of the next end step.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Blitz",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

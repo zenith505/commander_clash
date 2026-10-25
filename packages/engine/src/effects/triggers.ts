@@ -157,6 +157,7 @@ export type TriggerSourceEvent =
   | { type: "damagePreventedToPlayer"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
+  | { type: "foretold"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
@@ -741,6 +742,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
       const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      // The Auras attached to it then, by their controllers then (Hateful Eidolon): one gone too, as it last existed.
+      const auraControllers = (ev.attachments ?? []).flatMap((aid) => {
+        const a = s.objects[aid];
+        if (!a || !characteristics(s, a).subtypes.includes("Aura")) return [];
+        return [a.zone === "battlefield" ? controllerOf(s, a) : (s.lastKnown?.[aid]?.controller ?? a.owner)];
+      });
+      if (auraControllers.length) (lki as LastKnown).auraControllers = auraControllers;
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0));
@@ -926,8 +934,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
       add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
-  } else if (ev.type === "evidenceCollected" || ev.type === "proliferated") {
-    const kind = ev.type === "proliferated" ? "youProliferate" : "youCollectEvidence";
+  } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold") {
+    const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : "youCollectEvidence";
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });

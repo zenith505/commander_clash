@@ -941,7 +941,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // costs are paid (rulings on the Expertises, CR 118.9, 107.3b). Lands can't be cast.
       const sc = (s.resolving!.scratch ??= {});
       const p = player(s, ctx.controller);
+      // From the graveyard: "if that spell would be put into your graveyard, exile it instead" applies to the spell it became.
+      if (sc.castFromHand === "cast" && e.fromGraveyard && sc.castFromYard) {
+        const o = s.objects[sc.castFromYard];
+        if (o?.zone === "stack") o.exileIfToGraveyard = true;
+        sc.castFromYard = undefined;
+      }
       if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
+      const zone = e.fromGraveyard ? p.graveyard : p.hand;
       const castable = (id: ObjectId) => {
         s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
         const problem = castProblem(s, p.id, id);
@@ -956,18 +963,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "Draw three cards and reveal them": the ones still in hand, which everyone sees (CR 701.20a).
         const drawn = e.drawn ? (s.resolving!.drawnThisWay ?? []).filter((id) => p.hand.includes(id)) : undefined;
         if (drawn?.length) log(s, `${p.name} reveals ${drawn.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
-        const options = (drawn ?? p.hand).filter((id) => !isType(defOf(s, obj(s, id)), "Land") && printedMatches(filter, defOf(s, obj(s, id))) && castable(id));
+        const options = (drawn ?? zone).filter((id) => !isType(defOf(s, obj(s, id)), "Land") && printedMatches(filter, defOf(s, obj(s, id))) && castable(id));
         if (!options.length) {
-          log(s, drawn ? `${p.name} can't cast any of them.` : `${p.name} has no ${filter.text.replace(/^an? /, "")} in hand to cast.`);
+          log(s, drawn ? `${p.name} can't cast any of them.` : `${p.name} has no ${filter.text.replace(/^an? /, "")} ${e.fromGraveyard ? "in their graveyard" : "in hand"} to cast.`);
           return;
         }
         const text = filter.text.replace(/^(?!an? )/, /^[aeiou]/i.test(filter.text) ? "an " : "a ");
-        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: drawn ? "cast one of the cards you drew without paying its mana cost?" : `cast ${text} from your hand without paying its mana cost?` };
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: drawn ? "cast one of the cards you drew without paying its mana cost?" : `cast ${text} from your ${e.fromGraveyard ? "graveyard" : "hand"} without paying its mana cost?` };
         return "paused";
       }
       const id = sc.castFromHand;
       sc.castFromHand = "cast";
-      if (!s.objects[id] || obj(s, id).zone !== "hand" || !castable(id)) return;
+      if (!s.objects[id] || obj(s, id).zone !== (e.fromGraveyard ? "graveyard" : "hand") || !castable(id)) return;
+      if (e.fromGraveyard) sc.castFromYard = id;
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
       return "paused";
     }
@@ -1833,8 +1841,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       const defender = attack?.player;
-      // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g).
-      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src);
+      // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g). "Attached to
+      // ~" (Danitha): only to the source, still on the battlefield as the same object (CR 400.7).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me : undefined;
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : undefined);
       if (hosts === "paused") return "paused";
       // "That creature gains haste": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
@@ -1842,18 +1853,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const o of cards) {
           const host = hosts.get(o.id);
           if (defOf(s, o).subtypes.includes("Aura") && !host) {
-            log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s hand.`);
+            log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s ${o.zone}.`);
             continue;
           }
+          // An Equipment "attached to ~": only to a creature it could equip (CR 301.5c-d); otherwise it enters unattached
+          // (rulings on Danitha, Benalia's Hope).
+          const d = defOf(s, o);
+          const equip = e.attachToSelf && !d.subtypes.includes("Aura") && d.subtypes.includes("Equipment") && !isType(d, "Creature") && !!self && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, self, p.id, false, d) ? { attachTo: self.id } : undefined;
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
-          log(s, `${p.name} puts ${defOf(s, o).name} from their ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host });
+          log(s, `${p.name} puts ${defOf(s, o).name} from their ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
+          moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host, ...equip });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
             if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
           }
           if (o.zone !== "battlefield") continue;
-          const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
           if (me) o.putBy = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
           s.resolving?.created?.push(o.id);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
@@ -2249,7 +2263,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(filter, d) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn)) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(filter, d) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && !(e.notSacrificedThisWay && s.resolving!.sacrificedThisWay?.some((k) => k.id === id))) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");
@@ -2606,7 +2620,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
         log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
         const ch = characteristics(s, o);
-        const last = { power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: by, types: [...ch.types] };
+        const last = { id: o.id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: by, types: [...ch.types] };
         moveObject(s, o.id, "graveyard", { sacrificed: true });
         // "If you do" (Dark Depths): it was sacrificed (CR 701.21a).
         if (s.resolving && o.zone !== "battlefield") (s.resolving.sacrificedThisWay ??= []).push(last);

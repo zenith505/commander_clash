@@ -705,6 +705,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
   // Bloodghast: "as long as an opponent has 10 or less life" (one still in the game).
   if ((m = /^an opponent has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), opponent: true };
+  if ((m = /^each player has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), everyone: true };
   if ((m = /^you have at least (\d+) life more than your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1]) };
   if ((m = /^your life total is (greater than or equal to|greater than|less than or equal to|less than) (half )?your starting life total$/.exec(text))) {
     const base = m[2] ? Math.floor(STARTING_LIFE / 2) : STARTING_LIFE;

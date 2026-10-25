@@ -367,8 +367,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (n <= 0) return;
         // Twinning Staff: one more for each of them the player copying it controls (CR 614.1a; rulings), whose targets may
         // always be chosen anew. Only for spells: copying a card or an ability isn't copying a spell.
-        const extra = orig.kind === "spell" ? extraSpellCopies(s, ctx.controller) : 0;
-        sc.copies = { of: id!, left: n, ...(extra ? { extra } : {}) };
+        // Bonus Round: "that player copies it", the spell's controller (rulings), who chooses the copy's new targets.
+        const by = e.byController && orig.kind === "spell" ? orig.controller : undefined;
+        const extra = orig.kind === "spell" ? extraSpellCopies(s, by ?? ctx.controller) : 0;
+        sc.copies = { of: id!, left: n, ...(extra ? { extra } : {}), ...(by !== undefined ? { by } : {}) };
         }
       }
       const c = sc.copies;
@@ -377,7 +379,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const specs = orig?.body?.targets ?? [];
       while (orig && c.left > 0) {
         if (e.newTargets && specs.length && c.targets === undefined) {
-          s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
+          s.pending = { kind: "copyTargets", player: c.by ?? ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
           return "paused";
         }
         // The copies' controller chooses the order they go on the stack (rulings on Zada, Ink-Treader Nephilim and
@@ -399,7 +401,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Twinning Staff's additional copies, after the others (its controller chooses where they go, rulings).
       while (orig && c.left === 0 && c.extra) {
         if (specs.length && c.targets === undefined) {
-          s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
+          s.pending = { kind: "copyTargets", player: c.by ?? ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
           return "paused";
         }
         putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
@@ -721,12 +723,22 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst";
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => !stackOnly(k)) ? [{ ...x, keywords: x.keywords.filter((k) => !stackOnly(k)) }] : []));
-      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
+      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.whileSpell ? { whileSpell: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
       return;
     }
     case "counterSpell": {
       // The spell itself, if it's still on the stack (CR 701.6a).
       // "Return that spell to its owner's hand" (Krark): not a counter (CR 701.6a), so even one that can't be countered.
+      // Taigam: "exile the spell you cast with four time counters on it ... it gains suspend": not a counter either; the card
+      // (a copy has ceased to exist, CR 707.10a) suspended in exile.
+      if (e.cause && e.exileSpell) {
+        const item = ctx.cause ? s.stack.find((x) => x.id === ctx.cause) : undefined;
+        if (!item) return;
+        const o = item.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        counterOnStack(s, ctx, item.id, src, undefined, "exile", true);
+        if (e.suspend && o && s.objects[o.id] === o && o.zone === "exile" && !o.isToken && !s.stack.some((x) => x.id === item.id)) suspendExiled(s, o, e.suspend);
+        return;
+      }
       if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src, undefined, e.bounce ? "hand" : undefined, e.bounce) : undefined;
       // "Exile any number of target spells" (Mindbreak Trap): each target still legal.
       if (e.exileSpell) {

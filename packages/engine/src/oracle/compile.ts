@@ -16,6 +16,7 @@ import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
+import { parseBecomes } from "./sentence";
 import { PLANESWALKER_TYPES, parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
@@ -912,6 +913,22 @@ export function compile(d: CardDef): CompiledCard {
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, ...(byToughness[3] === "power" ? { perSourcePower: true as const } : { perSourceToughness: true as const }), ...(sub ? { asSubtype: sub } : {}), text: line });
       continue;
     }
+    // Displaced Dinosaurs: "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to
+    // its other types": a replacement effect on other permanents entering (CR 614.1c), judged as each would exist on the
+    // battlefield (CR 614.12); it enters as a 7/7 Dinosaur creature, not entering and then becoming one (rulings). Layers 4
+    // and 7b, for as long as it's on the battlefield. One that could describe itself (Displaced Dinosaurs isn't historic)
+    // stays out, as with Renata's.
+    const othersAs = /^As an? (.+? you control) enters, it becomes (an? .+)\.$/.exec(line);
+    if (othersAs) {
+      const g = parseGroup(`each ${othersAs[1]}`);
+      const mods = parseBecomes(othersAs[2]!);
+      // Whether this card fits the group as printed: by card type, supertype or subtype, each of "anyOf" too.
+      const fits = (f: TargetSpec): boolean => f.kind === "object" && (f.anyOf ? f.anyOf.some(fits) : (!f.types?.length || f.types.some((t) => d.types.includes(t))) && (f.supertypes ?? []).every((t) => d.supertypes.includes(t)) && (f.subtypes ?? []).every((t) => d.subtypes.includes(t)));
+      const self = g?.filter.kind === "object" && fits(g.filter);
+      if (!g || g.other || self || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || !mods) out.unsupported.push(raw);
+      else (out.othersEnterAs ??= []).push({ filter: g.filter, mods, text: line });
+      continue;
+    }
     const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control| for each mana from (?:a Treasure|an artifact source) spent to cast it)?\\.$`).exec(line);
     if (othersExtra) {
       // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
@@ -1514,7 +1531,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Evendo Brushrazer: "During your turn, as long as you've sacrificed a nontoken permanent this turn, you may play cards
     // exiled with ~."
-    const playWhile = /^During your turn, as long as (.+), you may play cards exiled with ~\.$/.exec(line);
+    // Theater of Horrors: "During your turn, if an opponent lost life this turn, you may play lands and cast spells from
+    // among cards exiled with ~": the same (playing a card is playing a land or casting a spell, CR 305.1, 601.2), the
+    // usual timing for each (rulings), checked whenever you'd play one.
+    const playWhile = /^During your turn, (?:as long as|if) (.+), you may (?:play cards exiled with ~|play lands and cast spells from among cards exiled with ~)\.$/.exec(line);
     if (playWhile) {
       const cond = parseStaticCondition(playWhile[1]!, { affects: { kind: "self" }, mods: [], text: line });
       if (!cond || out.playLinkedWhile || out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
@@ -2160,6 +2180,10 @@ export function compile(d: CardDef): CompiledCard {
       out.crewsAs = { ...(crewsAs[2] ? { n: Number(crewsAs[2]) } : { toughness: true as const }), saddles: !!crewsAs[1] };
       continue;
     }
+    if (line === "Creatures with power greater than the number of cards in your hand can't attack.") {
+      out.attackPowerCapHand = true;
+      continue;
+    }
     if (line === "Creature cards you own that aren't on the battlefield have flash.") {
       (out.flashOwned ??= []).push({ kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards you own" });
       continue;
@@ -2777,6 +2801,21 @@ export function compile(d: CardDef): CompiledCard {
     // "Spells you cast have affinity for artifacts" (Sami, Wildcat Captain): every spell.
     const grantAffinity = /^((?:[A-Z][a-z]+ (?:(?:and )?[a-z]+ )?)?spells|Spells) you cast have affinity for ([A-Za-z]+s)\.$/.exec(line);
     if (grantAffinity) line = `${grantAffinity[1]} you cast cost {1} less to cast for each ${grantAffinity[2]!.slice(0, -1)} you control.`;
+    // Radagast of Rhosgobel: "The first creature spell you cast each turn costs {2} less to cast and can be cast as though
+    // it had flash": both for the same spell, the first such one you cast this turn, counting those cast before it was on
+    // the battlefield (rulings). The flash is checked as you'd begin casting it (CR 601.3), the reduction as its cost is
+    // determined (CR 601.2f): its generic part only.
+    const firstFlash = /^(The first (.*?)spell you cast each turn) (costs \{\d+\} less to cast) and can be cast as though it had flash\.$/.exec(line);
+    if (firstFlash) {
+      const c = parseCostChange(`${firstFlash[1]} ${firstFlash[3]}.`);
+      const spec = firstFlash[2] ? parseTargetPhrase(`${firstFlash[2]}spell`) : null;
+      if (!c || c === "fail" || !("costMod" in c) || c.costMod.nth !== 1 || spec?.kind !== "spell" || spec.controller) out.unsupported.push(raw);
+      else {
+        out.costMods = [...(out.costMods ?? []), { ...c.costMod, text: line }];
+        (out.flashForFirst ??= []).push({ ...spec, text: `${firstFlash[2]}spells` });
+      }
+      continue;
+    }
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
@@ -3508,7 +3547,7 @@ function checkX(d: CardDef, out: CompiledCard) {
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
     // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX) return true;
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || (tr.event === "selfTurnedFaceUp" && faceUpX) || tr.eventX || (tr.xKicked && out.kicker?.multi)) return true;
     bad(tr.body.text);
     return false;
   });

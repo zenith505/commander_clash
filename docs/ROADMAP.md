@@ -1,7 +1,7 @@
 # Roadmap
 
-24,166 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,854 of 4,988 (97%).
+24,195 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,875 of 4,988 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -56,9 +56,14 @@ line blocks.
    no cap yet on a draw that size, for the engine or for bots); Dream Chisel and Kadena, Slinking Sorcerer (a face-down
    creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4); Ronin, Shadow
    Stalker ("Sacrifice an Equipment attached to ~" as a cost); Combat Calligrapher ("attacks one of your opponents ...
-   that opponent"). Next most played: Phyrexian Scriptures, Garnet, Princess of Alexandria, Displaced Dinosaurs,
-   Radagast of Rhosgobel, Cartographer's Hawk, Theater of Horrors, Olórin's Searing Light, Felisa, Fang of Silverquill,
-   The Raven Man, Marshal's Anthem.
+   that opponent"). Next most played: Trenzalore Clocktower, Ulalek, Fused Atrocity, Quick Sliver, Frodo, Adventurous
+   Hobbit, Surge to Victory, Azusa's Many Journeys, Prishe's Wanderings, Memory Plunder, Norman Osborn, Faramir, Prince
+   of Ithilien.
+   Smaller gaps from round 158: "you control a creature with the greatest power among creatures on the battlefield" works
+   in triggers and as a resolution check (High Score, Éomer of the Riddermark), but as the condition of a static ability
+   it would read power before the layers finish; bots using Garnet, Princess of Alexandria remove a lore counter from
+   every Saga of theirs that has one, even when that only delays a chapter they want; bots choosing which tied creature
+   Olórin's Searing Light exiles use the usual scoring.
    Smaller gaps from round 157: Angel of Suffering's prevention is always applied first, ahead of other prevention
    shields, rather than being the player's choice of order (CR 616.1); bots choosing which Equipment Gilgamesh,
    Master-at-Arms attaches take the one with the highest mana value.

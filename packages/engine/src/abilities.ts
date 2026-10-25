@@ -129,6 +129,8 @@ export type Count =
   | { kind: "tookFromHand" }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
+  /** "The power of the creature they exiled" (Olórin's Searing Light): the power, as it last existed on the battlefield, of the creatures this player controlled that this spell or ability exiled (CR 608.2h). */
+  | { kind: "exiledPowerOf"; who: PlayerRef }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
   | { kind: "destroyedThisWay"; filter: TargetSpec }
   /** "For each nontoken creature exiled this way" (Declaration in Stone): permanents, as they last existed. */
@@ -310,7 +312,7 @@ export type Count =
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
-  | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[] }
+  | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[]; /** Gyome, Master Chef: nontoken ones only. */ nontoken?: true }
   /** "If you sacrificed a Food this turn" (Elanor Gardner): the permanents its controller sacrificed this turn, of that subtype or card type as they last existed. */
   | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
@@ -411,6 +413,8 @@ export interface TargetSpec {
   notKeywords?: string[]; // "creature without flying"
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
+  /** "With total power and toughness 5 or less" (Cut Down): its power plus its toughness (rulings). */
+  totalPT?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
   /** "With mana cost {0} or {1}" (Urza's Saga): its mana cost is exactly one of these (CR 202.1; not {X} or none, rulings). */
   manaCostIn?: string[];
@@ -919,7 +923,9 @@ export type PlayerRef =
   /** "Each opponent who lost 3 or more life this turn" (Davros, Dalek Creator): paid life counts too (CR 119.4). */
   | { ref: "opponentsLostLife"; n: number }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
-  | { ref: "opponentsControllingNo"; filter: TargetSpec };
+  | { ref: "opponentsControllingNo"; filter: TargetSpec }
+  /** "Each player who controls an artifact or enchantment" (Fade from History): as this instruction is carried out. */
+  | { ref: "playersControlling"; filter: TargetSpec };
 
 export type DamageRecipient =
   | ObjRef
@@ -1402,6 +1408,8 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
   /** "If an opponent lost life this turn". */
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
+  /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
+  | { kind: "discardedThisTurn" }
   | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
@@ -1789,7 +1797,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -1821,7 +1829,7 @@ export type Effect =
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
   | { type: "keepDestroyRest"; filter: TargetSpec; n: number }
   /** Return to owner's hand (from the battlefield or a graveyard). `hidden`: a face-down card, named only to its owner. */
-  | { type: "bounce"; what: ObjRef; hidden?: true }
+  | { type: "bounce"; what: ObjRef; hidden?: true; /** "Return it to its owner's hand. If you do, ..." (Cartographer's Hawk): whether it was returned is what "if you do" asks. */ setsDid?: true }
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
    * "You may put a land card from your hand onto the battlefield": the player picks one (or, with `any`, any number) of
@@ -4016,6 +4024,10 @@ export interface TriggeredAbility {
   firstUpkeep?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
+  /** Its X is the number of times its permanent was kicked (Marshal's Anthem), not the spell's X. */
+  xKicked?: true;
+  /** "Deals combat damage to a player who controls more lands than you" (Cartographer's Hawk): checked as it triggers. */
+  toMoreLands?: true;
   /** For "batch": what the event has to move, see BatchTrigger. */
   batch?: BatchTrigger;
 }
@@ -4713,6 +4725,8 @@ export interface CompiledCard {
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
+  /** "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types" (Displaced Dinosaurs): other permanents like this enter with these changes, for as long as they're on the battlefield (CR 614.1c, 614.12). */
+  othersEnterAs?: { filter: TargetSpec; mods: Modification[]; text: string }[];
   othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** n for each mana from a Treasure (Kalain, Reclusive Painter) or an artifact source (Coin of Mastery) spent to cast the entering creature (CR 106.3; none if it wasn't cast). */ perSpentFrom?: "treasure" | "artifact"; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; /** Counted as it enters: "for each instant and sorcery spell you've cast this turn" (Ral, Leyline Prodigy). */ n: Amount }[];
@@ -5075,6 +5089,8 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
   noMaxHandSize?: boolean | "all";
+  /** Ensnaring Bridge: "Creatures with power greater than the number of cards in your hand can't attack" (any player's, checked as attackers are declared, rulings). */
+  attackPowerCapHand?: true;
   /** "Your maximum hand size is eight", "... is increased by one", "Each opponent's maximum hand size is reduced by seven" (CR 402.2). */
   handSize?: { who: "you" | "opponents"; set?: number; plus?: number }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
@@ -5271,6 +5287,8 @@ export interface CompiledCard {
    * controller may cast spells like these any time they could cast an instant.
    */
   flashFor?: TargetSpec[];
+  /** "The first creature spell you cast each turn ... can be cast as though it had flash" (Radagast of Rhosgobel): only while you've cast none of these this turn. */
+  flashForFirst?: TargetSpec[];
   /**
    * "Creature cards you own that aren't on the battlefield have flash" (Teferi, Mage of Zhalfir): those cards of its
    * controller's have flash wherever they are but the battlefield, whoever casts them (CR 702.8a).

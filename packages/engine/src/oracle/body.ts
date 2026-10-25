@@ -1677,6 +1677,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
       continue;
     }
+    // Garnet, Princess of Alexandria: "you may remove a lore counter from each of any number of Sagas you control. Put a
+    // +1/+1 counter on ~ for each lore counter removed this way": the Sagas chosen as it resolves, none too, then one
+    // lore counter off each (a Saga with none loses none and adds nothing, CR 122.8 counts only those removed). Removing
+    // lore counters doesn't trigger chapters; the next lore counters put on it do again (CR 714.2c, rulings).
+    const loreOff = !ctx.spell ? /^(?:[Yy]ou may )?[Rr]emove a lore counter from each of any number of Sagas you control$/.exec(s) : null;
+    if (loreOff && /^Put a \+1\/\+1 counter on ~ for each lore counter removed this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = pickFilter("Sagas");
+      if (!filter) return null;
+      effects.push(
+        { type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", anyNumber: true, prompt: "click any number of your Sagas to remove a lore counter from each, then choose them (a +1/+1 counter on ~ for each one removed)." },
+        { type: "removeCounters", what: { ref: "created" }, counter: "lore", n: 1 },
+        { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: { count: { kind: "countersRemovedThisWay" } } },
+      );
+      si++;
+      continue;
+    }
     // Yorion, Sky Nomad: "exile any number of other nonland permanents you own and control. Return those cards to the
     // battlefield at the beginning of the next end step": chosen as it resolves (rulings), exiled together, and returned
     // together by one delayed trigger (CR 603.7) under your control (CR 110.2a); a token doesn't come back (rulings).
@@ -1869,9 +1885,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Each player sacrifices a creature of their choice. If you sacrificed a creature this way, you may return another
     // permanent card from your graveyard to the battlefield." (Rise of the Witch-king): chosen after the sacrifices, and
     // not the card you sacrificed (rulings).
-    const sacYou = /^If you sacrificed a creature this way, you may return another permanent card from your graveyard to the battlefield$/.exec(s);
-    if (sacYou && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "eachPlayer" && sacPrev.n === 1 && !sacPrev.unless && sacPrev.filter?.types?.join() === "Creature") {
-      const inner = parseOne("Return a permanent card from your graveyard to the battlefield", ctx);
+    // Deadly Brew: "Each player sacrifices a creature or planeswalker of their choice. If you sacrificed a permanent this
+    // way, you may return another permanent card from your graveyard to your hand": the same, to your hand (rulings).
+    const sacYou = /^If you sacrificed a (creature|permanent) this way, you may return another permanent card from your graveyard to (the battlefield|your hand)$/.exec(s);
+    const sacTypes = sacYou?.[1] === "creature" ? ["Creature"] : ["Creature,Planeswalker"];
+    if (sacYou && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "eachPlayer" && sacPrev.n === 1 && !sacPrev.unless && sacTypes.includes(sacPrev.filter?.types?.join() ?? "")) {
+      const inner = parseOne(`Return a permanent card from your graveyard to ${sacYou[2]}`, ctx);
       if (inner?.length !== 1 || inner[0]!.type !== "chooseFromGraveyard") return null;
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay", you: true }, effects: [{ ...inner[0]!, upTo: true, notSacrificed: true }] });
       continue;
@@ -3451,6 +3470,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
         continue;
       }
+    }
+    // Ancient Animus: "Put a +1/+1 counter on target creature you control if it's legendary. Then it fights ...": the
+    // target is chosen either way, and only gets the counter if it's legendary as this resolves (rulings, CR 608.2c).
+    const putIfLegendary = /^(Put an? (?:[+-]1\/[+-]1 |[a-z]+ )?counter on target .+?) if it's legendary$/.exec(s);
+    if (putIfLegendary) {
+      const before = ctx.targets.length;
+      const fx = parseOne(putIfLegendary[1]!, ctx);
+      if (!fx || ctx.targets.length !== before + 1 || ctx.targets[before]!.kind !== "object" || ctx.targets[before]!.optional || ctx.targets[before]!.many || fx.length !== 1 || fx[0]!.type !== "counters") return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary" } }, effects: fx });
+      continue;
     }
     // Hydaelyn, the Mothercrystal: "Put a +1/+1 counter on another target creature you control. ... If that creature is
     // legendary, draw a card." The target as it is as this resolves (CR 608.2c); the instruction needn't be about it.
@@ -5254,6 +5283,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
         continue;
       }
+      // "Return it to its owner's hand. If you do, you may search your library ..." (Cartographer's Hawk): not optional, and
+      // done only if it was returned (rulings: not if it had left the battlefield).
+      if (ifDid[1] === "do" && prev?.type === "bounce" && prev.what.ref === "self" && !ctx.spell) {
+        const mayThen = /^you may (.+)$/.exec(ifDid[2]!);
+        const inner = parseOne(capital(mayThen ? mayThen[1]! : ifDid[2]!), ctx);
+        if (!inner) return null;
+        prev.setsDid = true;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: mayThen ? [{ type: "may", effects: inner, text: mayThen[1]! }] : inner });
+        continue;
+      }
       // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent
       // controls" (Masked Vandal): whether a card was exiled.
       if (!mustSac && (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay))) return null;
@@ -5297,6 +5336,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const ok = !!inner && defineX();
       if (sacIt) delete ctx.sacrificedIt;
       if (!ok) return null;
+      continue;
+    }
+    // Reject Imperfection: "Counter target spell. If that spell's mana value was 3 or less, proliferate.": the countered
+    // spell as it last existed on the stack (CR 608.2h), X included (CR 202.3e).
+    const mvWas = new RegExp(`^If that spell's mana value was ${NUM} or (less|greater), (.+)$`).exec(s);
+    const countered = effects.at(-1);
+    if (mvWas && countered?.type === "counterSpell" && ctx.spell) {
+      const inner = parseOne(capital(mvWas[3]!), ctx);
+      const mv = parseCount("that spell's mana value", ctx);
+      if (!inner || !mv || typeof mv !== "object" || !("count" in mv) || mv.count.kind !== "manaValue" || mv.count.of.ref !== "target" || mv.count.of.index !== countered.index) return null;
+      const n = num(mvWas[1]!);
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: mv, ...(mvWas[2] === "less" ? { max: n } : { min: n }) }, effects: inner });
       continue;
     }
     // "Create four Bear tokens instead if there are seven or more cards in your graveyard" (threshold) is

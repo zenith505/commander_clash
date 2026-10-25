@@ -121,6 +121,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (chose && ctx.chooseWords?.includes(chose[1]!)) return { ref: "choseWord", option: chose[1]! };
   const lost = /^each opponent who lost (?:(\d+) or more )?life this turn$/.exec(x);
   if (lost) return { ref: "opponentsLostLife", n: lost[1] ? Number(lost[1]) : 1 };
+  // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
+  const controlling = /^each player who controls an? (.+)$/.exec(x);
+  if (controlling) {
+    const spec = parseTargetPhrase(controlling[1]!);
+    return spec?.kind === "object" && !spec.controller && !spec.bound ? { ref: "playersControlling", filter: spec } : null;
+  }
   // "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): a legendary
   // creature or a legendary planeswalker (CR 205.4e words it so).
   const without = /^each opponent who doesn't control an? (.+)$/.exec(x);
@@ -954,6 +960,11 @@ export function parseTargetPhrase(
   }
   if ((m = / with toughness greater than its power$/.exec(p))) {
     extra.toughnessAbovePower = true;
+    p = p.slice(0, m.index);
+  }
+  // Cut Down: "creature with total power and toughness 5 or less": the two added up (rulings).
+  if ((m = / with total power and toughness (\d+) or (greater|less)$/.exec(p))) {
+    extra.totalPT = m[2] === "greater" ? { min: Number(m[1]) } : { max: Number(m[1]) };
     p = p.slice(0, m.index);
   }
   // "Creatures you control with power or toughness 1 or less" (Tetsuko Umezawa): either one (TargetSpec.anyOf).

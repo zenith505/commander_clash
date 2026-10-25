@@ -81,6 +81,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // Power and toughness only exist for creatures (CR 208.3); a noncreature has neither.
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
   if (spec.toughness && (!c.types.includes("Creature") || !inRange(c.toughness, spec.toughness))) return false;
+  if (spec.totalPT && (!c.types.includes("Creature") || !inRange(c.power + c.toughness, spec.totalPT))) return false;
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
@@ -311,6 +312,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   const creature = d.types.includes("Creature");
   if (spec.power && (!creature || !inRange(Number.parseInt(d.power ?? "0", 10) || 0, spec.power))) return false;
   if (spec.toughness && (!creature || !inRange(Number.parseInt(d.toughness ?? "0", 10) || 0, spec.toughness))) return false;
+  if (spec.totalPT && (!creature || !inRange((Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0), spec.totalPT))) return false;
   if (spec.manaValue && !inRange(defMv(d), spec.manaValue)) return false;
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;

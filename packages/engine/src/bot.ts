@@ -438,6 +438,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
       return [{ type: "pickPermanents", player: pid, ids: pick ? [pick.id] : [] }];
     }
+    // "Remove a lore counter from each of any number of Sagas you control. Put a +1/+1 counter on ~ for each lore counter
+    // removed this way" (Garnet): each of ours that has one, for the counters, and its chapter comes again.
+    const removing = pend.kind === "pickPermanents" && pend.action === "choose" && pend.anyNumber ? s.resolving?.body.effects[s.resolving.next + 1] : undefined;
+    if (pend.kind === "pickPermanents" && removing?.type === "removeCounters" && removing.what.ref === "created")
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => controllerOf(s, obj(s, id)) === pid && (obj(s, id).counters[removing.counter] ?? 0) > 0) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {

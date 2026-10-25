@@ -1164,6 +1164,10 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   const printed = characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
   if (!characteristics(s, o).hasPrintedAbilities) withCounters = undefined;
   if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
+  // "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types"
+  // (Displaced Dinosaurs): from permanents already on the battlefield, judged by the permanent as it would exist there
+  // (CR 614.12, as for othersAddCounters); it's that from the moment it enters (rulings).
+  othersChangeIt(s, o);
   // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
   const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
   // The counters it enters with arrive at once (CR 614.1c): its own "enters with", a spell's "additional" ones (opts),
@@ -1514,6 +1518,22 @@ function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = [])
     }
   }
   return out;
+}
+
+function othersChangeIt(s: GameState, o: GameObject) {
+  for (const id of s.battlefield) {
+    if (id === o.id) continue;
+    const src = obj(s, id);
+    const rules = abilitiesOf(s, src).othersEnterAs;
+    if (!rules) continue;
+    const you = controllerOf(s, src);
+    for (const r of rules) {
+      if (!objectMatches(s, r.filter, o, you, false)) continue;
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: you, sourceName: characteristics(s, src).name, duration: "game", affected: [o.id], mods: r.mods });
+      invalidateCharacteristics(s);
+      log(s, `${characteristics(s, o).name} enters as ${r.text.replace(/^.*?, it becomes /, "").replace(/ in addition to its other types\.$/, "")} (${characteristics(s, src).name}).`);
+    }
+  }
 }
 
 /** "Lands you control enter untapped" (Spelunking): a permanent already on the battlefield lets `o` enter untapped. */
@@ -4807,7 +4827,10 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
     const o = obj(s, id);
     // Teferi, Mage of Zhalfir: the card's owner's Teferi, whoever casts it.
     if (owner !== undefined && controllerOf(s, o) === owner && abilitiesOf(s, o).flashOwned?.some((spec) => printedMatches(spec, d))) return true;
-    return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));
+    if (controllerOf(s, o) !== pid) return false;
+    // Radagast: the first creature spell you cast this turn, those cast before it was on the battlefield counted (rulings).
+    const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, s.cards[c.card]!));
+    return !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d)) || !!abilitiesOf(s, o).flashForFirst?.some(first);
   });
 }
 
@@ -7751,6 +7774,14 @@ function discardToHandSize(s: GameState, p: Player, ids: ObjectId[]) {
 const creaturesOf = (s: GameState, pid: PlayerId) =>
   s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
 
+/**
+ * Ensnaring Bridge: a creature with power greater than the number of cards in the hand of a Bridge's controller can't
+ * attack, checked only as attackers are declared (rulings; CR 508.1c).
+ */
+function bridged(s: GameState, o: GameObject): boolean {
+  return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).attackPowerCapHand && power(s, o) > player(s, controllerOf(s, obj(s, id))).hand.length);
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
   return creaturesOf(s, pid).filter(
@@ -7760,6 +7791,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !objIsType(s, o, "Battle") && // a battle can't attack, even one that's also a creature (rulings)
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
+      !bridged(s, o) &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&

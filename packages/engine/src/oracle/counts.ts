@@ -104,10 +104,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
   // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
   // "The total power of attacking creatures" (Klauth): every player's attackers.
-  if (!each && (m = /^the total (power|toughness) of (creatures you control(?: with [a-z]+)?|attacking creatures)$/i.exec(p))) {
-    const spec = parseTargetPhrase(m[2]!.replace(/creatures/, "creature"), { chosen: true });
+  // Towering Titan: "the total toughness of other creatures you control" (as it enters, those entering with it not
+  // counted, rulings; see enterTogether).
+  if (!each && (m = /^the total (power|toughness) of (other )?(creatures you control(?: with [a-z]+)?|attacking creatures)$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[3]!.replace(/creatures/, "creature"), { chosen: true });
     if (spec?.kind !== "object") return null;
-    return { count: { kind: "greatestPower", total: true, filter: { ...spec, text: m[2]! }, ...(m[1] === "toughness" ? { toughness: true as const } : {}) } };
+    return { count: { kind: "greatestPower", total: true, filter: { ...spec, text: m[3]! }, ...(m[1] === "toughness" ? { toughness: true as const } : {}), ...(m[2] ? { other: true as const } : {}) } };
   }
   // "For each death vote", "the number of profit votes": the votes for that word in the ability's vote (CR 701.38).
   if ((m = /^(?:the number of )?(.+?) votes?$/i.exec(p)) && ctx?.vote?.options?.includes(m[1]!)) return { count: { kind: "votes", option: m[1]! } };
@@ -260,6 +262,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
     return count({ kind: "enteredThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { types: [capital(m[1]!)] }) });
+  // Gyome, Master Chef: "the number of nontoken creatures you had enter the battlefield under your control this turn":
+  // every one that entered, wherever it is now and whatever it is now (rulings), as it entered.
+  if (/^nontoken creatures you had enter the battlefield under your control this turn$/.test(p)) return count({ kind: "enteredThisTurn", types: ["Creature"], nontoken: true });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
   // Jeska, Thrice Reborn: "each time you've cast a commander from the command zone": only your own are cast from there (CR 903.8).
   if (/^times? you've cast (?:your|a) commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });
@@ -364,6 +369,15 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^counters? on (~|it)$/.exec(p))) {
     const of = whoseObject(m[1] === "~" ? "~'s" : "its", ctx);
     return of && count({ kind: "counters", counter: ANY_COUNTER, of });
+  }
+  // Death's Presence: "where X is the power of the creature that died": the trigger's subject as it last existed on the
+  // battlefield (rulings, CR 603.10a).
+  if ((m = /^the (power|toughness) of the creature that died$/.exec(p)) && ctx?.subjectIt) return count({ kind: m[1] as "power" | "toughness", of: { ref: "subject" } });
+  // Felisa, Fang of Silverquill: "where X is the number of counters it had on it", the creature that died: every kind
+  // (rulings), as it last existed on the battlefield (CR 603.10a, 608.2h).
+  if (/^counters it had on it$/.test(p) && ctx?.subjectIt) {
+    const of = whoseObject("its", ctx);
+    return of?.ref === "subject" ? count({ kind: "counters", counter: ANY_COUNTER, of }) : null;
   }
   // "Charge counter on ~", "+1/+1 counters on it".
   if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature)$`).exec(p))) {

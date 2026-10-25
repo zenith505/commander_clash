@@ -1081,6 +1081,8 @@ export interface CostChoices {
   evidence?: ObjectId[];
   /** "Collect evidence N" as a cost (an ability's, Conspiracy Unraveler's): the cards exiled from your graveyard for it. */
   collect?: ObjectId[];
+  /** Craft's materials (CR 702.167a): permanents you control and/or cards in your graveyard, exiled. */
+  craft?: ObjectId[];
   /** "Remove three counters from among ... you control": one entry for each counter removed, which permanent and kind. */
   counters?: { id: ObjectId; kind: string }[];
   /** Teamwork N: the untapped creatures you control, with total power N or more, tapped as you cast it. */

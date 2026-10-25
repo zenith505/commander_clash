@@ -2039,6 +2039,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
           s.resolving?.created?.push(o.id);
+          // Craft: "the exiled cards used to craft it" are the cards the cost exiled, while they stay exiled (CR 702.167c).
+          if (e.linkCostExiled && s.resolving?.item.costExiled?.length) (s.linkedExile ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] = [...s.resolving.item.costExiled];
           if (e.alsoMods) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
           // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
           if (e.attachSelf) {

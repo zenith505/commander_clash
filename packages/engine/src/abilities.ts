@@ -790,7 +790,7 @@ export type ObjRef =
    * graveyard it went to from the battlefield then or since, while it's still there (rulings); `yours`: "from your
    * graveyard", only if that's its controller's (rulings on Screams from Within).
    */
-  | { ref: "selfCard"; moved?: true; yours?: true }
+  | { ref: "selfCard"; moved?: true; yours?: true; /** Craft's "Return this card" (CR 702.167a): the card its own cost exiled, still in exile and still that object (CR 400.7j). */ exiledAsCost?: true }
   /** "Create a 0/0 Fractal creature token. Put X +1/+1 counters on it": the token(s) this ability just created. */
   | { ref: "created" }
   /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
@@ -1959,6 +1959,8 @@ export type Effect =
        * An Aura that can't enchant it stays in the graveyard; an Equipment that can't equip it enters unattached (rulings).
        */
       attachToCreated?: true;
+      /** Craft (CR 702.167c): the cards its activation's cost exiled (StackItem.costExiled) are linked to the permanent it becomes, "the exiled cards used to craft it". */
+      linkCostExiled?: true;
       /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"). */
       faceDown?: "forest";
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
@@ -4149,7 +4151,7 @@ export interface ActivatedAbility {
    * The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). A power-up
    * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
    */
-  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu";
+  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
@@ -4549,7 +4551,13 @@ export type AdditionalCost =
    * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,
    * any mix of them (of `counter`'s kind if set), chosen as it's paid (CR 602.2b, 601.2h); CostChoices.counters.
    */
-  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; other?: true };
+  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; other?: true }
+  /**
+   * Craft's materials (CR 702.167a-b): "Exile [materials] from among permanents you control and/or cards in your
+   * graveyard", `n` objects that match `filter` (a permanent by its characteristics, a card by its printed ones), any mix
+   * of the two, never the source (it's exiled by the other part of the cost); CostChoices.craft.
+   */
+  | { kind: "craft"; n: number; filter: TargetSpec };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,

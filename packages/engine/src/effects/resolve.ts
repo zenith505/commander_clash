@@ -333,6 +333,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // An Aura's card in the graveyard it went to from the battlefield, as its creature died or since (Angelic Destiny
     // rulings): one zone change after the trigger, or none if it was already there.
+    // Craft's "Return this card": the card the ability's own cost exiled, one zone change after it was activated (CR 400.7j).
+    if (ref.exiledAsCost) return o && o.zone === "exile" && ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) === ctx.sourceZc + 1 ? [o] : [];
     if (ref.moved) return o && o.zone === "graveyard" && ctx.sourceZc !== undefined && ((o.zoneChanges ?? 0) === ctx.sourceZc || (o.zoneChanges ?? 0) === ctx.sourceZc + 1) && (!ref.yours || o.owner === ctx.controller) ? [o] : [];
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
     // A merged permanent's other cards too, for an ability triggered by its leaving (CR 730.3c).

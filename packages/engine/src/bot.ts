@@ -35,6 +35,7 @@ import {
   cantBlockNow,
   provokerOf,
   tapCostCandidates,
+  craftCandidates,
   untapViaMana,
   counterCostCandidates,
   maxBlocks,
@@ -3604,7 +3605,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Mechtitan Core: itself and four others exiled for a 10/10, in our main phase with the stack empty (and only when
       // those four have less total power than the token, below).
       const titan = makesTitan(ab) && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
-      if ((ab.exileSelf && !titan) || (freeCost && !necro) || ab.station) continue;
+      // Craft: in our main phase with the stack empty, the back face being the point of it (materials: abilityCosts).
+      const craft = ab.keyword === "Craft" && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length;
+      if ((ab.exileSelf && !titan && !craft) || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
@@ -3648,7 +3651,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.length && ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies")) continue;
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
-      if (doesNothingNow(s, id, ab.body)) continue;
+      // Craft's "return this card" finds the card only once the cost has exiled it: the back face is what it's worth.
+      if (!craft && doesNothingNow(s, id, ab.body)) continue;
       // Chainer, Nightmare Adept: a permission to cast from our graveyard only in our main phase, with none unused yet,
       // for a card there we could pay for afterwards.
       const yardCast = ab.body.effects.find((e) => e.type === "graveyardCastThisTurn");
@@ -3671,7 +3675,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
       if (ab.body.modal && !modes) continue;
       const body = withModes(ab.body, modes);
-      if ((groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
+      if (!craft && (groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
@@ -4280,6 +4284,15 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const named = c.differentNames ? differentlyNamed(s, pool.map((x) => x.id)) : pool.map((x) => x.id);
       if (named.length < c.n) return null;
       out.sacrifice = [...(out.sacrifice ?? []), ...named.slice(0, c.n)];
+    } else if (c.kind === "craft") {
+      // Craft's materials: cards in our graveyard we have no use for there first, the cheapest; then tokens worth little
+      // (exiled, a token is gone for good, CR 111.7). Never a commander, a target, or something paying another cost.
+      const pool = craftCandidates(s, pid, o, c).filter((x) => x !== keep && !targeted.has(x) && !out.sacrifice?.includes(x) && !obj(s, x).isCommander);
+      const yard = pool.filter((x) => obj(s, x).zone === "graveyard" && !usefulInGraveyard(s, x)).sort((a, b) => mv(s, a) - mv(s, b));
+      const field = pool.filter((x) => obj(s, x).zone === "battlefield" && obj(s, x).isToken && worth(s, pid, obj(s, x)) <= 3).sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b)));
+      const picks = [...yard, ...field];
+      if (picks.length < c.n) return null;
+      out.craft = picks.slice(0, c.n);
     } else if (c.kind === "tap" && c.untap) {
       // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
       // Then a mana creature, tapped for mana while paying and untapped for the cost (rulings).

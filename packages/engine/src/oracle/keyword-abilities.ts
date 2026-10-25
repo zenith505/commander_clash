@@ -6,7 +6,7 @@ import type { CardDef, FaceDownKind } from "../types";
 import { NUM, num, keywordOf, plainMana, sacrificeSelf, pumpSelf, BASIC_TYPES, capital, singular, singularWord } from "./words";
 import { parsePayCost } from "./body";
 import { parseSearchFilter } from "./search";
-import { parseTargetPhrase } from "./targets";
+import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 
@@ -461,6 +461,37 @@ export function parseCostKeyword(
         sorcerySpeed: true,
         body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "Put a +1/+1 counter on ~." },
         text: `Outlast ${cost}`,
+      },
+    };
+  }
+  // Craft (CR 702.167a): "[Cost], Exile this permanent, Exile [materials] from among permanents you control and/or cards in
+  // your graveyard: Return this card to the battlefield transformed under its owner's control. Activate only as a sorcery."
+  // Materials named by a card type or subtype alone ("creature", "two artifacts", "Island") are permanents of that type
+  // or cards of it in your graveyard (702.167b). Other materials ("one or more creatures", "two that share a card type")
+  // aren't modeled.
+  if ((m = /^Craft with (.+?) ((?:\{[^}]+\})+)$/.exec(line))) {
+    const cost = m[2]!;
+    const mat = /^(?:(two|three|four|five|six) )?([A-Za-z]+)$/.exec(m[1]!);
+    if (!plainMana(cost) || !mat) return "fail";
+    const n = mat[1] ? num(mat[1]) : 1;
+    const word = n > 1 ? singular(mat[2]!) : mat[2]!;
+    const filter = pickFilter(word);
+    if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.length || filter.subtypes?.length) || (n > 1) === (word === mat[2])) return "fail";
+    return {
+      activated: {
+        manaCost: cost,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        exileSelf: true,
+        keyword: "Craft",
+        costs: [{ kind: "craft", n, filter: { ...filter, text: n > 1 ? mat[2]! : word } }],
+        body: {
+          targets: [],
+          effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard", exiledAsCost: true }, transformed: true, owner: true, linkCostExiled: true }],
+          text: "Return ~ to the battlefield transformed under its owner's control.",
+        },
+        text: `Craft with ${m[1]} ${cost}`,
       },
     };
   }

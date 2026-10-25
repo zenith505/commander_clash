@@ -5710,9 +5710,9 @@ export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
-  c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters";
-const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" =>
-  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand");
+  c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters";
+const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" =>
+  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
 
 /** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
 export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
@@ -5735,6 +5735,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
+  if (choices?.craft?.length && !costs.some((c) => c.kind === "craft")) return `${d.name} doesn't ask you to exile materials`;
   if (choices?.counters?.length && !costs.some((c) => c.kind === "removeCounters")) return `${d.name} doesn't ask you to remove counters`;
   if (costs.filter((c) => c.kind === "collectEvidence").length > 1) return `${d.name} would collect evidence twice`;
   for (const c of costs) {
@@ -5747,6 +5748,19 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     if (c.kind === "payLife") {
       if (c.n && payableLife(s, p.id) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
+      continue;
+    }
+    if (c.kind === "craft") {
+      // Craft's materials (CR 702.167a-b): any mix of permanents you control and cards in your graveyard, each once, and
+      // not one that pays another cost.
+      const pool = craftCandidates(s, pid, o, c).filter((id) => !both.includes(id));
+      const what = `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`;
+      const chosen = choices?.craft;
+      if (!chosen) {
+        if (pool.length < c.n) return `you need to exile ${what} you control or in your graveyard to ${doing}`;
+        continue;
+      }
+      if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id))) return `choose ${what} to exile`;
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
@@ -5954,6 +5968,16 @@ export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
 }
 
+/**
+ * What can be exiled for craft's materials (CR 702.167a-b): permanents `pid` controls that match (by their
+ * characteristics), then cards in their graveyard that match (by their printed ones, CR 109.2), never `o`, the source.
+ */
+export function craftCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "craft" }>): ObjectId[] {
+  const field = s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false));
+  const yard = player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
+  return [...field, ...yard];
+}
+
 /** Behold (CR 701.4a): the matching cards in `pid`'s hand and the matching permanents they control, not `o` itself. */
 export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: Extract<AdditionalCost, { kind: "reveal" }>): ObjectId[] {
   const hand = player(s, pid).hand.filter((id) => id !== o.id && printedMatches(c.filter, defOf(s, obj(s, id))));
@@ -6041,6 +6065,17 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       if (!c.n) continue; // "pay X life" with X = 0
       loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
+    } else if (c.kind === "craft") {
+      // Craft's materials (CR 702.167a): exiled; the cards are "used to craft" what it becomes (702.167c). A token isn't
+      // a card and ceases to exist (CR 111.7, rulings).
+      const ids = choices.craft ?? [];
+      log(s, `${p.name} exiles ${ids.map((id) => `${nameOf(s, id)}${obj(s, id).zone === "graveyard" ? " from their graveyard" : ""}`).join(", ")} to craft.`);
+      for (const id of ids) {
+        const o = obj(s, id);
+        moveObject(s, id, "exile");
+        if (o.zone === "exile" && !o.isToken) exiled?.push({ id, zc: o.zoneChanges ?? 0 });
+      }
+      closeZoneBatch(s);
     } else if (c.kind === "sacrifice" && c.exile) {
       for (const id of choices.sacrifice ?? []) {
         // "The exiled creature's mana value" (Food Chain): as it last existed (CR 608.2h).

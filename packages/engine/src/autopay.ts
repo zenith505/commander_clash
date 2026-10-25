@@ -563,7 +563,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
-  const exclude = [...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)];
+  const exclude = [...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...(costs?.craft ?? []), ...sacrificedTargets(s, targets)];
   const use = abilityUse(obj(s, objectId), ab, s);
   const due = lessWaterbend(cost, (x ?? 0) * xCount(cost), ab, tapCreatures);
   // Tezzeret, Betrayer of Flesh: this ability is begun first and the mana abilities paying for it come after (rulings),

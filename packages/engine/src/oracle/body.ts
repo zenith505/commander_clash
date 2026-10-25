@@ -682,6 +682,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Thousand-Faced Shadow: "create a token that's a copy of another target attacking creature. The token enters tapped and
   // attacking." (CR 508.4).
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
+  // Flamerush Rider: "create a token that's a copy of another target attacking creature and that's tapped and attacking"
+  // (CR 508.4), the same thing said in one sentence.
+  text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+?) and that's tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
   // Echoing Assault: "... The token enters tapped and attacking that player." after "Whenever you attack a player".
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking that player\./, "$1 a tapped and attacking that player token that's a copy of $2.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
@@ -3737,6 +3740,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "reflexive", putThisWay: true, body: { targets: [], effects: [{ type: "attachToChosen", source: { ref: "putThisWay" }, filter: { ...host, types: host.types?.length || host.subtypes?.length ? host.types : ["Creature"], text: attachOne[1]! }, may: true, equipmentOnly: true, pickOne: true }], text: `you may attach one of them to ${attachOne[1]!}.` } });
       continue;
     }
+    // Winota: "It gains indestructible until end of turn": the one card put onto the battlefield, the permanent it became
+    // (CR 400.7).
+    const digGains = dig?.into === "battlefield" && dig.count === 1 && !afterDig.length ? /^It gains (indestructible|haste) until end of turn$/.exec(s) : null;
+    if (digGains) {
+      afterDig = [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: [capital(digGains[1]!)] }], duration: "endOfTurn" }];
+      continue;
+    }
     // Armored Skyhunter: the one card put onto the battlefield, if it's an Equipment.
     if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^If an Equipment is put onto the battlefield this way, you may attach it to a creature you control$/.test(s)) {
       afterDig = [{ type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true, equipmentOnly: true }];
@@ -4401,8 +4411,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "continuous", what: last.what, mods: [p.mod], duration: "endOfTurn" });
       continue;
     }
+    // Zara, Renegade Recruiter: "Look at defending player's hand. You may put a creature card from it onto the battlefield
+    // under your control tapped and attacking that player or a planeswalker they control." (CR 508.4).
+    const fromTheirHand = /^You may put an? ([^.]+? card) from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control$/.exec(s);
+    if (fromTheirHand) {
+      const last = effects[effects.length - 1];
+      const filter = parseSearchFilter(fromTheirHand[1]!);
+      if (last?.type !== "lookAtHand" || last.who.ref !== "eventPlayer" || last.atRandom || !filter || !filter.types?.includes("Creature")) return null;
+      effects.push({ type: "putFromHand", fromHandOf: last.who, filter, may: true, tapped: true, attacking: true });
+      continue;
+    }
     const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
-    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s) ?? (/^Return it to the command zone at the beginning of the next end step$/.test(s) ? ["", "Return to the command zone"] : null);
+    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to (?:your|its owner's) hand at the beginning of the next end step$/.exec(s) ?? (/^Return it to the command zone at the beginning of the next end step$/.test(s) ? ["", "Return to the command zone"] : null);
     if (haste || atEnd) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;

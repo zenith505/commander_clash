@@ -1,16 +1,16 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType } from "../cards";
 import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { attackingPermanentOf, castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
-import { chooseAuraHosts } from "./run-zones";
+import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
@@ -1225,6 +1225,15 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays with the rest.`);
         return false;
       });
+      // "Tapped and attacking" (Winota, CR 508.4): during combat, attacking a player or planeswalker its controller chooses
+      // as it enters (rulings: not necessarily the one the trigger's creature attacks); never declared as an attacker.
+      // Outside combat it's only tapped (CR 506.3d).
+      const attackOptions = e.attacking && found.some((id) => isType(defOf(s, obj(s, id)), "Creature")) ? attackChoices(s, p.id, ctx.sourceId) : [];
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, obj(s, found.find((id) => isType(defOf(s, obj(s, id)), "Creature"))!)).name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.play ? " and may play it this turn" : ""}.`);
@@ -1247,7 +1256,13 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           else if (e.into === "battlefield") {
             const extra = e.countersIfMv && manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)) <= e.countersIfMv.max ? e.countersIfMv : e.counters;
             moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(extra ? { counters: { [extra.counter]: extra.n } } : {}), ...hosts.get(id) });
-            if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows
+            const o = obj(s, id);
+            if (attack && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
+              o.attacking = attack.player;
+              if (attack.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
+              log(s, `${defOf(s, o).name} is attacking ${attack.label}.`);
+            }
+            if (o.zone === "battlefield") r.created!.push(id); // "it" in what follows
           } else p.library = [id, ...p.library.filter((x) => x !== id)];
         }
       });

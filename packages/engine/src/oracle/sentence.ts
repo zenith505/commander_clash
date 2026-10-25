@@ -30,6 +30,9 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
   // "You may reveal a creature card ... from among them and put it onto the battlefield" (Loot, Exuberant Explorer): the
   // same as putting it there, revealed.
   s = s.replace(/^You may reveal (an? .+?) from among them and put it onto the battlefield$/, "You may put $1 from among them onto the battlefield");
+  // "Onto the battlefield tapped and attacking" (Winota): attacking as it enters, during combat (CR 508.4).
+  const attacking = dig.into === undefined && / from among them onto the battlefield tapped and attacking$/.test(s);
+  if (attacking) s = s.replace(/ tapped and attacking$/, " tapped");
   // Without "in a random order", the owner arranges the cards going to the bottom (CR 401.4).
   const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : r === "into your hand" ? { rest: "hand" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
   let m: RegExpExecArray | null;
@@ -106,7 +109,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (!filter) return null;
       if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
       if (total) Object.assign(filter, { text: `${filter.text} with total mana value ${total[1]} or less` });
-      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
+      if (attacking && (count !== 1 || !filter.types?.includes("Creature"))) return null;
+      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, ...(total ? { totalMv: Number(total[1]) } : {}), into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(attacking ? { attacking: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
       // "Put any number of land cards from among them onto the battlefield tapped, then shuffle" (Famished Worldsire).
       else if (/, then shuffle$/.test(s)) Object.assign(dig, { rest: "shuffle" });
@@ -137,7 +141,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     Object.assign(dig, { countersIfMv: { max: Number(m[1]), counter: "+1/+1", n: m[2] === "an" ? 1 : num(m[2]!) } });
     return "more";
   }
-  if ((m = new RegExp(`^Put (?:the rest(?: of those cards)?|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
+  if ((m = new RegExp(`^Put (?:the rest(?: of (?:those|the) cards)?|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   // "Then shuffle" (the "Then" is gone by now), "Then shuffle the rest into your library" (CR 701.20).
   if (/^Shuffle(?: the rest into your library)?$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "shuffle" };
   return null;

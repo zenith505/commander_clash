@@ -72,11 +72,17 @@ const landmark = scry("transform", [
   { name: "Oteclan Levitator", type_line: "Artifact Creature — Golem", oracle_text: "Flying\nWhenever this creature attacks, target attacking creature without flying gains flying until end of turn.", power: "1", toughness: "4" },
 ]);
 
+const flamerush = card("Flamerush Rider", "Creature — Human Warrior", "{4}{R}", { cmc: 5, power: "3", toughness: "3", keywords: ["Dash"], oracleText: "Whenever this creature attacks, create a token that's a copy of another target attacking creature and that's tapped and attacking. Exile the token at end of combat.\nDash {2}{R}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)" });
+const winota = card("Winota, Joiner of Forces", "Legendary Creature — Human Warrior", "{2}{R}{W}", { cmc: 4, power: "4", toughness: "4", oracleText: "Whenever a non-Human creature you control attacks, look at the top six cards of your library. You may put a Human creature card from among them onto the battlefield tapped and attacking. It gains indestructible until end of turn. Put the rest of the cards on the bottom of your library in a random order." });
+const zara = card("Zara, Renegade Recruiter", "Legendary Creature — Human Pirate", "{3}{U}{R}", { cmc: 5, power: "4", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhenever Zara attacks, look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control. Return that creature to its owner's hand at the beginning of the next end step." });
+
 const rock = card("Test Rock", "Artifact", "{2}", { cmc: 2 });
+const human = card("Test Squire", "Creature — Human Soldier", "{1}{W}", { cmc: 2, power: "2", toughness: "1" });
+const attack = (s: GameState, ap: PlayerId, attacks: { attacker: string; defender: PlayerId }[]) => act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks });
 const islandCard = card("Island", "Basic Land — Island");
 
 describe("round 161 cards", () => {
-  it("are fully supported", () => supported(tithing, visage, hulk, bricks, idol, iceberg, stonetree, needle, landmark));
+  it("are fully supported", () => supported(tithing, visage, hulk, bricks, idol, iceberg, stonetree, needle, landmark, flamerush, winota, zara));
 });
 
 describe("Craft (Tithing Blade)", () => {
@@ -195,5 +201,88 @@ describe("Craft with a subtype (Waterlogged Hulk) and with artifact (Idol of the
       if (!craft) s = run(s, acts);
     }
     expect(craft?.type === "activateAbility" && craft.costs?.craft).toEqual([dead]);
+  });
+});
+
+describe("Flamerush Rider", () => {
+  it("copies another attacking creature, tapped and attacking (not declared), and exiles the token at end of combat", () => {
+    const { s: s0, ap } = setup([]);
+    const b = next(s0, ap);
+    const rider = putOnBattlefield(s0, ap, flamerush);
+    const ogre = putOnBattlefield(s0, ap, bear({ name: "Test Ogre", power: "4", toughness: "4" }));
+    let s = attack(s0, ap, [{ attacker: rider, defender: b }, { attacker: ogre, defender: b }]);
+    // Its target: another attacking creature, not the Rider.
+    expect(s.pending?.kind === "chooseTargets" ? s.pending : null).toBeTruthy();
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: ogre }] });
+    for (let i = 0; i < 20 && (s.stack.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseOption" && s.pending.what === "attackWhom") s = act(s, { type: "chooseOption", player: ap, choice: String(b) });
+      else if (s.pending) break;
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    const token = s.battlefield.find((id) => s.objects[id]!.isToken && nameOf(s, id) === "Test Ogre")!;
+    expect(token).toBeDefined();
+    expect(s.objects[token]!.tapped).toBe(true);
+    expect(s.objects[token]!.attacking).toBe(b);
+    s = passUntil(s, "main2", ap);
+    s = resolveAll(s);
+    expect(s.battlefield.includes(token)).toBe(false);
+  });
+});
+
+describe("Winota, Joiner of Forces", () => {
+  it("a non-Human attacking finds a Human in the top six, put onto the battlefield tapped, attacking and indestructible", () => {
+    const { s: s0, ap } = setup([]);
+    const b = next(s0, ap);
+    putOnBattlefield(s0, ap, winota);
+    const ogre = putOnBattlefield(s0, ap, bear({ name: "Test Ogre", power: "4", toughness: "4" }));
+    const squire = into(s0, ap, human, "library");
+    let s = attack(s0, ap, [{ attacker: ogre, defender: b }]);
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length) && s.pending?.kind !== "searchLibrary"; i++) s = s.pending ? s : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, cards: [squire] });
+    s = act(s, { type: "searchLibrary", player: ap, found: [squire] });
+    // What it attacks is chosen as it enters (rulings), the defending player first.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "attackWhom" });
+    s = act(s, { type: "chooseOption", player: ap, choice: String(next(s, b)) });
+    expect(zone(s, squire)).toBe("battlefield");
+    expect(s.objects[squire]!.tapped).toBe(true);
+    expect(s.objects[squire]!.attacking).toBe(next(s, b));
+    expect(characteristics(s, s.objects[squire]!).keywords).toContain("Indestructible");
+    // The other five went to the bottom.
+    expect(s.players[ap]!.library.slice(-5).length).toBe(5);
+  });
+
+  it("doesn't trigger for a Human attacking", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, winota);
+    const squire = putOnBattlefield(s0, ap, human);
+    const s = attack(s0, ap, [{ attacker: squire, defender: next(s0, ap) }]);
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+  });
+});
+
+describe("Zara, Renegade Recruiter", () => {
+  it("puts a creature card from the defending player's hand onto the battlefield under your control attacking them, returned at the next end step", () => {
+    const { s: s0, ap } = setup([]);
+    const b = next(s0, ap);
+    const z = putOnBattlefield(s0, ap, zara);
+    const theirs = into(s0, b, bear({ name: "Test Ogre", power: "4", toughness: "4" }), "hand");
+    const land = into(s0, b, islandCard, "hand");
+    let s = attack(s0, ap, [{ attacker: z, defender: b }]);
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    // Their whole hand is shown; only the creature card can be taken.
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, hand: b });
+    const pend = s.pending?.kind === "searchLibrary" ? s.pending : undefined;
+    expect(pend?.cards).toContain(theirs);
+    expect(pend?.cards).not.toContain(land);
+    expect(pend?.dig?.looked).toContain(land);
+    s = act(s, { type: "searchLibrary", player: ap, found: [theirs] });
+    expect(zone(s, theirs)).toBe("battlefield");
+    expect(s.objects[theirs]!.controller).toBe(ap);
+    expect(s.objects[theirs]!.tapped).toBe(true);
+    expect(s.objects[theirs]!.attacking).toBe(b);
+    s = passUntil(s, "end", ap);
+    s = resolveAll(s);
+    expect(zone(s, theirs)).toBe("hand");
+    expect(s.players[b]!.hand).toContain(theirs);
   });
 });

@@ -368,7 +368,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // The Traps look back at what entered this turn, as it entered (after "as it enters" choices, CR 614.12).
   if (ev.type === "enters" && s.objects[ev.id]) {
     const c = characteristics(s, s.objects[ev.id]!);
-    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0 });
+    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors], id: ev.id, zc: s.objects[ev.id]!.zoneChanges ?? 0, ...(s.objects[ev.id]!.isToken ? { token: true as const } : {}) });
   }
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
@@ -440,7 +440,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(cause ? { cause } : {}),
           ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : {}),
           ...(lki ? { lki } : {}),
-          ...(x ? { x } : t.eventX && event?.amount ? { x: event.amount } : {}),
+          ...(t.xKicked ? (kicked?.length ? { x: kicked.length } : {}) : x ? { x } : t.eventX && event?.amount ? { x: event.amount } : {}),
           ...(kicked ? { kicked } : {}),
           ...(colorsSpent ? { colorsSpent } : {}),
           ...(event ? { event } : {}),
@@ -1445,7 +1445,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };
     causedBy = { event: "combatDamage", objs: [{ o, controller: controllerOf(s, o) }] };
-    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // Cartographer's Hawk: "to a player who controls more lands than you", as the damage is dealt.
+    const lands = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o))), undefined, undefined, undefined, undefined, undefined, undefined, info);
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);

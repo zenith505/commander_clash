@@ -146,7 +146,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         sc.queue.shift();
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}) };
       return "paused";
     }
     if (!n) {
@@ -215,7 +215,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       }
       if (e.action === "exile") {
         log(s, `${player(s, pid).name} exiles ${defOf(s, o).name}.`);
+        // As it last existed, for "the power of the creature they exiled" (Olórin's Searing Light, CR 608.2h).
+        const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
         moveObject(s, id, "exile");
+        if (s.objects[id]?.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
         continue;
       }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
@@ -1699,6 +1702,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, spell.id, "hand");
         return;
       }
+      // "Return it to its owner's hand. If you do, ..." (Cartographer's Hawk): only if it went there (not if it had left
+      // the battlefield, rulings, or a commander went to the command zone instead, CR 903.9b).
+      if (e.setsDid && s.resolving) s.resolving.did = false;
       for (const o of objects(s, e.what, ctx)) {
         if (e.hidden) {
           log(s, `${src} puts a card into ${player(s, o.owner).name}'s hand.`);
@@ -1706,7 +1712,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         } else log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
         // Flood of Tears: who controlled the nontoken permanents returned, even one a replacement sends elsewhere (rulings).
         if (o.zone === "battlefield" && !o.isToken && s.resolving) (s.resolving.returnedNontoken ??= []).push(controllerOf(s, o));
+        const token = o.isToken;
         moveObject(s, o.id, "hand");
+        if (e.setsDid && s.resolving && (token || s.objects[o.id]?.zone === "hand")) s.resolving.did = true;
       }
       return;
     }

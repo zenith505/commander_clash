@@ -201,6 +201,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
     case "greatestPowerExiled":
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
+    case "exiledPowerOf": {
+      const whose = refPlayers(s, c.who, ctx);
+      return (s.resolving?.exiled ?? []).filter(({ ch }) => whose.includes(ch.controller)).reduce((n, { ch }) => n + ch.power, 0);
+    }
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
     case "linkedExiled": {
@@ -293,7 +297,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "tokensCreatedThisTurn":
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
     case "enteredThisTurn":
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t)))).length;
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
     case "sacrificedThisTurn":
       return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
     case "attackersThisTurn":
@@ -677,6 +681,8 @@ function describeCount(c: Count): string {
       return "the excess damage";
     case "greatestPowerExiled":
       return "the greatest power among creature cards exiled";
+    case "exiledPowerOf":
+      return "the power of the creature they exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
     case "linkedExiled":
@@ -724,7 +730,7 @@ function describeCount(c: Count): string {
     case "tokensCreatedThisTurn":
       return `#${c.subtype ? `${c.subtype} ` : ""}tokens you created this turn`;
     case "enteredThisTurn":
-      return `#${c.anySubtype?.join("/") ?? c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
+      return `#${c.nontoken ? "nontoken " : ""}${c.anySubtype?.join("/") ?? c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
     case "sacrificedThisTurn":
       return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s you sacrificed this turn`;
     case "attackersThisTurn":

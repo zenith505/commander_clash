@@ -1,6 +1,6 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
-import type { AmountExpr, Count, Effect, ObjRef } from "../../abilities";
+import type { AmountExpr, Count, Effect, Modification, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
 import { addTarget } from "../body";
@@ -917,9 +917,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // being a creature (CR 205.3d, rulings).
   // "Earthbend X, .... That land becomes an Island in addition to its other types" (The Legend of Kyoshi): a basic land
   // type, with its mana ability (CR 305.6), for as long as it's on the battlefield.
-  if ((m = /^([Tt]arget .+?|That creature|That land|It|[Ee]ach creature you control) becomes an? ([A-Z][a-z]+) in addition to its other types$/.exec(s)) && (m[1] === "That land" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES]).includes(m[2]!)) {
+  // "Put a +1/+1 counter on up to one target creature. That creature becomes an artifact in addition to its other types"
+  // (Phyrexian Scriptures): a card type added in layer 4 (CR 205.1b, 613.1d), indefinitely (rulings).
+  if ((m = /^([Tt]arget .+?|That creature|That land|It|[Ee]ach creature you control) becomes an? ([A-Z][a-z]+|artifact) in addition to its other types$/.exec(s)) && (m[2] === "artifact" ? m[1] !== "That land" : (m[1] === "That land" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES]).includes(m[2]!))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it").replace(/^Each/, "each").replace(/^That land$/, "that land"), ctx);
-    if (what && (what.ref === "target" || what.ref === "each")) return [{ type: "continuous", what, mods: [{ kind: "addTypes", types: [], subtypes: [m[2]!] }], duration: "game" }];
+    const mods: Modification[] = m[2] === "artifact" ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }] : [{ kind: "addTypes", types: [], subtypes: [m[2]!] }];
+    if (what && (what.ref === "target" || what.ref === "each")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
   // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield

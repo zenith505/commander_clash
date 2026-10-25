@@ -630,6 +630,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };
   if ((m = /^you control the (creature|artifact) with the greatest (power|toughness|mana value) or tied for the greatest (power|toughness|mana value)$/.exec(text)) && m[2] === m[3])
     return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
+  // High Score: "if you control a creature with the greatest power among creatures on the battlefield": tied counts too.
+  if ((m = /^you control a (creature|artifact) with the greatest (power|toughness|mana value) among (creatures|artifacts) on the battlefield$/.exec(text)) && `${m[1]}s` === m[3])
+    return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   // "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's player, strictly
@@ -659,6 +662,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
@@ -1561,7 +1565,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     return c && staticCountOk(c, affects) ? c : null;
   };
   // "Gets +1/+1 for each enchantment you control and has first strike" (Ethereal Armor): the count, then what it has.
-  const andHas = each && / and ((?:has|have) .+)$/.exec(each[4]!);
+  // Machinist's Arsenal: "gets +2/+2 for each artifact you control and is an Artificer in addition to its other types":
+  // a creature type too, in layer 4 (CR 205.1b, 613.1d).
+  const andHas = each && / and ((?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types)$/.exec(each[4]!);
   const alsoHas = andHas ? parseStaticMods(andHas[1]!) : [];
   if (!alsoHas) return null;
   if (each && andHas) each[4] = each[4]!.slice(0, andHas.index);

@@ -803,6 +803,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!to || !c || typeof c !== "object" || !("count" in c) || c.times || !JSON.stringify(c).includes('"eachOne"')) return null;
     return [{ type: "damage", amount: m[2] ? { ...c, times: 2 } : c, to }];
   }
+  // Olórin's Searing Light: "~ deals damage to each opponent equal to the power of the creature they exiled": after
+  // "each opponent exiles a creature ...", each that creature's power as it last existed (rulings, CR 608.2h), all
+  // dealt at once (CR 120.3).
+  if (/^~ deals damage to each opponent equal to the power of the creature they exiled$/.test(s) && ctx.spell) {
+    const to = parseDamageRecipient("each opponent", ctx);
+    return to ? [{ type: "damage", amount: { count: { kind: "exiledPowerOf", who: { ref: "eachOne" } } }, to }] : null;
+  }
   // "~ deals damage to each player equal to half that player's life total, rounded down" (Heartless Hidetsugu): each
   // player half their own life total as it resolves, all dealt at once (CR 107.1a, 120.3).
   if ((m = /^~ deals damage to (each player|each opponent) equal to half (?:that player's|their) life total(?:, rounded (up|down))?$/i.exec(s))) {

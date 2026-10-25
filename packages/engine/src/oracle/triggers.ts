@@ -1635,6 +1635,21 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever you proliferate, ${expend[2]}`);
     return t && t !== "fail" && t.event === "youProliferate" && Object.keys(t).every((k) => k === "event" || k === "body") ? { ...t, event: "youExpend", expend: Number(expend[1]) } : "fail";
   }
+  // Marshal's Anthem: "When ~ enters, return up to X target creature cards from your graveyard to the battlefield, where X
+  // is the number of times ~ was kicked": X is known as the ability is put on the stack, when its targets are chosen
+  // (CR 601.2c, 603.3d), from the permanent's multikicker (CR 702.33d; TriggeredAbility.xKicked).
+  const kickedX = /^(When ~ enters), (.+), where X is the number of times ~ was kicked\.$/.exec(line);
+  if (kickedX && /\bup to X target\b/.test(kickedX[2]!)) {
+    const t = parseTrigger(`${kickedX[1]}, ${kickedX[2]}.`);
+    return t && t !== "fail" && t.event === "selfEnters" ? { ...t, xKicked: true } : "fail";
+  }
+  // Cartographer's Hawk: "When ~ deals combat damage to a player who controls more lands than you, ...": part of the
+  // trigger event, checked as it triggers only (CR 603.2; no "if", so not again as it resolves, CR 603.4).
+  const moreLands = /^(When(?:ever)? ~ deals combat damage to a player) who controls more lands than you, (.+)$/.exec(line);
+  if (moreLands) {
+    const t = parseTrigger(`${moreLands[1]}, ${moreLands[2]}`);
+    return t && t !== "fail" && t.event === "selfDealsCombatDamageToPlayer" && !t.orBattle && !t.orPlaneswalker && !t.toOpponent ? { ...t, toMoreLands: true } : "fail";
+  }
   // Jenova, Ancient Calamity: "Whenever a Mutant you control dies during your turn, ...": only during its controller's
   // turn, as it dies (CR 603.10a looks back to it).
   const diesOnYourTurn = /^(Whenever (?:an?|another) [^,]+? dies) during your turn, (.+)$/.exec(line);

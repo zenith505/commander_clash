@@ -1322,7 +1322,7 @@ export interface TurnLog {
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
-  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number }[];
+  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[]; /** The permanent, for "another" (Éowyn). */ id?: ObjectId; zc?: number; /** A token (Gyome's "nontoken creatures"). */ token?: true }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */

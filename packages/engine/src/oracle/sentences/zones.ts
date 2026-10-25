@@ -1025,6 +1025,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
   }
+  // Olórin's Searing Light: "Each opponent exiles a creature with the greatest power among creatures that player
+  // controls": each chooses in turn order, then they're exiled at once (rulings, CR 101.4).
+  if ((m = /^(.+?) exiles? a creature with the greatest power among creatures (?:they control|that player controls)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
+  }
   if ((m = /^(.+?) sacrifices? a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: "sacrifice", greatest: "manaValue" }] : null;

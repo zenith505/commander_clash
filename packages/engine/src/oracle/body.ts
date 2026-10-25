@@ -1815,6 +1815,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 3;
       continue;
     }
+    // Treasure Chest: "Search your library for a card. If it's an artifact card, you may put it onto the battlefield.
+    // Otherwise, put that card into your hand. Then shuffle." The card found goes onto the battlefield instead only if it's
+    // of that type and the searcher wants it there.
+    const ifTypeInstead = /^Search your library for a card$/.test(s) ? /^If it's an? (artifact|creature|land|enchantment|permanent) card, you may put it onto the battlefield$/.exec(sentences[si + 1] ?? "") : null;
+    if (ifTypeInstead && sentences[si + 2] === "Otherwise, put that card into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+      const fx = parseOne("Search your library for a card, put it into your hand, then shuffle", ctx);
+      const card = parseSearchFilter(`${ifTypeInstead[1]} card`);
+      if (fx?.length !== 1 || fx[0]!.type !== "search" || !card) return null;
+      effects.push({ ...fx[0]!, mayInstead: { dest: { zone: "battlefield" }, card } });
+      si += 3;
+      continue;
+    }
     // Dina's Guidance: "Search your library for a creature card, reveal it, put it into your hand or graveyard, then
     // shuffle": the searcher chooses which as it's put there.
     const handOrYard = /^Search your library for (an? [^,]+ card), reveal it, put it into your hand or graveyard, then shuffle$/.exec(s);
@@ -2745,6 +2757,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ) {
       const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, randomLinked: true } });
+      si += 2;
+      continue;
+    }
+    // Wondrous Crucible: "exile a nonland card at random from your graveyard. Copy it. You may cast the copy without paying
+    // its mana cost." Cast as this resolves, or never (CR 608.2g); the card stays exiled and an uncast copy ceases to exist
+    // (rulings); X is 0 (CR 107.3b).
+    const crucible = /^[Ee]xile an? (nonland|instant or sorcery) card at random from your graveyard$/.exec(s);
+    if (crucible && /^Copy it$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^You may cast the copy without paying its mana cost$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const filter: TargetSpec = crucible[1] === "nonland" ? { kind: "card", types: [], notTypes: ["Land"], notColors: [], owner: "you", text: "nonland card" } : { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, random: true } });
       si += 2;
       continue;
     }

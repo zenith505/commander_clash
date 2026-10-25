@@ -1055,6 +1055,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
       }
+      if (!sc.castAmong && e.fromYard?.random) {
+        // Wondrous Crucible: one card at random; a copy of that card only.
+        const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        const gone: ObjectId[] = [];
+        if (pool.length) {
+          const id = pool[Math.floor(nextRandom(s) * pool.length)]!;
+          moveObject(s, id, "exile");
+          log(s, `${you.name} exiles ${defOf(s, obj(s, id)).name}, chosen at random, from their graveyard.`);
+          if (obj(s, id).zone === "exile") gone.push(id);
+        } else log(s, `${you.name} has no ${e.fromYard.filter!.text} in their graveyard.`);
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.fromYard?.randomEachOpponent) {
         // Kefka, Dancing Mad: one card at random from each opponent's graveyard, in turn order (any card, lands too).
         const gone: ObjectId[] = [];

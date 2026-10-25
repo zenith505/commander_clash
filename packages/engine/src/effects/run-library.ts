@@ -856,7 +856,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // wants it there; asked after the search, before the shuffle.
       if (e.mayInstead && searchers.length === 1 && foundBy(searchers[0]!).length === 1 && exiledFor(searchers[0]!) === undefined && sc.mayInstead === undefined) {
         sc.mayInstead = false;
-        if (!e.mayInstead.cond || staticConditionNow(s, e.mayInstead.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller)) {
+        if ((!e.mayInstead.cond || staticConditionNow(s, e.mayInstead.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller)) && (!e.mayInstead.card || printedMatches(e.mayInstead.card, defOf(s, obj(s, foundBy(searchers[0]!)[0]!))))) {
           sc.may = undefined;
           sc.mayInstead = true;
           s.pending = { kind: "chooseMay", player: searchers[0]!, source: src, prompt: `put ${defOf(s, obj(s, foundBy(searchers[0]!)[0]!)).name} ${describeDest(e.mayInstead.dest)} (if you don't, ${describeDest(e.dest)})` };

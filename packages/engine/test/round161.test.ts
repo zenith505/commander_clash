@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, abilityProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, abilityProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -284,5 +284,85 @@ describe("Zara, Renegade Recruiter", () => {
     s = resolveAll(s);
     expect(zone(s, theirs)).toBe("hand");
     expect(s.players[b]!.hand).toContain(theirs);
+  });
+});
+
+/** The next dice rolled come up `values`, in order (the game's seeded random numbers, CR 706.1b). */
+function rig(s: GameState, sides: number, values: number[]) {
+  for (let st = 1; st < 50_000_000; st++) {
+    const t = { rngState: st };
+    if (values.every((v) => 1 + Math.floor(nextRandom(t) * sides) === v)) {
+      s.rngState = st;
+      return;
+    }
+  }
+  throw new Error("no such seed");
+}
+
+const chest = card("Treasure Chest", "Artifact", "{3}", { cmc: 3, oracleText: "{4}, Sacrifice this artifact: Roll a d20.\n1 | Trapped! — You lose 3 life.\n2—9 | Create five Treasure tokens.\n10—19 | You gain 3 life and draw three cards.\n20 | Search your library for a card. If it's an artifact card, you may put it onto the battlefield. Otherwise, put that card into your hand. Then shuffle." });
+const crucible = card("Wondrous Crucible", "Artifact", "{7}", { cmc: 7, oracleText: "Permanents you control have ward {2}.\nAt the beginning of your end step, mill two cards, then exile a nonland card at random from your graveyard. Copy it. You may cast the copy without paying its mana cost. (A copy of a permanent spell becomes a token.)" });
+const divination = card("Divination", "Sorcery", "{2}{U}", { cmc: 3, oracleText: "Draw two cards." });
+
+describe("Treasure Chest", () => {
+  it("is fully supported", () => supported(chest, crucible));
+
+  const roll20 = (found: CardDef) => {
+    const { s: s0, ap } = setup([]);
+    const c = putOnBattlefield(s0, ap, chest);
+    const f = into(s0, ap, found, "library");
+    rig(s0, 20, [20]);
+    let s = resolveAll(run(s0, planActivate(s0, ap, c, 0)));
+    expect(zone(s, c)).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    s = act(s, { type: "searchLibrary", player: ap, found: [f] });
+    return { s, ap, f };
+  };
+
+  it("on a 20, an artifact card found may go onto the battlefield instead of into your hand", () => {
+    const { s, ap, f } = roll20(rock);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    expect(zone(resolveAll(act(s, { type: "chooseMay", player: ap, yes: true })), f)).toBe("battlefield");
+    expect(zone(resolveAll(act(s, { type: "chooseMay", player: ap, yes: false })), f)).toBe("hand");
+  });
+
+  it("on a 20, any other card goes into your hand, with no question", () => {
+    const { s, f } = roll20(bear());
+    expect(s.pending?.kind).not.toBe("chooseMay");
+    expect(zone(resolveAll(s), f)).toBe("hand");
+  });
+});
+
+describe("Wondrous Crucible", () => {
+  it("at your end step mills two, exiles a nonland card at random and lets you cast a copy free; the card stays exiled", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, crucible);
+    const d = into(s0, ap, divination, "graveyard");
+    const lands = [into(s0, ap, islandCard, "library"), into(s0, ap, islandCard, "library")];
+    const hand = s0.players[ap]!.hand.length;
+    let s = passUntil(s0, "end", ap);
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    // The lands milled can't be chosen: only Divination is a nonland card there.
+    expect(lands.map((l) => zone(s, l))).toEqual(["graveyard", "graveyard"]);
+    expect(zone(s, d)).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", options: [d, "none"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: d });
+    expect(s.pending?.kind).toBe("castFree");
+    const copy = s.pending!.kind === "castFree" ? s.pending.objectId : "";
+    s = resolveAll(run(s, planCast(s, ap, copy)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(zone(s, d)).toBe("exile");
+  });
+
+  it("declining the copy leaves the card exiled", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, crucible);
+    const d = into(s0, ap, divination, "graveyard");
+    into(s0, ap, islandCard, "library");
+    into(s0, ap, islandCard, "library");
+    let s = passUntil(s0, "end", ap);
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "none" }));
+    expect(zone(s, d)).toBe("exile");
+    expect(s.pending).toBeFalsy();
   });
 });

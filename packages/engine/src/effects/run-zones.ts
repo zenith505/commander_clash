@@ -1055,6 +1055,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
       }
+      if (!sc.castAmong && e.fromYard?.random) {
+        // Wondrous Crucible: one card at random; a copy of that card only.
+        const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        const gone: ObjectId[] = [];
+        if (pool.length) {
+          const id = pool[Math.floor(nextRandom(s) * pool.length)]!;
+          moveObject(s, id, "exile");
+          log(s, `${you.name} exiles ${defOf(s, obj(s, id)).name}, chosen at random, from their graveyard.`);
+          if (obj(s, id).zone === "exile") gone.push(id);
+        } else log(s, `${you.name} has no ${e.fromYard.filter!.text} in their graveyard.`);
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+      }
       if (!sc.castAmong && e.fromYard?.randomEachOpponent) {
         // Kefka, Dancing Mad: one card at random from each opponent's graveyard, in turn order (any card, lands too).
         const gone: ObjectId[] = [];
@@ -1812,28 +1824,33 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // The player picks as it resolves, among the matching cards in their hand (CR 608.2d); it isn't playing a land.
       const sc = (s.resolving!.scratch ??= {});
       const p = player(s, ctx.controller);
+      // Zara: from another player's hand (looked at just before), under your control.
+      const from = e.fromHandOf ? players(s, e.fromHandOf, ctx)[0] : p.id;
+      if (from === undefined || player(s, from).lost) return;
       if (!sc.found) {
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         // "With lesser power" (Shadowfax): its power in your hand, less than the source's, or the source's as it last
         // existed on the battlefield (rulings).
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
-        const cards = [...p.hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
+        const cards = [...player(s, from).hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
         const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
         // "You may put a land card from your hand onto the battlefield. If you don't, ..." (Hakbal): whether one was put.
         s.resolving!.did = false;
         if (!cards.length || upTo <= 0) return;
         const what = `${e.upTo !== undefined ? `up to ${upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}${e.orGraveyard ? (e.any || e.upTo !== undefined ? " from your hand and/or graveyard" : " from your hand or graveyard") : ""}`;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true };
+        // Another player's hand: all of it shown, the cards that fit to choose from.
+        if (from !== p.id) s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: 1, hand: from, dig: { looked: [...player(s, from).hand], to: `from ${player(s, from).name}'s hand to put onto the battlefield under your control${e.tapped ? ", tapped" : ""}${e.attacking ? " and attacking" : ""}`, rest: `stay in ${player(s, from).name}'s hand` } };
+        else s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true };
         return "paused";
       }
-      const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard")) && o.owner === p.id);
+      const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard")) && o.owner === from);
       // "Tapped and attacking" (CR 508.4): only during combat, attacking a player its controller chooses as it enters (it
       // was never declared as an attacker, rulings on Kinscaer Sentry); outside combat it's only tapped (CR 506.3d).
       // "Attacking that opponent" (Kaalia): the player its creature attacked, even if it's attacking something else now, and
       // with that player gone, it isn't attacking (rulings).
       const eventFoe = e.attackingEvent ? ctx.event?.player : undefined;
-      const attackOptions = !e.attacking || !cards.some((o) => isType(defOf(s, o), "Creature")) ? [] : e.attackingEvent ? (eventFoe !== undefined && eventFoe !== p.id && !player(s, eventFoe).lost && attackChoices(s, p.id, ctx.sourceId).length ? [{ key: String(eventFoe), label: player(s, eventFoe).name, player: eventFoe }] : []) : attackChoices(s, p.id, ctx.sourceId);
+      const attackOptions = !e.attacking || !cards.some((o) => isType(defOf(s, o), "Creature")) ? [] : e.fromHandOf ? attackChoices(s, p.id, ctx.sourceId).filter((a) => a.player === from) : e.attackingEvent ? (eventFoe !== undefined && eventFoe !== p.id && !player(s, eventFoe).lost && attackChoices(s, p.id, ctx.sourceId).length ? [{ key: String(eventFoe), label: player(s, eventFoe).name, player: eventFoe }] : []) : attackChoices(s, p.id, ctx.sourceId);
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         const name = defOf(s, cards[0]!).name;
         s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${name} attacks` };
@@ -1861,7 +1878,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const d = defOf(s, o);
           const equip = e.attachToSelf && !d.subtypes.includes("Aura") && d.subtypes.includes("Equipment") && !isType(d, "Creature") && !!self && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, self, p.id, false, d) ? { attachTo: self.id } : undefined;
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
-          log(s, `${p.name} puts ${defOf(s, o).name} from their ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
+          log(s, `${p.name} puts ${defOf(s, o).name} from ${from === p.id ? "their" : `${player(s, from).name}'s`} ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}${equip ? ` attached to ${defOf(s, self!).name}` : e.attachToSelf && !host ? ", unattached" : ""}.`);
           moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host, ...equip });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
@@ -2039,6 +2056,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
           s.resolving?.created?.push(o.id);
+          // Craft: "the exiled cards used to craft it" are the cards the cost exiled, while they stay exiled (CR 702.167c).
+          if (e.linkCostExiled && s.resolving?.item.costExiled?.length) (s.linkedExile ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] = [...s.resolving.item.costExiled];
           if (e.alsoMods) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
           // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
           if (e.attachSelf) {
@@ -2207,6 +2226,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
         enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...hosts.get(id) })));
+        return;
+      }
+      if (e.dest === "castThisTurn") {
+        // Mission Briefing: a permission for that card only (CR 400.7), until the turn ends, at its normal timing (rulings).
+        for (const id of found) {
+          const o = obj(s, id);
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true, ...(e.exileAfter ? { exileAfter: true as const } : {}) };
+          log(s, `${p.name} chooses ${defOf(s, o).name} in their graveyard and may cast it this turn.`);
+        }
         return;
       }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");

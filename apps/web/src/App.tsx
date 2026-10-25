@@ -136,6 +136,7 @@ import {
   tapCostCandidates,
   untapViaMana,
   counterCostCandidates,
+  craftCandidates,
   ringBearer,
   power,
   toughness,
@@ -415,7 +416,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
@@ -437,7 +438,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -755,6 +756,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.collect !== undefined) continue;
         return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN), optional: false });
       }
+      if (c.kind === "craft") {
+        // Craft's materials (CR 702.167a): click permanents you control and/or cards in your graveyard that fit.
+        if (d.craft !== undefined) continue;
+        const what = c.n === 1 ? `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}` : `${c.n} ${c.filter.text}`;
+        return setCostPick({ activate: d, kind: "craft", label: cardOf(s, d.objectId).name, what: `craft: exile ${what} you control or from your graveyard`, n: c.n, candidates: craftCandidates(s, HUMAN, s.objects[d.objectId]!, c), chosen: [] });
+      }
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
         if (d.counters !== undefined) continue;
@@ -808,7 +815,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${c.n > 1 ? plural(what) : what}`;
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [], ...(c.kind === "sacrifice" && c.exile ? { exile: true as const } : {}) });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}), ...(d.craft?.length ? { craft: d.craft } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -952,6 +959,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
+      if (c.kind === "craft") continue; // an ability's cost only (CR 702.167a)
       // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
       if (c.kind === "removeCounters") {
         if (d.counters !== undefined) continue;
@@ -3812,6 +3820,8 @@ function LibrarySearch({
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from ${pending.anyGraveyard ? "a" : "your"} graveyard`
                   : pending.fromGraveyard === "battlefield" && pending.anyGraveyard
                   ? `${pending.source}: put ${pending.what} from a graveyard onto the battlefield under your control`
+                  : pending.fromGraveyard === "castThisTurn"
+                  ? `${pending.source}: choose ${pending.what} in your graveyard; you may cast it this turn`
                   : pending.fromGraveyard === "libraryTop"
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
                   : pending.fromGraveyard

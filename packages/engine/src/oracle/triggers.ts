@@ -1604,6 +1604,13 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(hurtBy[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
     return body ? { event: "opponentCreaturesDealCombatDamageToYou", body: { ...body, text: hurtBy[1]! } } : "fail";
   }
+  // Nelly Borca: "Whenever one or more creatures an opponent controls deal combat damage to one or more of your opponents,
+  // you and the controller of those creatures each draw a card."
+  const crossfire = /^Whenever one or more creatures an opponent controls deal combat damage to one or more of your opponents, (.+)$/.exec(line);
+  if (crossfire) {
+    const body = parseBody(crossfire[1]!.replace(/\bthe controller of those creatures\b/g, "that player"), { eventPlayer: true });
+    return body ? { event: "opponentCreaturesDamageYourOpponents", body: { ...body, text: crossfire[1]! } } : "fail";
+  }
   const attacks = /^Whenever a creature attacks enchanted player, (.+)$/.exec(line);
   if (attacks) {
     const body = parseBody(attacks[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });
@@ -2228,6 +2235,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (attacksOpp) {
     const text = attacksOpp[2]!;
     const oneOrMore = attacksOpp[1] === "one or more";
+    // Combat Calligrapher: "that attacking player creates a tapped ... token ... that's attacking that opponent": theirs,
+    // attacking the opponent attacked (CR 508.4), never declared as an attacker.
+    const inkling = !oneOrMore && !/, if that opponent/.test(line) ? /^that attacking player creates a tapped (.+? token(?: with [a-z, ]+)?) that's attacking that opponent\.?$/.exec(text) : null;
+    if (inkling) {
+      const body = parseBody(`Create a ${inkling[1]} that's tapped and attacking that player.`, { eventPlayer: true });
+      const e = body?.effects[0];
+      if (!body || body.effects.length !== 1 || e?.type !== "createToken" || !e.attackingEvent || e.who.ref !== "you") return "fail";
+      return { event: "playerAttacksYourOpponent", body: { ...body, effects: [{ ...e, who: { ref: "attackingPlayer" } }], text } };
+    }
     if (oneOrMore && /, if that opponent/.test(line)) return "fail";
     if (/\bthat (?:opponent|player)\b/.test(text.replace(/\bthat attacking player\b/g, ""))) return "fail";
     const body = parseBody(text.replace(/\bthat attacking player\b/g, "that player").replace(/ and you put /, ". Put "), { eventPlayer: true });

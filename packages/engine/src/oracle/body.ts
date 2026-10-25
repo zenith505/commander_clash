@@ -682,6 +682,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Thousand-Faced Shadow: "create a token that's a copy of another target attacking creature. The token enters tapped and
   // attacking." (CR 508.4).
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
+  // Flamerush Rider: "create a token that's a copy of another target attacking creature and that's tapped and attacking"
+  // (CR 508.4), the same thing said in one sentence.
+  text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+?) and that's tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
   // Echoing Assault: "... The token enters tapped and attacking that player." after "Whenever you attack a player".
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking that player\./, "$1 a tapped and attacking that player token that's a copy of $2.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
@@ -1117,7 +1120,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|, )[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+)\. (Creatures you control) gain that ability until end of turn\.$/, (_, pre: string, opts: string, who: string) => `${pre}${pre ? who.toLowerCase() : who} gain your choice of ${opts} until end of turn.`);
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
-  text = text.replace(/(^|\. )Create a token that's a copy of an? (permanent|creature|artifact) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
+  text = text.replace(/(^|\. )[Cc]reate a token that's a copy of an? (permanent|creature|artifact|non-Saga token) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
+  // "Whenever you cast a noncreature spell this turn, ..." (Summon: Good King Mog XII): a delayed triggered ability for
+  // the rest of the turn (CR 603.7c), the same as "Until end of turn, whenever you cast a noncreature spell, ...".
+  text = text.replace(/^Whenever you cast an? (noncreature|creature|instant or sorcery) spell this turn, /, "Until end of turn, whenever you cast a $1 spell, ");
   // "You may create a token that's a copy of a nonlegendary enchantment you control" (Calix, Guided by Fate): choosing
   // one is creating it, so "you may choose ... If you do, create a token that's a copy of it."
   text = text.replace(/(^|\. )([Yy]ou may) create a token that's a copy of an? ((?:nonlegendary )?(?:permanent|creature|artifact|enchantment)) you control\./g, "$1$2 choose a $3 you control. If you do, create a token that's a copy of it.");
@@ -1143,6 +1149,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   // "Loses two times X life" (Debt to the Deathless) is "loses twice X life".
   text = text.replace(/\bloses two times X life\b/g, "loses twice X life");
+  // "A token that's a copy of that creature except it's an artifact ..." (Faerie Artisans): the usual comma.
+  text = text.replace(/\b(a token that's a copy of that creature) except it's /g, "$1, except it's ");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Search your library for two cards. Put one into your hand and the other into your graveyard. Then shuffle." (Final
   // Parting): one search, as Cultivate's.
@@ -1812,6 +1820,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 3;
       continue;
     }
+    // Treasure Chest: "Search your library for a card. If it's an artifact card, you may put it onto the battlefield.
+    // Otherwise, put that card into your hand. Then shuffle." The card found goes onto the battlefield instead only if it's
+    // of that type and the searcher wants it there.
+    const ifTypeInstead = /^Search your library for a card$/.test(s) ? /^If it's an? (artifact|creature|land|enchantment|permanent) card, you may put it onto the battlefield$/.exec(sentences[si + 1] ?? "") : null;
+    if (ifTypeInstead && sentences[si + 2] === "Otherwise, put that card into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+      const fx = parseOne("Search your library for a card, put it into your hand, then shuffle", ctx);
+      const card = parseSearchFilter(`${ifTypeInstead[1]} card`);
+      if (fx?.length !== 1 || fx[0]!.type !== "search" || !card) return null;
+      effects.push({ ...fx[0]!, mayInstead: { dest: { zone: "battlefield" }, card } });
+      si += 3;
+      continue;
+    }
     // Dina's Guidance: "Search your library for a creature card, reveal it, put it into your hand or graveyard, then
     // shuffle": the searcher chooses which as it's put there.
     const handOrYard = /^Search your library for (an? [^,]+ card), reveal it, put it into your hand or graveyard, then shuffle$/.exec(s);
@@ -1845,6 +1865,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter) return null;
       const back: Effect = { type: "returnDiedThisWay", filter };
       effects.push(diedBack[1] ? { type: "if", cond: { kind: "xAtLeast", n: Number(diedBack[1]) }, effects: [back] } : back);
+      continue;
+    }
+    // Sorin, Lord of Innistrad: "Destroy up to three target creatures and/or other planeswalkers. Return each card put
+    // into a graveyard this way to the battlefield under your control." The cards the destroy put there, still there (a
+    // token isn't a card, and a commander its owner put into the command zone isn't there: CR 903.9a).
+    const lastKill = effects[effects.length - 1];
+    if (/^Return each card put into a graveyard this way to the battlefield under your control$/.test(s) && lastKill?.type === "destroy" && lastKill.what.ref === "target" && effects.filter((x) => x.type === "destroy").length === 1) {
+      effects.push({ type: "returnDiedThisWay", each: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" } });
       continue;
     }
     // Come Back Wrong: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the
@@ -2745,6 +2773,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Faerie Artisans: "Then exile all other tokens created with this creature": those its abilities created, as that
+    // object (rulings), not the one just created.
+    if (/^(?:Then )?[Ee]xile all other tokens created with (?:~|this creature)$/.test(s)) {
+      effects.push({ type: "exile", what: { ref: "tokensCreatedWithSelf" } });
+      continue;
+    }
+    // Wondrous Crucible: "exile a nonland card at random from your graveyard. Copy it. You may cast the copy without paying
+    // its mana cost." Cast as this resolves, or never (CR 608.2g); the card stays exiled and an uncast copy ceases to exist
+    // (rulings); X is 0 (CR 107.3b).
+    const crucible = /^[Ee]xile an? (nonland|instant or sorcery) card at random from your graveyard$/.exec(s);
+    if (crucible && /^Copy it$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /^You may cast the copy without paying its mana cost$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const filter: TargetSpec = crucible[1] === "nonland" ? { kind: "card", types: [], notTypes: ["Land"], notColors: [], owner: "you", text: "nonland card" } : { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, random: true } });
+      si += 2;
+      continue;
+    }
     // Kefka, Dancing Mad: "exile a card at random from each opponent's graveyard. You may cast any number of spells from
     // among cards exiled this way without paying their mana costs. Then each player who owns a spell you cast this way
     // loses life equal to its mana value." Cast as this resolves, or never (rulings, CR 608.2g); X is 0 (CR 107.3b).
@@ -3047,6 +3091,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const once: Effect = again[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
       effects.push(once, { type: "if", cond: { kind: "state", cond }, effects: [once] }, { type: "shuffle", who: { ref: "you" }, ifSearched: true });
       si += 2;
+      continue;
+    }
+    // Mission Briefing: "choose an instant or sorcery card in your graveyard. You may cast it this turn. If that spell would
+    // be put into your graveyard, exile it instead." Chosen as it resolves, not targeted (a card just surveilled there
+    // too, never this spell, still on the stack: rulings); then a permission at its normal timing (rulings).
+    const briefing = /^[Cc]hoose an? (instant or sorcery card|instant card|sorcery card) in your graveyard$/.exec(s);
+    if (briefing && /^You may cast it this turn$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(briefing[1]!);
+      if (!filter) return null;
+      const rider = sentences[si + 2]?.replace(/\.$/, "") === "If that spell would be put into your graveyard, exile it instead";
+      effects.push({ type: "chooseFromGraveyard", n: 1, filter, dest: "castThisTurn", ...(rider ? { exileAfter: true as const } : {}) });
+      si += rider ? 2 : 1;
       continue;
     }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
@@ -3737,6 +3793,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "reflexive", putThisWay: true, body: { targets: [], effects: [{ type: "attachToChosen", source: { ref: "putThisWay" }, filter: { ...host, types: host.types?.length || host.subtypes?.length ? host.types : ["Creature"], text: attachOne[1]! }, may: true, equipmentOnly: true, pickOne: true }], text: `you may attach one of them to ${attachOne[1]!}.` } });
       continue;
     }
+    // Winota: "It gains indestructible until end of turn": the one card put onto the battlefield, the permanent it became
+    // (CR 400.7).
+    const digGains = dig?.into === "battlefield" && dig.count === 1 && !afterDig.length ? /^It gains (indestructible|haste) until end of turn$/.exec(s) : null;
+    if (digGains) {
+      afterDig = [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "addKeywords", keywords: [capital(digGains[1]!)] }], duration: "endOfTurn" }];
+      continue;
+    }
     // Armored Skyhunter: the one card put onto the battlefield, if it's an Equipment.
     if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^If an Equipment is put onto the battlefield this way, you may attach it to a creature you control$/.test(s)) {
       afterDig = [{ type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true, equipmentOnly: true }];
@@ -4401,8 +4464,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "continuous", what: last.what, mods: [p.mod], duration: "endOfTurn" });
       continue;
     }
+    // Zara, Renegade Recruiter: "Look at defending player's hand. You may put a creature card from it onto the battlefield
+    // under your control tapped and attacking that player or a planeswalker they control." (CR 508.4).
+    const fromTheirHand = /^You may put an? ([^.]+? card) from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control$/.exec(s);
+    if (fromTheirHand) {
+      const last = effects[effects.length - 1];
+      const filter = parseSearchFilter(fromTheirHand[1]!);
+      if (last?.type !== "lookAtHand" || last.who.ref !== "eventPlayer" || last.atRandom || !filter || !filter.types?.includes("Creature")) return null;
+      effects.push({ type: "putFromHand", fromHandOf: last.who, filter, may: true, tapped: true, attacking: true });
+      continue;
+    }
     const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
-    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s) ?? (/^Return it to the command zone at the beginning of the next end step$/.test(s) ? ["", "Return to the command zone"] : null);
+    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to (?:your|its owner's) hand at the beginning of the next end step$/.exec(s) ?? (/^Return it to the command zone at the beginning of the next end step$/.test(s) ? ["", "Return to the command zone"] : null);
     if (haste || atEnd) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;

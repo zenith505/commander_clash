@@ -200,6 +200,7 @@ export type TriggerSourceEvent =
   | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; /** Dealt to this battle, `player` its protector (CR 310). */ battle?: ObjectId }
   /** Creatures dealt combat damage to this player in one combat damage step, whoever controls them (Witch-king of Angmar). */
   | { type: "creaturesDamagedPlayer"; player: PlayerId; ids: ObjectId[]; controllers: PlayerId[] }
+  | { type: "creaturesDamagedPlayers"; controller: PlayerId; players: PlayerId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
@@ -1161,6 +1162,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou");
       // Norn's Decree: once for each opponent whose creatures dealt it (CR 603.2c), that opponent being "that opponent".
       for (const c of ev.controllers) if (c !== ev.player) add(o, ev.player, (e) => e === "opponentCreaturesDealCombatDamageToYou", undefined, undefined, undefined, undefined, undefined, undefined, { player: c });
+    }
+  } else if (ev.type === "creaturesDamagedPlayers") {
+    // Nelly Borca: an opponent's creatures dealt combat damage to one or more of the watcher's opponents; that opponent
+    // is "the controller of those creatures".
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const w = controllerOf(s, o);
+      const opp = opponents(s, w);
+      if (opp.includes(ev.controller) && ev.players.some((p) => opp.includes(p))) add(o, w, (e) => e === "opponentCreaturesDamageYourOpponents", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.controller });
     }
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";

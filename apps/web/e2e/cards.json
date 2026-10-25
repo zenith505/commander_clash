@@ -10035,6 +10035,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c3a68018-9eff-47e6-a612-182886d28fe3",
+  "name": "Mission Briefing",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Surveil 2, then choose an instant or sorcery card in your graveyard. You may cast it this turn. If that spell would be put into your graveyard, exile it instead. (To surveil 2, look at the top two cards of your library, then put any number of them into your graveyard and the rest on top of your library in any order.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "40362fe0-a1a9-4d76-8c35-eac474b91af5",
   "name": "Mizzix's Mastery",
   "manaCost": "{3}{R}",
@@ -15766,6 +15794,72 @@
   "gameChanger": false
  },
  {
+  "oracleId": "883a4180-9ede-4249-a4b8-3a29c998fb63",
+  "name": "Tithing Blade // Consuming Sepulcher",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Artifact // Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters, each opponent sacrifices a creature of their choice.\nCraft with creature {4}{B} ({4}{B}, Exile this artifact, Exile a creature you control or a creature card from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Craft",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "common",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Tithing Blade",
+    "manaCost": "{1}{B}",
+    "typeLine": "Artifact",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "When this artifact enters, each opponent sacrifices a creature of their choice.\nCraft with creature {4}{B} ({4}{B}, Exile this artifact, Exile a creature you control or a creature card from your graveyard: Return this card transformed under its owner's control. Craft only as a sorcery.)",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1783913774",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1783913774"
+   },
+   {
+    "name": "Consuming Sepulcher",
+    "manaCost": "",
+    "typeLine": "Artifact",
+    "supertypes": [],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "At the beginning of your upkeep, each opponent loses 1 life and you gain 1 life.",
+    "colors": [
+     "B"
+    ],
+    "colorIndicator": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1783913774",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/d/b/dbaa9a2d-e9fd-4746-a26c-f99ae731f024.jpg?1783913774"
+   }
+  ]
+ },
+ {
   "oracleId": "986f510c-e2ec-423e-a443-51a169939558",
   "name": "Tomb Fortress",
   "manaCost": "",
@@ -17410,6 +17504,43 @@
   "commanderLegal": "legal",
   "set": "j25",
   "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cd2720c2-522c-4fdc-9cef-9c5ce250fe7b",
+  "name": "Zara, Renegade Recruiter",
+  "manaCost": "{3}{U}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Pirate",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Pirate"
+  ],
+  "oracleText": "Flying\nWhenever Zara attacks, look at defending player's hand. You may put a creature card from it onto the battlefield under your control tapped and attacking that player or a planeswalker they control. Return that creature to its owner's hand at the beginning of the next end step.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

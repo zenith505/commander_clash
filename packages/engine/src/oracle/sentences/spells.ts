@@ -157,7 +157,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const inner = parseSpellsSentence(`Discard your hand, then draw ${m[1]}`, ctx);
     return inner ? [{ type: "may", effects: inner, text: `discard your hand, then draw ${m[1]}` }] : null;
   }
-  if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s))) {
+  if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s)) && !/^Counter .+ unless /i.test(s)) {
     const who = /^Discard$/i.test(m[1]!) ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/ discards?$/i, ""), ctx);
     if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
     const out: Effect[] = [{ type: "discard", who, n: 0, hand: true }];
@@ -477,9 +477,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
   // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.
   // "Counter target spell that wasn't cast from its owner's hand" (Wash Away).
-  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| with \{X\} in its mana cost)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
+  // "Counter target spell unless its controller discards their hand" (Perplex): a choice they make as it resolves (CR 118.12).
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| with \{X\} in its mana cost)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
+    m.splice(3, 1);
     const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
-    const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
+    const unless = /discards their hand$/.test(s) ? { cost: "{0}", discardHand: true as const } : m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
     // An ability's X: one announced for its cost (Kozilek, the Great Distortion; checked in oracle/activated.ts).
     if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.activated && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];

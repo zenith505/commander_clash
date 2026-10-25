@@ -203,6 +203,8 @@ export interface Characteristics {
   assignsToughness: boolean;
   assignsToughnessIfGreater: boolean;
   attackDespiteDefender: boolean;
+  /** "Can attack as though it had haste" (Instill Energy, CR 302.6). */
+  attackAsThoughHaste: boolean;
   /** "Can attack players who attacked you during their last turn as though it didn't have defender" (Weathered Sentinels). */
   attackDespiteDefenderVs: boolean;
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
@@ -294,6 +296,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     assignsToughness: false,
     assignsToughnessIfGreater: false,
     attackDespiteDefender: false,
+    attackAsThoughHaste: false,
     attackDespiteDefenderVs: false,
     extraBlocks: 0,
     blockAny: false,
@@ -706,6 +709,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         const that = sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc ? chars.get(sub.id)!.controller : subjectId !== undefined && s.lastKnown?.[subjectId]?.zc === subjectZc ? s.lastKnown![subjectId]!.controller : undefined;
         return that !== undefined && that !== you && !s.players[that]!.lost && measure(that) > mine;
       }
+      if (cond.eventPlayer) return eventPlayer !== undefined && eventPlayer !== you && !s.players[eventPlayer]!.lost && measure(eventPlayer) > mine;
       if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
     }
@@ -1347,6 +1351,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackSamePlayer":
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
+    case "attackAsThoughHaste":
     case "allMustBlock":
     case "mustBlock":
       c[m.kind] = true;

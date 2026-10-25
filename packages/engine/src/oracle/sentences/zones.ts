@@ -112,16 +112,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
   // every one that has none of those subtypes or card types.
   // "Destroy all other permanents except for artifacts, lands, and Phyrexians" (The Argent Etchings): other than ~ too.
-  if ((m = /^([Rr]eturn all (?:creatures|permanents) to their owners' hands|[Dd]estroy all (?:other )?(?:creatures|permanents)) except for (.+)$/.exec(s))) {
+  // "Destroy all creatures and planeswalkers except for commanders" (Slash the Ranks): each one that isn't a commander
+  // (CR 903.3).
+  if ((m = /^([Rr]eturn all (?:creatures|permanents) to their owners' hands|[Dd]estroy all (?:other )?(?:creatures and planeswalkers|creatures|permanents)) except for (.+)$/.exec(s))) {
     const names = m[2]!.split(/,? and |, /).map((w) => (/^(Octopus|Platypus)es$/.test(w) ? w.slice(0, -2) : singularWord(w)));
     const types = names.filter((w) => PERMANENT_TYPES.includes(capital(w) as never)).map(capital);
     const subtypes = names.filter((w) => CREATURE_TYPES.has(w));
-    if (types.length + subtypes.length !== names.length) return null;
+    const commanders = names.includes("commander");
+    if (types.length + subtypes.length + (commanders ? 1 : 0) !== names.length) return null;
     const fx = parseSentence(m[1]!, ctx);
     const e = fx?.length === 1 ? fx[0] : undefined;
     if (!e || (e.type !== "bounce" && e.type !== "destroy") || e.what.ref !== "each" || e.what.filter.kind !== "object") return null;
     const f = e.what.filter;
-    return [{ ...e, what: { ...e.what, filter: { ...f, notTypes: [...(f.notTypes ?? []), ...types], ...(subtypes.length ? { notSubtypes: [...(f.notSubtypes ?? []), ...subtypes] } : {}), text: `${f.text} except ${m[2]}` } } } as Effect];
+    if (commanders && f.commander !== undefined) return null;
+    return [{ ...e, what: { ...e.what, filter: { ...f, notTypes: [...(f.notTypes ?? []), ...types], ...(subtypes.length ? { notSubtypes: [...(f.notSubtypes ?? []), ...subtypes] } : {}), ...(commanders ? { commander: false } : {}), text: `${f.text} except ${m[2]}` } } } as Effect];
   }
   // Meld (CR 701.42a), as normalizeSelf words it: "exile ~ and the creature named Bruna, the Fading Light, then meld them
   // into Brisela, Voice of Nightmares", after "if you both own and control ~ and a creature named ..." (checked again as
@@ -651,7 +655,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const toThat = m[8] === " attached to that creature";
     const before = ctx.targets[i - 1];
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
-    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || (attach && st === "Aura"));
+    // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
+    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || (attach && st === "Aura"));
     if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || what.n))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
     if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;

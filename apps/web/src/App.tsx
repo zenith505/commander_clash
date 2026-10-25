@@ -5152,6 +5152,8 @@ function Controls({
           <strong>{pending.source}:</strong>{" "}
           {sac ? (
             `sacrifice ${sac.n === 1 ? (/^[aeiou]/i.test(sac.filter.text) ? "an" : "a") : sac.n === 2 ? "two" : sac.n === 3 ? "three" : sac.n} ${sac.filter.text}${sac.n === 1 ? "" : "s"}`
+          ) : pending.discardHand ? (
+            "discard your hand"
           ) : discard ? (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}`
           ) : pending.cost === "{0}" && life ? (

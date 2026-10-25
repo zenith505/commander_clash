@@ -11616,6 +11616,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "904f9e0c-cb7f-4611-8bf7-2e408e8ab237",
+  "name": "Perplex",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell unless its controller discards their hand.\nTransmute {1}{U}{B} ({1}{U}{B}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Transmute"
+  ],
+  "commanderLegal": "legal",
+  "set": "rav",
+  "releasedAt": "2005-10-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",
   "name": "Phyrexian Altar",
   "manaCost": "{3}",
@@ -12637,6 +12667,40 @@
   "set": "khm",
   "releasedAt": "2021-02-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e445825a-e70e-4796-99be-4a7c4080b8cc",
+  "name": "Rhet-Tomb Mystic",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie Bird Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Bird",
+   "Wizard"
+  ],
+  "oracleText": "Flying\nEach creature card in your hand has cycling {1}{U}. ({1}{U}, Discard that card: Draw a card.)",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "drc",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

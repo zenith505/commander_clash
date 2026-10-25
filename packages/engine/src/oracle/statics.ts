@@ -735,6 +735,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^~ has (?:counters|a counter|one or more counters) on it$/.test(text)) return { kind: "self", is: "hasCounter" };
   // "If ~ is enchanted by two or more Auras, flip it" (Kitsune Mystic): the Auras attached to it.
   if ((m = new RegExp(`^~ is enchanted by ${NUM} or more Auras$`).exec(text))) return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: num(m[1]!) };
+  // Brass Knuckles: "Equipped creature has double strike as long as two or more Equipment are attached to it": to the
+  // equipped creature, this one included.
+  if ((m = new RegExp(`^${NUM} or more Equipment are attached to it$`).exec(text)) && st.affects.kind === "attached") return { kind: "amount", amount: { count: { kind: "attachedToHost", subtypes: ["Equipment"] } }, min: num(m[1]!) };
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
   if ((m = /^~ has (flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text)))
     return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
@@ -760,6 +763,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // land types, so one land with both; not Processing Plant, an Ulamog's Power-Plant), each of them.
   if ((m = /^you control an Urza's (Mine|Power-Plant|Tower) and an Urza's (Mine|Power-Plant|Tower)$/.exec(text)) && m[1] !== m[2])
     return { kind: "allOf", conds: [m[1]!, m[2]!].map((x) => ({ kind: "control" as const, who: "you" as const, filter: { kind: "object" as const, types: ["Land"], subtypes: ["Urza's"], anyOf: [{ kind: "object" as const, subtypes: [x], text: x }], text: `Urza's ${x}` }, min: 1 })) };
+  // "Whenever ~ attacks while you don't control another Dinosaur" (Pugnacious Hammerskull): none other than the source.
+  if ((m = /^you don't control another (.+)$/.exec(text))) {
+    const c = parseStaticCondition(`you control another ${m[1]}`, st);
+    return c?.kind === "control" && c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
+  }
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
@@ -1194,6 +1202,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Doran (CR 510.1a as modified), defender (CR 702.3b).
   if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];
   if (/^can attack as though (?:it|they) didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender" }];
+  if (/^can attack as though (?:it|they) had haste$/.test(rest)) return [{ kind: "attackAsThoughHaste" }];
   if (/^can attack players who attacked you during their last turn as though it didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender", vsAttackedYou: true }];
   // "Gets +0/+2 and assigns combat damage equal to its toughness ..." (Gauntlets of Light), "assigns ... and can attack
   // as though it didn't have defender" (Arcades).

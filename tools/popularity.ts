@@ -1,7 +1,7 @@
 // How often each card is played in Commander (EDHREC rank, from the Scryfall extract), so rounds can take the most
-// played unsupported cards first and `npm run coverage` can report the top 1,000 / 2,000 / 5,000.
+// played unsupported cards first and `npm run coverage` can report the top 1,000 / 2,000 / 5,000 / 10,000.
 //
-//   npm run popularity -- <dir>/scryfall-oracle-cards.jsonl.gz     rewrites data/popularity.json (top 5,000, in git)
+//   npm run popularity -- <dir>/scryfall-oracle-cards.jsonl.gz     rewrites data/popularity.json (every ranked card, in git)
 //   npm run popular [-- 100]                                       the most played unsupported cards and their lines
 //
 // data/popularity.json is small and tracked, so coverage works without the Scryfall extract. Rebuild it when the
@@ -13,10 +13,10 @@ import { fileURLToPath } from "node:url";
 import { createGunzip } from "node:zlib";
 
 const FILE = new URL("../data/popularity.json", import.meta.url);
-/** The popularity bars the roadmap tracks; cards are counted to the largest. */
-export const TOPS = [1000, 2000, 5000];
+/** The popularity bars the roadmap tracks. The file itself holds every ranked card, so `npm run popular` never runs dry. */
+export const TOPS = [1000, 2000, 5000, 10000];
 
-/** Card name -> EDHREC rank, for Commander-legal cards ranked within the largest bar; null if the file is missing. */
+/** Card name -> EDHREC rank, for every Commander-legal card EDHREC ranks; null if the file is missing. */
 export function loadRanks(): Map<string, number> | null {
   if (!existsSync(FILE)) return null;
   const { ranks } = JSON.parse(readFileSync(FILE, "utf8")) as { ranks: [number, string][] };
@@ -38,10 +38,10 @@ async function build(path: string) {
   for await (const line of lines) {
     if (!line.trim()) continue;
     const c = JSON.parse(line) as { name: string; edhrec_rank?: number; legalities?: { commander?: string } };
-    if (c.legalities?.commander === "legal" && c.edhrec_rank && c.edhrec_rank <= TOPS[TOPS.length - 1]) ranks.push([c.edhrec_rank, c.name]);
+    if (c.legalities?.commander === "legal" && c.edhrec_rank) ranks.push([c.edhrec_rank, c.name]);
   }
   ranks.sort((a, b) => a[0] - b[0]);
-  writeFileSync(FILE, `{"source":"EDHREC rank via Scryfall, Commander-legal cards ranked ${TOPS[TOPS.length - 1]} or better","ranks":[\n${ranks.map((r) => JSON.stringify(r)).join(",\n")}\n]}\n`);
+  writeFileSync(FILE, `{"source":"EDHREC rank via Scryfall, every ranked Commander-legal card","ranks":[\n${ranks.map((r) => JSON.stringify(r)).join(",\n")}\n]}\n`);
   console.log(`wrote ${ranks.length} ranked cards to data/popularity.json`);
 }
 

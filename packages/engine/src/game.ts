@@ -7819,6 +7819,14 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
       continueResolution(s);
       return;
     }
+    if (pend.discardHand) {
+      // The whole hand, discarded as the counter effect carries on (see paidUnless); an empty hand can be "discarded" too
+      // (rulings on Perplex).
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: { [p.id]: [...p.hand] } };
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
     if (pend.discard) {
       // Then which cards to discard; the cards are discarded as the counter effect carries on (see counterOnStack).
       if (p.hand.length < pend.discard) throw new RulesError(`you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
@@ -7867,7 +7875,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
   return creaturesOf(s, pid).filter(
     (o) =>
       !o.tapped &&
-      !isSummoningSick(s, o) &&
+      (!isSummoningSick(s, o) || characteristics(s, o).attackAsThoughHaste) && // CR 302.6
       !objIsType(s, o, "Battle") && // a battle can't attack, even one that's also a creature (rulings)
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&

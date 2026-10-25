@@ -1,11 +1,13 @@
 # Roadmap
 
-24,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,929 of 4,988 (98%).
+24,306 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,930 of 4,988 (98%), top 10,000: 8,197 of
+9,979 (82%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
-`data/popularity.json`; `npm run popularity` rebuilds it from the Scryfall extract). Each round starts at the top of that
+`data/popularity.json`, every ranked Commander-legal card since round 162; `npm run popularity` rebuilds it from the
+Scryfall extract). Each round starts at the top of that
 list and groups cards that share a mechanic. There is no stopping point (Ken, Oct 20 2026: "Popular, no stop"): rounds
 go on in popularity order until every legal card plays. `npm run blockers` still shows how many cards each missing
 line blocks.
@@ -67,12 +69,27 @@ line blocks.
    it enters" abilities mustn't apply, rulings; those are read from the printed card as it enters). Out after round 161:
    Toralf, God of Fury // Toralf's Hammer (the front face's "any target other than that permanent" is easy, but the
    Hammer grants the equipped creature an ability whose cost unattaches the Hammer and whose damage the Hammer deals,
-   rulings: an ability granted by an Equipment that names the Equipment isn't modeled). Next most played: Possibility
-   Storm, Izzet Generatorium, Triple Triad, Mm'menon, the Right Hand, Nissa, Vital Force, Arvinox, the Mind Flail, Cyber
-   Conversion, Sothera, the Supervoid, Tempt with Mayhem, Sin, Unending Cataclysm, Doors of Durin, Goldberry,
-   River-Daughter, Rydia, Summoner of Mist, Sauron's Ransom; Hallowed Moonlight (Containment Priest's replacement for one
-   turn) and Infernal Offering are near. Only 59 of the top 5,000 are left: `data/popularity.json` stops at rank 5,000
-   (`TOPS` in `tools/popularity.ts`), so it needs a deeper list before `npm run popular` runs dry.
+   rulings: an ability granted by an Equipment that names the Equipment isn't modeled). Out after round 162, each with a
+   piece of its own: Possibility Storm (the spell cast from a hand is exiled by its trigger, then cards until one that
+   shares a card type with it), Izzet Generatorium (an energy replacement and "if you've paid or lost four or more {E}
+   this turn"), Triple Triad (every player's exiled top card, playable for free by mana value), Mm'menon, the Right Hand
+   (mana spendable only on a spell cast from anywhere but your hand), Arvinox, the Mind Flail ("isn't a creature unless
+   you control three or more permanents you don't own", face-down cards you may cast), Cyber Conversion (turning a
+   permanent face down, rulings: not a double-faced one), Sothera, the Supervoid (each opponent chooses a creature to
+   exile, a card exiled with it returns), Tempt with Mayhem (each opponent may copy a spell they don't control, then
+   you copy it for each who did), Sin, Unending Cataclysm (removing counters from any number of permanents as it
+   enters), Doors of Durin (reveal the top card, then trample or hexproof until your next turn by what you control),
+   Goldberry, River-Daughter ("a counter of each kind not on ~", "one or more counters"), Sauron's Ransom (an opponent
+   makes a face-down pile and a face-up pile, which the UI would have to hide), Tromokratis ("can't be blocked unless
+   all creatures defending player controls block it", CR 509.1c). Next most played: Zurgo, Thunder's Decree, Sinister
+   Gnarlbark (blight), Rakdos, the Muscle, Storm of Souls, Gale, Waterdeep Prodigy, Aurora Phoenix, Damping Sphere,
+   Wakka, Devoted Guardian, Glacierwood Siege, Captain Howler, Sea Scourge; Hallowed Moonlight (Containment Priest's
+   replacement for one turn) and Infernal Offering are near. `npm run popular` now reads every ranked card (31,917),
+   so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 162: bots discard their hand to Perplex only when it's one card or none; Rhet-Tomb Mystic's
+   and Jo Grant's granted cycling are cycling abilities of the cards (CR 702.29a), but the hand-grant reads only
+   "ninjutsu" and "cycling" so far; Instill Energy's "can attack as though it had haste" covers attacking only, not {T}
+   abilities (CR 302.6).
    Smaller gaps from round 161: craft takes one kind of material only ("craft with a creature", "with two creatures",
    "with an Island", "with artifact"); "one or more", "creatures that share a creature type" and the like stay out
    (Jade Seedstones also needs the mana value of the card used to craft it, Master's Guide-Mural an "activate only if"

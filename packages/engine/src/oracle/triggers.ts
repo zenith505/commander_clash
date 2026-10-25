@@ -1673,6 +1673,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Kefka, Ruler of Ruin: "Whenever an opponent loses life during your turn, you draw that many cards": it triggers only
   // during its controller's turn.
+  // Zuko, Firebending Master: "Whenever you cast a spell during combat, ...": only while the game is in a combat phase
+  // (CR 506.1), as the spell is cast.
+  const castInCombat = /^Whenever you cast a spell during combat, (.+)$/.exec(line);
+  if (castInCombat) {
+    const t = parseTrigger(`Whenever you cast a spell, ${castInCombat[1]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "combat" } } : "fail";
+  }
   const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);
   if (lossOnYourTurn) {
     const t = parseTrigger(`Whenever an opponent loses life, ${lossOnYourTurn[1]}`);
@@ -1703,7 +1710,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
   // the event, checked as it attacks only (rulings), not an intervening if.
-  const attacksWhile = /^Whenever ~ attacks while (you control .+?), (.+)$/.exec(line);
+  // Pugnacious Hammerskull: "while you don't control another Dinosaur", the same (rulings).
+  const attacksWhile = /^Whenever ~ attacks while (you (?:don't )?control .+?), (.+)$/.exec(line);
   if (attacksWhile) {
     const cond = parseActivateCondition(attacksWhile[1]!);
     const t = cond && parseTrigger(`Whenever ~ attacks, ${attacksWhile[2]}`);
@@ -2039,7 +2047,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "At the beginning of each opponent's end step, if that player controls more creatures than you" (Keeper of the
   // Accord): the active player, as it triggers and resolves (rulings).
   const activeMore = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
-  const moreCond: StaticCondition | null = thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : null;
+  // "Whenever ~ attacks, if defending player controls more lands than you" (Aerial Surveyor): the player it attacks, or
+  // the controller of the planeswalker it attacks (CR 506.2), as it triggers and resolves (rulings).
+  const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  const moreCond: StaticCondition | null = thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: defMore[1] as "lands" | "creatures", eventPlayer: true } : null;
   const ifCond = putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";

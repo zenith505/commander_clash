@@ -67,7 +67,9 @@ function protectedGroup(p: string): DamageRuleSpec["to"] | null {
   if (t === "you") return { players: "you" };
   if (t === "players") return { players: "all" };
   const you = /^you and(?:\/or)? (.+)$/.exec(t);
-  const g = parseGroup(you ? you[1]! : t, true);
+  // "Dogs you control" (Pack Leader): a creature type keeps its capital.
+  const typed = /^([A-Z][a-z]+) you control$/.exec(p.trim());
+  const g = parseGroup(typed && CREATURE_TYPES.has(singular(typed[1]!)) ? p.trim() : you ? you[1]! : t, true);
   if (!g || g.other || (you && g.filter.controller !== "you")) return null;
   return { ...(you ? { players: "you" as const } : {}), objects: g.filter };
 }

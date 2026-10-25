@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withPutter } from "../counters";
@@ -214,6 +214,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, e.no ? `${defOf(s, o).name} is no longer suspected.` : `${src} suspects ${defOf(s, o).name}.`);
       }
       invalidateCharacteristics(s);
+      return;
+    case "turnFaceUp":
+      for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src);
       return;
     case "tap":
     case "untap":
@@ -613,7 +616,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const on = objects(s, e.what, ctx)[0];
         if (!on) return;
         if (!sc.counterKind) {
-          const kinds = [e.counter, e.orCounter];
+          const kinds = [e.counter, e.orCounter, ...(e.orCounters ?? [])];
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), prompt: `choose the kind of counter to put on ${characteristics(s, on).name}`, about: on.id };
           return "paused";
         }

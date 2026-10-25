@@ -281,6 +281,16 @@ export function convokedFor(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: 
   return o?.convoked ?? [];
 }
 
+/** The creature types of each creature that convoked the resolving spell, as it is or last was on the battlefield (CR 608.2h). */
+function convokerTypes(s: GameState, ctx: ResolveCtx): (Set<string> | "all")[] {
+  return convokedFor(s, ctx).flatMap((c) => {
+    const o = s.objects[c.id];
+    if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc) return [creatureTypesOf(s, o)];
+    const lk = s.lastKnown?.[c.id];
+    return lk?.zc === c.zc && lk.creatureTypes ? [lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes)] : [];
+  });
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
@@ -426,7 +436,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const whose = ref.of && players(s, ref.of, ctx);
     const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))));
+    const spared = ref.spareConvokerTypes ? convokerTypes(s, ctx) : [];
+    const spare = (o: GameObject) => spared.length > 0 && objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !objIsType(s, o, "Enchantment") && spared.some((t) => shareCreatureType(t, creatureTypesOf(s, o)));
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && !spare(o));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
@@ -892,6 +904,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspendCard":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
+    case "turnFaceUp":
     case "suspect":
     case "untap":
     case "untapUpTo":

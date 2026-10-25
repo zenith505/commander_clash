@@ -262,8 +262,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     }
     // Restrictions (CR 602.5b, 506.8g): "Activate only as a sorcery", "... only once each turn", "... only during your
     // upkeep", "... only during your turn and only if an opponent lost life this turn", in any combination.
+    // With exhaust too: "Exhaust — {4}: Earthbend 4. Activate only during your turn." (Bitter Work), once ever and only then.
     const only = / Activate only ([^.]+)\.$/.exec(effectText);
-    if (only && !activateIf && !sorcerySpeed && !oncePerTurn && !keyword) {
+    if (only && !activateIf && !sorcerySpeed && !oncePerTurn && (!keyword || keyword === "Exhaust")) {
       const clauses = parseOnlyClauses(only[1]!);
       if (!clauses) return "fail";
       sorcerySpeed = !!clauses.sorcery;

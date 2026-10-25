@@ -286,7 +286,8 @@ function diesMatches(
   you: PlayerId,
   chosen?: GameObject["chosen"],
 ): boolean {
-  if (d.attached) return attachedTo === dying.o.id && dying.c.types.includes("Creature");
+  // "When enchanted creature dies, if that creature was a Horror" (Endless Evil): its types as it last existed (CR 603.10a).
+  if (d.attached) return attachedTo === dying.o.id && dying.c.types.includes("Creature") && (!d.filter.subtypes?.length || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (srcId === dying.o.id) {
     if (d.orSelf) return true;
@@ -1156,8 +1157,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
         if (hit.length < (t.minAttackers ?? 1)) continue;
+        if (t.minTotalPower && hit.reduce((n, [x]) => n + power(s, obj(s, x)), 0) < t.minTotalPower) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && tt.minTotalPower === t.minTotalPower && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer && !!tt.selfOrCommander === !!t.selfOrCommander;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).

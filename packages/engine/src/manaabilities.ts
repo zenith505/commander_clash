@@ -46,7 +46,18 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   // Agatha's Soul Cauldron: the exiled creature cards' mana abilities too.
   if (c.hasPrintedAbilities) for (const d of exiledLentTo(s, o)) out.push(...compileCard(d).mana);
   // "If ~ has a luck counter on it, instead add one mana of any color" (Gemstone Caverns): what it makes now.
-  return out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
+  const swapped = out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
+  // Thran Portal: its own mana abilities cost life too, not those another permanent borrows from it (rulings).
+  const tax = lendingMana ? 0 : manaLifeTax(s, o);
+  return tax ? swapped.map((ab) => ({ ...ab, lifeCost: (ab.lifeCost ?? 0) + tax })) : swapped;
+}
+
+/**
+ * "Mana abilities of this land cost an additional 1 life to activate" (Thran Portal, CR 601.2f, 602.2b): the life every
+ * mana ability of this object costs on top of its own costs, while it has that ability.
+ */
+export function manaLifeTax(s: GameState, o: GameObject): number {
+  return characteristics(s, o).hasPrintedAbilities ? (compileCard(defOf(s, o)).manaAbilityLifeTax ?? 0) : 0;
 }
 
 /** Colors in the color identity of `pid`'s commander(s) (CR 903.4). */

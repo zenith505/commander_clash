@@ -14,6 +14,17 @@ import { parseGrants } from "../grants";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  // "Turn target face-down creature face up" (CR 708.8), "you may turn a face-down creature you control face up" (Ugin's
+  // Mastery): chosen as it resolves (CR 608.2d), with no cost paid.
+  let fu: RegExpExecArray | null;
+  if ((fu = /^[Tt]urn (target face-down .+?) face up$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;
+  }
+  if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control) face up$/.exec(s))) {
+    const filter = parseTargetPhrase(fu[1]!);
+    return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: fu[1]! }, n: 1, action: "choose" }, { type: "turnFaceUp", what: { ref: "created" } }] : null;
+  }
   if (/^You have no maximum hand size until your next turn$/.test(s)) return [{ type: "noMaxHandSize", untilYourNextTurn: true }];
   // Illusion of Choice (CR 701.38): the votes of every vote this turn are this player's to make.
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
@@ -498,7 +509,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // The Ozolith: "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
   // Resourceful Defense: "... put those counters on target permanent you control", the same way.
-  if ((m = /^Put those counters on (~|target .+)$/i.exec(s)) && ctx.subjectLeft) {
+  // Reluctant Role Model: "... on up to one target creature": none chosen, none put.
+  if ((m = /^Put those counters on (~|(?:up to one )?target .+)$/i.exec(s)) && ctx.subjectLeft) {
     const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }
@@ -604,6 +616,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^Double the number of (?:${COUNTER} counters|(each kind of) counter) on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: m[2] ? "+1/+1" : counterKind(m[1]!), n: 1, double: true, ...(m[2] ? { everyKind: true as const } : {}) }] : null;
+  }
+  // Reluctant Role Model: "put a flying, lifelink, or +1/+1 counter on it": one of the three kinds, chosen as it resolves.
+  if ((m = new RegExp(`^[Pp]ut an? ${COUNTER}, ${COUNTER}, or ${COUNTER} counter on (.+)$`).exec(s)) && new Set([m[1], m[2], m[3]]).size === 3) {
+    const what = parseObject(m[4]!, ctx);
+    return what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), orCounters: [counterKind(m[3]!)], n: 1 }] : null;
   }
   // Elspeth Conquers Death: "Put a +1/+1 counter or a loyalty counter on it": either kind, chosen as it resolves (rulings).
   if ((m = new RegExp(`^Put an? ${COUNTER} counter or an? ${COUNTER} counter on (.+)$`, "i").exec(s)) && m[1] !== m[2]) {

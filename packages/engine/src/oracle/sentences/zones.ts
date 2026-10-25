@@ -38,6 +38,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Everything Comes to Dust: "Exile all creatures except those that share a creature type with a creature that convoked
+  // ~, all artifacts, and all enchantments": an artifact or enchantment creature goes too, as an artifact or enchantment.
+  if (s === "Exile all creatures except those that share a creature type with a creature that convoked ~, all artifacts, and all enchantments" && ctx.spell)
+    return [{ type: "exile", what: { ref: "each", filter: { kind: "object", types: ["Artifact", "Creature", "Enchantment"], notTypes: [], notColors: [], text: "creatures, artifacts, and enchantments" }, spareConvokerTypes: true } }];
   // Nicol Bolas, Dragon-God: "Each opponent exiles a card from their hand or a permanent they control" (rulings: chosen in
   // turn order, exiled together).
   if ((m = /^(Each opponent|Each player) exiles a card from their hand or a permanent they control$/.exec(s))) {

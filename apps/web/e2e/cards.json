@@ -12187,6 +12187,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8d24c12a-a300-4199-b2a9-3d5ead8df617",
+  "name": "Reluctant Role Model",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Survivor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Survivor"
+  ],
+  "oracleText": "Survival — At the beginning of your second main phase, if this creature is tapped, put a flying, lifelink, or +1/+1 counter on it.\nWhenever this creature or another creature you control dies, if it had counters on it, put those counters on up to one target creature.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Survival"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e9ece3c6-81c2-441a-acce-c109aaa9026b",
   "name": "Render Inert",
   "manaCost": "{2}{B}",
@@ -14677,6 +14711,39 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b5ae8016-92ed-4ae8-83a8-65068defc616",
+  "name": "Tannuk, Steadfast Second",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Kavu Pilot",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kavu",
+   "Pilot"
+  ],
+  "oracleText": "Other creatures you control have haste.\nArtifact cards and red creature cards in your hand have warp {2}{R}. (You may cast a card from your hand for its warp cost. Exile that permanent at the beginning of the next end step, then you may cast it from exile on a later turn.)",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

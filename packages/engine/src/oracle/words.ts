@@ -47,6 +47,7 @@ export const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 /** "Elves" -> "Elf", "Zombies" -> "Zombie", "Wolves" -> "Wolf". */
 export function singular(word: string): string {
   if (/^(Zombie|Faerie|Detective|Cave)s$/i.test(word)) return word.slice(0, -1);
+  if (/^Octopuses$/i.test(word)) return word.slice(0, -2);
   if (/ves$/.test(word)) return word.replace(/ves$/, "f");
   if (/ies$/.test(word)) return word.replace(/ies$/, "y");
   if (/(x|ch|sh)es$/.test(word)) return word.replace(/es$/, "");

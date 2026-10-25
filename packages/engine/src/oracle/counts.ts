@@ -220,6 +220,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^card exiled from (?:their|your) hand this way$/i.test(p)) return count({ kind: "exiledFromHandThisWay" });
   // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).
   if (/^(?:players?|opponents?) being attacked$/i.test(p)) return count({ kind: "playersAttacked" });
+  // "For each opponent you attacked [this turn]" (Rose, Cutthroat Raider).
+  if (each && /^opponents? you attacked(?: this turn)?$/i.test(p)) return count({ kind: "players", opponents: true, attacked: true });
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   // "The number of opponents who control a creature with power 4 or greater" (Summon: Yojimbo), "for each opponent who
@@ -259,7 +261,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
     return count({ kind: "enteredThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { types: [capital(m[1]!)] }) });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
-  if (/^times? you've cast your commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });
+  // Jeska, Thrice Reborn: "each time you've cast a commander from the command zone": only your own are cast from there (CR 903.8).
+  if (/^times? you've cast (?:your|a) commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });
   if (/^the chosen commander's mana value$/i.test(p)) return count({ kind: "chosenCommanderMv" });
   if (!each && /^the greatest mana value among your commanders$/i.test(p)) return count({ kind: "commandersMv" });
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).

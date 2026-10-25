@@ -1,7 +1,7 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty } from "./manaabilities";
+import { payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
@@ -688,7 +688,7 @@ function planXMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric:
           const counts = { ...m0, [spare]: (m0[spare] ?? 0) + k - total(m0) };
           const bonus = emptyPool();
           for (const c of COLORS) bonus[c] += counts[c] ?? 0;
-          const taps = planManaWith(s, pid, cost0, extraGeneric, [...excluded, id, ...tokens], use, harm, wantSnow, bonus, ab.lifeCost ?? 0);
+          const taps = planManaWith(s, pid, cost0, extraGeneric, [...excluded, id, ...tokens], use, harm, wantSnow, bonus, (ab.lifeCost ?? 0) + manaLifeTax(s, o));
           if (taps) return [...taps, { type: "activateAbility", player: pid, objectId: id, index, x: k, costs: { tap: tokens } }, { type: "manaMix", player: pid, counts: Object.fromEntries(Object.entries(counts).filter(([, n]) => n)) }];
         }
       }

@@ -1,7 +1,7 @@
 # Roadmap
 
-24,115 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,825 of 4,988 (96%).
+24,148 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,841 of 4,988 (97%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,7 +22,7 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 155, most played first: Karazikar, the Eye Tyrant (no
+00. Most played first (`npm run popular`). Out after round 156, most played first: Karazikar, the Eye Tyrant (no
    rulings yet), Encroaching Mycosynth and Biotransference (they change the types of cards in every zone and of
    spells), Hushbringer (no rulings model yet for "dying doesn't cause abilities to trigger" with leaves-the-battlefield
    batches and look-back), Crucible of the Spirit Dragon ("remove X storage counters: add X mana in any combination of
@@ -52,9 +52,13 @@ line blocks.
    Meditation ("the first time you would create one or more tokens each turn, you may instead create copies": the same
    choice at token creation as Jinnie Fay); Sokrates, Athenian Teacher (a granted prevention whose draws count the
    damage prevented); Aminatou, the Fateshifter (−6: each player gains control of the next player's nonland permanents in
-   a chosen direction); Sunken Palace (mana that copies the spell or ability it's spent on). Next most played: Ultron,
-   Artificial Malevolence, Thran Portal, Everything Comes to Dust, Tannuk, Steadfast Second, Bitter Work, Ugin's
-   Mastery, V.A.T.S., Endless Evil.
+   a chosen direction); Sunken Palace (mana that copies the spell or ability it's spent on); Mathemagics ("target player draws 2ˣ cards":
+   no cap yet on a draw that size, for the engine or for bots); Dream Chisel and Kadena, Slinking Sorcerer (a face-down
+   creature spell's cost reduction: the cost filters see the card, not the face-down spell, CR 708.4). Next most played:
+   Gilgamesh, Master-at-Arms, Satsuki, the Living Lore, Gilraen, Dúnedain Protector, Rite of Harmony, Death Kiss, Grist,
+   Voracious Larva, Freya Crescent, Song of Freyalise, Angel of Suffering.
+   Smaller gaps from round 156: bots never cast a card for warp that Tannuk, Steadfast Second gives it; bots casting
+   Everything Comes to Dust convoke with whatever autopay picks, not to spare their own creature types.
    Smaller gaps from round 155: bots activate Mechtitan Core only in a main phase with an empty stack, and only when the
    four permanents exiled have total power under 10; bots roll The Deck of Many Things only with three or fewer cards
    in hand; Mechtitan Core's "Exile ... four other" cost button reads "Exile and activate" now (the cost picker said

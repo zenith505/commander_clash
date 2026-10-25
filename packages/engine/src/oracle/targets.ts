@@ -504,8 +504,10 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
   // With "where X is ...", X is defined by the text, which defineX (body.ts) works out or refuses.
   if (totalM && totalM[2] === "X" && !(ctx.spell || ctx.activated || ctx.ownX || ctx.whereX)) return null;
+  // "Any number of target creatures with equal toughness" (V.A.T.S.).
+  const equalToughness = many === "any" && / with equal toughness$/.test(mine0);
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
+  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
   // "Up to three other target creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity):
@@ -521,7 +523,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
   // One group with a total to each ability: the targets that have it are that group.
   if (total && ctx.targets.some((t) => t.total)) return null;
-  const spec: TargetSpec = total ? { ...spec0, total, text: `${spec0.text} (total ${total.key === "power" ? "power" : "mana value"} ${total.x ? "X" : total.max} or less)` } : spec0;
+  if (equalToughness && (total || ctx.targets.some((t) => t.equalToughness))) return null;
+  const spec: TargetSpec = total ? { ...spec0, total, text: `${spec0.text} (total ${total.key === "power" ? "power" : "mana value"} ${total.x ? "X" : total.max} or less)` } : equalToughness ? { ...spec0, equalToughness, text: `${spec0.text} (all with equal toughness)` } : spec0;
   // "Destroy up to one target artifact or enchantment. ... any number of other target creatures" (Kinetic Ooze): no target
   // before it was asked to be a creature, so "other" is other than the creature the ability is on.
   const sameWord = (t: TargetSpec) => t.kind === "any" || !t.types?.length || !spec.types?.length || t.types.some((x) => spec.types!.includes(x));
@@ -1047,6 +1050,11 @@ export function parseTargetPhrase(
     extra.transformed = true;
     p = p.slice(m[0].length);
   }
+  // "A face-down creature you control" (Ugin's Mastery, CR 708.2).
+  if ((m = /^face-down (?=permanent|creature)/.exec(p))) {
+    extra.faceDown = true;
+    p = p.slice(m[0].length);
+  }
   let tapped: boolean | undefined;
   if ((m = /^(un)?tapped /.exec(p))) {
     tapped = !m[1];
@@ -1241,7 +1249,7 @@ export function parseTargetPhrase(
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.
-  if (isSpell) return extra.keywords || extra.notKeywords || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

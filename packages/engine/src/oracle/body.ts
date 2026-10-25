@@ -5,7 +5,7 @@ import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTE
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
-import { parseBecomes, parseDig, parseSentence } from "./sentence";
+import { parseBecomes, parseChanges, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted, parseGrants } from "./grants";
 import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseObject, parsePlayer, parseTargetPhrase, pickFilter, PERMANENT_TYPES } from "./targets";
@@ -1088,6 +1088,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Look at that many cards from the top of your library" (Doomskar Warrior), with "that many" made X by the trigger:
   // the same as "the top X cards".
   text = text.replace(/\b([Ll]ook at|[Rr]eveal) X cards from the top of your library\b/g, "$1 the top X cards of your library");
+  // Jeska, Thrice Reborn: "Choose target creature. Until your next turn, if that creature would deal combat damage to one
+  // of your opponents, it deals triple that damage to that player instead": that target's combat damage to each of them
+  // (see parseDamageModSentence).
+  text = text.replace(/^Choose target creature\. Until your next turn, if that creature would deal combat damage to one of your opponents, it deals (double|triple) that damage to that player instead\.$/, "Until your next turn, each time target creature would deal combat damage to an opponent, it deals $1 that damage instead.");
+  // V.A.T.S.: "Choose any number of target creatures with equal toughness. Destroy the chosen creatures." The targets.
+  text = text.replace(/^Choose (any number of target creatures with equal toughness)\. Destroy the chosen creatures\.$/, "Destroy $1.");
+  // Angelic Skirmisher: "Choose first strike, vigilance, or lifelink. Creatures you control gain that ability until end of
+  // turn." The keyword is chosen as it resolves (CR 608.2d), and only creatures you control then gain it (CR 611.2c).
+  text = text.replace(/(^|, )[Cc]hoose ((?:[a-z ]+, )+or [a-z ]+)\. (Creatures you control) gain that ability until end of turn\.$/, (_, pre: string, opts: string, who: string) => `${pre}${pre ? who.toLowerCase() : who} gain your choice of ${opts} until end of turn.`);
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
   text = text.replace(/(^|\. )Create a token that's a copy of an? (permanent|creature|artifact) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
@@ -4718,6 +4727,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
+    // Ultron, Artificial Malevolence: "you may pay {2}. If you do, create a token that's a copy of it. If the token isn't a
+    // creature, it becomes a 2/2 Robot Villain creature in addition to its other types": the token as it is now, which
+    // becomes one for as long as it's on the battlefield (CR 611.2a). That isn't part of the copy effect, so it isn't
+    // copiable (CR 707.2): a copy of the token is no creature.
+    const tokenNotCreature = /^If the token isn't a creature, it (becomes an? \d+\/\d+ [A-Z][a-z]+(?: [A-Z][a-z]+)* creature in addition to its other types)$/.exec(s);
+    if (tokenNotCreature) {
+      const last = effects[effects.length - 1];
+      const made = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+      const mods = parseChanges(tokenNotCreature[1]!);
+      if (made?.type !== "createTokenCopy" || made.each || made.n !== 1 || !mods) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: ["Creature"], notColors: [], text: "noncreature permanent" };
+      effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: [{ type: "continuous", what: { ref: "created" }, mods, duration: "game" }] });
+      continue;
+    }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
     // Winds of Abandon: "For each creature exiled this way, its controller searches their library for a basic land card.
@@ -5500,6 +5523,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(rest, ctx);
       ctx.mayNow = false;
       if (!inner) return null;
+      // "You may turn a face-down creature you control face up" (Ugin's Mastery): choosing one is the "may", then that one
+      // turns face up.
+      if (inner.length === 2 && inner[0]!.type === "pick" && inner[0]!.action === "choose" && inner[1]!.type === "turnFaceUp" && inner[1]!.what.ref === "created") {
+        effects.push({ type: "may", effects: [inner[0]!], text: may[1]! }, { type: "if", cond: { kind: "youDid" }, effects: [inner[1]!] });
+        continue;
+      }
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
       if (inner.length > 1 && inner.some((e) => pauses(e))) return null;
       // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).

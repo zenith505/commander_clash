@@ -3728,6 +3728,8 @@ export type TriggerEvent =
   | "opponentSourceDamagesYouOrYours"
   /** "Whenever one or more creatures an opponent controls deal combat damage to you" (Norn's Decree): once for each such opponent, who is "that opponent". */
   | "opponentCreaturesDealCombatDamageToYou"
+  /** "Whenever one or more creatures an opponent controls deal combat damage to one or more of your opponents" (Nelly Borca): once for each such opponent in a combat damage step, who is "the controller of those creatures". */
+  | "opponentCreaturesDamageYourOpponents"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
   | "spellYouControlDealsDamage"
   /**

@@ -8740,6 +8740,11 @@ function finishCombatDamage(s: GameState): boolean {
       toPlayers.set(e.to.player, g);
     }
   for (const [player, g] of toPlayers) fireEvent(s, { type: "creaturesDamagedPlayer", player, ...g });
+  // "Whenever one or more creatures an opponent controls deal combat damage to one or more of your opponents" (Nelly
+  // Borca): once for the step for each player whose creatures dealt it, with the players they dealt it to (CR 603.2c).
+  const byController = new Map<PlayerId, PlayerId[]>();
+  for (const [player, g] of toPlayers) for (const c of g.controllers) byController.set(c, [...(byController.get(c) ?? []), player]);
+  for (const [controller, players] of byController) fireEvent(s, { type: "creaturesDamagedPlayers", controller, players });
   return false;
 }
 

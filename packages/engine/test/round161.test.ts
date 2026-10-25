@@ -366,3 +366,41 @@ describe("Wondrous Crucible", () => {
     expect(s.pending).toBeFalsy();
   });
 });
+
+const nelly = card("Nelly Borca, Impulsive Accuser", "Legendary Creature — Human Detective", "{2}{R}{W}", { cmc: 4, power: "2", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance\nWhenever Nelly Borca attacks, suspect target creature. Then goad all suspected creatures. (A suspected creature has menace and can't block.)\nWhenever one or more creatures an opponent controls deal combat damage to one or more of your opponents, you and the controller of those creatures each draw a card." });
+
+describe("Nelly Borca, Impulsive Accuser", () => {
+  it("is fully supported", () => supported(nelly));
+
+  it("an opponent's creatures dealing combat damage to your opponents: you and that player each draw, once for the step", () => {
+    const { s: s0, ap } = setup([]);
+    const [b, c, d] = [next(s0, ap), next(s0, next(s0, ap)), next(s0, next(s0, next(s0, ap)))];
+    putOnBattlefield(s0, c, nelly);
+    putOnBattlefield(s0, d, { ...nelly, oracleId: "nelly2" });
+    const x = putOnBattlefield(s0, ap, bear());
+    const y = putOnBattlefield(s0, ap, bear());
+    const z = putOnBattlefield(s0, ap, bear());
+    const hands = () => [ap, b, c, d].map((p) => s.players[p]!.hand.length);
+    let s = s0;
+    const before = hands();
+    // Two bears hit B (C's and D's opponent), one hits C (D's opponent, but not C's).
+    s = attack(s, ap, [{ attacker: x, defender: b }, { attacker: y, defender: b }, { attacker: z, defender: c }]);
+    s = passUntil(s, "endCombat", ap);
+    s = resolveAll(s);
+    const after = hands();
+    // C's Nelly: AP and C draw; D's Nelly: AP and D draw, once each though two players were hit.
+    expect(after.map((n, i) => n - before[i]!)).toEqual([2, 0, 1, 1]);
+  });
+
+  it("not for creatures dealing combat damage only to you, nor for your own creatures", () => {
+    const { s: s0, ap } = setup([]);
+    const b = next(s0, ap);
+    putOnBattlefield(s0, b, nelly);
+    putOnBattlefield(s0, ap, { ...nelly, oracleId: "nelly2" });
+    const x = putOnBattlefield(s0, ap, bear());
+    let s = attack(s0, ap, [{ attacker: x, defender: b }]);
+    const before = s.players[ap]!.hand.length + s.players[b]!.hand.length;
+    s = resolveAll(passUntil(s, "endCombat", ap));
+    expect(s.players[ap]!.hand.length + s.players[b]!.hand.length).toBe(before);
+  });
+});

@@ -5539,6 +5539,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3d92f2e6-27df-4329-b552-cf905f7616ba",
+  "name": "Flood of Tears",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return all nonland permanents to their owners' hands. If you return four or more nontoken permanents you control this way, you may put a permanent card from your hand onto the battlefield.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m20",
+  "releasedAt": "2019-07-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7dde4eb6-e9d7-4259-abc2-3af738e0f00f",
   "name": "Foil",
   "manaCost": "{2}{U}{U}",
@@ -9442,6 +9468,34 @@
   "commanderLegal": "legal",
   "set": "ncc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f1eb489d-104c-4801-b6d2-3f1a7ee73a75",
+  "name": "Mechtitan Core",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "{5}, Exile this Vehicle and four other artifact creatures and/or Vehicles you control: Create Mechtitan, a legendary 10/10 Construct artifact creature token with flying, vigilance, trample, lifelink, and haste that's all colors. When that token leaves the battlefield, return all cards exiled with this Vehicle except this card to the battlefield tapped under their owners' control.\nCrew 2",
+  "power": "2",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13597,6 +13651,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "49136bdc-bc50-49a2-999a-1ef9c16ea130",
+  "name": "Smuggler's Copter",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying\nWhenever this Vehicle attacks or blocks, you may draw a card. If you do, discard a card.\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ac914d98-221e-426c-8a50-342896b15f9e",
   "name": "Snap",
   "manaCost": "{1}{U}",
@@ -14276,6 +14359,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "67d29e56-9ca8-46bc-9ee0-20184e867ce4",
+  "name": "Summon: Valefor",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment Creature — Saga Drake",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Saga",
+   "Drake"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI — Sonic Wings — Each opponent chooses a creature with the greatest mana value among creatures they control. Return those creatures to their owners' hands.\nII, III, IV — Tap up to one target creature and put a stun counter on it.\nFlying",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "10d482fd-e034-4187-b148-51fe15885360",
   "name": "Sunbird's Invocation",
   "manaCost": "{5}{R}",
@@ -14756,6 +14873,30 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "91df4cf5-d7ec-4fcd-87ed-e075ef6ceba9",
+  "name": "The Deck of Many Things",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Roll a d20 and subtract the number of cards in your hand. If the result is 0 or less, discard your hand.\n1—9 | Return a card at random from your graveyard to your hand.\n10—19 | Draw two cards.\n20 | Put a creature card from any graveyard onto the battlefield under your control. When that creature dies, its owner loses the game.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

@@ -10,7 +10,8 @@ import type { Ctx } from "../body";
 import { addTarget } from "../body";
 import { parseDamageModSentence } from "../damage-mods";
 import { parseDamageRecipient, parseGroup, parseTargetPhrase } from "../targets";
-import { COLOR_WORDS, NUMX, amt } from "../words";
+import { COLOR_WORDS, NUMX, amt, singular } from "../words";
+import { CREATURE_TYPES } from "../../keywords";
 
 /** "red", "black or red", "artifact", "white" before "source": what the source has to be; "" is any source. */
 function sourceQuality(q: string): TargetSpec | null {
@@ -47,6 +48,13 @@ function sourceGroup(p: string): TargetSpec | null {
     }
     if (src[3]) spec.controller = "opponent";
     return spec;
+  }
+  // "Creatures other than Werewolves and Wolves" (Moonmist): creatures without either subtype, as the damage is dealt
+  // (rulings).
+  const otherThan = /^creatures other than ([A-Z][a-z]+)(?: and ([A-Z][a-z]+))?$/.exec(t);
+  if (otherThan) {
+    const subs = [otherThan[1]!, otherThan[2]].filter((w): w is string => !!w).map(singular);
+    return subs.every((x) => CREATURE_TYPES.has(x)) ? { kind: "object", types: ["Creature"], notSubtypes: subs, text: t.toLowerCase() } : null;
   }
   if (!/creatures\b/i.test(t)) return null;
   const g = parseGroup(t, true);

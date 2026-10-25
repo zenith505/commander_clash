@@ -47,7 +47,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At end of combat on your turn, (.+)$/, "yourEndCombat"],
   [/^At end of combat, (.+)$/, "eachEndCombat"],
   // "To a player or battle": either (TriggeredAbility.orBattle).
-  [/^Whenever ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
+  // "When ~ deals combat damage to a player" (RMS Titanic) is the same trigger (CR 603.1).
+  [/^When(?:ever)? ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
   [/^Whenever ~ deals combat damage to a player or planeswalker, (.+)$/, "selfDealsCombatDamageToPlayer"],
   [/^Whenever ~ deals combat damage, (.+)$/, "selfDealsCombatDamage"],
   [/^Whenever ~ deals damage to a player, (.+)$/, "selfDealsDamageToPlayer"],
@@ -1295,6 +1296,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
     batch = { what: "toGraveyard", from: "library", milled: true, ...(filter ? { filter } : {}) };
+    rest = m[2]!;
+  } else if ((m = /^Whenever a player mills an? (?:(.+?) )?card, (.+)$/.exec(line))) {
+    // Glowing One: "Whenever a player mills a nonland card": once for each such card milled (rulings, CR 603.2c).
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    batch = { what: "toGraveyard", from: "library", milled: true, each: true, ...(filter ? { filter } : {}) };
     rest = m[2]!;
   } else if ((m = /^Whenever one or more (?:(.+?) )?cards are milled, (.+)$/.exec(line))) {
     // The Wise Mothman: cards a mill instruction put into any graveyard (CR 701.17a), once for the whole event even when

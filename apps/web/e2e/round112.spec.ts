@@ -105,7 +105,7 @@ test("Food Chain: exile Hill Giant to add five mana of one color (green), only f
   await menu(page).locator("button", { hasText: "Exile a creature you control: add" }).filter({ has: page.locator("[title='{G}']") }).click();
   await expect(page.locator(".targeting")).toContainText("exile");
   await page.locator(`[data-obj="${giant}"]`).first().click();
-  await page.locator(".targeting").getByRole("button", { name: "Sacrifice and activate" }).click();
+  await page.locator(".targeting").getByRole("button", { name: "Exile and activate" }).click();
   const after = await resolveUntil(page, (st) => !st.pending && st.objects[giant]!.zone === "exile");
   expect(after.players[0]!.manaPool.G).toBe(5);
   expect(after.players[0]!.manaLots?.filter((l) => l.mana === "G" && l.only).reduce((n, l) => n + l.n, 0)).toBe(5);

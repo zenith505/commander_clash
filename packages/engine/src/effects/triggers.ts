@@ -1718,7 +1718,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? { event: "dies", objs: died.map((m) => ({ o: m.snapshot!, c: m.chars!, controller: m.controller ?? m.owner })) }
               : null;
         // Zellix: "Whenever a player mills one or more creature cards": once for each player who milled them.
-        if (b.milled && !b.together) {
+        if (b.milled && !b.together && !b.each) {
           for (const pid of [...new Set(matched.map((m) => m.owner))]) {
             const theirs = matched.filter((m) => m.owner === pid);
             add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: theirs.length, player: pid, group: theirs.map((m) => ({ id: m.id, zc: m.zc })) });

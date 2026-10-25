@@ -1703,6 +1703,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} puts a card into ${player(s, o.owner).name}'s hand.`);
           log(s, `It's ${defOf(s, o).name}.`, o.owner);
         } else log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
+        // Flood of Tears: who controlled the nontoken permanents returned, even one a replacement sends elsewhere (rulings).
+        if (o.zone === "battlefield" && !o.isToken && s.resolving) (s.resolving.returnedNontoken ??= []).push(controllerOf(s, o));
         moveObject(s, o.id, "hand");
       }
       return;
@@ -2110,11 +2112,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         const found = sc.found.filter((id) => yards().includes(id));
         sc.found = undefined;
+        // "When that creature dies, ..." (The Deck of Many Things): the permanent it became (CR 400.7).
+        if (toField && s.resolving) s.resolving.created = [];
         for (const id of found) {
           const o = obj(s, id);
           if (toField) {
             log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
             moveObject(s, id, "battlefield", { controller: ctx.controller });
+            if (o.zone === "battlefield" && s.resolving) s.resolving.created!.push(id);
             continue;
           }
           log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);

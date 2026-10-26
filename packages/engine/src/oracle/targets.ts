@@ -679,6 +679,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   let p = phrase.trim().replace(/\b(non-?[a-z]+), (?=non-?[a-z]+ )/gi, "$1 ");
   // "Each other Merfolk and/or Knight you control" (Vodalian Wave-Knight): each that's either one, or both.
   p = p.replace(/^(each (?:other )?)([A-Z][a-z]+) and\/or ([A-Z][a-z]+)(?= you control$)/, (all, e: string, a: string, b: string) => (CREATURE_TYPES.has(a) && CREATURE_TYPES.has(b) ? `${e}${a} or ${b}` : all));
+  // Aku Djinn: "each creature each opponent controls" is each creature your opponents control.
+  p = p.replace(/^(each (?:[a-z]+ )?creature) each opponent controls$/, "$1 your opponents control");
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
@@ -1254,6 +1256,9 @@ export function parseTargetPhrase(
     p = p.slice(m[0].length);
   } else if ((m = /^nonattacking,? nonblocking /.exec(p))) {
     extra.combat = "notInCombat";
+    p = p.slice(m[0].length);
+  } else if ((m = /^nonattacking (?=creatures?$)/.exec(p))) {
+    extra.combat = "notAttacking";
     p = p.slice(m[0].length);
   }
   const isSpell = / ?spell$/.test(p);

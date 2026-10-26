@@ -1275,6 +1275,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Marcus, Mutant Mayor: "draw a card if that creature has a +1/+1 counter on it. If it doesn't, put a +1/+1 counter
   // on it": one condition, checked as it resolves (CR 608.2c).
   text = text.replace(/^[Dd]raw a card if (that creature has an? [^.]+? counter on it)\. If it doesn't, ([^.]+)\.$/, "If $1, draw a card. Otherwise, $2.");
+  // Kathari Bomber: "create two 1/1 red Goblin creature tokens and sacrifice ~": two instructions, in order.
+  text = text.replace(/^([Cc]reate [^.]+? tokens?) and sacrifice ~\.$/, "$1. Sacrifice ~.");
+  // Swarm Surge: "Creatures you control get +2/+0 until end of turn. Colorless creatures you control also gain first strike
+  // until end of turn.": a second effect of its own.
+  text = text.replace(/(\. )((?:[A-Z][a-z]+ )?creatures you control) also (gain|get) /, "$1$2 $3 ");
   // Roar of Challenge's "That creature gains indestructible until end of turn if ..." too.
   text = text.replace(/(^|\. )That creature (?:also )?gains ([^.]+?) until end of turn if (you control [^.,]+)\./, "$1If $3, that creature gains $2 until end of turn.");
   // "Sacrifice another creature. You gain X life and draw X cards, where X is that creature's power." (Disciple of Bolas):
@@ -3507,6 +3512,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "draw", who: { ref: "you" }, n: { count: { kind: "discardedThisWay" } } });
       continue;
     }
+    // Forget: "Target player discards two cards, then draws as many cards as they discarded this way.": the same player.
+    const prevDiscard = effects[effects.length - 1];
+    if (/^(?:That player|They) draws? as many cards as they discarded this way$/.test(s) && prevDiscard?.type === "discard" && prevDiscard.who.ref === "target") {
+      effects.push({ type: "draw", who: prevDiscard.who, n: { count: { kind: "discardedThisWay" } } });
+      continue;
+    }
+    // Gerrard's Verdict: "Target player discards two cards. You gain 3 life for each land card discarded this way."
+    const gainPer = /^You gain (\d+) life for each (land|creature|nonland) card discarded this way$/.exec(s);
+    if (gainPer && effects[effects.length - 1]?.type === "discard") {
+      const filter = parseSearchFilter(`${gainPer[2]} card`);
+      if (!filter) return null;
+      effects.push({ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "discardedThisWay", filter }, times: Number(gainPer[1]) } });
+      continue;
+    }
     // Moraug: "there's an additional combat phase after this phase. At the beginning of that combat, untap all creatures
     // you control." The delayed trigger is for that combat phase only (rulings: not the turn's regular combat).
     // World at War: "After the second main phase this turn, there's an additional combat phase followed by an additional
@@ -3986,15 +4005,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // last existed on the battlefield (CR 608.2h), so it's checked just before it's destroyed, and the rest happens after.
     // Rite of the Serpent: "If that creature had a +1/+1 counter on it, ...": the same, its counters as it last existed.
     // Icequake, Thermokarst: "Destroy target land. If that land was a snow land, ...": the same, its supertypes.
-    const destroyWas = /^[Dd]estroy target creature$/.test(s)
-      ? /^If (?:that creature|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+))|wasn't attacking|had an? (\+1\/\+1) counter on it), (.+?)\.?$/.exec(sentences[si + 1] ?? "")
-      : /^[Dd]estroy target land$/.test(s) ? /^If that land (was a snow land)(), ()()()(.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
-    if (destroyWas && (!destroyWas[4] || CREATURE_TYPES.has(destroyWas[4]))) {
+    // Gloomwidow's Feast: "Destroy target creature with flying. If that creature was blue or black, ...", Filigree Fracture:
+    // "Destroy target artifact or enchantment. If that permanent was blue or black, draw a card.", Molten Rain: "Destroy
+    // target land. If that land was nonbasic, ~ deals 2 damage to the land's controller.", Liliana's Defeat: "If that
+    // permanent was a Liliana planeswalker, her controller loses 3 life.": the same, as it last existed.
+    const destroyWas = /^[Dd]estroy target (?:creature|creature with [a-z]+|artifact or enchantment|black creature or black planeswalker)$/.test(s)
+      ? /^If (?:that creature|that permanent|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+)(?: planeswalker)?)|wasn't attacking|had an? (\+1\/\+1) counter on it), (.+?)\.?$/.exec(sentences[si + 1] ?? "")
+      : /^[Dd]estroy target (?:land|non-Swamp land)$/.test(s) ? /^If that land (was a snow land|was nonbasic)(), ()()()(.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    const planeswalkerWas = destroyWas && / planeswalker,/.test(sentences[si + 1] ?? "");
+    if (destroyWas && (!destroyWas[4] || planeswalkerWas || CREATURE_TYPES.has(destroyWas[4]))) {
       const before = ctx.targets.length;
       const fx = parseOne(s, ctx);
       if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy") return null;
       const filter: TargetSpec = destroyWas[1] === "was a snow land"
         ? { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Snow"], text: "snow" }
+        : destroyWas[1] === "was nonbasic"
+        ? { kind: "object", types: [], notTypes: [], notColors: [], notSupertypes: ["Basic"], text: "nonbasic" }
+        : planeswalkerWas
+        ? { kind: "object", types: ["Planeswalker"], notTypes: [], notColors: [], subtypes: [destroyWas[4]!], text: `a ${destroyWas[4]} planeswalker` }
         : destroyWas[2]
         ? { kind: "object", types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[destroyWas[2]]!, COLOR_WORDS[destroyWas[3]!]!], text: `${destroyWas[2]} or ${destroyWas[3]}` }
         : destroyWas[4]
@@ -4002,7 +4030,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
           : destroyWas[5]
             ? { kind: "object", types: [], notTypes: [], notColors: [], counter: "+1/+1", text: "with a +1/+1 counter on it" }
             : { kind: "object", types: [], notTypes: [], notColors: [], combat: "attacking", text: "attacking" };
-      const then = parseOne(capital(destroyWas[6]!), ctx);
+      const then = parseOne(capital(destroyWas[6]!.replace(/\b(?:the land's|her) controller\b/, "that permanent's controller")), ctx);
       if (!then || !then.length || ctx.targets.length !== before + 1) return null;
       const yes = [...fx, ...then];
       effects.push(destroyWas[1] === "wasn't attacking"
@@ -4017,10 +4045,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // 1 damage to target creature. If that creature is white or blue, ~ deals 4 damage to it instead.": which one, by the
     // creature as this resolves.
     const dmgIs = /^~ deals \d+ damage to target creature$/.test(s)
-      ? /^If that creature (is an? (enchantment|artifact)|is (white|blue|black|red|green)(?: or (white|blue|black|red|green))?|has ([a-z]+)), (~ deals \d+ damage to that creature's controller|~ deals (\d+) damage to it instead)\.?$/.exec(sentences[si + 1] ?? "")
+      ? /^If that creature (is an? (enchantment|artifact)|is (white|blue|black|red|green)(?: or (white|blue|black|red|green))?|has ([a-z]+)), (~ deals \d+ damage to that creature's controller|~ deals (\d+) damage to (?:it|that creature) instead)\.?$/.exec(sentences[si + 1] ?? "")
       : null;
     const dmgKeyword = dmgIs?.[5] ? capital(dmgIs[5]) : undefined;
-    if (dmgIs && (!dmgKeyword || (SUPPORTED_KEYWORDS as readonly string[]).includes(dmgKeyword))) {
+    // Hexgold Slash: "If that creature has toxic, ...": any toxic ability (CR 702.164).
+    if (dmgIs && (!dmgKeyword || dmgKeyword === "Toxic" || (SUPPORTED_KEYWORDS as readonly string[]).includes(dmgKeyword))) {
       const before = ctx.targets.length;
       const fx = parseOne(s, ctx);
       if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "damage") return null;
@@ -4028,7 +4057,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         ? { kind: "object", types: [capital(dmgIs[2])], notTypes: [], notColors: [], text: dmgIs[2] }
         : dmgIs[3]
           ? { kind: "object", types: [], notTypes: [], notColors: [], colors: [dmgIs[3], dmgIs[4]].filter(Boolean).map((c) => COLOR_WORDS[c!]!), text: dmgIs[1]!.replace(/^is /, "") }
-          : { kind: "object", types: [], notTypes: [], notColors: [], keywords: [dmgKeyword!], text: `with ${dmgIs[5]}` };
+          : dmgKeyword === "Toxic"
+            ? { kind: "object", types: [], notTypes: [], notColors: [], toxic: true, text: "with toxic" }
+            : { kind: "object", types: [], notTypes: [], notColors: [], keywords: [dmgKeyword!], text: `with ${dmgIs[5]}` };
       if (dmgIs[7]) {
         effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [{ ...fx[0]!, amount: num(dmgIs[7]) } as Effect], otherwise: fx });
       } else {
@@ -4082,13 +4113,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
     // Hidden Blade: "Attach it to target creature you control. If that creature is an Assassin, it gains deathtouch ...".
     // Karametra's Blessing: "If it's an enchanted creature or enchantment creature, ..." (TargetSpec.anyOf).
-    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+|enchanted creature or enchantment creature), (.+)$/.exec(s);
-    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (CREATURE_TYPES.has(ifIts[2]!) && !ifIts[1]))) {
+    // Elder Cathar: "put a +1/+1 counter on target creature you control. If that creature is a Human, put two +1/+1
+    // counters on it instead.": which one, by the creature as this resolves (CR 608.2c).
+    const moreCounters = /^If that creature is an? ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on it instead$/.exec(s);
+    if (moreCounters) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "counters" || last.what.ref !== "target" || last.what.n || last.counter !== "+1/+1" || last.n !== 1 || !CREATURE_TYPES.has(moreCounters[1]!)) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [moreCounters[1]!], text: `a ${moreCounters[1]}` };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(moreCounters[2]!) }], otherwise: [last] };
+      continue;
+    }
+    // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.
+    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+(?: or [A-Z][a-z]+)?|enchanted creature or enchantment creature), (.+)$/.exec(s);
+    if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (ifIts[2]!.split(" or ").every((x) => CREATURE_TYPES.has(x)) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];
       const typed = parseTargetPhrase(ifIts[2]!);
-      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text", ...(/^[A-Z]/.test(ifIts[2]!) ? ["subtypes"] : []), ...(/ or /.test(ifIts[2]!) ? ["anyOf"] : [])].includes(k));
+      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text", ...(/^[A-Z]/.test(ifIts[2]!) ? ["subtypes"] : []), ...(/ or /.test(ifIts[2]!) ? ["anyOf"] : []), ...(ifIts[2] === "token" && !ifIts[1] ? ["token"] : [])].includes(k));
       const types = typed?.kind === "object" ? [...(typed.types ?? []), ...(typed.allTypes ?? [])] : [];
       // Anything else is left to the readings below (Carbonize's "If it's a creature, it can't be regenerated ...").
       // "Up to one target ... loses all abilities until your next turn. If it's a creature, it also has base power and
@@ -4120,7 +4162,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];
       if (t?.kind !== "object" || t.optional || t.many || !prev || !mentionsTarget(prev, i)) return null;
-      const fx = parseOne(capital(ifLegendary[1]!), ctx);
+      // Gimli's Fury: "If it's legendary, it also gains trample until end of turn."
+      const fx = parseOne(capital(ifLegendary[1]!.replace(/^it also /, "it ")), ctx);
       if (!fx || ctx.targets.length !== i + 1 || fx.some((e) => pauses(e))) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary" } }, effects: fx });
       continue;
@@ -6336,7 +6379,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Swirling Sandstorm: "~ deals 5 damage to each creature without flying if there are seven or more cards in your graveyard".
-    const trailIf = !insteadIf ? /^((?:[Dd]raw|(?:[Yy]ou )?[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|Its controller loses|[Pp]ut|[Tt]arget [^,]+ gets|~ deals \d+ damage to each (?!target)[^,]+?) .+) if ((?!it\b|~|that\b(?! player (?:has|controls) more [a-z ]+ than each other player$)|they\b|able\b)[^,]+)$/.exec(s) : null;
+    const trailIf = !insteadIf ? /^((?:[Dd]raw|[Dd]iscard|(?:[Yy]ou )?[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|Its controller loses|[Pp]ut|[Tt]arget [^,]+ gets|~ deals \d+ damage to each (?!target)[^,]+?) .+) if ((?!it\b|~|that\b(?! player (?:has|controls) more [a-z ]+ than each other player$)|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
     // "It deals that much damage to each other opponent if ~'s power is 7 or greater" (Vincent), "Then if ~'s power is 4
@@ -6539,7 +6582,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (ifState && stateCond) {
       // "If you've completed a dungeon, that creature also gets +5/+0" (Rilsa Rael): as well as what came before.
       // "Draw another card": one more.
-      const then = ifState[2]!.replace(/^(that creature|that player|it|~) also (?=(?:gains?|gets?|deals?|has|loses?) )/i, "$1 ").replace(/^draw another card$/, "draw a card");
+      const then = ifState[2]!.replace(/^(that creature|that player|those creatures|it|~) also (?=(?:gains?|gets?|deals?|has|loses?) )/i, "$1 ").replace(/^draw another card$/, "draw a card");
       // "If there are four or more charge counters on ~, you may remove all charge counters from ~ and transform ~" (Primal
       // Amulet): optional, decided as it resolves (CR 608.2d).
       // Other "you may" sentences that read on their own come first ("you may cast the discarded card ...", Malcolm).

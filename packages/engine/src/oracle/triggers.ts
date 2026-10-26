@@ -1812,6 +1812,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return { event: "youGetEnergy", body, ...(energy[1] ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   // Voracious Tome-Skimmer: "Whenever you cast a spell during an opponent's turn, ...": the same, checked as you cast it.
+  // Quirion Dryad: "Whenever you cast a spell that's white, blue, black, or red": a spell of any of those colors.
+  const castThats = /^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )+or (?:white|blue|black|red|green)), (.+)$/.exec(line);
+  if (castThats) return parseTrigger(`Whenever you cast a ${castThats[1]} spell, ${castThats[2]}`);
   const castTheirTurn = /^Whenever you cast a spell during an opponent's turn, (.+)$/.exec(line);
   if (castTheirTurn) {
     const t = parseTrigger(`Whenever you cast a spell, ${castTheirTurn[1]}`);
@@ -1820,10 +1823,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
   // the event, checked as it attacks only (rulings), not an intervening if.
   // Pugnacious Hammerskull: "while you don't control another Dinosaur", the same (rulings).
-  const attacksWhile = /^Whenever ~ attacks while (you (?:don't )?control .+?), (.+)$/.exec(line);
+  // Burning Sun Cavalry: "Whenever ~ attacks or blocks while you control a Dinosaur", the same for both events.
+  const attacksWhile = /^Whenever ~ (attacks|attacks or blocks) while (you (?:don't )?control .+?), (.+)$/.exec(line);
   if (attacksWhile) {
-    const cond = parseActivateCondition(attacksWhile[1]!);
-    const t = cond && parseTrigger(`Whenever ~ attacks, ${attacksWhile[2]}`);
+    const cond = parseActivateCondition(attacksWhile[2]!);
+    const t = cond && parseTrigger(`Whenever ~ ${attacksWhile[1]}, ${attacksWhile[3]}`);
     return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
   }
   // Wedding Ring: "Whenever an opponent who controls an artifact named ~ draws a card during their turn, you draw a card",
@@ -2025,6 +2029,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(alone[2]!, { subjectIt: true, defending: true });
     return body ? { event: "creatureYouControlAttacksAlone", body, ...(filter ? { subjectFilter: { ...filter, text: alone[1]! } } : {}) } : "fail";
   }
+  // Weatherseed Totem: "When ~ is put into a graveyard from the battlefield, if it was a creature, return ~ to its owner's
+  // hand": a creature put into a graveyard from the battlefield is what dies (CR 700.4), and what it was can't change.
+  const wasCreature = /^When ~ is put into a graveyard from the battlefield, if it was a creature, (return ~ to its owner's hand\.)$/.exec(line);
+  if (wasCreature) return parseTrigger(`When ~ dies, ${wasCreature[1]}`);
   // The Enduring cycle: "When ~ dies, if it was a creature, return it to the battlefield under its owner's control.
   // It's an enchantment. (It's not a creature.)" Only a creature dies here (CR 700.4), so the intervening if (CR 603.4)
   // holds whenever it triggers. It enters as an enchantment only, without its creature types (rulings, CR 205.1b).

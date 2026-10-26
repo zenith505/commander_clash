@@ -13249,6 +13249,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d59cfff9-2bce-439a-9456-ae68eabbf67d",
+  "name": "Rhystic Deluge",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{U}: Tap target creature unless its controller pays {1}.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "53236dd7-845a-444c-96d5-f41ed7325d8f",
   "name": "Rhystic Study",
   "manaCost": "{2}{U}",
@@ -15015,6 +15041,47 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "85dec6cf-6f27-4eb0-834b-5f6fbbe25fc8",
+  "name": "Spider-Man, To the Rescue",
+  "manaCost": "{2}{G/W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Spider Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spider",
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Flash\nReach, vigilance\nNo One Dies! — When Spider-Man enters, you may tap him. When you do, another target nonattacking creature you control gains indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy it.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Reach",
+   "Vigilance",
+   "Flash",
+   "No One Dies!"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -608,7 +608,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "beforeAttackers":
       return s.activePlayer === you && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
     case "during": // CR 506.8, 601.3, 602.5b
-      return (!cond.turn || (s.activePlayer === you) === (cond.turn === "you")) && inWindow(s, cond.window);
+      return ((!cond.turn || (s.activePlayer === you) === (cond.turn === "you")) && inWindow(s, cond.window)) !== !!cond.not;
     case "attackedThisStep": {
       // Attackers are declared as the declare attackers step begins (CR 508.1); attacking only planeswalkers doesn't count.
       const ap = s.players[s.activePlayer];

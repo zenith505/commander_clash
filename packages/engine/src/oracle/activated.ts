@@ -277,6 +277,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, most.index);
       found = true;
     }
+    // "You can't activate this ability during combat." (Djinn of Infinite Deceits, CR 602.5b): any time but then.
+    if (/ You can't activate this ability during combat\.$/.test(effectText) && !activateIf) {
+      activateIf = { kind: "during", window: "combat", not: true };
+      effectText = effectText.slice(0, effectText.length - " You can't activate this ability during combat.".length);
+      found = true;
+    }
     // Restrictions (CR 602.5b, 506.8g): "Activate only as a sorcery", "... only once each turn", "... only during your
     // upkeep", "... only during your turn and only if an opponent lost life this turn", in any combination.
     // With exhaust too: "Exhaust — {4}: Earthbend 4. Activate only during your turn." (Bitter Work), once ever and only then.

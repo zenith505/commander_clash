@@ -1431,7 +1431,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const options = (i: number) => legalTargets(s, body.targets[i]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
     const ours = (i: number) => options(i).filter((o) => controllerOf(s, o) === pid && !o.isCommander).sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
     const theirs = (i: number, not?: GameObject) => options(i).filter((o) => controllerOf(s, o) !== pid && o !== not).sort((a, b) => worth(s, pid, b) - worth(s, pid, a))[0];
-    const picks: [GameObject | undefined, GameObject | undefined][] = swap.a.ref === "self" ? [[me, theirs(swap.b.index)]] : [[ours(swap.a.index), theirs(swap.b.index)], [theirs(swap.a.index), ours(swap.b.index)]];
+    const picks: [GameObject | undefined, GameObject | undefined][] = swap.a.ref === "self" ? [[me?.isCommander ? undefined : me, theirs(swap.b.index)]] : [[ours(swap.a.index), theirs(swap.b.index)], [theirs(swap.a.index), ours(swap.b.index)]];
     for (const [a, b] of picks) {
       const [mine, other] = a && controllerOf(s, a) === pid ? [a, b] : [b, a];
       if (!a || !b || !mine || !other || worth(s, pid, other) < worth(s, pid, mine) + 2) continue;

@@ -262,8 +262,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
     }
-    case "discardedManaValue":
-      return (s.resolving?.discardedAll ?? []).reduce((n, id) => n + (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0), 0);
+    // "The discarded card's mana value": a card the effect discarded (Ninja's Blades), else the one a discard cost
+    // discarded (Mercurial Chemister, StackItem.costDiscarded), as it last existed in the graveyard.
+    case "discardedManaValue": {
+      const done = s.resolving?.discardedAll ?? [];
+      if (done.length) return done.reduce((n, id) => n + (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0), 0);
+      return (s.resolving?.item.costDiscarded ?? []).reduce((n, k) => n + (s.cards[k] ? defMv(s.cards[k]!) : 0), 0);
+    }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
     case "cardsExiledThisWay":

@@ -1,7 +1,7 @@
 # Roadmap
 
-24,822 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,544 of
+24,873 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,570 of
 9,979 (85%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -190,25 +190,42 @@ line blocks.
    that parse with small pieces (Tainted Remedy, Balan, Marcus, Serra the Benevolent, Oblivion Stone, Curator's Ward
    and others) and easy ones further down, to Grinning Ignus (rank 8,293); `npm run popular` from Godsend (rank
    7,725) on is still to go through.
-   Next most played: Godsend, Kiora, the Crashing Wave, The Red Terror, Amped Raptor, Repeated Reverberation, Obeka,
-   Brute Chronologist, Outlaws' Merriment, Moldgraf Monstrosity, Myojin of Cryptic Dreams, Radagast the Brown, Caves
-   of Chaos Adventurer, Errant and Giada, Quicksilver Elemental, Secret of Bloodbending, Chiss-Goria, Forge Tyrant,
-   Molecule Man, Runadi, Behemoth Caller, Confiscation Coup, Gryff's Boon, Zoyowa Lava-Tongue, Don't Move, Role
-   Reversal, Scriv, the Obligator, Craig Boone, Novac Guard, Repay in Kind, Spelltwine, Howlpack Piper, Ultimate
-   Magic: Meteor, Spectral Searchlight, Recommission, Rat King, Verminister, Vampire Gourmand, Sage of Hours,
-   Valgavoth's Onslaught, Motivated Pony; and from before round 172: Grindstone, Halo Forager, Moritte of the Frost,
-   Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal Extortion,
-   Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper, Jolted
-   Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
-   Calamity, Galloping Inferno, Shifting Grift, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six,
-   Crystalline Giant, Kaervek, the Punisher, Obsessive Pursuit, Gemcutter Buccaneer, Nissa of Shadowed Boughs,
-   Chandra, Flameshaper, Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the
-   Exemplary, Realm of Koh, Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker,
-   The Mycotyrant, Lifecraft Engine, Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal
-   Illuminator, Sigarda, Host of Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless
-   Conscription, Bloatfly Swarm, War's Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving
-   Amalgam.
+   Out after round 173: Godsend (exiling one of the creatures blocking or blocked by the equipped creature, and
+   "can't cast spells with the same name as a card exiled with ~"), The Red Terror (a damage trigger for any red
+   source you control), Amped Raptor (casting a card by paying energy instead of its mana cost), Repeated
+   Reverberation (a delayed copy of the next instant, sorcery or loyalty ability), Outlaws' Merriment (a mode chosen
+   at random), Moldgraf Monstrosity (two creature cards at random from a graveyard), Hidetsugu and Kairi (life loss
+   between the exile and the free cast), Scuttlemutt ("the color or colors of your choice" needs a multi-color
+   picker), Role Reversal, Shifting Loyalties, Daring Thief and The Trickster-God's Heist (two targets that "share a
+   card type" or "permanent type": no target rule between two targets yet), Conjured Currency ("target permanent you
+   neither own nor control"), Visions of Duplicity (flashback cheaper by a commander's mana value). Round 173 went
+   down the list from Godsend to Dovin, Hand of Control (rank 8,497), taking the cards that parse with small pieces,
+   and took the other cards that share their mechanics wherever they are in the list: exchanging control (Switcheroo,
+   Avarice Totem, Kitsune, Djinn of Infinite Deceits, Modify Memory and others), "you may sacrifice an artifact or
+   discard a card", "the discarded card's mana value", "shuffle your library" and "target creature other than this
+   creature".
+   Next most played: Myojin of Cryptic Dreams, Radagast the Brown, Caves of Chaos Adventurer, Errant and Giada,
+   Quicksilver Elemental, Secret of Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Runadi, Behemoth Caller,
+   Confiscation Coup, Zoyowa Lava-Tongue, Don't Move, Scriv, the Obligator, Craig Boone, Novac Guard, Spelltwine,
+   Howlpack Piper, Ultimate Magic: Meteor, Spectral Searchlight, Recommission, Rat King, Verminister, Sage of Hours,
+   Valgavoth's Onslaught, Motivated Pony, Valentin, Dean of the Vein, Spider-Verse, Captain America, First Avenger,
+   Desert Warfare, Soulfire Eruption, March of Reckless Joy, Bard Class, Arahbo, Roar of the World, Círdan the
+   Shipwright, Tithe Taker, Signature Slam; and from before round 172: Grindstone, Halo Forager, Moritte of the
+   Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
+   Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper,
+   Jolted Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
+   Calamity, Galloping Inferno, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant,
+   Kaervek, the Punisher, Obsessive Pursuit, Gemcutter Buccaneer, Nissa of Shadowed Boughs, Chandra, Flameshaper,
+   Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the Exemplary, Realm of Koh,
+   Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft
+   Engine, Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of
+   Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's
+   Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 173: bots never activate Obeka, Brute Chronologist and say no when it asks them to end
+   their turn; bots aim Modify Memory like Switcheroo (their least useful creature for an opponent's best), never at
+   two opponents' creatures to draw three; bots aim Shifting Grift's exchanges with the usual target picks, not the
+   exchange logic; Modify Memory's "if you control neither creature" checks only the targets still legal (CR 608.2b).
    Smaller gaps from round 172: bots don't avoid gaining life under an opponent's Tainted Remedy or Plague Drone;
    Kellan, Daring Traveler's test uses its creature face alone; "a card left your graveyard this turn" counts cards,
    not tokens, by their owner.

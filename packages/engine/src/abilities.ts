@@ -1653,7 +1653,7 @@ export type StaticCondition =
    * "Cast ~ only during combat", "Activate only during your upkeep" (CR 506.8, 601.3, 602.5b): the part of the turn
    * it may be cast or activated in; `turn`: "your" or "an opponent's" (upkeep, end step, combat, declare attackers step).
    */
-  | { kind: "during"; window: TimingWindow; turn?: "you" | "opponent" }
+  | { kind: "during"; window: TimingWindow; turn?: "you" | "opponent"; /** "You can't activate this ability during combat" (Djinn of Infinite Deceits): any time but then. */ not?: true }
   /**
    * "Only if you've been attacked this step", with "during the declare attackers step": a creature declared as an
    * attacker this step attacks you, not only planeswalkers you control (rulings on Heavy Fog).
@@ -1667,7 +1667,7 @@ export type StaticCondition =
 
 /** A restriction naming a part of the turn (CR 506.8, 602.5b): "only during your upkeep", "only during combat". */
 export const timedCondition = (c: StaticCondition | undefined): boolean =>
-  !!c && (c.kind === "during" || c.kind === "attackedThisStep" || ((c.kind === "allOf" || c.kind === "anyOf") && c.conds.some(timedCondition)));
+  !!c && ((c.kind === "during" && !c.not) || c.kind === "attackedThisStep" || ((c.kind === "allOf" || c.kind === "anyOf") && c.conds.some(timedCondition)));
 
 /**
  * When a restricted spell or ability may be used (CR 506.8): "upkeep", "end" (end step), "afterUpkeep" (the steps after

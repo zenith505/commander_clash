@@ -3918,6 +3918,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: tapped }, effects: [{ type: "may", effects: fx, text: "destroy target creature" }] });
       continue;
     }
+    // Modify Memory: "If you control neither creature, draw three cards." after exchanging control of two targets: who
+    // controls each as this resolves, after the exchange. A target gone or illegal can't be looked at (CR 608.2b), so
+    // only the legal ones are checked.
+    const neither = /^If you control neither creature, (.+?)\.?$/.exec(s);
+    const swapped = effects[effects.length - 1];
+    if (neither && swapped?.type === "exchangeControl" && swapped.a.ref === "target" && swapped.b.ref === "target") {
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(neither[1]!), ctx);
+      if (!fx || ctx.targets.length !== before) return null;
+      const yours: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "you control" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: swapped.a.index, filter: yours }, effects: [], otherwise: [{ type: "if", cond: { kind: "targetIs", index: swapped.b.index, filter: structuredClone(yours) }, effects: [], otherwise: fx }] });
+      continue;
+    }
     // Éowyn, Lady of Rohan: "Target creature gains your choice of first strike or vigilance until end of turn. If that
     // creature is equipped, it gains first strike and vigilance until end of turn instead.": whether it's equipped as this
     // resolves; then no choice is made.

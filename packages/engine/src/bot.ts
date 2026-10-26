@@ -1423,6 +1423,25 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     if (forced) return pick ? [pick] : null;
     return pick && s.activePlayer === pid && s.step === "main1" && army(pick.id) > army(pid) + 3 ? [pick] : null;
   }
+  // Exchanging control (Switcheroo, Avarice Totem): our least useful permanent for an opponent's most useful one, worth it
+  // only when theirs is worth clearly more; an exchange between two of their permanents does us no good.
+  const swap = body.effects.find((e): e is Extract<Effect, { type: "exchangeControl" }> => e.type === "exchangeControl");
+  if (swap && body.targets.length <= 2 && (swap.a.ref === "target" || swap.a.ref === "self") && swap.b.ref === "target" && body.targets.every((t) => t.kind === "object")) {
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const options = (i: number) => legalTargets(s, body.targets[i]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
+    const ours = (i: number) => options(i).filter((o) => controllerOf(s, o) === pid && !o.isCommander).sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+    const theirs = (i: number, not?: GameObject) => options(i).filter((o) => controllerOf(s, o) !== pid && o !== not).sort((a, b) => worth(s, pid, b) - worth(s, pid, a))[0];
+    const picks: [GameObject | undefined, GameObject | undefined][] = swap.a.ref === "self" ? [[me, theirs(swap.b.index)]] : [[ours(swap.a.index), theirs(swap.b.index)], [theirs(swap.a.index), ours(swap.b.index)]];
+    for (const [a, b] of picks) {
+      const [mine, other] = a && controllerOf(s, a) === pid ? [a, b] : [b, a];
+      if (!a || !b || !mine || !other || worth(s, pid, other) < worth(s, pid, mine) + 2) continue;
+      const t: TargetChoice[] = [];
+      if (swap.a.ref === "target") t[swap.a.index] = { kind: "object", id: a.id };
+      t[swap.b.index] = { kind: "object", id: b.id };
+      return t;
+    }
+    return null;
+  }
   // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {
     const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);

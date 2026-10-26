@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { COLOR_WORDS, NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf, counterKind } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -774,6 +774,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
     const what = p && /^(~|it|that creature|target .+)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
+  }
+  // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent
+  // an opponent controls": the same, until its controller's next turn begins (CR 611.2b).
+  if ((m = /^Until your next turn, (prevent all .+)$/.exec(s))) {
+    const p = parsePreventAll(capital(m[1]!));
+    const what = p && /^target .+$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    return p && what?.ref === "target" ? [{ type: "continuous", what, mods: [p.mod], duration: "yourNextTurn" }] : null;
   }
   // Redirection shields (CR 614.9): "The next 1 damage that would be dealt to ~ this turn is dealt to target creature
   // you control instead" (the en-Kor), "... dealt this turn to target white creature you control is dealt to ~ instead".

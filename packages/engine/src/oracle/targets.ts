@@ -1046,6 +1046,11 @@ export function parseTargetPhrase(
     extra.basePtEither = Number(m[1]);
     p = p.slice(0, m.index);
   }
+  // "Another creature you control with base power 1" (Rapid Augmenter).
+  if ((m = / with base power (\d+)$/.exec(p))) {
+    extra.basePower = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
   if ((m = / with toughness greater than its power$/.exec(p))) {
     extra.toughnessAbovePower = true;
     p = p.slice(0, m.index);

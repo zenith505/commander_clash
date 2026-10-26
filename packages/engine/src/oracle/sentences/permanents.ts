@@ -982,6 +982,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const b = a?.ref === "self" || (a?.ref === "target" && !a.n) ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
   }
+  // "Exchange control of two target creatures" (Switcheroo), "... two target lands" (Shifting Borders), "... two other
+  // target creatures controlled by different players" (Kitsune, Dragon's Daughter); "Exchange control of ~ and target
+  // nonland permanent" (Avarice Totem): whoever controls them; with both under one player's control, or either target
+  // illegal, nothing happens (CR 701.12b).
+  if ((m = /^[Ee]xchange control of (two (?:other )?target .+|~ and target .+)$/.exec(s))) {
+    const self = m[1]!.startsWith("~");
+    const first = ctx.targets.length;
+    const what = parseObject(self ? m[1]!.replace(/^~ and /, "") : m[1]!, ctx);
+    if (what?.ref !== "target" || ctx.targets.length !== first + (self ? 1 : 2) || ctx.targets.slice(first).some((t) => t.kind !== "object" || t.skip)) return null;
+    return [{ type: "exchangeControl", a: self ? { ref: "self" } : { ref: "target", index: first }, b: { ref: "target", index: self ? first : first + 1 } }];
+  }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
   // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,
   // card and creature types are replaced; its supertypes stay (rulings).

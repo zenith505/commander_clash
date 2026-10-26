@@ -122,6 +122,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
+  /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
+  | { kind: "discardedManaValue" }
   /** "The total mana value of those exiled cards" (Ensnared by the Mara): of the cards an "exile the top N cards" before it exiled (GameState.resolving.exiledTopCards). */
   | { kind: "exiledTopManaValue" }
   /** "For each card of the chosen color exiled this way" (Oona, Queen of the Fae): of the cards the "exile the top X cards" before it exiled, those matching `filter` (a chosen color bound as it resolves), still in exile. */
@@ -420,6 +422,8 @@ export interface TargetSpec {
   powerAboveBase?: true;
   /** "With base power or toughness 1" (Sword of the Squeak): a creature whose base power or base toughness is this (see basePowerNow). */
   basePtEither?: number;
+  /** "With base power 1" (Rapid Augmenter): a creature whose base power is this (see basePowerNow). */
+  basePower?: number;
   /** "With toughness greater than its power" (Fecund Greenshell): as it is now (as it enters, for an enters trigger). */
   toughnessAbovePower?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */

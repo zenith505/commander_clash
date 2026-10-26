@@ -262,6 +262,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
     }
+    case "discardedManaValue":
+      return (s.resolving?.discardedAll ?? []).reduce((n, id) => n + (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0), 0);
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
     case "cardsExiledThisWay":
@@ -731,6 +733,8 @@ function describeCount(c: Count): string {
       return "#cards in library";
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
+    case "discardedManaValue":
+      return "the discarded card's mana value";
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
     case "cardsExiledThisWay":

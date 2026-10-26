@@ -525,6 +525,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
+  // Avatar of Woe: "If there are ten or more creature cards total in all graveyards": every player's together.
+  if ((m = new RegExp(`^there are ${NUM} or more (\\w+) cards total in all graveyards$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} cards in all graveyards`, null);
+    return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   // Tomb Tyrant: "if there are at least three Zombie creature cards in your graveyard": the same.
   if ((m = new RegExp(`^there are at least ${NUM} ([A-Z][a-z]+ creature|\\w+) cards in your graveyard$`).exec(text))) {
     const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);

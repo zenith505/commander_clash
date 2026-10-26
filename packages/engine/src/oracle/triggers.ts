@@ -1735,6 +1735,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever an opponent attacks you, ${attacksMonarch[1]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "monarch" } } : "fail";
   }
+  // The Watcher in the Water: "Whenever you draw a card during an opponent's turn, ...": a condition on the event, checked
+  // as you draw (CR 603.2); every other player's turn is an opponent's here.
+  const drawTheirTurn = /^Whenever you draw a card during an opponent's turn, (.+)$/.exec(line);
+  if (drawTheirTurn) {
+    const t = parseTrigger(`Whenever you draw a card, ${drawTheirTurn[1]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
+  }
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
   // the event, checked as it attacks only (rulings), not an intervening if.
   // Pugnacious Hammerskull: "while you don't control another Dinosaur", the same (rulings).

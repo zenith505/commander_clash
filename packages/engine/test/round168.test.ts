@@ -583,3 +583,202 @@ const interceptor = card("Interceptor Mechan", "Artifact Creature — Robot", "{
 describe("Interceptor Mechan", () => {
   it("is fully supported", () => supported(interceptor));
 });
+
+const viewpoint = card("Viewpoint Synchronization", "Sorcery", "{4}{G}", { cmc: 5, keywords: ["Freerunning"], oracleText: "Freerunning {2}{G} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nSearch your library for up to three basic land cards and reveal them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle." });
+const jarad = card("Jarad's Orders", "Sorcery", "{2}{B}{G}", { cmc: 4, oracleText: "Search your library for up to two creature cards and reveal them. Put one into your hand and the other into your graveyard. Then shuffle." });
+
+describe("Searching for several cards, split: Viewpoint Synchronization, Jarad's Orders", () => {
+  it("are fully supported", () => supported(viewpoint, jarad));
+  /** Casts `def` and finds `pick(library)` when asked; returns where they went. */
+  const castAndFind = (def: CardDef, pick: (s: GameState, ap: PlayerId) => string[]) => {
+    let { s, ap, ids } = setup([def]);
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const p = pending<{ firstN?: number; firstTo?: string; othersTo?: string }>(s);
+    const found = pick(s, ap);
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found }));
+    return { s, found, p };
+  };
+  const forests = (s: GameState, ap: PlayerId, n: number) => s.players[ap]!.library.filter((id) => named(s, id) === "Forest").slice(0, n);
+  it("Viewpoint Synchronization: the first two found onto the battlefield tapped, the third into your hand", () => {
+    const { s, found, p } = castAndFind(viewpoint, (s, ap) => forests(s, ap, 3));
+    expect(p.firstN).toBe(2);
+    expect(found.slice(0, 2).map((id) => [zone(s, id), s.objects[id]!.tapped])).toEqual([["battlefield", true], ["battlefield", true]]);
+    expect(zone(s, found[2]!)).toBe("hand");
+  });
+  it("Viewpoint Synchronization: with two found, both go onto the battlefield", () => {
+    const { s, found } = castAndFind(viewpoint, (s, ap) => forests(s, ap, 2));
+    expect(found.map((id) => zone(s, id))).toEqual(["battlefield", "battlefield"]);
+  });
+  it("Jarad's Orders: one into your hand, the other into your graveyard; one alone goes to your hand", () => {
+    const bears = (s: GameState, ap: PlayerId, n: number) => s.players[ap]!.library.filter((id) => named(s, id) === "Grizzly Bears").slice(0, n);
+    const two = castAndFind(jarad, (s, ap) => bears(s, ap, 2));
+    expect(two.found.map((id) => zone(two.s, id))).toEqual(["hand", "graveyard"]);
+    const one = castAndFind(jarad, (s, ap) => bears(s, ap, 1));
+    expect(zone(one.s, one.found[0]!)).toBe("hand");
+  });
+});
+
+const continueCard = card("Continue?", "Instant", "{1}{W}", { cmc: 2, oracleText: "Choose up to four target creature cards in your graveyard that were put there from the battlefield this turn. Return them to the battlefield." });
+
+describe("Continue?", () => {
+  it("is fully supported", () => supported(continueCard));
+  it("returns creature cards that died this turn, not ones already in the graveyard", () => {
+    let { s, ap, ids } = setup([continueCard]);
+    const old = into(s, ap, bear({ name: "Old Bear" }), "graveyard");
+    const dead = [putOnBattlefield(s, ap, bear({ name: "Dead Bear 1" })), putOnBattlefield(s, ap, bear({ name: "Dead Bear 2" }))];
+    for (const id of dead) {
+      s.objects[id]!.damage = 5;
+    }
+    invalidateCharacteristics(s);
+    s = act(s, { type: "passPriority", player: ap });
+    s = priorityTo(s, ap);
+    expect(dead.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard"]);
+    expect(planCast(s, ap, ids[0]!, [tgt(old), { kind: "none" }, { kind: "none" }, { kind: "none" }])).toBeNull();
+    s = run(s, planCast(s, ap, ids[0]!, [...dead.map(tgt), { kind: "none" }, { kind: "none" }]));
+    s = resolveAll(s);
+    expect(dead.map((id) => zone(s, id))).toEqual(["battlefield", "battlefield"]);
+    expect(zone(s, old)).toBe("graveyard");
+  });
+});
+
+const changeOfFortune = card("Change of Fortune", "Sorcery", "{3}{R}", { cmc: 4, oracleText: "Discard your hand, then draw a card for each card you've discarded this turn." });
+
+describe("Change of Fortune", () => {
+  it("is fully supported", () => supported(changeOfFortune));
+  it("draws for this discard and the ones earlier this turn", () => {
+    let { s, ap, ids } = setup([changeOfFortune, bear({ name: "A" }), bear({ name: "B" }), bear({ name: "C" })]);
+    s.turnLog = { ...s.turnLog, discards: [{ player: ap, cards: ["x"] }, { player: next(s, ap), cards: ["y", "z"] }] };
+    // The opening hand and the three cards: all but Change of Fortune are discarded, plus the one earlier.
+    const discarding = s.players[ap]!.hand.length - 1;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(ids.slice(1).map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "graveyard"]);
+    expect(s.players[ap]!.hand).toHaveLength(discarding + 1);
+  });
+});
+
+const glenElendra = card("Glen Elendra Guardian", "Creature — Faerie Wizard", "{2}{U}", { cmc: 3, power: "3", toughness: "4", keywords: ["Flying", "Flash"], oracleText: "Flash\nFlying\nThis creature enters with a -1/-1 counter on it.\n{1}{U}, Remove a counter from this creature: Counter target noncreature spell. Its controller draws a card." });
+
+describe("Glen Elendra Guardian", () => {
+  it("is fully supported", () => supported(glenElendra));
+  it("removes a counter from itself to counter a noncreature spell; its controller draws; then it can't again", () => {
+    let { s, ap, opp } = setup([]);
+    const g = putOnBattlefield(s, ap, glenElendra);
+    s.objects[g]!.counters["-1/-1"] = 1;
+    invalidateCharacteristics(s);
+    s = passUntil(s, "main1", opp);
+    for (const l of [card("Plains", "Basic Land — Plains"), card("Plains", "Basic Land — Plains")]) putOnBattlefield(s, opp, l);
+    const gift = into(s, opp, lifeSpell("Their Gift", "{1}{W}", 2), "hand");
+    s = run(s, planCast(s, opp, gift));
+    s = priorityTo(s, ap);
+    const hand = s.players[opp]!.hand.length;
+    const idx = 0;
+    const target: TargetChoice[] = [{ kind: "stack", id: s.stack.at(-1)!.id }];
+    s = run(s, planActivate(s, ap, g, idx, target, undefined, undefined, undefined, { counters: [{ id: g, kind: "-1/-1" }] }));
+    expect(s.objects[g]!.counters["-1/-1"] ?? 0).toBe(0);
+    s = resolveAll(s);
+    expect(zone(s, gift)).toBe("graveyard");
+    expect(s.players[opp]!.hand.length).toBe(hand + 1);
+    expect(planActivate(s, ap, g, idx)).toBeNull();
+  });
+});
+
+const avatarOfWoe = card("Avatar of Woe", "Creature — Avatar", "{6}{B}{B}", { cmc: 8, power: "6", toughness: "5", keywords: ["Fear"], oracleText: "If there are ten or more creature cards total in all graveyards, this spell costs {6} less to cast.\nFear (This creature can't be blocked except by artifact creatures and/or black creatures.)\n{T}: Destroy target creature. It can't be regenerated." });
+
+describe("Avatar of Woe", () => {
+  it("is fully supported", () => supported(avatarOfWoe));
+  it("costs {6} less with ten creature cards among all graveyards", () => {
+    const tryCast = (n: number) => {
+      const { s, ap, ids, opp } = setup([avatarOfWoe]);
+      // Only two Swamps: {B}{B} and no more.
+      s.battlefield.filter((id) => s.objects[id]!.controller === ap && named(s, id) !== "Swamp").forEach((id) => (s.objects[id]!.tapped = true));
+      for (let i = 0; i < n; i++) into(s, i % 2 ? ap : opp, bear({ name: `Dead ${i}` }), "graveyard");
+      return planCast(s, ap, ids[0]!);
+    };
+    expect(tryCast(9)).toBeNull();
+    expect(tryCast(10)).not.toBeNull();
+  });
+});
+
+const mindGrind = card("Mind Grind", "Sorcery", "{X}{U}{B}", { cmc: 2, oracleText: "Each opponent reveals cards from the top of their library until they reveal X land cards, then puts all cards revealed this way into their graveyard. X can't be 0." });
+
+describe("Mind Grind", () => {
+  it("is fully supported", () => supported(mindGrind));
+  it("each opponent reveals until X land cards and puts them all into their graveyard; X can't be 0", () => {
+    let { s, ap, ids, opp } = setup([mindGrind]);
+    expect(planCast(s, ap, ids[0]!, undefined, undefined, "auto", 0)).toBeNull();
+    // Top of the opponent's library: bear, Forest, bear, bear, Forest, ...
+    const order = [bear({ name: "T1" }), card("Forest", "Basic Land — Forest"), bear({ name: "T2" }), bear({ name: "T3" }), card("Forest", "Basic Land — Forest")];
+    const top = [...order].reverse().map((d) => into(s, opp, d, "library")).reverse();
+    const before = s.players[opp]!.library.length;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, undefined, undefined, "auto", 2)));
+    expect(top.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "graveyard", "graveyard", "graveyard"]);
+    expect(s.players[opp]!.library.length).toBe(before - 5);
+    expect(s.players[ap]!.graveyard.filter((id) => named(s, id) !== "Mind Grind")).toHaveLength(0);
+  });
+});
+
+const lifeDeath = card("Life // Death", "Sorcery // Sorcery", "{G} // {1}{B}", {
+  cmc: 3,
+  layout: "split",
+  oracleText: "All lands you control become 1/1 creatures until end of turn. They're still lands.",
+  faces: [
+    { name: "Life", manaCost: "{G}", typeLine: "Sorcery", supertypes: [], types: ["Sorcery"], subtypes: [], oracleText: "All lands you control become 1/1 creatures until end of turn. They're still lands.", colors: ["G"] },
+    { name: "Death", manaCost: "{1}{B}", typeLine: "Sorcery", supertypes: [], types: ["Sorcery"], subtypes: [], oracleText: "Return target creature card from your graveyard to the battlefield. You lose life equal to its mana value.", colors: ["B"] },
+  ],
+});
+
+describe("Life // Death", () => {
+  it("is fully supported", () => supported(lifeDeath));
+  it("Death returns a creature card and you lose life equal to its mana value", () => {
+    let { s, ap, ids } = setup([lifeDeath]);
+    const big = into(s, ap, card("Big Thing", "Creature — Beast", "{4}{G}{G}", { cmc: 6, power: "6", toughness: "6" }), "graveyard");
+    const life = s.players[ap]!.life;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(big)], undefined, "auto", undefined, { face: 1 })));
+    expect(zone(s, big)).toBe("battlefield");
+    expect(s.players[ap]!.life).toBe(life - 6);
+  });
+});
+
+const watcher = card("The Watcher in the Water", "Legendary Creature — Kraken", "{3}{U}{U}", { cmc: 5, power: "9", toughness: "9", oracleText: "The Watcher in the Water enters tapped with nine stun counters on it. (If a permanent with a stun counter would become untapped, remove one from it instead.)\nWhenever you draw a card during an opponent's turn, create a 1/1 blue Tentacle creature token.\nWhenever a Tentacle you control dies, untap up to one target Kraken and put a stun counter on up to one target nonland permanent." });
+const quickDraw = card("Quick Draw", "Instant", "{U}", { cmc: 1, oracleText: "Draw a card." });
+
+describe("The Watcher in the Water", () => {
+  it("is fully supported", () => supported(watcher));
+  const tentacles = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid && characteristics(s, s.objects[id]!).subtypes.includes("Tentacle"));
+  it("makes a Tentacle when you draw during an opponent's turn, not during yours", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, watcher);
+    const mine = into(s, ap, quickDraw, "hand");
+    s = resolveAll(run(s, planCast(s, ap, mine)));
+    expect(tentacles(s, ap)).toHaveLength(0);
+    s = priorityTo(passUntil(s, "upkeep", opp), ap);
+    const theirs = into(s, ap, quickDraw, "hand");
+    s = resolveAll(run(s, planCast(s, ap, theirs)));
+    expect(tentacles(s, ap)).toHaveLength(1);
+  });
+});
+
+const shusher = card("Vexing Shusher", "Creature — Goblin Shaman", "{R/G}{R/G}", { cmc: 2, power: "2", toughness: "2", oracleText: "This spell can't be countered.\n{R/G}: Target spell can't be countered." });
+const counterspell = card("Counterspell", "Instant", "{U}{U}", { cmc: 2, oracleText: "Counter target spell." });
+
+describe("Vexing Shusher", () => {
+  it("is fully supported", () => supported(shusher));
+  it("makes a spell on the stack uncounterable", () => {
+    let { s, ap } = setup([]);
+    const v = putOnBattlefield(s, ap, shusher);
+    const gift = into(s, ap, lifeSpell("My Gift", "{1}{W}", 2), "hand");
+    const cs = into(s, ap, counterspell, "hand");
+    const life = s.players[ap]!.life;
+    s = run(s, planCast(s, ap, gift));
+    const spell = s.stack.at(-1)!.id;
+    s = run(s, planActivate(s, ap, v, 0, [{ kind: "stack", id: spell }]));
+    s = act(s, { type: "passPriority", player: ap });
+    s = priorityTo(s, ap);
+    expect(s.stack.at(-1)!.uncounterable).toBe(true);
+    // Countering it does nothing to it.
+    s = resolveAll(run(s, planCast(s, ap, cs, [{ kind: "stack", id: spell }])));
+    expect(zone(s, gift)).toBe("graveyard");
+    expect(s.players[ap]!.life).toBe(life + 3);
+  });
+});

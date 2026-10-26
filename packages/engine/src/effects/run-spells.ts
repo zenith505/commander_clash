@@ -736,6 +736,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.whileSpell ? { whileSpell: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
       return;
     }
+    case "spellUncounterable": {
+      // Vexing Shusher: the targeted spell, if it's still a legal target (CR 608.2b).
+      const t = ctx.targets[e.index];
+      const item = ctx.legal[e.index] && t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+      if (!item) return;
+      item.uncounterable = true;
+      log(s, `${src}: ${item.kind === "spell" && item.objectId ? defOf(s, obj(s, item.objectId)).name : "that spell"} can't be countered.`);
+      return;
+    }
     case "counterSpell": {
       // The spell itself, if it's still on the stack (CR 701.6a).
       // "Return that spell to its owner's hand" (Krark): not a counter (CR 701.6a), so even one that can't be countered.
@@ -916,7 +925,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (!o) return false;
   const d = defOf(s, o);
   const compiled = compileCard(d);
-  if (compiled.cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
+  if (compiled.cantBeCountered || (o.uncounterableCast && !item.copy) || item.uncounterable) return true;
   // Banefire: its X, chosen as it was cast (a copy has the same X, CR 707.10).
   if (compiled.cantBeCounteredX !== undefined && (item.x ?? 0) >= compiled.cantBeCounteredX) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).

@@ -213,6 +213,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.players.filter((p) => !p.lost && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent)).length;
     case "drawnThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.draws?.turn === s.turn ? s.players[pid]!.draws!.n : 0), 0);
+    case "discardedThisTurn": {
+      const who = refPlayers(s, c.who, ctx);
+      return (s.turnLog?.discards ?? []).reduce((n, d) => n + (who.includes(d.player) ? d.cards.length : 0), 0);
+    }
     case "cardsInHand":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
     case "cardsInLibrary":
@@ -868,6 +872,8 @@ function describeCount(c: Count): string {
       return "the greatest number of cards an opponent has drawn this turn";
     case "drawnThisTurn":
       return "#cards drawn this turn";
+    case "discardedThisTurn":
+      return "#cards discarded this turn";
     case "playersAttacked":
       return "#players being attacked";
     case "treasureSpent":

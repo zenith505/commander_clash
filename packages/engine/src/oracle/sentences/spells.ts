@@ -174,6 +174,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         : /^cards equal to the greatest number of cards a player discarded this way$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, greatest: true as const } }
         // "Then draw cards equal to your devotion to red" (Clive), counted after the discard (rulings).
         : who.ref === "you" && /^cards equal to your devotion to /i.test(m[2]) ? parseCount(m[2].replace(/^cards equal to /i, ""), ctx)
+        // Change of Fortune: "then draw a card for each card you've discarded this turn": for any reason, this discard
+        // too (rulings).
+        : who.ref === "you" && /^a card for each card you've discarded this turn$/i.test(m[2]) ? parseCount(m[2].replace(/^a card for each /i, ""), ctx)
         : null;
       if (!n) return null;
       out.push({ type: "draw", who, n });
@@ -481,6 +484,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell that targets a permanent you control" (Rebuff the Wicked), "... that targets you".
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
   // value, as it resolves, is countered (rulings).
+  if (/^Target spell can't be countered$/i.test(s)) return [{ type: "spellUncounterable", index: addTarget(ctx, { kind: "spell", text: "target spell" }) }];
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).

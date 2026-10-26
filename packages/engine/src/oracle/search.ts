@@ -83,6 +83,10 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   if (filter?.subtypes?.length === 1 && filter.subtypes[0] === "Aura" && n === 1 && new RegExp(`^put ${SEARCH_PRONOUN} onto the battlefield attached to ~, then shuffle$`).test(rest)) return [{ ...base, dest: { zone: "battlefield", attachToSelf: true } }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the (?:other|rest) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];
+  // Viewpoint Synchronization: "Put two of them onto the battlefield tapped and the other into your hand": with two or
+  // fewer found, they all go to the first place (rulings).
+  if ((r = new RegExp(`^put two of them ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 3)
+    return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!), firstN: 2 }];
   // The shuffle and putting the card on top are one action (rulings).
   if (/^then shuffle and put (?:that card|the card|it) on top(?: of your library)?$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop" } }];
   // "Then shuffle and put those cards on top in any order" (Goblin Recruiter, Insidious Dreams): the searcher orders them.

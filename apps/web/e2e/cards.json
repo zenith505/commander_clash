@@ -17083,6 +17083,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2e338e09-5758-4cc2-9143-21f050a28677",
+  "name": "Viewpoint Synchronization",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Freerunning {2}{G} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nSearch your library for up to three basic land cards and reveal them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Freerunning"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f2fae95d-074b-4c0c-99cd-f9385a424c05",
   "name": "Villainous Wealth",
   "manaCost": "{X}{B}{G}{U}",

@@ -789,8 +789,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // battlefield this turn. Return it to your hand. Then the Ring tempts you." The same, then the Ring.
   text = text.replace(/^[Cc]hoose ((?:up to one )?target [^.]+? in your graveyard(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)\. Return it to your hand\.(?=$| Then )/, "Return $1 to your hand.");
   // Brought Back: "Choose up to two target permanent cards in your graveyard that were put there from the battlefield this
-  // turn. Return them to the battlefield tapped." is one instruction; they return at the same time.
-  text = text.replace(/^[Cc]hoose (up to (?:one|two|three) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
+  // turn. Return them to the battlefield tapped." is one instruction; they return at the same time. Continue?: up to four.
+  text = text.replace(/^[Cc]hoose (up to (?:one|two|three|four) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
   // can't be the targets of blue or black spells this turn": two instructions.
   text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
@@ -868,6 +868,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nissa's Pilgrimage: "..., reveal those cards, and put one onto the battlefield tapped and the rest into your hand. Then
   // shuffle." is Cultivate's search.
   text = text.replace(/^(Search your library for up to \w+ [^.]+? cards, reveal those cards), and (put one [^.]+? and the rest into your hand)\. Then shuffle\./, "$1, $2, then shuffle.");
+  // Jarad's Orders: "Search your library for up to two creature cards and reveal them. Put one into your hand and the
+  // other into your graveyard. Then shuffle." Viewpoint Synchronization: "... up to three basic land cards and reveal
+  // them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle." One search each.
+  text = text.replace(/^(Search your library for up to (?:two|three) [^.]+? cards) and reveal them\. Put (one|two of them) ([^.]+? and the other [^.]+?)(?:\. Then shuffle|, then shuffle)\./, (_, a: string, b: string, c: string) => `${a}, reveal them, put ${b.toLowerCase()} ${c}, then shuffle.`);
   // Out of the Tombs: "put two eon counters on ~, then mill cards equal to the number of eon counters on it": ~ is the
   // only object named, so "it" is ~.
   text = text.replace(/^([Pp]ut [^.~]+ counters? on ~, then [^.~]+ counters on )it\./, "$1~.");
@@ -6119,6 +6123,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer(untilLand[1]!, ctx);
       if (!who) return null;
       effects.push({ type: "revealUntilLandToGraveyard", who });
+      si++;
+      continue;
+    }
+    // Mind Grind: "Each opponent reveals cards from the top of their library until they reveal X land cards, then puts all
+    // cards revealed this way into their graveyard." The spell's X (its "X can't be 0" is read by compile).
+    const untilXLand = ctx.spell && /^(Each opponent|Target opponent|Target player) reveals cards from the top of their library until they reveal X land cards$/i.exec(s);
+    if (untilXLand && /^(?:Then )?puts all cards revealed this way into their graveyard\.?$/i.test(sentences[si + 1] ?? "")) {
+      const who = parsePlayer(untilXLand[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealUntilLandToGraveyard", who, n: { count: { kind: "x" } } });
       si++;
       continue;
     }

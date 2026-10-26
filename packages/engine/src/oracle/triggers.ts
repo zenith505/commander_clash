@@ -732,6 +732,15 @@ const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or i
  * dies": "it" and "that card" are the card in the graveyard, "its power" as it last existed (CR 603.10a).
  */
 function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Iron Apprentice: "When ~ dies, if it had counters on it, put those counters on target creature you control.": an
+  // intervening if on ~ as it last existed (CR 603.4, 603.10a), the same as "~ or another creature" about ~ alone.
+  const selfHad = /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+)$/.exec(line);
+  if (selfHad) {
+    const t = parseDiesTrigger(`When ~ or another creature dies, ${selfHad[1]}`);
+    if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
+    const { orSelf: _, ...dies } = t.dies;
+    return { ...t, dies: { ...dies, self: true } };
+  }
   // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
   const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile), (.+)$/.exec(line);
   const attached = attachedM && [attachedM[0], attachedM[1]!, attachedM[4]!];

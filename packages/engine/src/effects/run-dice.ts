@@ -79,13 +79,39 @@ export function runDiceEffect(s: GameState, e: Extract<Effect, { type: "roll" }>
  * either way, so only whether they won is kept. "Flip a coin until you lose a flip": as many as it takes. Each flip won
  * or lost is an event of its own ("whenever you win a coin flip").
  */
-export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin" }>, ctx: ResolveCtx, src: string): void {
+export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const who = ctx.controller;
+  const sc = (s.resolving!.scratch ??= {});
+  // Krark's Thumb (a replacement, CR 614.1a): each flip is two coins, one of them ignored, so only the kept one counts
+  // as won or lost. A second Thumb is treated as one (not modeled: ROADMAP).
+  const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
+  const flip = () => (thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5]);
+  // One flip won and one lost: its controller keeps the one they choose, having seen both (rulings).
+  if (sc.thumbFlip !== undefined) {
+    const won = sc.may !== false;
+    sc.thumbFlip = undefined;
+    sc.may = undefined;
+    fireEvent(s, { type: "coinFlipped", player: who, won });
+    s.resolving!.flipped = { won, wins: won ? 1 : 0 };
+    log(s, `${player(s, who).name} flips two coins for ${src} and keeps the ${won ? "won" : "lost"} flip.`);
+    return;
+  }
+  let first: boolean[] | undefined;
+  if (!e.untilLose && thumb) {
+    const [a, b] = (first = flip());
+    if (a !== b) {
+      sc.thumbFlip = true;
+      sc.may = undefined;
+      s.pending = { kind: "chooseMay", player: who, prompt: "keep the won coin flip (Krark's Thumb flipped two coins, one won and one lost; No keeps the lost flip)", source: src, thumb: true };
+      return "paused";
+    }
+  }
   let wins = 0;
   let won = false;
   // Even "until you lose a flip" ends some time; a long run of wins is cut short where paper Magic would be (CR 732).
+  // With Krark's Thumb, each flip of the run keeps a won coin if there is one: a lost flip would only end the run.
   for (let i = 0; i < 100; i++) {
-    won = nextRandom(s) < 0.5;
+    won = (i === 0 && first ? first : flip()).some((w) => w);
     fireEvent(s, { type: "coinFlipped", player: who, won });
     if (won) wins++;
     if (!won || !e.untilLose) break;

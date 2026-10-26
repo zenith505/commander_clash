@@ -428,6 +428,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = stackSpec(m[2]!);
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one ${spec.text}` } : spec), ...(unless ? { unless } : {}) }];
   }
+  // Verdant Command: "Counter target loyalty ability of a planeswalker": an activated ability with a loyalty symbol in
+  // its cost (CR 606.3), on the stack.
+  if (/^Counter target loyalty ability of a planeswalker$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { ...stackSpec("activated ability"), loyaltyOnly: true, text: "target loyalty ability of a planeswalker" }) }];
   // Siren Stormtamer: "Counter target spell or ability that targets you or a creature you control".
   if ((m = /^Counter target (spell|spell or ability) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
     const what = m[3] === "you" ? "you" : parseTargetPhrase(m[3]!.replace(/^an? /, ""));

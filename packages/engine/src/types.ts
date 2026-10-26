@@ -731,6 +731,8 @@ export interface Player {
   drewFromEmptyLibrary: boolean;
   /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
   draws?: { turn: number; n: number };
+  /** The names of the creatures that have dealt this player combat damage this game (Gollum, Obsessed Stalker). */
+  combatDamagedByNames?: string[];
   /** How many spells of each English name this player has cast this game (copies aren't cast): Approach of the Second Sun. */
   castNames?: Record<string, number>;
   /** The turn of their draw step in which they last drew (the first card drawn in it isn't doubled by Alhammarret's Archive). */
@@ -805,6 +807,8 @@ export interface StackItem {
   sourceId?: ObjectId; // the permanent an ability came from
   sourceCardId?: string; // its card definition (abilities remember their source, CR 113.7a)
   sourceZc?: number; // the source's zoneChanges when the ability was created: "this creature" means that object only
+  /** An activated loyalty ability (CR 606.3), for "target loyalty ability of a planeswalker". */
+  loyalty?: true;
   controller: PlayerId;
   description: string;
   /** For a triggered ability: the spell or ability on the stack that triggered it ("that spell", ward). */
@@ -1172,7 +1176,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** What declining means, shown after the question (Fandaniel: "If you don't, you lose 4 life."), or what doing it means (The Second Doctor). */ otherwise?: string; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Krark's Thumb: one of the two coins was won and one lost; yes keeps the won flip, no the lost one. */ thumb?: true; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -2135,6 +2139,8 @@ export interface Resolving {
     /** returnHeld paused for an Aura's host: the cards it returns. */
     returningHeld?: { id: ObjectId; zc: number }[];
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
+    playLinkedPick?: true;
+    thumbFlip?: true; // Krark's Thumb: one coin won, one lost, the choice asked // "play one of them" (Evercoat Ursine): which one was asked (in `found`)
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     /** Birthing Ritual: the sacrifice after looking has been chosen (Effect dig `sacrificeFirst`). */

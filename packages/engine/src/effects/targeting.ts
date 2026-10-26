@@ -439,7 +439,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.hasTargets && !(item.targets ?? []).some((x) => x.kind !== "none")) return false;
     // "Target triggered ability you control" (Strionic Resonator).
     const aims = !spec.targetsWhat || targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller));
-    if (item.kind === "ability") return aims && !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller) && (!spec.abilityFrom || abilitySourceIs(s, item, spec.abilityFrom));
+    if (item.kind === "ability") return aims && !!spec.stackAbilities && (!spec.loyaltyOnly || !!item.loyalty) && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller) && (!spec.abilityFrom || abilitySourceIs(s, item, spec.abilityFrom));
     if (spec.noSpells || !item.objectId) return false;
     // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
     if ((spec.controller === "you" && item.controller !== controller) || (spec.controller === "opponent" && item.controller === controller)) return false;

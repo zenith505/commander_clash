@@ -1517,8 +1517,22 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
       const linked = e.revealed ? (s.resolving?.revealed ? [s.resolving.revealed] : []) : (s.linkedExile?.[key] ?? []);
       const from = e.revealed ? "library" : "exile";
-      const card = linked.map((l) => ({ o: s.objects[l.id], zc: l.zc })).find((x) => x.o && x.o.zone === from && (x.o.zoneChanges ?? 0) === x.zc)?.o;
+      const live = linked.map((l) => ({ o: s.objects[l.id], zc: l.zc })).filter((x) => x.o && x.o.zone === from && (x.o.zoneChanges ?? 0) === x.zc).map((x) => x.o!);
       const sc = (s.resolving!.scratch ??= {});
+      // "Play one of them" (Evercoat Ursine): with more than one, its controller picks one first, or none.
+      if (e.one && (live.length > 1 || sc.playLinkedPick)) {
+        if (!sc.playLinkedPick) {
+          sc.playLinkedPick = true;
+          delete sc.found;
+          const ids = live.map((o) => o.id);
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: "a card", cards: ids, min: 0, max: 1, dig: { looked: ids, to: "to play without paying its mana cost", rest: "stay in exile" } };
+          return "paused";
+        }
+        const chosen = (sc.found ?? []).find((id) => live.some((o) => o.id === id));
+        if (!chosen) return;
+        live.splice(0, live.length, obj(s, chosen));
+      }
+      const card = live[0];
       if (!card) return;
       const p = player(s, ctx.controller);
       const d = defOf(s, card);
@@ -2160,7 +2174,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const o = obj(s, id);
           if (toField) {
             log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.zone === "exile" ? "exile" : `${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard`} onto the battlefield.`);
-            moveObject(s, id, "battlefield", { controller: ctx.controller });
+            moveObject(s, id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}) });
             if (o.zone === "battlefield" && s.resolving) s.resolving.created!.push(id);
             continue;
           }
@@ -2205,6 +2219,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different names`
           : count === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
+            : e.upTo && count >= 99
+            ? `any number of ${kind.replace(/\bcard\b/, "cards")}`
             : `${e.upTo ? "up to " : ""}${count} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
         // Realmbreaker: you choose from their graveyard.
         s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : p.id, source: src, what: e.youChoose ? `${what} in ${p.name}'s graveyard` : what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };

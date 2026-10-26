@@ -1,7 +1,7 @@
 # Roadmap
 
-24,356 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,226 of
+24,382 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,245 of
 9,979 (82%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -91,10 +91,23 @@ line blocks.
    returned a Squirrel card this way"), Rot Hulk (up to X targets, X the number of opponents), Crown of Gondor (an
    equip cost that's lower while you're the monarch), Calix, Destiny's Hand ("until target enchantment you control
    leaves the battlefield"), Xenagos, the Reveler (any number of creature and land cards from among seven onto the
-   battlefield), Great Unclean One (a token for each opponent with less life than you). Next most played: Agility
-   Bobblehead, Timeline Culler, Evercoat Ursine, Arwen, Mortal Queen, Shelob, Child of Ungoliant, Gollum, Obsessed
-   Stalker, Sword of Hours, Krark's Thumb, Professor Hojo, Verdant Command, Infesting Radroach, Reverse the Polarity.
+   battlefield), Great Unclean One (a token for each opponent with less life than you). Out after round 164: Agility
+   Bobblehead (up to X targets, X counted as it's activated; "can't be blocked except by creatures with haste"),
+   Nahiri's Resolve (exile any number of your artifacts and creatures, then return those cards at your next upkeep),
+   Omo, Queen of Vesuva (everything counters: every land type, every creature type), Shelob, Child of Ungoliant
+   (creatures dealt damage this turn by a Spider you controlled; a copy that's a Food artifact and loses its other
+   card types), Professor Hojo (a cost reduction for the first activated ability that targets a creature you control;
+   "become the target of an activated ability"), Squee, Dubious Monarch (an alternative cost from the graveyard that
+   exiles four other cards, not escape), Moxite Refinery ("remove X counters" of any kinds as a cost), Reverse the
+   Polarity ("counter all other spells"; "creatures can't be blocked this turn" means the creatures there as it
+   resolves, CR 611.2c), Battle Cry Goblin and the other pack tactics cards (no rulings on when the attackers' total
+   power is counted). Next most played: The Kami War, Angelic Arbiter, Iridescent Hornbeetle, Fblthp, Lost on the
+   Range, Oona, Queen of the Fae, Teyo, Geometric Tactician, Esper Origins, Life of the Party, Akroma, Vision of
+   Ixidor, Narci, Fable Singer, Cloud's Limit Break.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 164: with Krark's Thumb, bots always keep the won coin; "flip a coin until you lose a flip"
+   keeps a won coin of each pair (a player could keep the lost one to end the run early), and a second Thumb counts as
+   one. Evercoat Ursine's "play one of them" picks in the card picker, then casts or plays the card as usual.
    Smaller gaps from round 162: bots discard their hand to Perplex only when it's one card or none; Rhet-Tomb Mystic's
    and Jo Grant's granted cycling are cycling abilities of the cards (CR 702.29a), but the hand-grant reads only
    "ninjutsu" and "cycling" so far; Instill Energy's "can attack as though it had haste" covers attacking only, not {T}

@@ -239,6 +239,7 @@ export function dealDamage(
         if (!by.includes(`${from.id}@${zc}`)) by.push(`${from.id}@${zc}`);
       }
       if (src.types.includes("Creature")) {
+        if (src.name && !p.combatDamagedByNames?.includes(src.name)) (p.combatDamagedByNames ??= []).push(src.name);
         const seen = ((s.turnLog ??= {}).combatDamageSubtypes ??= []);
         // A changeling has every creature type (CR 702.73a): "*".
         for (const t of from && from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes) if (!seen.includes(t)) seen.push(t);

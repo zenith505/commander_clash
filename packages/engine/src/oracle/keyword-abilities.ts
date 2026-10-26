@@ -44,6 +44,9 @@ export function parseGraveyardKeyword(
   // "You may cast ~ from exile" (Misthollow Griffin), "... from your graveyard or from exile" (Squee, the Immortal): its
   // owner may cast it from exile, paying its mana cost and following the normal timing rules (rulings).
   if (/^You may cast (?:~|this card) from exile\.?$/.test(line)) return { fromExile: true };
+  // "You may cast this card from your graveyard using its warp ability" (Timeline Culler): a permission to cast it from
+  // there only for its warp cost (CR 702.185a), so it's exiled at the next end step and may be cast from exile later.
+  if (/^You may cast (?:~|this card) from your graveyard using its warp ability\.?$/.test(line)) return /^Warp—/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "warp" } } : "fail";
   if (/^You may cast (?:~|this card) from your graveyard or from exile\.?$/.test(line)) return { fromExile: true, fromGraveyard: { kind: "permission", costs: [], exile: false } };
   if ((m = /^You may cast (?:~|this card|this creature) from your graveyard(?: (?:as long as|if) (.+?))?(?: by (.+?) in addition to paying its other costs)?$/.exec(line.replace(/\.$/, "")))) {
     const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
@@ -271,7 +274,13 @@ export function parseCostKeyword(
   }
   if (/^Impending\b/.test(line)) return "fail";
   // Blitz [cost] (CR 702.152a) and warp [cost] (CR 702.185a): alternative costs that send the permanent away at the next
-  // end step. "Blitz—{2}{B}{B}, Discard a card" and "Warp—{B}, Pay 2 life" aren't modeled.
+  // end step. "Blitz—{2}{B}{B}, Discard a card" isn't modeled; "Warp—{B}, Pay 2 life" (Timeline Culler) is: the life is
+  // paid along with the warp cost (CR 118.9, 601.2h).
+  if ((m = /^Warp—((?:\{[^}]+\})+), (Pay \d+ life)\.?$/.exec(line))) {
+    const cost = parseAdditionalCost(m[2]!);
+    if (!plainMana(m[1]!) || cost?.kind !== "payLife" || !d.types.some((ty) => ["Creature", "Artifact", "Enchantment", "Planeswalker", "Battle"].includes(ty))) return "fail";
+    return { alt: { kind: "warp", mana: m[1]!, costs: [cost], text: m[2]!.replace(/^P/, "p") } };
+  }
   if ((m = /^(Blitz|Warp)(?: |—)(.+?)\.?$/.exec(line))) {
     const mana = m[2]!;
     if (!/^(\{[^}]+\})+$/.test(mana) || !plainMana(mana)) return "fail";

@@ -423,6 +423,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     }
     return out;
   }
+  // "Put a +1/+1 counter and a lifelink counter on that creature and a +1/+1 counter and a lifelink counter on ~"
+  // (Arwen, Mortal Queen): the first on that creature, then the rest on ~.
+  if ((m = /^Put (.+? counters?) on (that creature|it) and (an? .+? counters?|two .+? counters?) on ~$/i.exec(s))) {
+    const first = parseSentence(`Put ${m[1]} on ${m[2]}`, ctx);
+    const second = first && parseSentence(`Put ${m[3]} on ~`, ctx);
+    if (first && second) return [...first, ...second];
+  }
+  // "Put a +1/+1 counter and a lifelink counter on that creature": both kinds on the same one.
+  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and (${NUMX} ${COUNTER} counters?) on (that creature|it)$`, "i").exec(s))) {
+    const first = parseSentence(`Put ${m[1]} on ${m[7]}`, ctx);
+    const second = first && parseSentence(`Put ${m[4]} on ${m[7]}`, ctx);
+    if (first && second) return [...first, ...second];
+  }
   // "Put a +1/+1 counter and a lifelink counter on target creature" (Unexpected Fangs): the same on the target.
   if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and (${NUMX} ${COUNTER} counters?) on (target .+)$`, "i").exec(s))) {
     const before = ctx.targets.length;

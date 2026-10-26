@@ -1325,12 +1325,13 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (filter === null) return "fail";
     batch = { what: "toGraveyard", from: "library", milled: true, ...(filter ? { filter } : {}) };
     rest = m[2]!;
-  } else if ((m = /^Whenever a player mills an? (?:(.+?) )?card, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (a player|an opponent) mills an? (?:(.+?) )?card, (.+)$/.exec(line))) {
     // Glowing One: "Whenever a player mills a nonland card": once for each such card milled (rulings, CR 603.2c).
-    const filter = batchCards(m[1]);
+    // Infesting Radroach: "Whenever an opponent mills a nonland card": cards from an opponent's library.
+    const filter = batchCards(m[2]);
     if (filter === null) return "fail";
-    batch = { what: "toGraveyard", from: "library", milled: true, each: true, ...(filter ? { filter } : {}) };
-    rest = m[2]!;
+    batch = { what: "toGraveyard", from: "library", milled: true, each: true, ...(m[1] === "an opponent" ? { whose: "opponent" as const } : {}), ...(filter ? { filter } : {}) };
+    rest = m[3]!;
   } else if ((m = /^Whenever one or more (?:(.+?) )?cards are milled, (.+)$/.exec(line))) {
     // The Wise Mothman: cards a mill instruction put into any graveyard (CR 701.17a), once for the whole event even when
     // several players mill at the same time (rulings).
@@ -1667,6 +1668,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${kickedX[1]}, ${kickedX[2]}.`);
     return t && t !== "fail" && t.event === "selfEnters" ? { ...t, xKicked: true } : "fail";
   }
+  // Sword of Hours: "Whenever equipped creature deals combat damage, roll a d12. If the result is greater than the damage
+  // dealt ...": the combat damage it dealt, all of it, the amount the trigger is about.
+  const dealtAbove = /^(Whenever (?:~|equipped creature) deals combat damage), (roll a d\d+\. If the result is greater than) the damage dealt (or .+)$/.exec(line);
+  if (dealtAbove) {
+    const t = parseTrigger(`${dealtAbove[1]}, ${dealtAbove[2]} the damage this trigger is about ${dealtAbove[3]}`);
+    return t && t !== "fail" && t.event === "selfDealsCombatDamage" ? t : "fail";
+  }
   // Cartographer's Hawk: "When ~ deals combat damage to a player who controls more lands than you, ...": part of the
   // trigger event, checked as it triggers only (CR 603.2; no "if", so not again as it resolves, CR 603.4).
   const moreLands = /^(When(?:ever)? ~ deals combat damage to a player) who controls more lands than you, (.+)$/.exec(line);
@@ -1959,6 +1967,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone || t.ifCond || t.host) return "fail";
     return { ...t, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } };
   }
+  // Infesting Radroach: "Whenever an opponent mills a nonland card, if ~ is in your graveyard, you may return it to your
+  // hand": the same as "you may return ~ from your graveyard to your hand" below, an ability that works only there.
+  const inYardReturn = /^(Whenever an opponent mills [^,]+), if ~ is in your graveyard, you may return it to your hand\.$/.exec(line);
+  if (inYardReturn) {
+    const t = parseTrigger(`${inYardReturn[1]}, you may return ~ from your graveyard to your hand.`);
+    return t && t !== "fail" && t.zone === "graveyard" && t.event === "batch" && t.batch?.milled ? t : "fail";
+  }
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
@@ -1968,7 +1983,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
     if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
-    if (!YARD_EVENTS.includes(t.event) || t.host) return "fail";
+    // A milled-cards batch (Infesting Radroach) is watched from graveyards too (see the batch event in effects/triggers.ts).
+    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "batch" && t.batch?.milled && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
     const attach = / attached to that creature$/.test(yard[2]!);
     if (attach && !(t.event === "permanentEnters" && t.enters?.filter.types?.includes("Creature")) && t.event !== "anotherCreatureYouControlEnters") return "fail";
@@ -2080,6 +2096,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     }
     // "If there are cards exiled with ~, put them into their owner's graveyard" (Valakut Exploration): those cards.
     if (/^there are cards exiled with ~$/.test(intervening[2]!)) rest = rest.replace(/^put them into their owner's graveyard,/, "put all cards exiled with ~ into their owners' graveyards,");
+    // "If there are cards exiled with it, you may play one of them without paying its mana cost" (Evercoat Ursine).
+    if (/^there are cards exiled with (?:~|it)$/.test(intervening[2]!)) rest = rest.replace(/^you may play one of them without paying its mana cost\.$/, "you may play one of the cards exiled with ~ without paying its mana cost.");
     // "At the beginning of your upkeep, if ~ is tapped, put a storage counter on it" (Bottomless Vault): "it" is ~, the
     // only thing named.
     // So is every "it" of "sacrifice it" (Mad Dog) and "it deals 2 damage to you unless it came under your control this
@@ -2386,6 +2404,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (fromHand) {
     const t = parseTrigger(`When ~ enters, ${fromHand[1]}`);
     return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromHand: true };
+  }
+  // Flayer of the Hatebound: "Whenever ~ or another creature enters from your graveyard": a creature card you own put onto
+  // the battlefield from there, under anyone's control.
+  const orAnotherFromYard = /^Whenever ~ or another creature enters from your graveyard, (.+)$/.exec(line);
+  if (orAnotherFromYard) {
+    const t = parseTrigger(`Whenever ~ or another creature enters, ${orAnotherFromYard[1]}`);
+    return !t || t === "fail" || t.event !== "permanentEnters" || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "yours" };
   }
   const fromYard = /^When(?:ever)? ~ enters from (a|your) graveyard, (.+)$/.exec(line);
   if (fromYard) {

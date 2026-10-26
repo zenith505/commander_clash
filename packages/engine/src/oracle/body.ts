@@ -254,7 +254,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest", "villainous", "putFromExiledTop"]);
+const PAUSING = new Set<Effect["type"]>(["vote", "flipCoin", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest", "villainous", "putFromExiledTop"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -2003,6 +2003,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Roll a d20 and subtract the number of cards in your hand. If the result is 0 or less, discard your hand." (The Deck
     // of Many Things): the result after the modifier (CR 706.2, rulings), before the results table.
+    // Sword of Hours: "If the result is greater than the damage dealt or the result is 12, ...": the damage its "deals
+    // combat damage" trigger is about (CR 603.2).
+    const aboveDealt = /^If the result is greater than the damage this trigger is about or the result is (\d+), (.+)$/.exec(s);
+    if (aboveDealt && !row && effects.length === 1 && effects[0]!.type === "roll" && !effects[0].n) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(aboveDealt[2]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "rollIn", aboveEvent: true, min: Number(aboveDealt[1]) }, effects: inner });
+      continue;
+    }
     const resultIs = /^If the result is (\d+) or (less|greater), (.+)$/.exec(s);
     if (resultIs && !row && effects.some((e) => e.type === "roll")) {
       const before = ctx.targets.length;
@@ -2024,9 +2034,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^(?:Tap|Untap) it$/.test(s) && si > 0 && /^~ (?:gets|gains|has|becomes)\b/.test(sentences[si - 1]!) && !/\btarget\b/.test(sentences[si - 1]!)) s = s.replace(/it$/, "~");
     // "Put seven +1/+1 counters on ~. It becomes a 0/0 Spirit creature" (Haunted Screen), "~ becomes a Werewolf. Put two
     // +1/+1 counters on it" (Mild-Mannered Librarian): "it" is ~, when the sentence before was about ~ and nothing else.
-    const aboutSelf = si > 0 && /^(?:~ (?:gets|gains|has|becomes)\b|Put [^.]+ counters? on ~$)/.test(sentences[si - 1]!) && !/\b(?:target|it|them)\b/.test(sentences[si - 1]!);
+    const aboutSelf = si > 0 && /^(?:~ (?:gets|gains|has|becomes)\b|[Pp]ut [^.]+ counters? on ~$)/.test(sentences[si - 1]!) && !/\b(?:target|it|them)\b/.test(sentences[si - 1]!);
     if (aboutSelf && /^It (?:becomes|gains|gets) /.test(s)) s = s.replace(/^It /, "~ ");
     if (aboutSelf && /^Put [^.]+ counters? on it(?: and |$)/.test(s)) s = s.replace(/ counters? on it\b/, (w) => w.replace(/it$/, "~"));
+    // Aligned Heart: "Put a rally counter on ~. Then create a 1/1 white Monk creature token with prowess for each rally
+    // counter on it": ~'s counters.
+    if (aboutSelf && /^(?:Then )?[Cc]reate [^.]+ for each [a-z+\/-]+ counter on it$/.test(s)) s = s.replace(/ on it$/, " on ~");
     // "Put three +1/+1 counters on ~ and it becomes a black Demon ..." (Possessed Goat): two instructions about ~.
     const putThen = /^(Put [^.]+ counters? on ~) and it (becomes .+)$/.exec(s);
     if (putThen) {
@@ -5031,6 +5044,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "forEachThisWay", which, ...(graveyard ? { graveyard: true as const } : {}), filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
       continue;
     }
+    // Rampant Frogantua: "You may mill that many cards. Put any number of land cards from among them onto the battlefield
+    // tapped": part of milling, if you do, any of the land cards milled, chosen as it resolves.
+    const anyMilled = /^Put any number of ([a-z]+) cards from among them onto the battlefield tapped$/.exec(s);
+    if (anyMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${anyMilled[1]} card`);
+      if (prev?.type !== "may" || prev.pay || prev.effects.length !== 1 || prev.effects[0]!.type !== "mill" || prev.effects[0]!.who.ref !== "you" || !filter) return null;
+      prev.effects.push({ type: "chooseFromGraveyard", n: 99, upTo: true, milled: true, filter, dest: "battlefield", tapped: true });
+      continue;
+    }
     // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among
     // the cards milled this way ..." (Blanchwood Prowler), "You may put an instant or sorcery card milled this way into
     // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
@@ -5371,6 +5394,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "searchFound", filter }, effects: then });
       continue;
     }
+    // Valkyrie's Call: "It has flying and is an Angel in addition to its other types": the same as "It's an Angel with
+    // flying in addition to its other types".
+    const hasAndIs = /^It has ([a-z]+) and is (an? [A-Z][a-z]+) in addition to its other types$/.exec(s);
+    if (hasAndIs) s = `It's ${hasAndIs[2]} with ${hasAndIs[1]} in addition to its other types`;
     const isAlso = /^(?:That creature is|It's|It is|Each of them is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
@@ -5825,7 +5852,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

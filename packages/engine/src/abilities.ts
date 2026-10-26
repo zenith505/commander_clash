@@ -347,7 +347,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -649,6 +649,8 @@ export interface TargetSpec {
    */
   stackAbilities?: "activated" | "triggered" | "both";
   noSpells?: true;
+  /** "Target loyalty ability of a planeswalker" (Verdant Command): an activated loyalty ability only (CR 606.3, StackItem.loyalty). */
+  loyaltyOnly?: true;
   /**
    * "Target activated or triggered ability you control from an enchantment source" (Weaver of Harmony), "... from a
    * colorless source" (Abstruse Archaic): what the ability's source must be (CR 113.7, 113.7a). An ability with no
@@ -938,6 +940,8 @@ export type PlayerRef =
   | { ref: "opponentsLostLife"; n: number }
   /** "Each opponent with no cards in hand" (Tinybones, Trinket Thief): as it resolves (rulings). */
   | { ref: "opponentsEmptyHanded" }
+  /** "Each opponent dealt combat damage this game by a creature named ~" (Gollum, Obsessed Stalker): by any creature with this source's name, whoever controlled it (rulings; Player.combatDamagedByNames). */
+  | { ref: "opponentsCombatDamagedByName" }
   /** "Each of its controller's opponents" (Bounty Board): every other player than the subject's controller (CR 102.2, 800.4), as it last existed. */
   | { ref: "subjectControllerOpponents" }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
@@ -1800,7 +1804,7 @@ export type Effect =
    * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
    * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).
    */
-  | { type: "playLinked"; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true }
+  | { type: "playLinked"; /** "Play one of them" (Evercoat Ursine): of the cards exiled with it, the one its controller chooses. */ one?: true; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true }
   /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
   | { type: "cipher" }
   /**
@@ -3314,7 +3318,7 @@ export type SpellCondition =
    * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
    */
-  | { kind: "rollIn"; min?: number; max?: number; event?: true }
+  | { kind: "rollIn"; min?: number; max?: number; event?: true; /** "If the result is greater than the damage dealt or the result is 12" (Sword of Hours): above the trigger's event amount, or at least `min`. */ aboveEvent?: true }
   /** "If none of those creatures attacked you" (Firemane Commando): the attack trigger's event counted none attacking its controller. */
   | { kind: "noneAttackedYou" }
   /** "If they didn't attack you that turn" (Faramir, Prince of Ithilien): the event player attacked you (not your planeswalkers or battles, rulings) with a creature this turn; `not`: didn't. */
@@ -4629,6 +4633,8 @@ export interface CastFromGraveyard {
   anyOwner?: true;
   /** "If a spell cast this way would be put into a graveyard, exile it instead" (CR 614.1a). */
   exileIfToGraveyard?: true;
+  /** "Cast this card from your graveyard using its warp ability" (Timeline Culler): only for that alternative cost. */
+  alt?: AltCostKind;
 }
 
 /**
@@ -5363,6 +5369,8 @@ export interface CompiledCard {
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /** Krark's Thumb: each coin its controller would flip is two coins, and they ignore one (rulings: they see both first). */
+  flipTwo?: true;
   /** "You may play Forests from your graveyard." (Titania, Nature's Force): only lands with one of these subtypes. */
   landsFromGraveyardOf?: string[];
   /** Glacierwood Siege's "• Sultai — You may play lands from your graveyard.": the same as `landsFromGraveyard`, only while this holds. */

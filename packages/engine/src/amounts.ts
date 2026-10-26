@@ -398,6 +398,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
+      if (c.lostGame) return s.players.filter((p) => p.lost && !(c.opponents && p.id === ctx.controller)).length;
       // "Each opponent you attacked [this turn]": players (not planeswalkers or battles) attacked in any combat this turn.
       if (c.attacked) {
         const a = s.players[ctx.controller]?.attackedInTurn;
@@ -743,7 +744,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
     case "tokensCreatedThisTurn":

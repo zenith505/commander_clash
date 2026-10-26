@@ -2220,6 +2220,13 @@ export function compile(d: CardDef): CompiledCard {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;
     }
+    // "You don't lose the game for having 0 or less life" (CR 704.5a); Marina Vendrell's Grimoire says both at once.
+    const zeroLife = /^You (have no maximum hand size and )?don't lose the game for having 0 or less life\.$/.exec(line);
+    if (zeroLife) {
+      if (zeroLife[1]) out.noMaxHandSize = out.noMaxHandSize || true;
+      out.noZeroLifeLoss = true;
+      continue;
+    }
     const handSize = new RegExp(`^(Your|Each opponent's) maximum hand size is (?:${NUM}|(increased|reduced) by ${NUM})\\.$`).exec(line);
     if (handSize) {
       const n = num((handSize[2] ?? handSize[4])!);

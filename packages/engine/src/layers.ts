@@ -770,6 +770,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "defendingHasRad":
+      return src.attacking !== undefined && (s.players[src.attacking]?.rad ?? 0) > 0;
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];
       return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);

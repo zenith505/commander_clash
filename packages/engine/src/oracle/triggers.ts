@@ -1759,6 +1759,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever you draw a card, ${drawTheirTurn[1]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
   }
+  // Voracious Tome-Skimmer: "Whenever you cast a spell during an opponent's turn, ...": the same, checked as you cast it.
+  const castTheirTurn = /^Whenever you cast a spell during an opponent's turn, (.+)$/.exec(line);
+  if (castTheirTurn) {
+    const t = parseTrigger(`Whenever you cast a spell, ${castTheirTurn[1]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
+  }
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
   // the event, checked as it attacks only (rulings), not an intervening if.
   // Pugnacious Hammerskull: "while you don't control another Dinosaur", the same (rulings).
@@ -2513,7 +2519,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ enters, if it was kicked, ...": an intervening if (CR 603.4) on how it was cast.
       let body0 = m[1]!;
       let ifKicked: SpellCondition | undefined;
-      const kicked = /^if it was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
+      const kicked = /^if (?:it|~) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
       if (kicked) {
         // "When you cast ~, if it was kicked, exile target land." (Sowing Mycospawn): the spell as it was cast.
         if (event !== "selfEnters" && event !== "selfCast") return "fail" as const;

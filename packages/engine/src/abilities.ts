@@ -1484,6 +1484,8 @@ export type StaticCondition =
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
    */
   | { kind: "noCombatDamageSinceLastTurn" }
+  /** Nightkin Ambusher: "as long as defending player has a rad counter": the player the source is attacking (CR 506.2, 728). */
+  | { kind: "defendingHasRad" }
   /** "If a player was dealt combat damage by a Zombie this turn" (Lost Monarch of Ifnir): by a creature of that type. */
   | { kind: "playerCombatDamaged"; subtype: string }
   /** "If an opponent was dealt combat damage by a legendary creature this turn" (Blitzball): whoever controlled it (rulings). */
@@ -5210,6 +5212,11 @@ export interface CompiledCard {
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).
    */
   cantLose?: "you" | "opponents";
+  /**
+   * "You don't lose the game for having 0 or less life" (Marina Vendrell's Grimoire, Phyrexian Unlife): its controller
+   * skips the state-based action of CR 704.5a while it's on the battlefield; they can still lose any other way.
+   */
+  noZeroLifeLoss?: true;
   cantWin?: "you" | "opponents";
   /**
    * The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1." A replacement effect

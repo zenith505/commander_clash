@@ -8937,7 +8937,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
-      if (p.life <= 0) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a
+      if (p.life <= 0 && !zeroLifeOk(s, p.id)) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a
       else if (p.drewFromEmptyLibrary) changed = playerLoses(s, p.id, "drew from an empty library") || changed; // 704.5b
       else if ((p.poison ?? 0) >= 10) changed = playerLoses(s, p.id, "ten poison counters") || changed; // 704.5c
       else {
@@ -9205,6 +9205,14 @@ export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"
       const rule = what === "lose" ? a.cantLose : a.cantWin;
       return !!rule && (rule === "you" ? you === pid : you !== pid);
     });
+  });
+}
+
+/** "You don't lose the game for having 0 or less life" (Marina Vendrell's Grimoire): a permanent `pid` controls says so. */
+export function zeroLifeOk(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)].some((a) => a.noZeroLifeLoss);
   });
 }
 

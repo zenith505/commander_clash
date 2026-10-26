@@ -5219,7 +5219,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
-    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If an? ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s);
+    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If (?:an?|at least one) ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s);
     if (ifMilled) {
       const then = ifMilled[ifMilled.length - 1]!;
       const filter: TargetSpec | null = ifMilled.length === 2 ? { kind: "card", chosen: "name", text: "card with the chosen name" } : (parseSearchFilter(ifMilled[1]!.replace(/, (?=non)/, " ")) ?? null);

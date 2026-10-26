@@ -1479,7 +1479,7 @@ export interface GameState {
   zoneBatch?: ZoneMove[];
   /** Groups of two or more cards that went to one graveyard at the same time, waiting for their owner to arrange them. */
   /** `library`: a merged permanent's cards put into its owner's library together (CR 730.3a), unless it's shuffled since (`shuffles`, Player.shuffles then). */
-  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number } }[];
+  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number; /** What put them there, for the prompt (a merged permanent's cards if left out). */ source?: string } }[];
   /** How many times abilities that ask ("if this is the second time this ability has resolved this turn") resolved this turn, by source object and ability. */
   resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */

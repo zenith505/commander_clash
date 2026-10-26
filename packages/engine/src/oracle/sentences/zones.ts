@@ -677,12 +677,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" || w === "all opponents'" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s?$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
-  // "Exile all creature cards from target player's graveyard" (Crypt Incursion), "... from all graveyards" (Honor the Fallen).
-  if ((m = /^[Ee]xile all (.+?) cards from (target player's|target opponent's|each opponent's|all) graveyards?$/.exec(s))) {
-    const filter = parseSearchFilter(`${m[1]} card`);
-    const w = m[2]!;
-    const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s$/, ""), ctx);
-    return filter && who ? [{ type: "exileGraveyard", who, filter }] : null;
+  // "Exile all creature cards from target player's graveyard" (Crypt Incursion), "... from all graveyards" (Honor the Fallen),
+  // "... from your graveyard" (Zombie Mob). Tombfire: "Target player exiles all cards with flashback from their
+  // graveyard": the same, that player doing it.
+  const theirs = /^(Target player|Target opponent) exiles all (.+?) from their graveyard$/.exec(s);
+  const all = theirs ? { what: theirs[2]!, whose: `${theirs[1]!.toLowerCase()}'s` } : (m = /^[Ee]xile all (.+?) from (target player's|target opponent's|each opponent's|your|all) graveyards?$/.exec(s)) && { what: m[1]!, whose: m[2]! };
+  if (all) {
+    const flashback = all.what === "cards with flashback";
+    const kind = /^(.+?) cards$/.exec(all.what);
+    // "All cards": the whole graveyard.
+    const filter = flashback || all.what === "cards" ? undefined : kind ? parseSearchFilter(`${kind[1]} card`) : null;
+    const w = all.whose;
+    const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
+    return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
   }
   if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
@@ -819,6 +826,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
+  }
+  // "Put two target lands on top of their owners' libraries" (Plow Under), "Put all enchantments on top of their owners'
+  // libraries" (Harmonic Convergence): each owner arranges their own cards there (CR 401.4, rulings).
+  if ((m = /^Put ((?:two|three) target .+?|all .+?) on (top|the bottom) of their owners' libraries$/i.exec(s)) && !/graveyards?$/i.test(m[1]!)) {
+    const what = parseObject(m[1]!, ctx);
+    return what && (what.ref === "target" || what.ref === "each") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
   // Ugin's Labyrinth: "{T}: Return the exiled card to its owner's hand": the card its imprint ability exiled, while it's
   // still in exile (CR 607.2a, 400.7); compile() links the two.

@@ -1,6 +1,6 @@
 # Roadmap
 
-25,030 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+25,091 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,599 of
 9,979 (86%).
 
@@ -1178,14 +1178,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   single source); Groffskithur ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
   Panther (a cost that sacrifices creatures by name); Sworn Defender and Lesser Werewolf (power-dependent combat
   tricks).
-- Next for Lane B, least played first: Possessed Nomad/Centaur/Barbarian (threshold, "is black" and a granted
-  ability), Indentured Oaf and Enchanted Being (prevent damage to or from creatures of a color), Cylian Sunsinger
-  ("each other creature with the same name"), Wormwood Dryad and Treefolk ("gains forestwalk ... and deals 1 damage
-  to you"), Tombfire, Trapfinder's Trick, Endangered Armodon (state trigger), Wirecat, Ivory Guardians, Zealots
-  en-Dal, Vaporous Djinn and Warping Wurm (phase out unless you pay), Psionic Entity and Reckless Embermage ("and 3
-  damage to itself"), Walking Dream, Branded and Veteran Brawlers ("can't block if you control an untapped land"),
-  Skizzik Surger (echo by sacrificing lands), Burning Palm Efreet, Smoke Teller and Aven Soulgazer (look at a
-  face-down creature), Rebuking Ceremony, Vexing Beetle, Goblin Furrier, Monstrous Hound.
+- Round B2 (ranks 32,230 up to about 31,000, plus some more played cards the same templates cover): prevention of
+  damage a creature deals to, or is dealt by, creatures of a color, snow creatures, Walls, enchanted creatures or
+  creatures with first strike (Indentured Oaf, Goblin Furrier, Enchanted Being, Tresserhorn Skyknight, Marble Priest,
+  Wall of Putrid Flesh); "All Walls able to block ~ do so" (CR 509.1c); "can't attack/block unless you control more
+  lands/creatures than defending/attacking player", "unless a black or green creature also attacks", "if an
+  enchantment is on the battlefield", "unless there is a Mountain on the battlefield", "can't block if you control an
+  untapped land"; "as long as no opponent controls ..."; "Creatures named ~ get +1/+1"; threshold "is black, and has"
+  (Possessed); the Volvers ("if ~ was kicked with its {B} kicker, it enters with ... and with ..."); Plow Under,
+  Rebuking Ceremony and Harmonic Convergence, whose owners order the cards on top (CR 401.4: Gravepurge now asks too);
+  "reveals their hand and discards all X cards"; "exiles all land cards / cards with flashback from their graveyard";
+  blocked, unblocked (only once blockers are declared, CR 509.1h) and "nonattacking, nonblocking" creatures; "each
+  creature blocking or blocked by ~"; "sacrifice it unless you sacrifice two Swamps"; "defending player may draw a
+  card"; "deals 2 damage to any target and 3 damage to itself"; "Destroy target creature. If that creature was green
+  or white / a Human / wasn't attacking, ..." checked as it last existed (CR 608.2h). +61.
+- Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
+  name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
+  supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
+  (creatures sharing a type), Melira's Keepers ("can't have counters put on it"), Heart Wolf (Dwarves, a delayed
+  leaves trigger), Endangered Armodon (state trigger), Exiled Doomsayer (morph cost tax), Treacherous Vampire and
+  Rotting Giant (sacrifice unless you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in
+  a graveyard dealing damage), Cut the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of
+  Blasting, Tribal Golem, Forethought Amulet; Unforge, Reign of Terror ("for each creature that died this way"),
+  Derelor and Jade Leech (colored cost increases), Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Spitfire
+  Handler, Vaporous Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling
+  Stance (forecast), Krovikan Rot (recover), Takenuma Bleeder, Warden of the Beyond, Fire and Brimstone, Exalted
+  Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
+  and Aven Soulgazer (look at a face-down creature).
 
 ## Known gaps (from earlier rounds)
 

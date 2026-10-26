@@ -35,6 +35,8 @@ import {
   cantBlockNow,
   cantBeBlockedNow,
   provokerOf,
+  lureBinds,
+  withoutCompany,
   tapCostCandidates,
   craftCandidates,
   untapViaMana,
@@ -5170,6 +5172,12 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
+  // Scarred Puma stays home without a black or green creature beside it (CR 508.1c).
+  for (let i = 0; i < 4; i++) {
+    const kept = attacks.filter((a) => !withoutCompany(s, a.attacker, attacks));
+    if (kept.length === attacks.length) break;
+    attacks = kept;
+  }
   // One that can only attack alone (Master of Cruelties) stays home when others attack (CR 506.5).
   if (attacks.length > 1) attacks = attacks.filter((a) => !characteristics(s, obj(s, a.attacker)).onlyAttacksAlone);
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
@@ -5203,6 +5211,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     const taps = tax && !(symbols && player(s, pid).life - 2 * symbols <= 10) ? planMana(s, pid, parseManaCost(tax)) : tax ? null : [];
     if (taps) {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
+      if (declared.some((a) => withoutCompany(s, a.attacker, declared))) declared = declared.filter((a) => !withoutCompany(s, a.attacker, declared));
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
     }
     const taxed = declared.filter((a) => attackTaxOf(s, a)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
@@ -5257,8 +5266,9 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const desperate = totalIncoming >= me.life;
   // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
   // must be blocked if able gets our sturdiest blocker (two against menace).
-  for (const at of incoming.filter((a) => characteristics(s, a).allMustBlock && !characteristics(s, a).maxOneBlocker)) {
-    const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
+  for (const at of incoming.filter((a) => (characteristics(s, a).allMustBlock || characteristics(s, a).allMustBlockBy) && !characteristics(s, a).maxOneBlocker)) {
+    const all = characteristics(s, at).allMustBlock;
+    const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at) && (all || lureBinds(s, at, b)));
     if (able.length < blockersNeeded(s, at)) continue;
     for (const b of able) {
       used.add(b.id);

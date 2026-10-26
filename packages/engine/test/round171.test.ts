@@ -1110,3 +1110,107 @@ describe("O-Naginata and bots", () => {
     expect(acts.some((a) => a.type === "activateAbility" && (a as { objectId?: string }).objectId === eq)).toBe(false);
   });
 });
+
+const dalek = card("Dalek Drone", "Artifact Creature — Dalek", "{3}{B}{B}", { cmc: 5, power: "3", toughness: "3", keywords: ["Flying", "Exterminate!", "Menace"], oracleText: "Flying, menace\nExterminate! — When this creature enters, destroy target creature an opponent controls. That player loses 3 life." });
+const vision = card("Diabolic Vision", "Sorcery", "{U}{B}", { cmc: 2, oracleText: "Look at the top five cards of your library. Put one of them into your hand and the rest on top of your library in any order." });
+const glimpse = card("Glimpse of Nature", "Sorcery", "{G}", { cmc: 1, oracleText: "Whenever you cast a creature spell this turn, draw a card." });
+const blowgun = card("Hunter's Blowgun", "Artifact — Equipment", "{1}", { cmc: 1, keywords: ["Equip"], oracleText: "Equipped creature gets +1/+1.\nEquipped creature has deathtouch during your turn. Otherwise, it has reach.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)" });
+const liege = card("Deathbringer Liege", "Creature — Horror", "{2}{W/B}{W/B}{W/B}", { cmc: 5, power: "3", toughness: "4", oracleText: "Other white creatures you control get +1/+1.\nOther black creatures you control get +1/+1.\nWhenever you cast a white spell, you may tap target creature.\nWhenever you cast a black spell, you may destroy target creature if it's tapped." });
+
+describe("fifth cards: parse", () => {
+  it("compiles every line", () => supported(dalek, vision, glimpse, blowgun, liege));
+});
+
+describe("Dalek Drone", () => {
+  it("Exterminate! destroys an opponent's creature and its controller loses 3 life", () => {
+    let { s, ap, opp } = setup([]);
+    const b = putOnBattlefield(s, opp, bear());
+    const d = into(s, ap, dalek, "hand");
+    s = resolveAll(run(s, planCast(s, ap, d)));
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(b)] }));
+    expect(zone(s, b)).toBe("graveyard");
+    expect(lifeOf(s, opp)).toBe(37);
+  });
+});
+
+describe("Diabolic Vision", () => {
+  it("puts one of the top five into your hand and the other four back on top in an order you choose", () => {
+    let { s, ap } = setup([]);
+    const top = [0, 1, 2, 3, 4].map(() => into(s, ap, bear(), "library")).reverse();
+    const v = into(s, ap, vision, "hand");
+    s = resolveAll(run(s, planCast(s, ap, v)));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 1, max: 1 });
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [top[2]!] }));
+    expect(zone(s, top[2]!)).toBe("hand");
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "order" });
+    const rest = [top[4]!, top[3]!, top[1]!, top[0]!];
+    expect([...pending<{ cards: string[] }>(s).cards].sort()).toEqual([...rest].sort());
+    s = resolveAll(act(s, { type: "arrangeTop", player: ap, top: rest, away: [] }));
+    expect(s.players[ap]!.library.slice(0, 4)).toEqual(rest);
+  });
+});
+
+describe("Glimpse of Nature", () => {
+  it("draws a card for each creature spell you cast this turn, and not for others", () => {
+    let { s, ap } = setup([]);
+    const g = into(s, ap, glimpse, "hand");
+    s = resolveAll(run(s, planCast(s, ap, g)));
+    const b = into(s, ap, bear(), "hand");
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, b)));
+    expect(handOf(s, ap).length).toBe(hand - 1 + 1);
+    const purge = into(s, ap, card("Purge", "Sorcery", "{0}", { cmc: 0, oracleText: "You gain 1 life." }), "hand");
+    const hand2 = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, purge)));
+    expect(handOf(s, ap).length).toBe(hand2 - 1);
+  });
+});
+
+describe("Hunter's Blowgun", () => {
+  it("gives deathtouch on your turn and reach otherwise", () => {
+    let { s, ap, opp } = setup([]);
+    const eq = putOnBattlefield(s, ap, blowgun);
+    const b = putOnBattlefield(s, ap, bear());
+    s = resolveAll(run(s, planActivate(s, ap, eq, 0, [tgt(b)])));
+    expect(s.objects[eq]!.attachedTo).toBe(b);
+    expect(pt(s, b)).toBe("3/3");
+    expect(kw(s, b, "Deathtouch")).toBe(true);
+    expect(kw(s, b, "Reach")).toBe(false);
+    s.activePlayer = opp;
+    invalidateCharacteristics(s);
+    expect(kw(s, b, "Deathtouch")).toBe(false);
+    expect(kw(s, b, "Reach")).toBe(true);
+  });
+});
+
+describe("Deathbringer Liege", () => {
+  it("pumps other white and black creatures; a white spell taps, a black spell destroys a tapped creature", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, liege);
+    const both = putOnBattlefield(s, ap, card("Knight", "Creature — Knight", "{W}{B}", { cmc: 2, colors: ["W", "B"], power: "2", toughness: "2" }));
+    const white = putOnBattlefield(s, ap, card("Squire", "Creature — Human", "{W}", { cmc: 1, colors: ["W"], power: "1", toughness: "1" }));
+    expect(pt(s, both)).toBe("4/4");
+    expect(pt(s, white)).toBe("2/2");
+    const victim = putOnBattlefield(s, opp, bear());
+    const w = into(s, ap, card("Sun Bit", "Instant", "{0}", { cmc: 0, colors: ["W"], oracleText: "You gain 1 life." }), "hand");
+    s = run(s, planCast(s, ap, w));
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(victim)] });
+    s = resolveAll(s);
+    expect(s.objects[victim]!.tapped).toBe(true);
+    const bl = into(s, ap, card("Night Bit", "Instant", "{0}", { cmc: 0, colors: ["B"], oracleText: "You gain 1 life." }), "hand");
+    s = run(s, planCast(s, ap, bl));
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(victim)] });
+    s = resolveAll(s);
+    expect(zone(s, victim)).toBe("graveyard");
+  });
+  it("a black spell doesn't destroy an untapped creature", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, liege);
+    const victim = putOnBattlefield(s, opp, bear());
+    const bl = into(s, ap, card("Night Bit", "Instant", "{0}", { cmc: 0, colors: ["B"], oracleText: "You gain 1 life." }), "hand");
+    s = run(s, planCast(s, ap, bl));
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(victim)] });
+    s = resolveAll(s);
+    expect(zone(s, victim)).toBe("battlefield");
+  });
+});

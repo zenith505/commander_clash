@@ -3026,6 +3026,16 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
+    // Hunter's Blowgun: "Equipped creature has deathtouch during your turn. Otherwise, it has reach.": one keyword during
+    // your turn, the other during the others'.
+    const blowgun = /^Equipped creature has ([a-z ]+) during your turn\. Otherwise, it has ([a-z ]+)\.$/.exec(line);
+    if (blowgun) {
+      const [mine, others] = [parseConditionalStatic(`During your turn, equipped creature has ${blowgun[1]}.`), parseStatic(`Equipped creature has ${blowgun[2]}.`)];
+      if (mine?.condition?.kind === "yourTurn" && mine.affects.kind === "attached" && others?.affects.kind === "attached" && !others.condition && [...mine.mods, ...others.mods].every((m) => m.kind === "addKeywords")) {
+        out.statics.push({ ...mine, text: line }, { ...others, condition: { kind: "yourTurn", not: true }, text: line });
+        continue;
+      }
+    }
     // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste
     // if you control a Warrior, and flying if you control a Wizard": each keyword while its condition holds.
     const byControl = /^Equipped creature has (.+)\.$/.exec(line);
@@ -3114,7 +3124,7 @@ export function compile(d: CardDef): CompiledCard {
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game." Rite of Harmony's "Whenever a creature or
     // enchantment you control enters this turn, draw a card" too (CR 603.7b).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

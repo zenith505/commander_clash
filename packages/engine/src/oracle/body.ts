@@ -1298,7 +1298,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Destroy all other permanents except for lands and tokens\./, "$1Destroy all other nonland, nontoken permanents.");
   // Suspended Sentence: "Destroy target creature an opponent controls. That player loses 3 life.": that player is the
   // creature's controller, as it last existed on the battlefield (CR 608.2h).
-  text = text.replace(/(^|\. )(Destroy|Exile) target creature an opponent controls\. That player (loses|gains) /, "$1$2 target creature an opponent controls. Its controller $3 ");
+  text = text.replace(/(^|\. )([Dd]estroy|[Ee]xile) target creature an opponent controls\. That player (loses|gains) /, "$1$2 target creature an opponent controls. Its controller $3 ");
   // Wand of Orcus: "it and Zombies you control gain deathtouch until end of turn": both, at once.
   text = text.replace(/(^|, |\. )it and ([A-Z][a-z]+s) you control gain ([a-z]+) until end of turn\./, "$1it gains $3 until end of turn. $2 you control gain $3 until end of turn.");
   // "Until end of turn, target attacking creature gets +1/+1 for each other attacking creature and gains double strike"
@@ -3489,6 +3489,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Diabolic Vision: "Look at the top five cards of your library. Put one of them into your hand and the rest on top of
+    // your library in any order.": the others stay on top, then their owner orders them (CR 401.4).
+    const visionLook = new RegExp(`^Look at the top ${NUM} cards of your library$`).exec(s);
+    if (visionLook && sentences[si + 1]?.replace(/\.$/, "") === "Put one of them into your hand and the rest on top of your library in any order" && num(visionLook[1]!) > 1) {
+      effects.push({ type: "dig", n: num(visionLook[1]!), count: 1, upTo: false, into: "hand", rest: "keep", reveal: false }, { type: "orderTop", who: { ref: "you" }, n: num(visionLook[1]!) - 1 });
+      si++;
+      continue;
+    }
     // "Look at the top three cards of target player's library, then put them back in any order." The player
     // looking orders them (CR 401.4 lets nobody else see them). "You may shuffle." after it is a choice to shuffle.
     const order = new RegExp(`^([Yy]ou may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
@@ -3851,6 +3859,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!then || ctx.targets.length !== before + 1) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
       si++;
+      continue;
+    }
+    // Deathbringer Liege: "you may destroy target creature if it's tapped": any creature is a legal target; whether it's
+    // tapped is checked as this resolves, and only then may it be destroyed (rulings).
+    if (/^[Yy]ou may destroy target creature if it's tapped$/.test(s)) {
+      const before = ctx.targets.length;
+      const fx = parseOne("Destroy target creature", ctx);
+      if (!fx || ctx.targets.length !== before + 1) return null;
+      const tapped: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], tapped: true, text: "tapped" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: tapped }, effects: [{ type: "may", effects: fx, text: "destroy target creature" }] });
       continue;
     }
     // Éowyn, Lady of Rohan: "Target creature gains your choice of first strike or vigilance until end of turn. If that

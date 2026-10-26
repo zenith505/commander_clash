@@ -1689,7 +1689,7 @@ const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanent
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
-  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+!? — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
   const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);

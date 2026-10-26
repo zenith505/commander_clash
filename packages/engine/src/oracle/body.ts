@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification } from "../abilities";
+import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -361,7 +361,7 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   const sentences = ofChosen ? sentences0.map((x, i) => (i === at ? x.replace(/ card of the chosen type, /, " card, ") : x)) : sentences0;
   // "If it's a card of the chosen type, ..." (Gathering Stone): any card with that creature type (CR 205.3m).
   const anyOfChosen = /^If (?:it's|that card is) a card of the chosen type, (.+)$/.exec(sentences0[at] ?? "");
-  const first = anyOfChosen ? (["", "", "card", anyOfChosen[1]!] as const) : (/^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? ""));
+  const first = anyOfChosen ? (["", "", "card", anyOfChosen[1]!] as const) : (/^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If (?:it's|that card is) ()(an? [a-z]+ card with mana value \d+ or (?:less|greater)), (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? ""));
   // "If that card has the chosen name, sacrifice ~ and draw three cards" (Diviner's Lockbox), after "choose a card name".
   const named = !first && /^If (?:it|that card) has the chosen name, (.+)$/.exec(sentences[at] ?? "");
   if (named) {
@@ -370,7 +370,7 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
     return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
   }
   if (!first) return null;
-  const filter0: TargetSpec | null = anyOfChosen ? { kind: "card", chosen: "type", text: "card of the chosen type" } : (parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`) ?? null);
+  const filter0: TargetSpec | null = anyOfChosen ? { kind: "card", chosen: "type", text: "card of the chosen type" } : (parseSearchFilter(/ card with mana value /.test(first[2]!) ? first[2]!.replace(/^an? /, "") : `${first[2]!.replace(/^an? /, "")} card`) ?? null);
   const filter = filter0 && ofChosen && !anyOfChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
   const then = filter && revealedAction(first[3]!, ctx);
   if (!filter || !then) return null;
@@ -821,6 +821,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "~ deals damage to each opponent equal to the number of tapped creatures that opponent controls" (Mjölnir, Storm
   // Hammer): each opponent's own count.
   text = text.replace(/(deals damage to each opponent equal to the number of [^.]+?) that opponent controls\b/g, "$1 that player controls");
+  // Acidic Soil: "~ deals damage to each player equal to the number of lands they control": each that player's own.
+  text = text.replace(/(deals damage to each (?:player|opponent) equal to the number of [^.]+?) they control\b/g, "$1 that player controls");
   // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
   // of the Bridge): the same X, counted again (nothing between them changes it).
   // Afterlife from the Loam: "For each player, choose up to one target creature card in that player's graveyard. Put those
@@ -907,7 +909,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Level Up: "Then if it has power 10 or greater, draw a card": the same as "if its power is 10 or greater".
   text = text.replace(/\b([Ii]f) (it|~) has (power|toughness) (\w+) or (greater|less),/g, (_, i: string, w: string, st: string, n: string, c: string) => `${i} ${w === "~" ? "~'s" : "its"} ${st} is ${n} or ${c},`);
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
-  text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
+  text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total|you control a creature with the greatest power among creatures on the battlefield)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   // Benevolent Offering: "You gain 2 life for each creature you control and that player gains 2 life for each creature they
   // control." is two instructions, you first.
   text = text.replace(/\bYou gain (\d+) life for each creature you control and that player gains \1 life for each creature they control\./g, "You gain $1 life for each creature you control. That player gains $1 life for each creature they control.");
@@ -1209,6 +1211,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b([Rr]eturn target [a-z ]+? you own) from the battlefield to your hand\./g, "$1 to its owner's hand.");
   // Divine Reckoning: "Each player chooses a creature they control. Destroy the rest." One instruction (CR 608.2c).
   text = text.replace(/(^|\. )(Each player chooses an? [a-z]+ they control)\. Destroy the rest\./g, "$1$2 and the rest are destroyed.");
+  // Duneblast: "Choose up to one creature. Destroy the rest." The same as Mount Doom's "..., then destroy the rest".
+  text = text.replace(/(^|\. )(Choose up to (?:one|two|three) (?:creatures?|permanents?|nonland permanents?|artifacts?))\. Destroy the rest\./g, (_, lead: string, c: string) => `${lead}${c.replace(/(creature|permanent|artifact)$/, "$1s")}, then destroy the rest.`);
   // "Put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card." (Waterbender
   // Ascension): "it" is ~.
   // Sab-Sunen, Luxa Embodied: "Then if it has an odd number of counters on it, draw two cards" too.
@@ -1244,7 +1248,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Pp]ut an? [^.]+? counter on ~) and add ((?:\{[WUBRGC]\})+)\.$/, "$1. Add $2.");
   // "That creature also gains trample until end of turn if you control a creature with power 4 or greater" (Temur Battle
   // Rage): checked as it resolves (CR 608.2c).
-  text = text.replace(/(^|\. )That creature also gains ([^.]+?) until end of turn if (you control [^.,]+)\./, "$1If $3, that creature gains $2 until end of turn.");
+  // Marcus, Mutant Mayor: "draw a card if that creature has a +1/+1 counter on it. If it doesn't, put a +1/+1 counter
+  // on it": one condition, checked as it resolves (CR 608.2c).
+  text = text.replace(/^[Dd]raw a card if (that creature has an? [^.]+? counter on it)\. If it doesn't, ([^.]+)\.$/, "If $1, draw a card. Otherwise, $2.");
+  // Roar of Challenge's "That creature gains indestructible until end of turn if ..." too.
+  text = text.replace(/(^|\. )That creature (?:also )?gains ([^.]+?) until end of turn if (you control [^.,]+)\./, "$1If $3, that creature gains $2 until end of turn.");
   // "Sacrifice another creature. You gain X life and draw X cards, where X is that creature's power." (Disciple of Bolas):
   // with none sacrificed, X is 0 and nothing happens, the same as "If you do, ...".
   text = text.replace(/(^|\. )([Ss]acrifice (?:another|a) creature)\. You ([^.]+, where X is that creature's (?:power|toughness))\./, "$1$2. If you do, you $3.");
@@ -1337,6 +1345,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )Until your next turn, (all lands you control become [^.]+)\./, "$1$2 until your next turn.");
   // Nissa, Vital Force: "Untap target land you control. Until your next turn, it becomes a 5/5 Elemental creature with
   // haste. It's still a land." The same.
+  // Matter Reshaper: "You may put that card onto the battlefield if it's a permanent card with mana value 3 or less.
+  // Otherwise, put that card into your hand." Not one or not put: into your hand (rulings), as Fecund Greenshell's.
+  text = text.replace(/(^|\. )You may put that card onto the battlefield if it's (an? [a-z]+ card with mana value \d+ or (?:less|greater))\. Otherwise, put that card into your hand\./, "$1If it's $2, you may put it onto the battlefield. Otherwise, put it into your hand.");
+  // Energy Tap: "Tap target untapped creature you control. If you do, add ...": its only target is untapped as long as
+  // it's legal, so when the spell resolves the creature is always tapped (CR 608.2b).
+  text = text.replace(/^Tap target untapped creature you control\. If you do, add /, "Tap target untapped creature you control. Add ");
+  // Mirko, Obsessive Theorist: "target creature card with power less than ~'s": than ~'s power.
+  text = text.replace(/\bwith (power|toughness) (less|greater) than ~'s(?! power| toughness)\b/g, "with $1 $2 than ~'s $1");
+  // Conflux: "Search your library for a white card, ... and a green card. Reveal those cards, put them into your hand,
+  // then shuffle." One search, as in one sentence.
+  text = text.replace(/(^|\. )(Search your library for [^.]+? card)\. Reveal those cards, put them into your hand, then shuffle\./, "$1$2, reveal them, put them into your hand, then shuffle.");
+  // Pointed Discussion: "You draw two cards, lose 2 life, then create a Blood token": three instructions, in order.
+  text = text.replace(/(^|\. )You draw (\w+) cards?, lose (\w+) life, then (create [^.]+)\./, (_, lead: string, n: string, l: string, c: string) => `${lead}Draw ${n} card${n === "a" ? "" : "s"}. You lose ${l} life. ${capital(c)}.`);
+  // Crawling Barrens: "Put two +1/+1 counters on ~. Then you may have it become a 0/0 Elemental creature ...": ~.
+  text = text.replace(/(^|\. )(Put [^.]+ counters? on ~)\. Then you may have it become /, "$1$2. Then you may have ~ become ");
   text = text.replace(/(^|\. )Until your next turn, it becomes (an? \d+\/\d+ [^.]+)\. It's still a land\./, "$1It becomes $2 until your next turn. It's still a land.");
   // "Enchanted player mills X cards, where X is the number of cards put into their graveyard ..." (Fraying Sanity).
   text = text.replace(/\b(enchanted player) mills X cards, where X is the number of cards put into their graveyard/g, "$1 mills X cards, where X is the number of cards put into enchanted player's graveyard");
@@ -3773,6 +3796,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "subjectIs", filter }, effects: [{ type: "may", effects: [{ type: "attach", what: { ref: "created" }, source: { ref: "subject" } }], text: "Attach it to the token" }] });
       continue;
     }
+    // Jenson Carthalion, Druid Exile: "If that spell was all colors, create ...": the spell the cast trigger is about, as it
+    // was cast (all five colors, CR 105.1).
+    const allColors = ctx.castSpell && /^If that spell (?:was|is) all colors, (.+)$/.exec(s);
+    if (allColors) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(allColors[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "causeSpellIs", filter: { kind: "card", colorCount: "all", text: "spell that's all colors" } }, effects: inner });
+      continue;
+    }
     // Toph, Hardheaded Teacher: "Whenever you cast a spell, earthbend 1. If that spell is a Lesson, put an additional +1/+1
     // counter on that land." The land earthbending chose, the spell as it was cast.
     const lessonIf = ctx.castSpell && /^If that spell is an? ([A-Z][a-z]+), put an additional \+1\/\+1 counter on that land$/.exec(s);
@@ -5501,6 +5534,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "damage", amount: Number(wheeled[1]), to: { ref: "choseThisWay", opponents: true } });
       continue;
     }
+    // Elixir: "Shuffle all nonland cards from your graveyard into your library. You gain life equal to the number of cards
+    // shuffled into your library this way."
+    if (s === "You gain life equal to the number of cards shuffled into your library this way") {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "shuffleZones" || prev.who.ref !== "you" || prev.drawThatMany || prev.bottom) return null;
+      prev.gainThatMany = true;
+      continue;
+    }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
@@ -5511,7 +5552,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // choice": whether a creature died, not whether a card was drawn (rulings).
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard");
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard");
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -6170,6 +6211,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // "If that creature has a +1/+1 counter on it" (Bring Low, Marcus): the trigger's subject, or else the one object
+    // target; with neither, unsupported.
+    const counterSubject = (c: StaticCondition | null): { subject?: ObjRef } | null => !c || c.kind !== "subjectCounter" || (ctx.subjectIt && !ctx.spell) ? {} : ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 ? { subject: { ref: "target", index: ctx.lastObjectTarget } } : null;
+    const insteadSubject = counterSubject(insteadOf);
+    const stateSubject = counterSubject(stateCond);
+    if (!insteadSubject || !stateSubject) return null;
     if (ifState && insteadOf) {
       const from = thenParts.has(sentences[si]!) ? prevStart : prevWhole;
       const previous = effects.slice(from);
@@ -6199,7 +6246,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
-      effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
+      effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf, ...insteadSubject }, effects: done, otherwise: previous });
       continue;
     }
     // "You lose 2 life unless you control another Pirate": the instruction happens only if the condition is false as it
@@ -6239,7 +6286,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Its instructions run one at a time, so one may wait on a player ("draw a card, then discard a card", see the "if"
       // effect).
       if (!inner) return null;
-      effects.push({ type: "if", cond: { kind: "state", cond: stateCond }, effects: inner });
+      effects.push({ type: "if", cond: { kind: "state", cond: stateCond, ...stateSubject }, effects: inner });
       // "Then if you're the monarch, ~ deals X damage to each opponent, where X is the number of creatures you control"
       // (Court of Embereth): the instruction's own X (CR 107.3c), counted as it resolves.
       if (!defineX()) return null;

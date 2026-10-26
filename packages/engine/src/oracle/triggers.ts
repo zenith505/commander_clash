@@ -3,7 +3,7 @@ import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singular, singul
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { ANY_COUNTER } from "../abilities";
-import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { HISTORIC, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
@@ -749,7 +749,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     return { ...t, dies: { ...dies, self: true } };
   }
   // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
-  const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile), (.+)$/.exec(line);
+  // Curator's Ward: "When enchanted permanent leaves the battlefield, if it was historic, ...": to any zone (CR 603.6c),
+  // historic as it last existed (CR 603.10a, 700.6).
+  const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile|leaves the battlefield), (.+)$/.exec(line);
   const attached = attachedM && [attachedM[0], attachedM[1]!, attachedM[4]!];
   // Scrap Trawler: "Whenever ~ dies or another artifact you control is put into a graveyard from the battlefield": ~ is an
   // artifact, and dying is being put into a graveyard from the battlefield (CR 700.4), so the same as "~ or another".
@@ -811,6 +813,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const wasType = attached?.[1] === "enchanted" && attachedM![2] === "creature" && attachedM![3] === "dies" ? /^if that creature was an? ([A-Z][a-z]+), (.+)$/.exec(bodyText) : null;
   if (wasType && !CREATURE_TYPES.has(wasType[1]!)) return "fail";
   if (wasType) bodyText = wasType[2]!;
+  const wasHistoric = attached && attachedM![3] === "leaves the battlefield" ? /^if it was historic, (.+)$/.exec(bodyText) : null;
+  if (wasHistoric) bodyText = wasHistoric[1]!;
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
@@ -839,8 +843,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
     // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).
     if (attached[1] === "enchanted") for (const e of allEffects(body.effects)) if ((e.type === "bounce" || e.type === "putOntoBattlefield") && e.what.ref === "self") e.what = { ref: "selfCard", moved: true };
-    const filter: TargetSpec = wasType ? { kind: "object", types: ["Creature"], subtypes: [wasType[1]!], text: wasType[1]! } : attachedM![2] === "creature" ? { kind: "object", types: ["Creature"], text: "creature" } : { kind: "object", text: "permanent" };
-    return { event: "permanentDies", dies: { filter, attached: true, ...(attachedM![3] !== "dies" ? { leaves: true as const, toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}) }, body };
+    const base: TargetSpec = wasType ? { kind: "object", types: ["Creature"], subtypes: [wasType[1]!], text: wasType[1]! } : attachedM![2] === "creature" ? { kind: "object", types: ["Creature"], text: "creature" } : { kind: "object", text: "permanent" };
+    const filter: TargetSpec = wasHistoric ? { ...base, anyOf: HISTORIC, text: "historic permanent" } : base;
+    const toZones = attachedM![3] === "dies or is put into exile" ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {};
+    return { event: "permanentDies", dies: { filter, attached: true, ...(attachedM![3] !== "dies" ? { leaves: true as const, ...toZones } : {}) }, body };
   }
   let phrase = m![2]!;
   const damaged = / dealt damage by ~ this turn$/.exec(phrase);

@@ -293,7 +293,8 @@ function diesMatches(
   chosen?: GameObject["chosen"],
 ): boolean {
   // "When enchanted creature dies, if that creature was a Horror" (Endless Evil): its types as it last existed (CR 603.10a).
-  if (d.attached) return attachedTo === dying.o.id && dying.c.types.includes("Creature") && (!d.filter.subtypes?.length || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
+  // "When enchanted permanent leaves the battlefield, if it was historic" (Curator's Ward): any permanent, of that kind.
+  if (d.attached) return attachedTo === dying.o.id && (!d.filter.types?.length || d.filter.types.some((ty) => dying.c.types.includes(ty))) && ((!d.filter.subtypes?.length && !d.filter.anyOf?.length) || objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c));
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
   if (srcId === dying.o.id) {
     if (d.orSelf) return true;

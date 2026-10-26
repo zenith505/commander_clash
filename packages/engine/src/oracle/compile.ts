@@ -1750,6 +1750,11 @@ export function compile(d: CardDef): CompiledCard {
       out.gainsNoLife = true;
       continue;
     }
+    // Tainted Remedy (CR 614.1a): after "can't gain life" (CR 119.7) and Sulfuric Vortex, before the gain is doubled.
+    if (line === "If an opponent would gain life, that player loses that much life instead.") {
+      out.opponentsGainLose = true;
+      continue;
+    }
     if (line === "Damage can't be prevented.") {
       out.damageCantBePrevented = true;
       continue;
@@ -1805,9 +1810,12 @@ export function compile(d: CardDef): CompiledCard {
       out.lifeGainPlus = (out.lifeGainPlus ?? 0) + Number(plusLife[1]);
       continue;
     }
-    const floor = /^Damage that would reduce your life total to less than (\d+) reduces it to \1 instead\.$/.exec(line);
-    if (floor) {
-      out.lifeFloor = Number(floor[1]);
+    // Serra the Benevolent's emblem: "If you control a creature, damage that would reduce ...": only while you do.
+    const floor = /^(If (you control an? [^,]+), )?[Dd]amage that would reduce your life total to less than (\d+) reduces it to \3 instead\.$/.exec(line);
+    const floorIf = floor?.[2] ? parseStaticCondition(floor[2], { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    if (floor && floorIf !== null) {
+      out.lifeFloor = Number(floor[3]);
+      if (floorIf) out.lifeFloorIf = floorIf;
       continue;
     }
     if (line === "Room abilities of dungeons you own trigger an additional time.") {

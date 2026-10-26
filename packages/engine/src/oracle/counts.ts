@@ -219,7 +219,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // own result (CR 706.2).
   if (each && /^(odd|even) result$/i.test(p)) return count({ kind: "rollParity", odd: /^odd/i.test(p) });
   // "Put a +1/+1 counter on ~ for each flip you won" (Crazed Firecat).
-  if (each && /^flip you won$/i.test(p)) return count({ kind: "flipsWon" });
+  // "For each flip you win, create ..." (Goblin Traprunner, after "flip three coins") too.
+  if (each && /^flip you w(?:on|in)$/i.test(p)) return count({ kind: "flipsWon" });
   // Life and hands.
   if ((m = /^(your|their|that player's|target player's|target opponent's|enchanted player's) life total$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);

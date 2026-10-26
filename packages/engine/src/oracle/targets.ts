@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AmountExpr, DamageRecipient, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
+import { NUM, num, counterKind, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
 import { Ctx, addTarget } from "./body";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseSearchFilter } from "./search";
@@ -125,6 +125,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   const lost = /^each opponent who lost (?:(\d+) or more )?life this turn$/.exec(x);
   if (lost) return { ref: "opponentsLostLife", n: lost[1] ? Number(lost[1]) : 1 };
   if (/^each opponent (?:with|who has) no cards in hand$/.test(x)) return { ref: "opponentsEmptyHanded" };
+  const poisoned = new RegExp(`^each opponent (?:with|who has) ${NUM} or more poison counters$`).exec(x);
+  if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
@@ -991,9 +993,10 @@ export function parseTargetPhrase(
     extra.manaAbility = true;
     p = p.slice(0, manaAb.index);
   }
-  const without = / without an? ([+-]1\/[+-]1) counters? on (?:it|them)/.exec(p);
+  // Oblivion Stone: "each nonland permanent without a fate counter on it": any kind of counter.
+  const without = / without an? ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
   if (without) {
-    extra.notCounter = without[1]!;
+    extra.notCounter = counterKind(without[1]!);
     p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();
   }
   const none = / with no counters on (?:it|them)/.exec(p);
@@ -1127,6 +1130,10 @@ export function parseTargetPhrase(
     extra.combat = "attackingOpponent";
     p = "creature";
   }
+  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you or a planeswalker you control$/.test(p)) {
+    extra.combat = "attackingYouOrYourPlaneswalker";
+    p = "creature";
+  }
   // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you$/.test(p)) {
     extra.combat = "attackingYou";
@@ -1185,6 +1192,12 @@ export function parseTargetPhrase(
   if (p === "creature or vehicle") {
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
+  }
+  // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell": either one (CR 205.3).
+  const orSub = /^(creature|instant) or (spacecraft|aura)$/.exec(p);
+  if (orSub && !extra.orSubtypes) {
+    extra.orSubtypes = [capital(orSub[2]!)];
+    p = orSub[1]!;
   }
   // "Each land and Ally you control" (Great Divide Guide): a land, or an Ally whatever its card types.
   // "Artifact creature and/or Vehicle" (Iron Spider): every Vehicle is an artifact (CR 205.3g), so "artifact" is for both

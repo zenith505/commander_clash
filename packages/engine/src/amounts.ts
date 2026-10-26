@@ -147,9 +147,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "permanents": {
       let n = 0;
       const names = new Set<string>();
-      // "Named ~" (Hare Apparent): the source's name as it is now (a copy's is what it copies, CR 707.2).
+      // "Named ~" (Hare Apparent): the source's name as it is now (a copy's is what it copies, CR 707.2); in a static
+      // ability (Timberpack Wolf), as the layers have it so far.
       const me = c.filter.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      const filter = c.filter.named === "~" ? { ...c.filter, named: me?.zone === "battlefield" ? characteristics(s, me).name : (ctx.sourceName ?? (me ? defOf(s, me).name : "")) } : bindChosen(c.filter, ctx.chosen);
+      const filter = c.filter.named === "~" ? { ...c.filter, named: me?.zone === "battlefield" ? (view(me)?.name ?? defOf(s, me).name) : (ctx.sourceName ?? (me ? defOf(s, me).name : "")) } : bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;

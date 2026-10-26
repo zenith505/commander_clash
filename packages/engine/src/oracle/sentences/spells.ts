@@ -511,6 +511,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // value, as it resolves, is countered (rulings).
   if (/^Target spell can't be countered$/i.test(s)) return [{ type: "spellUncounterable", index: addTarget(ctx, { kind: "spell", text: "target spell" }) }];
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
+  if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).
   if (/^Counter target spell if it has the same name as that card$/i.test(s) && ctx.activated && ctx.costLinked) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifCostCardName: true }];
@@ -519,7 +520,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.
   // "Counter target spell that wasn't cast from its owner's hand" (Wash Away).
   // "Counter target spell unless its controller discards their hand" (Perplex): a choice they make as it resolves (CR 118.12).
-  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| with \{X\} in its mana cost)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| cast from a graveyard| with \{X\} in its mana cost)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
     m.splice(3, 1);
     const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
     const unless = /discards their hand$/.test(s) ? { cost: "{0}", discardHand: true as const } : m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);

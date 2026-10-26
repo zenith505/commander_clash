@@ -3090,6 +3090,24 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Phyrexian Boon: "Enchanted creature gets +2/+1 as long as it's black. Otherwise, it gets -1/-2."; Clutch of Undeath
+    // ("as long as it's a Zombie"), Nyx Infusion ("as long as it's an enchantment"): one bonus while the enchanted creature
+    // is that, the other while it isn't, each checked continuously (CR 611.3a).
+    const boon = /^Enchanted creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it gets ([+-]\d+\/[+-]\d+)\.$/.exec(line);
+    if (boon) {
+      const w = boon[2]!;
+      const yes: TargetSpec | null = COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[w]!], text: `${w} creature` }
+        : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], allTypes: [capital(w.slice(3))], text: `${w.slice(3)} creature` }
+        : CREATURE_TYPES.has(w.replace(/^an? /, "")) ? { kind: "object", types: ["Creature"], subtypes: [w.replace(/^an? /, "")], text: `${w.replace(/^an? /, "")} creature` } : null;
+      const no: TargetSpec | null = !yes ? null : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], notColors: [COLOR_WORDS[w]!], text: `non${w} creature` }
+        : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], notTypes: [capital(w.slice(3))], text: `non${w.slice(3)} creature` }
+        : { kind: "object", types: ["Creature"], notSubtypes: [w.replace(/^an? /, "")], text: `non-${w.replace(/^an? /, "")} creature` };
+      const [a, b] = [parseStatic(`Enchanted creature gets ${boon[1]}.`), parseStatic(`Enchanted creature gets ${boon[3]}.`)];
+      if (yes && no && a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
+        out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "attachedIs", filter: no }, text: line });
+        continue;
+      }
+    }
     // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste
     // if you control a Warrior, and flying if you control a Wizard": each keyword while its condition holds.
     const byControl = /^Equipped creature has (.+)\.$/.exec(line);

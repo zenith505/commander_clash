@@ -828,6 +828,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
       if (endsTurnOnly(body)) return theirs;
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
+      // Ertai's Trickery: only a kicked spell is countered.
+      if (c?.type === "counterSpell" && c.ifKicked && !top.kicked?.length) return false;
       return !!c && (c.type !== "counterSpell" || !c.unless || !canPayUnless(s, top.controller, c.unless, pid, sourceId, x));
     };
     for (const id of player(s, pid).hand) {
@@ -2819,6 +2821,9 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const given = new Set((s.resolving.countersPutThisWay ?? []).map((c) => c.id));
     return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   }
+  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
+  const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+  if ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created") return [...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one

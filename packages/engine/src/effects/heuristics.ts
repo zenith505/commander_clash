@@ -70,6 +70,13 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // it's removed or blocked, without costing its owner anything.
     if (e.type === "haunt") mark(0);
     if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index, e.who.n);
+    // "Target player sacrifices a creature" (Diabolic Edict), "target opponent chooses a creature they control. Destroy
+    // that creature." (Imperial Edict), "unless target player pays {3}, that player loses 5 life" (Rhystic Syphon),
+    // "target opponent puts a card from their hand on top of their library" (Chittering Rats), "look at the top two
+    // cards of target player's library. Put one of them into their graveyard" (Wu Spy): aimed at an opponent.
+    if (e.type === "pick" && e.who.ref === "target" && ["sacrifice", "exile", "bounce", "choose", "tap"].includes(e.action)) mark(e.who.index, e.who.n);
+    if ((e.type === "punisher" || e.type === "handToTop") && e.who?.ref === "target") mark(e.who.index, e.who.n);
+    if (e.type === "dig" && e.into === "graveyard" && e.library?.ref === "target") mark(e.library.index, e.library.n);
     if ((e.type === "fight" || e.type === "bite") && e.b.ref === "target") mark(e.b.index);
     // Removing all counters (loyalty, +1/+1) is aimed at others' permanents, unless it can only be your own.
     if ((e.type === "removeAllCounters" || e.type === "removeAnyCounters") && e.what.ref === "target" && body.targets[e.what.index]?.controller !== "you") mark(e.what.index, e.what.n);

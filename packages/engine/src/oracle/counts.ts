@@ -373,6 +373,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // Breathe Your Last: "Destroy target creature or planeswalker. You gain 1 life for each of its colors."
+  if (/^of its colors$/i.test(p) && ctx?.lastObjectTarget !== undefined) {
+    const of = whoseObject("its", ctx);
+    return of && count({ kind: "colorsOf", of });
+  }
   // "Your Ring-bearer's power" (One Ring to Rule Them All): 0 without one (CR 701.54a, 107.1b).
   if ((m = /^your Ring-bearer's (power|toughness)$/.exec(p))) return count({ kind: m[1] as "power" | "toughness", of: { ref: "ringBearer" } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".

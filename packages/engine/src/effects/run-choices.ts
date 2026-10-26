@@ -556,7 +556,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "castFromHandAndAnotherNamed"
             ? ((o) => !s.resolving!.item.copy && o?.castFrom === "hand" && (player(s, ctx.controller).castNames?.[defOf(s, o).name] ?? 0) >= 2)(s.objects[s.resolving!.item.objectId ?? ""])
             : e.cond.kind === "castFromGraveyard"
-            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.castFrom === (e.cond.hand ? "hand" : e.cond.exile ? "exile" : "graveyard")
+            ? !s.resolving!.item.copy && ((from) => (e.cond.kind === "castFromGraveyard" && e.cond.notHand ? !!from && from !== "hand" : from === (e.cond.kind === "castFromGraveyard" && e.cond.hand ? "hand" : e.cond.kind === "castFromGraveyard" && e.cond.exile ? "exile" : "graveyard")))(s.objects[s.resolving!.item.objectId ?? ""]?.castFrom)
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"

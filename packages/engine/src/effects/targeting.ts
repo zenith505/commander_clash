@@ -427,7 +427,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (playerProtectedFrom(s, t.id, controller, src)) return false; // CR 702.16b, 702.16k
     // "You gain hexproof from blue and from black until end of turn" (Veil of Summer): as for a permanent (CR 702.11d).
     if (src && t.id !== controller && !sees && hexproofFrom(gainedBy(s, t.id), src)) return false;
-    if (spec.kind === "any") return !spec.opponent || t.id !== controller;
+    // Needle Drop: "any target that was dealt damage this turn", a player too.
+    if (spec.kind === "any") return (!spec.opponent || t.id !== controller) && (!spec.dealtDamageThisTurn || !!s.damagedThisTurn?.includes(t.id));
     if (spec.kind !== "player") return false;
     if (spec.notEventPlayer || t.id === spec.notPlayer) return false;
     return !spec.opponent || t.id !== controller;

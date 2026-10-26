@@ -1143,6 +1143,20 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         body: { targets: [], effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "Draw a card." },
         text: `Cycling—Pay ${m[1]} life`,
       });
+    } else if ((m = /^cycling—(sacrifice an? [a-z]+)\.?$/i.exec(p)) && parseAdditionalCost(m[1]!)) {
+      // Edge of Autumn: "Cycling—Sacrifice a land." The same ability with a sacrifice for its cost (CR 702.29a, 602.2b).
+      out.activated.push({
+        manaCost: "",
+        costs: [parseAdditionalCost(m[1]!)!],
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        zone: "hand",
+        discardSelf: true,
+        cycling: true,
+        body: { targets: [], effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "Draw a card." },
+        text: `Cycling—${m[1]}`,
+      });
     } else if ((m = /^reinforce (\d+)—((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.77a: "[Cost], Discard this card: Put N +1/+1 counters on target creature." Only from a hand (702.77b).
       const n = Number(m[1]);

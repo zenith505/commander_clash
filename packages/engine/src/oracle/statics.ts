@@ -161,6 +161,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^During your end step, (.+)$/.exec(text))) [cond, statement] = ["it's your end step", m[1]];
   // Razorkin Needlehead: "~ has first strike during your turn".
   else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
+  // Medomai the Ageless: "~ can't attack during extra turns" (CR 500.7).
+  else if ((m = /^(~ can't attack) during extra turns$/.exec(text))) [statement, cond] = [m[1], "it's an extra turn"];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
   // Topiary Stomper: "~ can't attack or block unless you control seven or more lands", Desperate Castaways "... unless you
@@ -558,6 +560,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's.
   if (/^it(?: isn't that player's|'s not their| isn't their) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
+  if (/^it's an extra turn$/.test(text)) return { kind: "extraTurn" };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"
   // (the traps): attacking creatures, anyone's.
   if ((m = new RegExp(`^(?:${NUM} or more|(exactly one)|an?) (.+?) (?:is|are) attacking$`).exec(text))) {
@@ -601,6 +604,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
+  // Nightpack Ambusher: "if you didn't cast a spell this turn".
+  if (/^you didn't cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true };
   // Hall of Oracles: "if you've cast an instant or sorcery spell this turn": either kind.
   if ((m = /^you've cast an? ((?!other\b|another\b)[a-z]+(?: or [a-z]+)?) spell this turn$/.exec(text))) {
     const filter = parseSearchFilter(`${m[1]!} card`);
@@ -1510,7 +1515,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   const noAbilities = /^Enchanted (creature|permanent|artifact|land)'s activated abilities can't be activated( unless they're mana abilities)?$/.exec(text);
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control)
-  if (/^You control enchanted (creature|permanent|artifact|land)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  if (/^You control enchanted (creature|permanent|artifact|land|enchantment)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   // Ghostly Prison, Propaganda (CR 508.1g-h).
   // Sphere of Safety: "you or planeswalkers you control ... {X} for each of those creatures, where X is ...", counted now.
   const tax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+|X)\} for each (?:creature they control that's attacking you|of those creatures)(?:, where X is (.+))?$/.exec(text);

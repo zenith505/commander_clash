@@ -317,7 +317,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Beacon of Immortality: "Double target player's life total": they gain (or, below 0, lose) as much life as it takes
   // (CR 701.10d).
-  if ((m = /^Double (your|target player's|target opponent's|that player's|each player's) life total$/i.exec(s))) {
+  // Celestial Mantle: "Whenever enchanted creature deals combat damage to a player, double its controller's life total."
+  if ((m = /^Double (your|target player's|target opponent's|that player's|each player's|its controller's) life total$/i.exec(s))) {
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: 0, double: true }] : null;
   }
@@ -904,6 +905,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const half = roundOf(m[3], ctx);
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
+  }
+  // Dire Fleet Ravager: "Each player loses a third of their life, rounded up" (CR 107.1a): each their own life total.
+  if ((m = /^(Each player|Each opponent) loses a third of their life, rounded up$/i.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half: "up", third: true } }] : null;
   }
   // "Each opponent loses life equal to the life they lost this turn" (Wound Reflection): each their own, counted as the
   // ability resolves, so a second one counts the first one's loss too (rulings).

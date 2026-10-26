@@ -82,6 +82,8 @@ export interface AmountExpr {
   plus?: number;
   negate?: boolean;
   half?: "up" | "down";
+  /** "A third of their life, rounded up" (Dire Fleet Ravager): a third instead of half, rounded the same way. */
+  third?: true;
   /** It may be below 0: doubling a creature's power gives it +X/+0 for a negative X too (CR 107.1b, 701.10c). */
   signed?: true;
   /** "If X is 6 or more, ... twice X damage ... instead" (Shatterskull Smashing): twice as much when the X announced is this or more. */
@@ -191,6 +193,8 @@ export type Count =
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
+  /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
+  | { kind: "colorsOf"; of: ObjRef }
   | { kind: "life"; who: PlayerRef }
   /** "The difference" between your starting life total and your life total when it is less (Shadow of Mortality); 0 otherwise. */
   | { kind: "lifeBelowStart" }
@@ -1368,6 +1372,8 @@ export type StaticCondition =
   | { kind: "selfInExile" }
   /** Eminence's "if ~ is in the command zone or on the battlefield". */
   | { kind: "selfCommandOrBattlefield" }
+  /** "If ~ is in the command zone" (Oloro, Ageless Ascetic): an ability that works only there (CR 113.6). */
+  | { kind: "selfInCommand" }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
   | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
@@ -1415,6 +1421,8 @@ export type StaticCondition =
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */
   | { kind: "yourTurn"; not?: true }
+  /** "During extra turns" (Medomai the Ageless): the turn being taken is an extra turn (CR 500.7), whoever's it is. */
+  | { kind: "extraTurn" }
   /** "If it isn't that player's turn" (Tataru Taru): the trigger's event player is (not) the active player. */
   | { kind: "eventPlayersTurn"; not?: true }
   /**
@@ -1577,7 +1585,7 @@ export type StaticCondition =
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
-  | { kind: "castCount"; n: number; filter: TargetSpec }
+  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true }
   /** "There are five colors among permanents you control" (CR 105.2). */
   | { kind: "colorsAmong"; n: number }
   /** "You've gained 5 or more life this turn": in total. */
@@ -3382,7 +3390,8 @@ export type SpellCondition =
   /** "If this spell was cast from a graveyard" (Sevinne's Reclamation): a copy wasn't cast (rulings, CR 707.10). */
   /** `exile`: "if ~ was cast from exile" (Delayed Blast Fireball) instead. A copy wasn't cast (CR 707.10). */
   /** `hand`: "if ~ was cast from your hand" (Transpose). */
-  | { kind: "castFromGraveyard"; exile?: true; hand?: true }
+  /** `notHand`: "if ~ was cast from anywhere other than your hand" (See the Truth). */
+  | { kind: "castFromGraveyard"; exile?: true; hand?: true; notHand?: true }
   /** Approach of the Second Sun: "If ~ was cast from your hand and you've cast another spell named ~ this game". */
   | { kind: "castFromHandAndAnotherNamed" }
   /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */

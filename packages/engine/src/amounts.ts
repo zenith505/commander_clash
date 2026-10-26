@@ -73,7 +73,7 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
   const v0 = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
-  const n = a.signed ? v : Math.max(0, a.half ? halve(v, a.half) : v);
+  const n = a.signed ? v : Math.max(0, a.half ? (a.third ? (a.half === "up" ? Math.ceil(v / 3) : Math.floor(v / 3)) : halve(v, a.half)) : v);
   return a.negate ? -n : n;
 }
 
@@ -379,6 +379,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
+    case "colorsOf": {
+      const o = refObjects(s, c.of, ctx)[0];
+      if (!o) return 0;
+      if (o.zone === "battlefield") return characteristics(s, o).colors.length;
+      // It left the battlefield on its last move (destroyed by an earlier part of this effect): as it last existed there.
+      const lk = s.lastKnown?.[o.id];
+      return lk && lk.zc === (o.zoneChanges ?? 0) - 1 ? (lk.source?.colors.length ?? 0) : characteristics(s, o).colors.length;
+    }
     case "castSpellColors": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
@@ -682,7 +690,7 @@ export function describeAmount(a: Amount): string {
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
-  const v1 = a.half ? `half ${v0}, rounded ${a.half}` : v0;
+  const v1 = a.half ? `${a.third ? "a third of" : "half"} ${v0}, rounded ${a.half}` : v0;
   const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
   return a.negate ? `-(${v})` : v;
 }
@@ -859,6 +867,8 @@ function describeCount(c: Count): string {
       return "colors of mana spent";
     case "castSpellColors":
       return "that spell's colors";
+    case "colorsOf":
+      return "its colors";
     case "castSpellCommanderCasts":
       return "times it's been cast from the command zone";
     case "manaSpent":

@@ -4470,6 +4470,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.splice(0, effects.length, { type: "if", cond: howCast.cond, effects: [...moves.map((_, i): Effect => ({ type: "bounce", what: { ref: "target", index: i } })), { type: "exileSpell" }], otherwise: effects.slice() });
       continue;
     }
+    // See the Truth: "Look at the top three cards of your library. Put one of those cards into your hand and the rest on the
+    // bottom ... If ~ was cast from anywhere other than your hand, put each of those cards into your hand instead."
+    const seeDig = effects[effects.length - 1];
+    if (howCast && !howCast.not && howCast.text === "put each of those cards into your hand instead" && seeDig?.type === "dig" && seeDig.into === "hand" && !seeDig.filter && !seeDig.upTo && typeof seeDig.n === "number" && effects.length - 1 === prevStart) {
+      effects[effects.length - 1] = { type: "if", cond: howCast.cond, effects: [{ ...seeDig, count: seeDig.n }], otherwise: [seeDig] };
+      continue;
+    }
     // "Return target creature card from your graveyard to the battlefield. If {G} was spent to cast ~, that creature enters
     // with an additional +1/+1 counter on it" (Vigor Mortis): it enters with it (CR 614.1c), so the return itself differs.
     const more = howCast && !howCast.not && /^(?:that creature|it) enters with an additional (\+1\/\+1|-1\/-1) counter on it$/i.exec(howCast.text);
@@ -6747,6 +6754,8 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
   { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast from your hand", cond: { kind: "castFromGraveyard", hand: true }, spellOnly: true, noTargets: true },
+  // See the Truth: a copy wasn't cast at all (CR 707.10), so it isn't the same as "if ~ wasn't cast from your hand".
+  { re: "~ was cast from anywhere other than your hand", cond: { kind: "castFromGraveyard", notHand: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Its targets are chosen whenever it's cast; they're only not acted on (Return to Dust rulings).
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, ungated: true },

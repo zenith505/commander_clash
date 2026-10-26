@@ -1988,6 +1988,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(eminence[1]!)) return "fail";
     return { ...t, eminence: true, ...(/This ability triggers only/.test(line) ? {} : { ifCond: { kind: "selfCommandOrBattlefield" as const } }) };
   }
+  // Oloro, Ageless Ascetic: "At the beginning of your upkeep, if ~ is in the command zone, you gain 2 life." An ability
+  // that works only in the command zone (CR 113.6), with an intervening if (CR 603.4).
+  const inCommand = /^((?:When|Whenever|At)\b[^,]+), if ~ is in the command zone, (.+)$/.exec(line);
+  if (inCommand) {
+    const t = parseTrigger(`${inCommand[1]}, ${inCommand[2]}`);
+    if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(inCommand[1]!)) return "fail";
+    return { ...t, eminence: true, ifCond: { kind: "selfInCommand" as const } };
+  }
   // Senu: "When a legendary creature you control attacks and isn't blocked, if this card is exiled, put it onto the
   // battlefield attacking." An ability of the face-up card in exile (CR 113.6k), controlled by its owner (CR 113.8),
   // with an intervening if (CR 603.4). It was never declared as an attacker (CR 508.4; rulings).

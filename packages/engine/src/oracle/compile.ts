@@ -525,6 +525,14 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // Poisonous N given to other creatures ("All Sliver creatures have poisonous 1", Virulent Sliver; "Enchanted creature
+    // has poisonous 3"): "Whenever this creature deals combat damage to a player, that player gets N poison counters"
+    // (CR 702.70a), one ability for each instance (702.70b).
+    const poisonous = /^(All [A-Z][a-z]+ creatures have|Enchanted creature has) poisonous (\d+)\.$/.exec(line);
+    if (poisonous) {
+      const n = Number(poisonous[2]);
+      line = `${poisonous[1]} "Whenever this creature deals combat damage to a player, that player gets ${n === 1 ? "a poison counter" : `${n} poison counters`}."`;
+    }
     // "~ can't be copied." (See Double): copy effects make no copy of this spell (CR 707.10).
     if (isSpell && line === "~ can't be copied.") {
       uncopyableSpell = true;
@@ -2699,7 +2707,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.
-    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped(?: and)?)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
       // "~ enters tapped with three stun counters on it." "... if you attacked this turn" (raid), "... if a creature

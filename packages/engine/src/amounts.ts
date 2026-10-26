@@ -585,6 +585,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
+        if (c.inEventGroup && !(ctx.event?.group ?? []).some((g) => g.id === id && g.zc === (o.zoneChanges ?? 0))) continue;
         const ch = view(o);
         if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) {
           const n = c.toughness ? ch.toughness : ch.power;

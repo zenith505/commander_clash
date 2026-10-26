@@ -255,6 +255,8 @@ export type Count =
       whose?: PlayerRef;
       /** "The total power of creatures you control" (Ghalta): the sum, a negative power taking some off (rulings). */
       total?: true;
+      /** "The greatest power among those creatures" (Shriekwood Devourer): only the trigger event's group still on the battlefield, as it resolves (rulings). */
+      inEventGroup?: true;
     }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
@@ -739,6 +741,8 @@ export interface SearchDest {
   counters?: { counter: CounterKind; n: Amount };
   /** "Put that card onto the battlefield attached to ~" (Light-Paws): an Aura that can't enchant the source stays in the library (rulings). */
   attachToSelf?: true;
+  /** "Exile the other with a silver counter on it" (Karn, Scion of Urza): a counter of this kind on each card exiled (CR 122.1). */
+  counter?: CounterKind;
 }
 
 /** Inclusive bounds; either end may be open. */
@@ -1368,7 +1372,7 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** A level symbol's "at least N1 and no more than N2 level counters" (CR 711.2), a station symbol's "N or more charge counters" (CR 721.2). */
-  | { kind: "selfCounters"; /** "*": all kinds together. */ counter: CounterKind; min: number; max?: number }
+  | { kind: "selfCounters"; /** "*": all kinds together. */ counter: CounterKind; min: number; max?: number; /** Sab-Sunen: "an even number of counters on it" (zero is even). */ parity?: "even" | "odd" }
   /** A Class's level (CR 716.2a): at least `min`, at most `max`; a permanent without a level is level 1 (716.2d). */
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
@@ -1796,7 +1800,7 @@ export type Effect =
    * `dest` "battlefield": "Put all creature cards exiled with ~ onto the battlefield under your control. They gain
    * decayed." (Gisa, Glorious Resurrector): those matching `filter`, all at once, gaining `gain` for good.
    */
-  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true }
+  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game"; atEndStep?: "sacrifice" }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -1965,7 +1969,7 @@ export type Effect =
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
    */
-  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" }
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
@@ -2392,7 +2396,7 @@ export type Effect =
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
    */
-  | { type: "discover"; n: Amount }
+  | { type: "discover"; n: Amount; /** Zoyowa's Justice: "Then that player discovers X": that player (CR 701.57a), you otherwise. */ who?: PlayerRef }
   /**
    * Ripple N as it resolves (CR 702.60a): reveal the top N cards, cast any with the same name as the spell for free,
    * the rest to the bottom in any order. `of`: "cause" when the ripple was given to the spell that triggered it.
@@ -4974,7 +4978,7 @@ export interface CompiledCard {
   /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
   loyaltyAtInstantSpeed?: true;
   /** Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant." Still once each turn (CR 606.3). */
-  selfLoyaltyAtInstantSpeed?: true;
+  selfLoyaltyAtInstantSpeed?: true | "enteredThisTurn";
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
   opponentsCantCastMvAtMost?: number;
   /** "Your opponents can't cast spells with even mana values." (Void Winnower). */

@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { COLOR_WORDS, NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf, counterKind } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -137,12 +137,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.others || chooser === null) return null;
     return [{ ...fx[0]!, split: { ...(chooser ? { chooser } : {}), n: opp[3] === "one" ? 1 : 2, to: zoneOf(opp[4]!) } }];
   }
-  const revealPick = /^Reveal the top (two|three|four|five) cards of your library; (target opponent|an opponent) chooses (one|an? ([a-z]+) card from among them); put it (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard))?$/.exec(s);
+  // Karn, Scion of Urza: "... and exile the other with a silver counter on it" (the one card not chosen, CR 122.1).
+  const revealPick = /^Reveal the top (two|three|four|five) cards of your library; (target opponent|an opponent) chooses (one|an? ([a-z]+) card from among them); put it (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard)| and exile the other with an? ([a-z]+) counter on it)?$/.exec(s);
   if (revealPick) {
     const filter = revealPick[4] ? parseSearchFilter(`${revealPick[4]} card`) : undefined;
     const chooser = revealPick[2] === "target opponent" ? parsePlayer("target opponent", ctx) : undefined;
-    if (filter === null || chooser === null) return null;
-    return [{ type: "revealPick", n: num(revealPick[1]!), ...(chooser ? { chooser } : {}), ...(filter ? { filter } : {}), to: zoneOf(revealPick[5]!), ...(revealPick[6] ? { rest: zoneOf(revealPick[6]) } : {}) }];
+    if (filter === null || chooser === null || (revealPick[7] && revealPick[1] !== "two")) return null;
+    return [{ type: "revealPick", n: num(revealPick[1]!), ...(chooser ? { chooser } : {}), ...(filter ? { filter } : {}), to: zoneOf(revealPick[5]!), ...(revealPick[6] ? { rest: zoneOf(revealPick[6]) } : revealPick[7] ? { rest: { zone: "exile" as const, counter: counterKind(revealPick[7]) } } : {}) }];
   }
   // Fact or Fiction, Steam Augury (as parseBody rewrites them): piles (CR 700.3).
   const piles = /^[Rr]eveal the top (two|three|four|five|six|seven|X|X plus one) cards of your library; (an opponent separates them into two piles|you separate them into two piles and an opponent chooses one); put one pile into your hand and the other (into your graveyard|on the bottom of your library in any order)$/.exec(s);

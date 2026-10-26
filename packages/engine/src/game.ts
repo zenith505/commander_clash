@@ -1313,7 +1313,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
     // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
-    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0);
+    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0, controllerOf(s, target) === o.controller);
     if (Object.keys(more).length) {
       const counters = { ...opts.counters };
       for (const [k, n] of Object.entries(more)) counters[k] = (counters[k] ?? 0) + n;
@@ -6219,7 +6219,7 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
 /** Teferi, Temporal Archmage's emblem: loyalty abilities any time you could cast an instant (you have priority). */
 const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   // Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant."
-  (!!o && !!abilitiesOf(s, o).selfLoyaltyAtInstantSpeed) ||
+  (!!o && (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === true || (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === "enteredThisTurn" && o.enteredTurn === s.turn))) ||
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
 export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {

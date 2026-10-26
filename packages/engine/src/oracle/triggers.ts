@@ -1226,7 +1226,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
   // "Look at the top five cards of your library. You may reveal a creature card from among them and put it into your
   // hand." (Horn of the Mark) too.
-  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? [a-z ]+ card from among them and put it into your hand)\./;
+  // Cosmic Cube: "Look at the top six cards of your library. You may cast a spell from among them ..." too.
+  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? [a-z ]+ card from among them and put it into your hand|You may cast a spell from among them [^.]+)\./;
   // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
   const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
   // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next
@@ -1919,6 +1920,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
     return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), ...(type ? { withOthersType: type } : {}) } : "fail";
   }
+  // Glimmer Lens: "Whenever equipped creature and at least one other creature attack, draw a card": the equipped
+  // creature attacking with others, as attackers are declared (CR 508.1, 508.3a).
+  const hostBattalion = /^Whenever equipped creature and at least (one|two) other creatures? attack, (.+)$/.exec(line);
+  if (hostBattalion) {
+    const t = parseTrigger(`Whenever equipped creature attacks, ${hostBattalion[2]}`);
+    return t && t !== "fail" && t.host === "attached" ? { ...t, withOthers: num(hostBattalion[1]!) } : "fail";
+  }
   // "Whenever a creature you control attacks alone" (exalted's event, CR 702.83a, 506.5): that creature is the subject.
   const alone = /^Whenever an? (.+?) you control attacks alone, (?!if )(.+)$/.exec(line);
   if (alone) {
@@ -1997,7 +2005,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
+  // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);

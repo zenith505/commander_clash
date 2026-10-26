@@ -1049,6 +1049,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of got) moveObject(s, id, zone(e.to), e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
         if (e.rest) for (const id of rest) moveObject(s, id, zone(e.rest));
       });
+      // Karn, Scion of Urza: "exile the other with a silver counter on it".
+      if (e.rest?.counter) {
+        for (const id of rest) {
+          const o = obj(s, id);
+          if (o.zone === "exile") o.counters[e.rest.counter] = (o.counters[e.rest.counter] ?? 0) + 1;
+        }
+        if (rest.length) log(s, `${p.name} exiles ${rest.map((id) => defOf(s, obj(s, id)).name).join(", ")} with a ${e.rest.counter} counter on it.`);
+      }
       return;
     }
     case "vault": {

@@ -166,6 +166,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // control an artifact": the restriction applies while the "you control" condition is false (negated below).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (you control (?!more )[^,]+)$/.exec(text))) [statement, cond, negate] = [m[1], m[2], true];
   // Flowering Lumberknot: "~ can't attack or block unless it's paired with a creature with soulbond".
+  // Sab-Sunen, Luxa Embodied: "~ can't attack or block unless it has an even number of counters on it" (of all kinds).
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
@@ -523,6 +525,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
+  // Tomb Tyrant: "if there are at least three Zombie creature cards in your graveyard": the same.
+  if ((m = new RegExp(`^there are at least ${NUM} ([A-Z][a-z]+ creature|\\w+) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);
+    return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   // "Your devotion to black is less than five" (Theros gods, CR 700.5), "... is five or greater".
   if ((m = new RegExp(`^(your devotion to .+?) is (?:less than ${NUM}|${NUM} or greater)$`).exec(text))) {
     const amount = parseCount(m[1]!, null);
@@ -779,6 +786,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
+  if ((m = /^(?:it|~) has an? (even|odd) number of counters on it$/.exec(text))) return { kind: "selfCounters", counter: "*", min: 0, parity: m[1] as "even" | "odd" };
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Jeweled Amulet: "Activate only if there are no charge counters on ~".
   if ((m = new RegExp(`^there are no ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
@@ -1446,6 +1454,14 @@ function parseStaticLine(line: string): StaticAbility | null {
     const type = singular(notOwned[1]!);
     if (!CREATURE_TYPES.has(type)) return null;
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], owner: "opponent", text: "creature you control but don't own" } }, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
+  }
+  // Don Andres, the Renegade: "Each creature you control but don't own gets +2/+2, has menace and deathtouch, and is a
+  // Pirate in addition to its other types": layers 4, 6 and 7c, all for the creatures it controls then (layer 2 first).
+  const notOwnedMore = /^Each creature you control but don't own (gets [+-]\d+\/[+-]\d+), has ([a-z ]+?),? and is an? ([A-Z][a-z]+) in addition to its other types$/.exec(text);
+  if (notOwnedMore) {
+    const mods = parseStaticMods(`${notOwnedMore[1]} and has ${notOwnedMore[2]}`);
+    if (!mods || !CREATURE_TYPES.has(notOwnedMore[3]!)) return null;
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], owner: "opponent", text: "creature you control but don't own" } }, mods: [...mods, { kind: "addTypes", types: [], subtypes: [notOwnedMore[3]!] }], text: line };
   }
   // Ashaya: "Nontoken creatures you control are Forest lands in addition to their other types" (layer 4, CR 613.1d): a
   // Forest has "{T}: Add {G}" (CR 305.6), still affected by summoning sickness (CR 302.6). Toph: "Nontoken artifacts you

@@ -39,6 +39,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!n || tok?.type !== "createToken" || typeof tok.n !== "object" || !("count" in tok.n) || tok.n.count.kind !== "x" || tok.n.times !== undefined) return null;
     return [{ ...tok, n }];
   }
+  // Najeela, the Blade-Blossom: "you may have its controller create a 1/1 white Warrior creature token that's tapped and
+  // attacking": your choice, that player's token (attacking what that player chooses, CR 508.4, rulings).
+  if ((m = /^([Yy]ou may )?[Hh]ave its controller create (.+ creature tokens?(?: with [^"]+?)? that(?:'s| are) tapped and attacking)$/.exec(s))) {
+    const fx = parseSentence(`Its controller creates ${m[2]}`, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "createToken" || fx[0]!.who.ref !== "subjectController") return null;
+    return m[1] ? [{ type: "may", effects: fx, text: `have its controller create ${m[2]}` }] : fx;
+  }
   // "Create a 3/3 colorless Phyrexian Wurm artifact creature token with deathtouch and a 3/3 colorless Phyrexian Wurm
   // artifact creature token with lifelink" (Wurmcoil Engine): each of them, entering at the same time (CR 608.2f).
   if ((m = /^[Cc]reate (.+)$/.exec(s))) {

@@ -1671,6 +1671,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const now = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });
         if (e.alsoMods && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: e.alsoMods });
+        // Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." (CR 603.7, while it's that object).
+        if (e.haste && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: now, mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+        if (e.atEndStep) for (const id of now) addDelayed(s, "nextEndStep", p.id, obj(s, id), { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~." });
         invalidateCharacteristics(s);
         if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !ids.includes(l.id));
         return;
@@ -2102,7 +2105,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") {
         log(s, `${src} returns ${d.name}, chosen at random, from ${p.name}'s graveyard to their hand.`);
         moveObject(s, o.id, "hand");
-      } else if (isPermanentCard(d) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
+      } else if ((e.dest === "battlefield" || isPermanentCard(d)) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
         log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
       } else if (e.dest === "creatureOrHand") {
@@ -2124,7 +2127,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (ownerId === undefined) return;
         const owner = player(s, ownerId);
         const sc = (s.resolving!.scratch ??= {});
-        const fits = (id: ObjectId) => obj(s, id).owner === owner.id && obj(s, id).zone === "exile" && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // Karn, Scion of Urza: "a card you own with a silver counter on it" (TargetSpec.counter): on that card in exile.
+        const fits = (id: ObjectId) => obj(s, id).owner === owner.id && obj(s, id).zone === "exile" && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter.counter ? { ...e.filter, counter: undefined } : e.filter, defOf(s, obj(s, id)))) && (!e.filter?.counter || (obj(s, id).counters[e.filter.counter] ?? 0) > 0);
         if (!sc.found) {
           const cards = owner.exile.filter(fits);
           if (!cards.length) return;
@@ -2321,13 +2325,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (hosts === "paused") return "paused";
       const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
       if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
-      enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) })));
+      // Storm of Souls: "Each of them is a 1/1 Spirit with flying ...", for good (CR 611.2c); Grimoire of the Dead: "They're
+      // black Zombies ...". They are already that as they enter, before their enters abilities trigger (rulings on Chainer,
+      // Dementia Master's like ability).
+      enterTogether(s, () => {
+        ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) }));
+        const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
+        if (e.alsoMods && entered.length) {
+          s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: entered, mods: e.alsoMods });
+          invalidateCharacteristics(s);
+        }
+      });
       const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
-      // Storm of Souls: "Each of them is a 1/1 Spirit with flying ...", for good (CR 611.2c).
-      if (e.alsoMods && entered.length) {
-        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: entered, mods: e.alsoMods });
-        invalidateCharacteristics(s);
-      }
       // "They gain haste until end of turn" (Wake the Past): the permanents they became.
       (s.resolving!.created ??= []).push(...entered);
       return;

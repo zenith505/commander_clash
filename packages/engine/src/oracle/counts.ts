@@ -112,6 +112,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const text = `${m[3]!} ${who}`;
     return { count: { kind: "greatestPower", filter: { ...spec, text }, ...(m[2] ? { other: true as const } : {}), ...(m[1] === "toughness" ? { toughness: true as const } : {}), ...(whose ? { whose } : {}) } };
   }
+  // Shriekwood Devourer: "the greatest power among those creatures": the attackers of the trigger's event, those still on
+  // the battlefield as it resolves (rulings).
+  if (!each && /^the greatest power among those creatures$/i.test(p) && ctx?.lastGroup && "ref" in ctx.lastGroup && ctx.lastGroup.ref === "eventGroup")
+    return { count: { kind: "greatestPower", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "those creatures" }, inEventGroup: true } };
   // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
   // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
   // "The total power of attacking creatures" (Klauth): every player's attackers.

@@ -200,6 +200,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
     // losing the other subtypes (rulings, CR 205.1a).
     else if (/^(?:it's|they're) an artifact$/.test(p)) out.setTypes = ["Artifact"];
     else if ((m = /^enters with an additional (\+1\/\+1|loyalty) counter on it(?: if it's an? (creature|planeswalker))?$/.exec(p))) (out.enterCounters ??= []).push({ counter: m[1]!, ...(m[2] ? { ifType: m[2] === "creature" ? "Creature" : "Planeswalker" } : {}) });
+    // Undercover Operative: "except it enters with a shield counter on it if you control that creature".
+    else if (/^enters with a shield counter on it if you control that creature$/.test(p)) (out.enterCounters ??= []).push({ counter: "shield", ifYouControl: true });
     // Altered Ego: "except it enters with X additional +1/+1 counters on it".
     else if (/^enters with X additional \+1\/\+1 counters on it$/.test(p)) (out.enterCounters ??= []).push({ counter: "+1/+1", x: true });
     else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're|he's|she's) legendary$/.test(p)) out.legendary = true;

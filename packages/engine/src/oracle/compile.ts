@@ -2521,6 +2521,11 @@ export function compile(d: CardDef): CompiledCard {
       out.selfLoyaltyAtInstantSpeed = true;
       continue;
     }
+    // The Wandering Emperor: only on the turn it entered, and still one loyalty ability that turn (rulings, CR 606.3).
+    if (line === "As long as ~ entered this turn, you may activate ~'s loyalty abilities any time you could cast an instant.") {
+      out.selfLoyaltyAtInstantSpeed = "enteredThisTurn";
+      continue;
+    }
     if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
       out.loyaltyAtInstantSpeed = true;
       continue;

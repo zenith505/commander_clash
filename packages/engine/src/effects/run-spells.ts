@@ -603,7 +603,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "discover": {
       // CR 701.57a: the mana value of the spell it would be is checked too (701.57a), the card's own for the cards we have.
-      const p = player(s, ctx.controller);
+      const who = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (who === undefined) return;
+      const p = player(s, who);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
         const n = amountNow(s, e.n, ctx);

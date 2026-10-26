@@ -307,10 +307,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j) or "Whenever you
   // cast a multicolored spell, you may return ~ from your graveyard to your hand" (CR 113.6m): the card itself,
   // while it's still the object whose ability was activated or triggered (CR 400.7).
-  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s))) {
+  // Persistent Marshstalker: "return ~ from your graveyard to the battlefield tapped and attacking" (attacking what its
+  // controller chooses, CR 508.4).
+  // Phoenix Chick: "... tapped and attacking with a +1/+1 counter on it" (it enters with it, CR 614.1c).
+  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with a \+1\/\+1 counter on it)?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
     const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
-    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}) }];
+    if ((m[3] || m[4]) && (m[1] === "your hand" || !m[2] || !m[3] || ctx.auraCard)) return null;
+    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { "+1/+1": 1 } } : {}) }];
   }
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
@@ -336,6 +340,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "randomFromGraveyard", dest: "hand", ...(filter ? { filter } : {}) }];
   }
+  // Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield": a creature card, so a
+  // permanent card (CR 110.4b).
+  if ((m = /^[Rr]eturn an? (.+? creature card) at random from your graveyard to the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter?.types?.includes("Creature") ? [{ type: "randomFromGraveyard", dest: "battlefield", filter }] : null;
+  }
   // "Return a creature or planeswalker card from your graveyard to your hand" (Takenuma), "return up to two instant
   // and/or sorcery cards ...": chosen as it resolves, not targeted.
   if ((m = /^[Rr]eturn (an?|one|two|three|up to one|up to two|up to three) (.+?) from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
@@ -350,6 +360,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "chooseFromGraveyard", n: 1, upTo: true, fromExile: true, ...(filter ? { filter } : {}) }];
   }
+  // Karn, Scion of Urza: "Put a card you own with a silver counter on it from exile into your hand": one of them, chosen as
+  // it resolves (not targeted).
+  if ((m = /^[Pp]ut a card you own with an? ([a-z]+) counter on it from exile into your hand$/.exec(s)))
+    return [{ type: "chooseFromGraveyard", n: 1, fromExile: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], counter: counterKind(m[1]!), text: `card with a ${m[1]} counter on it` } }];
   // Oblivion Sower: "you may put any number of land cards that player owns from exile onto the battlefield under your
   // control": face-up cards in exile, however they got there (rulings), chosen as it resolves.
   if ((m = /^(?:[Tt]hen )?(?:[Yy]ou may )?[Pp]ut any number of (.+?) (that player|target opponent|target player) owns from exile onto the battlefield under your control$/.exec(s))) {
@@ -659,7 +673,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what?.ref === "target" && ctx.targets[i]?.linkedExile ? [{ type: "putInGraveyard", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?(?: that was (?:put there from their library|milled) this turn| that (?:was|were) put there from the battlefield this turn)?|exiled with ~)) (?:to|onto) the battlefield( tapped(?: and attacking)?)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature| attached to that creature)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
@@ -686,7 +700,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
     // "With two additional +1/+1 counters on it" (The Darkness Crystal): it enters with them (CR 614.1c).
     const n = m[5] ? ({ "two additional": 2, "three additional": 3 } as Record<string, number>)[m[5].toLowerCase()] ?? 1 : 0;
-    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toThat ? { attachToCreated: true as const } : { attachToEnchanted: true as const }) : {}) }];
+    // "Tapped and attacking" (Alesha, Yore-Tiller Nephilim): attacking what its controller chooses (CR 508.4, rulings).
+    const attacking = / and attacking$/.test(m[3] ?? "");
+    if (attacking && (m[4] || attach)) return null;
+    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(attacking ? { attacking: true as const } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? (toThat ? { attachToCreated: true as const } : { attachToEnchanted: true as const }) : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it
@@ -838,6 +855,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
     // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
     if (/^Put a creature card exiled with ~ onto the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" } }];
+    if (/^Put a creature card exiled with ~ onto the battlefield under your control with a finality counter on it, and it gains haste until it is sacrificed when the next end step begins$/i.test(s))
+      return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" }, counters: { finality: 1 }, haste: "game", atEndStep: "sacrifice" }];
   }
   // "Attach target Equipment you control to target creature you control" (Brass Squire), "attach up to one target
   // Equipment you control to ~" (Cloud), "... to that creature" (Kemba: the creature that entered), Magnetic Theft's

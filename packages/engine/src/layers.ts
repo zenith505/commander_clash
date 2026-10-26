@@ -561,7 +561,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
       const counters = lk ? (lk.zc === sourceZc ? (lk.counters ?? {}) : {}) : src.counters;
       const n = cond.counter === "*" ? Object.values(counters).reduce((a, b) => a + (b ?? 0), 0) : (counters[cond.counter] ?? 0);
-      return n >= cond.min && (cond.max === undefined || n <= cond.max);
+      return n >= cond.min && (cond.max === undefined || n <= cond.max) && (!cond.parity || n % 2 === (cond.parity === "odd" ? 1 : 0));
     }
     case "classLevel": {
       const n = src.classLevel ?? 1; // CR 716.2d

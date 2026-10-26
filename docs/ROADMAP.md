@@ -1,8 +1,8 @@
 # Roadmap
 
-24,981 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,570 of
-9,979 (85%).
+25,030 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,599 of
+9,979 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -204,13 +204,38 @@ line blocks.
    Avarice Totem, Kitsune, Djinn of Infinite Deceits, Modify Memory and others), "you may sacrifice an artifact or
    discard a card", "the discarded card's mana value", "shuffle your library" and "target creature other than this
    creature".
-   Next most played: Myojin of Cryptic Dreams, Radagast the Brown, Caves of Chaos Adventurer, Errant and Giada,
-   Quicksilver Elemental, Secret of Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Runadi, Behemoth Caller,
-   Confiscation Coup, Zoyowa Lava-Tongue, Don't Move, Scriv, the Obligator, Craig Boone, Novac Guard, Spelltwine,
-   Howlpack Piper, Ultimate Magic: Meteor, Spectral Searchlight, Recommission, Rat King, Verminister, Sage of Hours,
-   Valgavoth's Onslaught, Motivated Pony, Valentin, Dean of the Vein, Spider-Verse, Captain America, First Avenger,
-   Desert Warfare, Soulfire Eruption, March of Reckless Joy, Bard Class, Arahbo, Roar of the World, Círdan the
-   Shipwright, Tithe Taker, Signature Slam; and from before round 172: Grindstone, Halo Forager, Moritte of the
+   Out after round 174: Radagast the Brown and Conjurer's Mantle ("a card that shares a creature type with" a
+   creature, among the cards looked at), Quicksilver Elemental (gaining a creature's activated abilities), Secret of
+   Bloodbending (controlling a player), Chiss-Goria, Forge Tyrant (granting affinity for artifacts), Molecule Man
+   (granting miracle), Confiscation Coup (paying energy equal to the target's mana value), Zoyowa Lava-Tongue and
+   Osseous Sticktwister (a punisher read back with "didn't"), Scriv, the Obligator (Aura tokens with abilities), Craig
+   Boone, Novac Guard (a reflexive damage trigger with "unless that creature's controller"), Spelltwine (casting copies
+   of exiled cards), Ultimate Magic: Meteor ("if ~ was cast from exile" with a choice for each opponent), Spectral
+   Searchlight (another player adds the mana), Rat King, Verminister ("all other cards with the same name"),
+   Valgavoth's Onslaught (manifest dread X times), Motivated Pony ("untap those creatures" after a Food entered),
+   Valentin, Dean of the Vein (a reflexive trigger from a replacement), Spider-Verse ("from anywhere other than your
+   hand"), Captain America, First Avenger (unattaching an Equipment as a cost), Desert Warfare, Soulfire Eruption,
+   March of Reckless Joy ("up to two of those cards"), Círdan the Shipwright (secret council for players), Dragonlord
+   Kolaghan, Back for Seconds (bargain's "instead"), Sanctuary Warden (removing a counter from a chosen permanent as a
+   cost), Kamiz, Obscura Oculus, Commander Liara Portyr, Bre of Clan Stoutarm, Lich's Mastery, Thunderwave,
+   Contamination, Amzu, Swarm's Hunger, Ravenous Rotbelly, Fluctuator (cycling costs), Enchanted Evening, Grinning
+   Ignus, Luxurious Locomotive and Subterranean Schooner ("crewed it"), Gwen Stacy ("for as long as you control ~"),
+   Aurelia, Exemplar of Justice (its "choose up to one target creature you control" sentence with color conditions
+   doesn't parse yet), Relic Amulet ("that much"), Hankyu (a granted ability with its own counters), Essence Sliver
+   ("whenever a Sliver deals damage", any damage: no trigger for that yet), Topography Tracker (an explore
+   replacement). Round 174 went down the list from Myojin of Cryptic Dreams to Detention Sphere (rank 8,455), then took
+   the easy cards from there to about rank 8,880 (Risk Factor, What Must Be Done, Necklace of Girion, Savor the
+   Moment, Uglúk, Midnight Tilling, Tax Collector, Over the Edge), plus Jadelight Ranger and Defossilize ("explores,
+   then it explores again"); `npm run popular` from Detention Sphere on is still to go through.
+   Next most played: Detention Sphere, Yuna's Whistle, Tangle Wire, Steward of the Harvest, Solitary Sanctuary,
+   Werewolf Pack Leader, Agent's Toolkit, Nessian Wanderer, Heroes in a Half Shell, Ran and Shaw, Rampaging
+   Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, Ferrafor, Young Yew, From the Catacombs,
+   Loki, God of Mischief, Katsumasa, the Animator, Kabira Evangel, Curious Colossus, Slagstone Refinery, Inalla,
+   Archmage Ritualist, Threats Undetected, Leader, Super-Genius, Scarecrone, Redcap Gutter-Dweller, Nev, the Practical
+   Dean, Witherbloom Command; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
+   Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Scriv,
+   the Obligator, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
+   Verminister, Valgavoth's Onslaught, Motivated Pony; and from before round 172: Grindstone, Halo Forager, Moritte of the
    Frost, Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal
    Extortion, Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper,
    Jolted Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
@@ -222,6 +247,10 @@ line blocks.
    Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's
    Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 174: Howlpack Piper's and Tlincalli Hunter's tests use their front face alone (and Retrieve
+   Prey on its own); bots activate "remove all counters" abilities in their second main phase only (Sage of Hours with
+   five or more); bots take Risk Factor's 4 damage while it leaves them above 10 life; "the number of counters removed
+   this way" is read only after "Remove all ... counters from ~" as a cost.
    Smaller gaps from round 173: bots never activate Obeka, Brute Chronologist and say no when it asks them to end
    their turn; bots aim Modify Memory like Switcheroo (their least useful creature for an opponent's best), never at
    two opponents' creatures to draw three; bots aim Shifting Grift's exchanges with the usual target picks, not the

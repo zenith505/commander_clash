@@ -1064,6 +1064,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ],
       text,
     };
+  // Telling Time: "Look at the top three cards of your library. Put one of those cards into your hand, one on top of your
+  // library, and one on the bottom of your library." In that order, with fewer cards too (rulings): the other two stay
+  // on top for the second pick, which leaves one on top and puts the other on the bottom.
+  if (/^Look at the top three cards of your library\. Put one of (?:those cards|them) into your hand, one on top of your library, and one on the bottom of your library\.$/.test(text.trim()))
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n: 3, count: 1, upTo: false, into: "hand", rest: "keep", reveal: false },
+        { type: "dig", n: 2, count: 1, upTo: false, into: "libraryTop", rest: "bottom", reveal: false },
+      ],
+      text,
+    };
   // Planar Genesis: "Look at the top four cards of your library. You may put a land card from among them onto the
   // battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library
   // in a random order." The land, or else any one of the four into your hand; the rest to the bottom.
@@ -1431,6 +1443,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
     ctx.afterExileTop = last?.type === "exileTop";
+    // Kari Zev, Skyship Raider: "Create Ragavan, a legendary 2/1 red Monkey creature token. Ragavan enters tapped and
+    // attacking.": the token is created tapped and attacking (CR 506.3d), as "a token that's tapped and attacking".
+    const named = /^[Cc]reate ([A-Z][a-z]+), (a legendary .+ token)$/.exec(s);
+    if (named && sentences[si + 1] === `${named[1]} enters tapped and attacking`) {
+      sentences[si + 1] = "";
+      s = `${s} that's tapped and attacking`;
+    }
+    if (!s) continue;
     // Akroma, Vision of Ixidor: one instruction, before the conditions below read its "if it has" (sentences/permanents.ts).
     if (/^[Uu]ntil end of turn, each other creature you control gets \+1\/\+1 if it has flying, \+1\/\+1 if it has first strike, and so on for /.test(s)) {
       const akroma = parseSentence(capital(s), ctx);
@@ -3527,6 +3547,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Elven Farsight: "Scry 3, then you may reveal the top card of your library. If a creature card is revealed this way,
+    // draw a card.": the card on top after the scry, revealed only if you choose to (CR 701.20a).
+    const farsight = /^You may reveal the top card of your library$/.test(s);
+    const farsightIf = farsight && /^If an? ([a-z]+) card is revealed this way, (.+)$/.exec(sentences[si + 1] ?? "");
+    if (farsightIf) {
+      const r = parseRevealedIf(sentences.map((x, i) => (i === si + 1 ? `If it's a ${farsightIf[1]} card, ${farsightIf[2]}` : x)), si + 1, ctx);
+      if (!r) return null;
+      effects.push({ type: "may", effects: [{ type: "revealTop" }, r.effect], text: "reveal the top card of your library" });
+      si = r.next - 1;
+      continue;
+    }
     const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
     if (/^[Rr]eveal the top card of your library$/.test(s) || (atRandom && /^If that card has the chosen name, /.test(sentences[si + 1] ?? ""))) {
       const r = parseRevealedIf(sentences, si + 1, ctx);
@@ -3618,6 +3649,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [landIs[1]!], text: landIs[1]! };
       const either: Effect = { type: "either", options: [[{ type: "putOntoBattlefield", what: back.what }], [back]], labels: ["Return it to the battlefield", "Return it to your hand"] };
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
+      continue;
+    }
+    // Oran-Rief Hydra: "Put a +1/+1 counter on ~. If that land is a Forest, put two +1/+1 counters on ~ instead."; Akoum
+    // Hellkite: "~ deals 1 damage to any target. If that land is a Mountain, ~ deals 2 damage instead." The land that
+    // entered as this resolves, or as it last existed (CR 608.2h); the same instruction with the other number.
+    const landMore = ctx.subject ? /^If that land is an? (Plains|Island|Swamp|Mountain|Forest), (put (two|three) \+1\/\+1 counters on ~|~ deals (\d+) damage) instead$/.exec(s) : null;
+    if (landMore) {
+      const prev = effects[effects.length - 1];
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [landMore[1]!], text: landMore[1]! };
+      const more: Effect | null =
+        landMore[3] && prev?.type === "counters" && prev.what.ref === "self" && prev.counter === "+1/+1" && prev.n === 1 ? { ...prev, n: num(landMore[3]) }
+        : landMore[4] && prev?.type === "damage" && typeof prev.amount === "number" && !prev.by && !prev.also && !prev.divided ? { ...prev, amount: Number(landMore[4]) }
+        : null;
+      if (!more || !prev) return null;
+      effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [more], otherwise: [prev] };
       continue;
     }
     // Andúril, Flame of the West: "Create two tapped 1/1 white Spirit creature tokens with flying. If that creature is
@@ -4913,9 +4959,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
     // Handling): checked against the card this resolution's discard put into the graveyard (CR 701.9a).
     // Vohar, Vodalian Desecrator: "Draw a card, then discard a card. If you discarded an instant or sorcery card this way, ...".
-    const ifDiscarded = /^If (?:an? (.+? card) was discarded|you discarded an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
+    // Lord Windgrace: "Discard a card, then draw a card. If a land card is discarded this way, draw an additional card":
+    // the discard before the draw.
+    const ifDiscarded = /^If (?:an? (.+? card) (?:was|is) discarded|you discarded an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
     if (ifDiscarded) {
-      const prev = effects[effects.length - 1];
+      const last = effects[effects.length - 1];
+      const prev = last?.type === "draw" && last.who.ref === "you" && effects[effects.length - 2]?.type === "discard" ? effects[effects.length - 2] : last;
       if (prev?.type !== "discard" || (/^If you/.test(s) && prev.who.ref !== "you")) return null;
       const filter = parseSearchFilter(ifDiscarded[1]!);
       const then = ifDiscarded[2]!;
@@ -7004,6 +7053,8 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");
   // "~ deals 1 damage to each opponent and each creature and planeswalker they control" (End the Festivities): theirs.
   s = s.replace(/^(~ deals (?:\d+|X) damage to each opponent and each [a-z ]+?) they control$/, "$1 your opponents control");
+  // "Untap ~ and put a +1/+1 counter on it" (Grimgrin, Corpse-Born): "it" is ~.
+  s = s.replace(/^((?:Untap|Tap) ~ and put .+ counters? on) it$/, "$1 ~");
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
@@ -7098,7 +7149,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
     ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
-    ctx.opponentsDiscarded = last?.type === "discard" && last.who.ref === "eachOpponent" && last.n === 1 && !last.random && !last.filter;
+    // "Each player discards a card. Each opponent who can't loses 3 life." (Liliana, Waker of the Dead): the same opponents.
+    ctx.opponentsDiscarded = last?.type === "discard" && (last.who.ref === "eachOpponent" || last.who.ref === "eachPlayer") && last.n === 1 && !last.random && !last.filter;
     if (last?.type === "amass") ctx.amassed = true;
     // "Exile target player's graveyard. For each artifact or land card exiled this way, ..." (Canoptek Scarab Swarm).
     if ((last?.type === "exileGraveyard" && !last.library && !last.until) || (last?.type === "exile" && !last.until && last.what.ref === "target" && ctx.targets[last.what.index]?.kind === "card")) ctx.exiledCards = true;

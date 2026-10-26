@@ -114,8 +114,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], tapped: m[2] === "tapped", text: `${m[2]} creature` } } };
   }
   // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
+  // Tenza, Godo's Maul: "As long as it's legendary, it gets an additional +2/+2": a second bonus, only while legendary.
   if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
-    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]!.replace(/^an additional /, "")}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], supertypes: ["Legendary"], text: "legendary creature" } } };
   }
@@ -812,6 +813,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you don't control another (.+)$/.exec(text))) {
     const c = parseStaticCondition(`you control another ${m[1]}`, st);
     return c?.kind === "control" && c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
+  }
+  // Dire Tactics: "If you don't control a Human, ...": none at all.
+  if ((m = /^you don't control an? ([A-Z][a-z]+)$/.exec(text))) {
+    const c = parseStaticCondition(`you control a ${m[1]}`, st);
+    return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);

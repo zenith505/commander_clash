@@ -359,7 +359,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     // "Tap all creatures your opponents control. Those creatures don't untap ..." (Cone of Cold): the group just tapped.
     const tapped = what && what === ctx.lastGroup && /^(?:those creatures|they)$/i.test(m[1]!);
-    return what && (!isGroup(what) || tapped) ? [{ type: "skipUntap", what }] : null;
+    // Tangle: "Each attacking creature doesn't untap during its controller's next untap step": those attacking as it
+    // resolves (CR 611.2c).
+    const attackers = /^each attacking creature$/i.test(m[1]!);
+    return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what }] : null;
+  }
+  // Sleep: "Tap all creatures target player controls. Those creatures don't untap during that player's next untap step":
+  // the creatures that player controls, so their controller's untap step.
+  if ((m = /^(those creatures|they) don't untap during that player's next untap step$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const theirs = what && what === ctx.lastGroup && what.ref === "each" && what.of?.ref === "target" && ctx.targets[what.of.index]?.kind === "player";
+    return what && theirs ? [{ type: "skipUntap", what }] : null;
   }
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
   if ((m = /^(.+?) phases? out$/i.exec(s))) {

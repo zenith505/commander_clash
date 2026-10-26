@@ -154,14 +154,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // means the token itself ("When Smaug dies, ...").
   // Bonny Pall: "create Beau, a legendary blue Ox creature token with "Beau's power and toughness are each equal to ..."":
   // no printed power and toughness, which its characteristic-defining ability sets (CR 604.3).
-  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+))?$/.exec(s))) {
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
     if (m[3] === undefined && !/^"[^"]*'s power and toughness are each equal to [^"]+"$/.test(m[6] ?? "")) return null;
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const withText = m[6]?.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`(^"|\\. )?\\b${esc}\\b`, "g"), (_, start?: string) => (start ? `${start}This creature` : "this creature")));
     const token = parseToken(Number(m[3] ?? 0), Number(m[4] ?? 0), m[5]!, withText);
-    return token && who ? [{ type: "createToken", who, n: 1, token: { ...token, name, named: true, legendary: true } }] : null;
+    // Kari Zev, Skyship Raider: "... token. Ragavan enters tapped and attacking." (read as "that's tapped and attacking").
+    return token && who ? [{ type: "createToken", who, n: 1, token: { ...token, name, named: true, legendary: true }, ...(m[7] ? { tapped: true as const, attacking: true as const } : {}) }] : null;
   }
   // "For each token you control, create a token that's a copy of that permanent" (Second Harvest), "For each creature
   // target player controls, create a token that's a copy of that creature" (Clone Legion): one copy of each of them.
@@ -300,7 +301,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Proliferate twice$/i.test(s)) return [{ type: "proliferate", twice: true }];
   // "Proliferate X times, where X is ..." (Tromell, Seymour's Butler): X separate proliferate actions; X is defined by the
   // text (defineX in body.ts), never the X announced.
-  if (/^Proliferate X times$/.test(s) && ctx.whereX) return [{ type: "proliferate", n: amt("X") }];
+  // On a spell with {X} in its cost ("Proliferate X times.", Expansion Algorithm), the X announced (CR 107.3a).
+  if (/^Proliferate X times$/.test(s) && (ctx.whereX || ctx.spell)) return [{ type: "proliferate", n: amt("X") }];
   // Populate (CR 701.36): copy a creature token you control, not targeted; with none, nothing happens.
   if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
@@ -324,6 +326,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Investigate (?:once )?for each (.+)$/i.exec(s))) {
     const n = parseCount(m[1]!, ctx, true);
     return n ? [{ type: "createToken", who: { ref: "you" }, n, token: PREDEFINED_TOKENS.Clue! }] : null;
+  }
+  // "Destroy target creature or planeswalker. Its controller investigates." (Fateful Absence): the player named, as in
+  // "Its controller creates a ..." (the destroyed permanent's last controller, CR 608.2h).
+  if ((m = /^(.+?) investigates$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "createToken", who, n: 1, token: PREDEFINED_TOKENS.Clue! }] : null;
   }
   // "That player investigates for each nontoken creature exiled this way" (Declaration in Stone).
   if ((m = /^(.+?) investigates for each (.+)$/i.exec(s))) {

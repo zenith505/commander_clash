@@ -145,6 +145,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     const filter = parseSearchFilter(notDiscarded[1]!);
     return filter ? { ref: "opponentsNotDiscarded", filter } : null;
   }
+  // "Each opponent discards a card. Each opponent who can't loses 3 life." (Entropic Battlecruiser): those who had no
+  // card to discard (CR 701.9b), so discarded none.
+  if (ctx.opponentsDiscarded && x === "each opponent who can't") return { ref: "opponentsNotDiscarded", filter: { kind: "card", text: "card" } };
   // "Choose an opponent. That player sacrifices a creature of their choice."
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // Stuffy Doll: "the chosen player" of "As ~ enters, choose a player" (compile checks there is one).
@@ -662,6 +665,8 @@ const SAME_PLURAL = new Set(["Merfolk", "Treefolk", "Moonfolk", "Kithkin", "Samu
 export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
   // "Each nonland, nontoken permanent": the same as "each nonland nontoken permanent".
   let p = phrase.trim().replace(/\b(non-?[a-z]+), (?=non-?[a-z]+ )/gi, "$1 ");
+  // "Each other Merfolk and/or Knight you control" (Vodalian Wave-Knight): each that's either one, or both.
+  p = p.replace(/^(each (?:other )?)([A-Z][a-z]+) and\/or ([A-Z][a-z]+)(?= you control$)/, (all, e: string, a: string, b: string) => (CREATURE_TYPES.has(a) && CREATURE_TYPES.has(b) ? `${e}${a} or ${b}` : all));
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
@@ -707,6 +712,13 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
+  // "Each other creature you control that's a Cat, Elemental, Nightmare, Dinosaur, or Beast" (Kaheera, the Orphanguard):
+  // a list of three or more creature types, read as a list (parseTargetPhrase).
+  const typeList = /^((?:[A-Z][a-z]+, )+[A-Z][a-z]+,? or [A-Z][a-z]+) creature$/.exec(head);
+  if (typeList && all?.[1]!.toLowerCase() === "each" && typeList[1]!.split(/,? or |, /).every((w) => CREATURE_TYPES.has(w))) {
+    const spec = parseTargetPhrase(`${head} ${tail}`.trim(), { chosen: true, ...(count ? { count } : {}) });
+    return spec?.kind === "object" ? { filter: { ...spec, text: phrase.trim().toLowerCase() }, other } : null;
+  }
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
   // A plural noun is a group; a singular one only after "each" ("each creature", but not "all creature").
   // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word; so is a static

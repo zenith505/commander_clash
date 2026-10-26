@@ -305,6 +305,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if ((m = /^(nontoken )?creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[2] ? { yours: true as const } : {}), ...(m[1] ? { nontoken: true as const } : {}) });
+  // The Zubera: "for each Zubera that died this turn", any player's.
+  if ((m = /^([A-Z][a-z]+) that died this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "diedThisTurn", subtype: m[1]! });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))

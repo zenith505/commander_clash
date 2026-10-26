@@ -1,7 +1,7 @@
 # Roadmap
 
-25,280 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,675 of
+25,360 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,677 of
 9,979 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1277,6 +1277,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   one target's untap steps); Nulltread Gargantuan ("put a creature you control on top of its owner's library", a
   pick that moves to the library); Eunuchs' Intrigues ("other creatures they control can't block": the chosen one
   apart).
+- Round B4 (ranks about 29,700 up to about 26,300, template clusters, plus more played cards the same templates cover:
+  Wren's Run Hydra, Saheeli, Radiant Creator, Trystan, Lys Alana Dignitary, Dawnhand Eulogist, Ramunap Hydra and
+  others): "you control a Desert or there is a Desert card in your graveyard", "there is a land / an artifact / a
+  Warrior card in your graveyard", "an instant card and a sorcery card are in your graveyard", "ten or more cards in a
+  single graveyard"; "Spirit or enchantment" (also "Human or artifact"); "creatures with no counters on
+  them"; threshold "instead" with "the damage can't be prevented", "destroy that creature. It can't be regenerated" and
+  "deals 5 damage to each creature without flying"; "If that land was a snow land"; "If that creature is white or blue
+  / is an enchantment / has infect" (CR 608.2h); "if you've cast another black (blue, green, white) spell this turn",
+  never counting the spell or the permanent itself (Soul Reap, Dream Thief, Talara's Battalion, Patrician's Scorn);
+  Recover (CR 702.59a, a may-pay from the graveyard, exile otherwise); Reinforce X; "If ~ was kicked, it enters with
+  N +1/+1 counters on it and with haste" (a single kicker); the Mana Batteries ({G}, plus one more for each charge
+  counter removed); the Zubera ("for each Zubera that died this turn", any player's, changelings included); the Leeches
+  ("Red spells you cast cost {R} more"); the Opal, Hidden, Veiled and Lurking enchantments ("When an opponent casts a
+  creature spell, if ~ is an enchantment, it becomes a 2/2 Soldier creature", CR 603.4, 205.1a). +80 (25,295 with
+  round 175).
+- Skipped there, with reasons: Burning Wish, Living Wish, Death Wish, Cunning Wish, Glittering Wish and Ring
+  of Ma'rûf (nothing outside the game in Commander here: they'd only exile themselves); Thraben Exorcism ("creature
+  with disturb"); Public Execution ("each other creature that player controls" after a target creature); Feast of
+  Worms ("another land" of that player's); Burning-Eye and Rushing-Tide Zubera (all damage dealt this turn would need
+  tracking); Garza's Assassin (recover by paying half your life); Opal Titan (protection from that spell's colors),
+  Veiled Sentry (P/T equal to that spell's mana value), Hidden Herd ("plays a nonbasic land"), Hidden Predators,
+  Lurking Jackals, Opal Avenger and Veiled Crocodile (state triggers on an enchantment).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1285,9 +1307,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rotting Giant (sacrifice unless you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in
   a graveyard dealing damage), Cut the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of
   Blasting, Tribal Golem, Forethought Amulet; Unforge, Reign of Terror ("for each creature that died this way"),
-  Derelor and Jade Leech (colored cost increases), Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Vaporous
+  Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Vaporous
   Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling Stance (forecast),
-  Krovikan Rot (recover), Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
+  Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
 
 ## Known gaps (from earlier rounds)

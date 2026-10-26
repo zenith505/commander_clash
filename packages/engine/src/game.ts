@@ -1109,6 +1109,7 @@ export function moveObject(
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedNamesThisTurn ??= []).push(o.faceDown ? "" : last.name);
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedTypesThisTurn ??= []).push(o.faceDown ? { subtypes: [] } : { subtypes: [...last.subtypes], ...(last.allCreatureTypes ? { all: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && !o.isToken) (s.nontokenDiedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
@@ -2899,6 +2900,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
   s.diedNamesThisTurn = undefined;
+  s.diedTypesThisTurn = undefined;
   s.nontokenDiedThisTurn = undefined;
   s.toGraveyardThisTurn = undefined;
   s.cardsToGraveyardThisTurn = undefined;
@@ -3955,7 +3957,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.produces.kind === "removeX") {
-    const n = combos![combo!]!.length;
+    const n = combos![combo!]!.length - (ab.produces.base ?? 0);
     removeCountersCost(s, o, { counter: ab.produces.counter, n });
     log(s, `${p.name} removes ${n} ${ab.produces.counter} counter${n === 1 ? "" : "s"} from ${name}.`);
   }
@@ -4420,6 +4422,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
+  // Colored increases (Ruby Leech) are added to the total cost like an additional cost, also when it's cast without
+  // paying its mana cost (CR 601.2f, 118.9d).
+  const moreMana = mods.moreColored.map((c) => `{${c}}`).join("");
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
@@ -4490,7 +4495,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
   // A "Kicker {X}" is still paid, with its X (CR 118.9d).
   if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !realAlt && plottedCast(s, pid, o)) || freeFromExile) {
-    const kicked = anyType(lessColored(parseManaCost(kickCost)));
+    const kicked = anyType(lessColored(parseManaCost(kickCost + moreMana)));
     const kx = x * xCount(kicked);
     // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
     const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
@@ -4506,7 +4511,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const way = graveyardWay(s, o, how.via, pid);
   const wayMana = way && !(how.alt && permissionWay(way)) ? way.mana : undefined;
   const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid, o)?.mana ?? airbent ?? d.manaCost);
-  const mana = anyType(lessColored(parseManaCost(base + kickCost)));
+  const mana = anyType(lessColored(parseManaCost(base + kickCost + moreMana)));
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
@@ -4560,8 +4565,9 @@ export function eminenceCommanders(s: GameState): GameObject[] {
   return s.players.filter((p) => !p.lost).flatMap((p) => p.command.map((id) => s.objects[id]!)).filter((o) => o?.zone === "command" && !o.emblem && !!compileCard(defOf(s, o)).costMods?.some((m) => m.eminence));
 }
 
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; moreColored: Color[]; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
+  const moreColored: Color[] = [];
   const lessColored: Color[] = [];
   const lessColoredOrGeneric: Color[] = [];
   const lifeOffers: { id: ObjectId; life: number }[] = [];
@@ -4608,6 +4614,10 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         lessColored.push(...m.colored);
         continue;
       }
+      if (m.moreColored) {
+        moreColored.push(...m.moreColored);
+        continue;
+      }
       if (m.coloredOrGeneric) {
         const k = Math.max(0, m.times ? evalAmount(s, m.times, { controller: c.controller, sourceId: src.id }) : 0);
         for (let i = 0; i < k; i++) lessColoredOrGeneric.push(m.coloredOrGeneric);
@@ -4630,7 +4640,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     if (m.n > 0) more += m.n;
     else less -= m.n;
   }
-  return { more, less, lessColored, lessColoredOrGeneric, lifeOffers };
+  return { more, less, moreColored, lessColored, lessColoredOrGeneric, lifeOffers };
 }
 
 /**
@@ -9853,7 +9863,7 @@ export function availableMana(s: GameState, pid: PlayerId): number {
       if (manaAbilityProblem(s, pid, o, i, true)) return;
       // A storage land as autopay uses it: one counter at a time.
       const combos = manaCombos(s, o, ab);
-      const most = ab.produces.kind === "removeX" ? Math.min(1, o.counters[ab.produces.counter] ?? 0) : combos ? Math.max(0, ...combos.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
+      const most = ab.produces.kind === "removeX" ? Math.min(1, o.counters[ab.produces.counter] ?? 0) + (ab.produces.base ?? 0) : combos ? Math.max(0, ...combos.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });
     for (const { ab, options } of payableActivatedMana(s, pid, o)) best = Math.max(best, Math.max(0, ...options.map((x) => x.adds.length)) - manaValue(parseManaCost(ab.manaCost)));

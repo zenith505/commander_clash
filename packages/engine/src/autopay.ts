@@ -65,10 +65,11 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
       const tapRider = abilitiesOf(s, o).triggers.some((t) => t.event === "tappedForMana" && !t.manaTap?.filter) ? 2 : 0;
       const options = manaOptions(s, o)
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
-        // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs.
+        // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs; a Mana
+        // Battery gives its one mana without removing any.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
         // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !abs[x.ability]!.discardHand && abs[x.ability]!.produces.kind !== "doublePool" && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && abs[x.ability]!.produces.kind !== "doublePool" && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };

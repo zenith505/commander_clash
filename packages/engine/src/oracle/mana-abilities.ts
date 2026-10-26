@@ -270,6 +270,9 @@ export function removeCounterCost(part: string): { counter: CounterKind; n: numb
 function removedProduced(text: string, counter: CounterKind, any: boolean): ManaProduce | null {
   const each = new RegExp(`^\\{([WUBRGC])\\} for each ${COUNTER} counter removed this way$`).exec(text);
   if (any && each && counterKind(each[2]!) === counter) return { kind: "removeX", counter, colors: [each[1] as ManaType], min: 0 };
+  // The Mana Batteries: "{G}, then add an additional {G} for each charge counter removed this way": one more than removed.
+  const plusOne = new RegExp(`^\\{([WUBRGC])\\}, then add an additional \\{([WUBRGC])\\} for each ${COUNTER} counter removed this way$`).exec(text);
+  if (any && plusOne && plusOne[1] === plusOne[2] && counterKind(plusOne[3]!) === counter) return { kind: "removeX", counter, colors: [plusOne[1] as ManaType], min: 0, base: 1 };
   const combo = /^X mana in any combination of \{([WUBRG])\} and\/or \{([WUBRG])\}$/.exec(text);
   if (!any && combo && combo[1] !== combo[2]) return { kind: "removeX", counter, colors: [combo[1] as ManaType, combo[2] as ManaType], min: 1 };
   return null;

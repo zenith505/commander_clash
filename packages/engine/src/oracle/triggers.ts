@@ -2195,7 +2195,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const ptCond = ptIf && ({ kind: "selfPT", stat: ptIf[1] as "power" | "toughness", ...(ptIf[3] === "less" ? { max: num(ptIf[2]!) } : { min: num(ptIf[2]!) }) } as const);
   // "When this token enters, if it's a creature, ..." (Mythos of Illuna's token): its card type as it triggers and
   // resolves (CR 603.4, rulings).
-  const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : null;
+  // "When an opponent casts a creature spell, if ~ is an enchantment, it becomes a 2/2 Soldier creature" (Opal Caryatid,
+  // the Hidden and Veiled cycles): ~'s type, whatever the event (rulings: nothing happens if it's no longer one).
+  const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : intervening && /^it becomes /.test(intervening[3]!) ? /^~ is an? (creature|enchantment)$/.exec(intervening[2]!) : null;
   const typeCond: StaticCondition | null = typeIf && { kind: "selfIs", filter: { kind: "object", types: [(typeIf[1]!.charAt(0).toUpperCase() + typeIf[1]!.slice(1)) as "Creature"], text: typeIf[1]! } };
   // "Whenever a nontoken creature you control enters, if it doesn't have the same name as another creature you control
   // or a creature card in your graveyard" (Guardian Project): about the creature that entered.
@@ -2248,6 +2250,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Riders of the Mark: "return it to its owner's hand. If you do, create a number of ... tokens equal to its toughness":
       // ~ and ~'s (as it last existed, CR 608.2h).
       rest = /^return it to its owner's hand\. If you do, create a number of [^.]+ equal to its (?:power|toughness)\.$/.test(rest) ? rest.replace(/^return it/, "return ~").replace(/ equal to its /, " equal to ~'s ") : /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.").replace(/^(you may remove an? \S+ counter from) it\./, "$1 ~.") : rest.replace(/\bit\b/g, "~");
+    if (typeIf && !/^(?:When|Whenever) ~ /.test(intervening[1]!)) rest = rest.replace(/^it becomes /, "~ becomes ");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     if (!t || t === "fail" || t.ifCond) return "fail";
     // "Whenever a Mountain you control enters, if you control at least five other Mountains" (Valakut, the Molten

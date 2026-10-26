@@ -1550,6 +1550,8 @@ export interface GameState {
   diedThisTurn?: PlayerId[];
   /** Their names, as they last existed ("" for a face-down one, CR 708.2): "a creature not named ~ died this turn" (Ebondeath). */
   diedNamesThisTurn?: string[];
+  /** Their creature types as they last existed ("for each Zubera that died this turn"): `all` for a changeling (CR 702.73a); none for a face-down one. */
+  diedTypesThisTurn?: { subtypes: string[]; all?: true }[];
   /** The same for nontoken creatures (Gadrak, the Crown-Scourge). */
   nontokenDiedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */

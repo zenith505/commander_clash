@@ -208,7 +208,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const plain = plainFilter(p);
   if (plain) return plain;
   // "An instant, sorcery, or Dragon card" (Dragonologist): a card of any one of those card types or that creature type.
-  const mixed = /^((?:[A-Za-z]+, )+[A-Za-z]+),? or ([A-Za-z]+) card$/.exec(p);
+  // "A Knight, Aura, Equipment, or legendary artifact card" (Acclaimed Contender): the last one with a supertype.
+  const mixed = /^((?:[A-Za-z]+, )+[A-Za-z]+),? or ((?:legendary )?[A-Za-z]+) card$/.exec(p);
   if (mixed && /[A-Z]/.test(p)) {
     const subs = [...mixed[1]!.split(", "), mixed[2]!].map((w) => plainFilter(`${w} card`));
     if (subs.some((x) => !x)) return null;

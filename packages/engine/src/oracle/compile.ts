@@ -2578,6 +2578,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantSearchOwn = true;
       continue;
     }
+    if (line === "Your opponents can't search libraries.") {
+      out.opponentsCantSearch = true;
+      continue;
+    }
     if (line === "You control your opponents while they're searching their libraries.") {
       out.controlsOpponentSearches = true;
       continue;

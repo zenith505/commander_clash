@@ -65,6 +65,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 99, upTo: true, filter, into: "hand" }, restOf(m[2]!));
+    } else if (dig.reveal && (m = new RegExp(`^Put (an? .+? card) from among them into your hand(?: and the rest ${REST})?$`).exec(s))) {
+      // "Reveal the top six cards ... Put an Assassin, Pirate, or Vehicle card from among them into your hand and the rest
+      // on the bottom" (Adéwalé, Breaker of Chains): one that fits must be taken, if there's one (the cards are revealed).
+      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+      if (!filter || / of the chosen /.test(m[1]!)) return null;
+      Object.assign(dig, { count: 1, upTo: false, required: true, filter, into: "hand" });
+      if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if ((m = /^You may reveal any number of ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));

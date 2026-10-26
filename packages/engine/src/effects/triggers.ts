@@ -1498,6 +1498,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (wc !== dealerBy) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && !(t.toOpponent && ev.player === wc) && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
     }
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
+    // "Whenever a Vehicle you control deals combat damage to a player, you may return this card from your graveyard to
+    // your hand" (Adéwalé, Breaker of Chains): works only there (CR 113.6m), its owner the "you".
+    fromGraveyards((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
     fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && ((t.dealer.orSelf && src.id === o.id) || objectMatches(s, t.dealer.filter, o, ctrl, false)) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);

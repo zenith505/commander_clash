@@ -179,10 +179,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
+        else if (c.differentManaValues) names.add(String(o.faceDown ? 0 : defMv(defOf(s, o))));
         else if (!c.differentNames) n++;
         else if (ch.name && !o.faceDown) names.add(ch.name);
       }
-      return c.differentNames ? names.size : n;
+      return c.differentNames || c.differentManaValues ? names.size : n;
     }
     case "mostSharingCreatureType": {
       // White Lotus Tile: for each creature type, how many creatures you control have it; a changeling has every one
@@ -622,7 +623,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
-      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
     }
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
@@ -700,7 +701,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}`;
     case "cardsInHand":
       return "#cards in hand";
     case "timesAffectedAttacked":
@@ -848,7 +849,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn`;
+      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":

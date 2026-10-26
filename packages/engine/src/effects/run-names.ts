@@ -7,7 +7,7 @@ import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, printedMatches } from "./targeting";
 import { chooseAuraHosts } from "./run-zones";
-import { searchBarred } from "./run-library";
+import { cantSearch, searchBarred } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics } from "../layers";
 import { ResolveCtx, amountNow, players } from "./resolve";
@@ -30,8 +30,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "All cards": the ones in the graveyard, a public zone, must be found; in the hidden hand and library, the
         // searcher may leave some (CR 701.23b). "Any number", "up to four": any of them, from any of the zones (rulings).
         sc.forced = e.all ? p.graveyard.filter(match) : [];
-        // Ashiok, Dream Render: not your own library, if it's yours this searches.
-        const lib = pid === ctx.controller && searchBarred(s, pid) ? [] : p.library;
+        // Ashiok, Dream Render: not your own library, if it's yours this searches. Stranglehold: no library.
+        const lib = (pid === ctx.controller && searchBarred(s, pid)) || cantSearch(s, ctx.controller) ? [] : p.library;
         const cards = [...(e.all ? [] : p.graveyard.filter(match)), ...p.hand.filter(match), ...lib.filter(match)];
         const max = Math.min(e.max ?? cards.length, cards.length);
         if (cards.length) {

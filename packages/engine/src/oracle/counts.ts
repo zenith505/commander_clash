@@ -40,6 +40,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
   }
+  // "Each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way."
+  // (Voracious Fell Beast): the permanents this ability's sacrifice took.
+  if (ctx && ((each && /^creature sacrificed this way$/.test(p)) || /^the number of creatures sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
@@ -341,6 +344,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was
+  // (rulings).
+  if (/^spells? you've cast this turn from anywhere other than your hand$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });
   // Rug of Smothering: "for each spell they've cast this turn", the player the trigger is about.
   if (ctx?.eventPlayer && /^spells? (?:they've|that player has) cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", eventPlayer: true });
   // Magebane Lizard: "the number of noncreature spells they've cast this turn", that one included (it's cast by now).
@@ -443,6 +449,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
   if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
     return count({ kind: "attachedToSelf", subtypes: /and/.test(m[1]!) ? ["Aura", "Equipment"] : [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // Lunar Insight: "for each different mana value among nonland permanents you control".
+  if (each && (m = /^different mana value among (.+?) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, differentManaValues: true } } : null;
+  }
   // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
   if ((m = /^differently named (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx, each);

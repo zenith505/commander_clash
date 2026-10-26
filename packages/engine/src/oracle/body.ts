@@ -898,6 +898,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
   // Dawn of a New Age: "Then if ~ has no hope counters on it, sacrifice it and you gain 4 life": ~, as it resolves.
   text = text.replace(/\b[Tt]hen if ~ has no ([a-z]+) counters on it, sacrifice it\b/, "If there are no $1 counters on ~, sacrifice ~");
+  // Archfiend of the Dross: "Remove an oil counter from ~. Then if it has no oil counters on it, you lose the game": ~,
+  // checked after the removal. Thing in the Ice: "..., transform it" too.
+  text = text.replace(/(\b[Rr]emove an? ([a-z]+) counter from ~\.) Then if it has no \2 counters on it, (you lose the game|transform it)\./, (_, rm: string, kind: string, then: string) => `${rm} If there are no ${kind} counters on ~, ${then.replace(/ it$/, " ~")}.`);
   // Amalia Benavides Aguirre: "~ explores. Then destroy all other creatures if its power is exactly 20": ~ is the only
   // object named, checked once as the ability resolves, after the explore (rulings).
   text = text.replace(/^(~ explores\. Then [^.~]+ if )its (power|toughness)\b/, "$1~'s $2");
@@ -1243,6 +1246,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )You add ((?:\{[WUBRGC]\})+)(?= and |\.)/, "$1Add $2");
   // "~ deals 2 damage to each other player" (Syphon Soul): with no teams, every other player is an opponent (CR 102.3).
   text = text.replace(/\b(deals \w+ damage to) each other player\b/g, "$1 each opponent");
+  // "~ deals X damage to that player, where X is the number of untapped lands they control" (Citadel of Pain): "they"
+  // is that player.
+  text = text.replace(/\b(damage to that player, where X is the number of [a-z ]+?) they control\./, "$1 that player controls.");
+  // Self-Destruct: "Target creature you control deals X damage to any other target and X damage to itself, where X is its
+  // power": one X, its power as this resolves (rulings).
+  text = text.replace(/^Target creature you control deals X damage to any other target and X damage to itself, where X is its power\.$/, "Target creature you control deals damage equal to its power to any other target and to itself.");
   // "~ deals 3 damage to each of your opponents" (Aurelia, the Law Above) is "each opponent".
   text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
@@ -3470,7 +3479,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Look at the top three cards of target player's library, then put them back in any order." The player
     // looking orders them (CR 401.4 lets nobody else see them). "You may shuffle." after it is a choice to shuffle.
-    const order = new RegExp(`^(You may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
+    const order = new RegExp(`^([Yy]ou may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
     if (order && /^[Pp]ut them back in any order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const who = parsePlayer(order[3] === "your" ? "you" : order[3]!.replace(/'s$/, ""), ctx);
       if (!who) return null;

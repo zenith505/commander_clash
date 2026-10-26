@@ -1,7 +1,7 @@
 // Round 170: the most played cards, in popularity order, after round 169 (from Carth the Lion, rank 6,377, on).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
+import { act, bear, card, forest, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
 import { moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -525,5 +525,294 @@ describe("Cloudpost", () => {
     const before = s.players[ap]!.manaPool.C ?? 0;
     s = run(s, planActivate(s, ap, cp, 0));
     expect(s.players[ap]!.manaPool.C).toBe(before + 2);
+  });
+});
+
+const mirrisGuile = card("Mirri's Guile", "Enchantment", "{G}", { cmc: 1, oracleText: "At the beginning of your upkeep, you may look at the top three cards of your library, then put them back in any order." });
+
+describe("Mirri's Guile", () => {
+  it("is fully supported", () => supported(mirrisGuile));
+  it("at your upkeep you may look at the top three and put them back in any order", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, mirrisGuile);
+    s = passUntil(passUntil(s, "end", ap), "upkeep", ap);
+    s = priorityTo(s, ap);
+    s = act(s, { type: "passPriority", player: ap });
+    for (let i = 0; i < 6 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = may(s, true);
+    expect(s.pending?.kind).not.toBe("chooseMay");
+    expect(s.pending).not.toBeNull();
+  });
+});
+
+const wellOfIdeas = card("Well of Ideas", "Enchantment", "{5}{U}", { cmc: 6, oracleText: "When this enchantment enters, draw two cards.\nAt the beginning of each other player's draw step, that player draws an additional card.\nAt the beginning of your draw step, draw two additional cards." });
+
+describe("Well of Ideas", () => {
+  it("is fully supported", () => supported(wellOfIdeas));
+  it("each other player draws an additional card in their draw step", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, wellOfIdeas);
+    s = passUntil(s, "draw", opp);
+    const before = handOf(s, opp).length;
+    s = passUntil(s, "main1", opp);
+    expect(handOf(s, opp).length - before).toBe(1);
+    const third = next(s, opp);
+    s = passUntil(s, "draw", third);
+    const b3 = handOf(s, third).length;
+    s = passUntil(s, "main1", third);
+    expect(handOf(s, third).length - b3).toBe(1);
+  });
+});
+
+const citadelOfPain = card("Citadel of Pain", "Enchantment", "{2}{R}", { cmc: 3, oracleText: "At the beginning of each player's end step, this enchantment deals X damage to that player, where X is the number of untapped lands they control." });
+
+describe("Citadel of Pain", () => {
+  it("is fully supported", () => supported(citadelOfPain));
+  it("at each player's end step, damage to that player equal to their untapped lands", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, citadelOfPain);
+    const lands = [forest, forest, forest, forest].map((l) => putOnBattlefield(s, opp, l));
+    s = passUntil(s, "main1", opp);
+    s.objects[lands[0]!]!.tapped = true;
+    const life = lifeOf(s, opp);
+    s = passUntil(s, "end", opp);
+    s = resolveAll(s);
+    expect(lifeOf(s, opp)).toBe(life - 3);
+  });
+});
+
+const stranglehold = card("Stranglehold", "Enchantment", "{3}{R}", { cmc: 4, oracleText: "Your opponents can't search libraries.\nIf an opponent would begin an extra turn, that player skips that turn instead." });
+const ramp = card("Ramp Test", "Sorcery", "{G}", { cmc: 1, oracleText: "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle." });
+
+describe("Stranglehold", () => {
+  it("is fully supported", () => supported(stranglehold));
+  it("an opponent can't search; its controller can", () => {
+    let { s, ap, ids, opp } = setup([ramp, ramp]);
+    const sh = putOnBattlefield(s, opp, stranglehold);
+    const lands = s.battlefield.length;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.pending).toBeNull();
+    expect(s.battlefield.length).toBe(lands);
+    // Its controller searches as usual.
+    s.objects[sh]!.controller = ap;
+    s.objects[sh]!.owner = ap;
+    invalidateCharacteristics(s);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.pending?.kind).toBe("searchLibrary");
+  });
+});
+
+const archfiend = card("Archfiend of the Dross", "Creature — Phyrexian Demon", "{2}{B}{B}", { cmc: 4, power: "6", toughness: "6", oracleText: "Flying\nThis creature enters with four oil counters on it.\nAt the beginning of your upkeep, remove an oil counter from this creature. Then if it has no oil counters on it, you lose the game.\nWhenever a creature an opponent controls dies, its controller loses 2 life.", keywords: ["Flying"] });
+
+describe("Archfiend of the Dross", () => {
+  it("is fully supported", () => supported(archfiend));
+  it("removes an oil counter each upkeep; with none left, you lose", () => {
+    let { s, ap } = setup([]);
+    const a = putOnBattlefield(s, ap, archfiend);
+    s.objects[a]!.counters.oil = 2;
+    s = resolveAll(passUntil(passUntil(s, "end", ap), "upkeep", ap));
+    s = resolveAll(s);
+    expect(s.objects[a]!.counters.oil).toBe(1);
+    expect(s.players[ap]!.lost).toBeFalsy();
+    s = resolveAll(passUntil(passUntil(s, "end", ap), "upkeep", ap));
+    s = resolveAll(s);
+    expect(s.players[ap]!.lost).toBe(true);
+  });
+});
+
+const thingInTheIce = scry("transform", [
+  { name: "Thing in the Ice", mana_cost: "{1}{U}", type_line: "Creature — Horror", power: "0", toughness: "4", oracle_text: "Defender\nThis creature enters with four ice counters on it.\nWhenever you cast an instant or sorcery spell, remove an ice counter from this creature. Then if it has no ice counters on it, transform it." },
+  { name: "Awoken Horror", type_line: "Creature — Kraken Horror", power: "7", toughness: "8", color_indicator: ["U"], oracle_text: "When this creature transforms into Awoken Horror, return all non-Horror creatures to their owners' hands." },
+], { keywords: ["Transform", "Defender"] });
+const opt = card("Opt Test", "Instant", "{U}", { cmc: 1, oracleText: "Draw a card." });
+
+describe("Thing in the Ice", () => {
+  it("is fully supported", () => supported(thingInTheIce));
+  it("removes an ice counter for each instant or sorcery; the last one transforms it", () => {
+    let { s, ap, ids, opp } = setup([opt, opt]);
+    const t = putOnBattlefield(s, ap, thingInTheIce);
+    s.objects[t]!.counters.ice = 2;
+    const b = putOnBattlefield(s, opp, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[t]!.counters.ice).toBe(1);
+    expect(named(s, t)).toBe("Thing in the Ice");
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    expect(named(s, t)).toBe("Awoken Horror");
+    expect(zone(s, b)).toBe("hand");
+    expect(zone(s, t)).toBe("battlefield");
+  });
+});
+
+const selfDestruct = card("Self-Destruct", "Instant", "{1}{R}", { cmc: 2, oracleText: "Target creature you control deals X damage to any other target and X damage to itself, where X is its power." });
+
+describe("Self-Destruct", () => {
+  it("is fully supported", () => supported(selfDestruct));
+  it("your creature deals damage equal to its power to another target and to itself", () => {
+    let { s, ap, ids, opp } = setup([selfDestruct]);
+    const mine = putOnBattlefield(s, ap, card("Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "5" }));
+    const b = putOnBattlefield(s, opp, card("Wall", "Creature — Wall", "{2}", { power: "0", toughness: "5" }));
+    expect(planCast(s, ap, ids[0]!, [tgt(mine), tgt(mine)])).toBeNull();
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(mine), tgt(b)])));
+    expect(s.objects[b]!.damage).toBe(3);
+    expect(s.objects[mine]!.damage).toBe(3);
+  });
+  it("the other target gone: still damage to itself", () => {
+    let { s, ap, ids, opp } = setup([selfDestruct]);
+    const mine = putOnBattlefield(s, ap, card("Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "5" }));
+    const b = putOnBattlefield(s, opp, bear());
+    s = run(s, planCast(s, ap, ids[0]!, [tgt(mine), tgt(b)]));
+    moveObject(s, b, "graveyard");
+    s = resolveAll(s);
+    expect(s.objects[mine]!.damage).toBe(3);
+  });
+  it("can hit a player", () => {
+    let { s, ap, ids, opp } = setup([selfDestruct]);
+    const mine = putOnBattlefield(s, ap, card("Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "5" }));
+    const life = lifeOf(s, opp);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(mine), { kind: "player", id: opp }])));
+    expect(lifeOf(s, opp)).toBe(life - 3);
+    expect(s.objects[mine]!.damage).toBe(3);
+  });
+});
+
+const windreader = card("Windreader Sphinx", "Creature — Sphinx", "{5}{U}{U}", { cmc: 7, power: "3", toughness: "7", oracleText: "Flying\nWhenever a creature with flying attacks, you may draw a card.", keywords: ["Flying"] });
+const flier = () => card("Bird", "Creature — Bird", "{1}{W}", { power: "1", toughness: "1", oracleText: "Flying", keywords: ["Flying"] });
+
+describe("Windreader Sphinx", () => {
+  it("is fully supported", () => supported(windreader));
+  it("whenever any creature with flying attacks, you may draw; not one without", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, windreader);
+    const f = putOnBattlefield(s, opp, flier());
+    const g = putOnBattlefield(s, opp, bear());
+    s = passUntil(s, "main1", opp);
+    const hand = handOf(s, ap).length;
+    s = attack(s, opp, [{ attacker: f, defender: ap }, { attacker: g, defender: ap }]);
+    s = resolveAll(s);
+    expect(handOf(s, ap).length).toBe(hand + 1);
+  });
+});
+
+const contender = card("Acclaimed Contender", "Creature — Human Knight", "{2}{W}", { cmc: 3, power: "3", toughness: "3", oracleText: "When this creature enters, if you control another Knight, look at the top five cards of your library. You may reveal a Knight, Aura, Equipment, or legendary artifact card from among them and put it into your hand. Put the rest on the bottom of your library in a random order." });
+const relic = card("Old Relic", "Legendary Artifact", "{3}", { cmc: 3 });
+
+describe("Acclaimed Contender", () => {
+  it("is fully supported", () => supported(contender));
+  it("with another Knight: a Knight, Aura, Equipment or legendary artifact card from the top five", () => {
+    let { s, ap, ids } = setup([contender]);
+    putOnBattlefield(s, ap, card("Squire", "Creature — Human Knight", "{W}", { power: "1", toughness: "1" }));
+    const r = into(s, ap, relic, "library");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [r], min: 0, max: 1 });
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [r] }));
+    expect(handOf(s, ap)).toContain(r);
+  });
+  it("without another Knight: nothing", () => {
+    let { s, ap, ids } = setup([contender]);
+    into(s, ap, relic, "library");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.pending).toBeNull();
+  });
+});
+
+const adewale = card("Adéwalé, Breaker of Chains", "Legendary Creature — Human Assassin Pirate", "{1}{U}{B}", { cmc: 3, power: "4", toughness: "1", oracleText: "When Adéwalé enters, reveal the top six cards of your library. Put an Assassin, Pirate, or Vehicle card from among them into your hand and the rest on the bottom of your library in a random order.\nWhenever a Vehicle you control deals combat damage to a player, you may return this card from your graveyard to your hand." });
+const pirate = card("Deckhand", "Creature — Human Pirate", "{U}", { power: "1", toughness: "1" });
+
+describe("Adéwalé, Breaker of Chains", () => {
+  it("is fully supported", () => supported(adewale));
+  it("puts an Assassin, Pirate or Vehicle card from the top six into your hand: one must be taken", () => {
+    let { s, ap, ids } = setup([adewale]);
+    const p1 = into(s, ap, pirate, "library");
+    const p2 = into(s, ap, pirate, "library");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 1, max: 1 });
+    expect(pending<{ cards: string[] }>(s).cards.sort()).toEqual([p1, p2].sort());
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [p2] }));
+    expect(handOf(s, ap)).toContain(p2);
+    expect(handOf(s, ap)).not.toContain(p1);
+  });
+  it("only one that fits: it's put into your hand", () => {
+    let { s, ap, ids } = setup([adewale]);
+    const p1 = into(s, ap, pirate, "library");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.pending).toBeNull();
+    expect(handOf(s, ap)).toContain(p1);
+  });
+  it("from your graveyard: returns when a Vehicle you control deals combat damage to a player", () => {
+    let { s, ap, opp } = setup([]);
+    const a = into(s, ap, adewale, "graveyard");
+    const v = putOnBattlefield(s, ap, card("Cart", "Artifact Creature — Vehicle", "{2}", { power: "2", toughness: "2" }));
+    s = attack(s, ap, [{ attacker: v, defender: opp }]);
+    for (let i = 0; i < 40 && s.pending?.kind !== "chooseMay"; i++) {
+      const pid = waitingOn(s)!;
+      s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : act(s, { type: "passPriority", player: pid });
+    }
+    expect(pending(s)).toMatchObject({ kind: "chooseMay", player: ap });
+    s = resolveAll(s);
+    expect(zone(s, a)).toBe("hand");
+  });
+});
+
+const fellBeast = card("Voracious Fell Beast", "Creature — Drake Beast", "{4}{B}{B}", { cmc: 6, power: "4", toughness: "4", oracleText: "Flying\nWhen this creature enters, each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")", keywords: ["Flying"] });
+
+describe("Voracious Fell Beast", () => {
+  it("is fully supported", () => supported(fellBeast));
+  it("each opponent sacrifices a creature; a Food for each one sacrificed", () => {
+    let { s, ap, ids, opp } = setup([fellBeast]);
+    const b1 = putOnBattlefield(s, opp, bear());
+    const b2 = putOnBattlefield(s, next(s, opp), bear());
+    s = settle(run(s, planCast(s, ap, ids[0]!)), ap);
+    expect(zone(s, b1)).toBe("graveyard");
+    expect(zone(s, b2)).toBe("graveyard");
+    const foods = s.battlefield.filter((id) => s.objects[id]!.isToken && /^Food/.test(named(s, id)));
+    expect(foods.length).toBe(2);
+  });
+});
+
+const glimpse = card("Glimpse the Core", "Sorcery", "{1}{G}", { cmc: 2, oracleText: "Choose one —\n• Search your library for a basic Forest card, put that card onto the battlefield tapped, then shuffle.\n• Return target Cave card from your graveyard to the battlefield tapped." });
+const cave = card("Hidden Cave", "Land — Cave", "", { oracleText: "{T}: Add {C}." });
+
+describe("Glimpse the Core", () => {
+  it("is fully supported", () => supported(glimpse));
+  it("returns a Cave card from your graveyard to the battlefield tapped", () => {
+    let { s, ap, ids } = setup([glimpse]);
+    const c = into(s, ap, cave, "graveyard");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(c)], [1])));
+    expect(zone(s, c)).toBe("battlefield");
+    expect(s.objects[c]!.tapped).toBe(true);
+  });
+});
+
+const surge = card("Surge of Brilliance", "Instant", "{1}{U}", { cmc: 2, oracleText: "Paradox — Draw a card for each spell you've cast this turn from anywhere other than your hand.\nForetell {1}{U} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)", keywords: ["Foretell"] });
+
+describe("Surge of Brilliance", () => {
+  it("is fully supported", () => supported(surge));
+  it("counts only the spells you've cast this turn from somewhere other than your hand", () => {
+    let { s, ap, ids, opp } = setup([surge]);
+    const id = s.objects[ids[0]!]!.cardId;
+    s.castThisTurn = [{ player: ap, card: id, from: "graveyard" }, { player: ap, card: id, from: "command" }, { player: ap, card: id, from: "hand" }, { player: opp, card: id, from: "exile" }];
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(handOf(s, ap).length).toBe(hand - 1 + 2);
+  });
+});
+
+const lunar = card("Lunar Insight", "Sorcery", "{2}{U}", { cmc: 3, oracleText: "Draw a card for each different mana value among nonland permanents you control." });
+
+describe("Lunar Insight", () => {
+  it("is fully supported", () => supported(lunar));
+  it("draws one for each different mana value among your nonland permanents", () => {
+    let { s, ap, ids } = setup([lunar]);
+    putOnBattlefield(s, ap, bear());
+    putOnBattlefield(s, ap, bear());
+    putOnBattlefield(s, ap, relic);
+    const fd = putOnBattlefield(s, ap, card("Hidden", "Creature — Bear", "{5}", { cmc: 5, power: "2", toughness: "2" }));
+    s.objects[fd]!.faceDown = "manifest";
+    invalidateCharacteristics(s);
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    // 2 (the Bears), 3 (the relic), 0 (face down); the commanders aren't on the battlefield.
+    expect(handOf(s, ap).length).toBe(hand - 1 + 3);
   });
 });

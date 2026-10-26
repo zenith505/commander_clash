@@ -546,6 +546,9 @@ export function compile(d: CardDef): CompiledCard {
       else out.triggers.push(bindThisAbility({ ...(ab as TriggeredAbility), body: { targets: [], effects: [], text: line, inert: true } }, line));
       continue;
     }
+    // Adaptive Training Post: "Whenever you cast ..., if ~ has fewer than three charge counters on it, put a charge counter
+    // on it": "it" is ~ both times, not the spell.
+    line = line.replace(/^(Whenever you cast [^,]+, if ~ has [^,]+ counters on it, put an? [^ ,]+ counter on) it\.$/, "$1 ~.");
     // Poisonous N given to other creatures ("All Sliver creatures have poisonous 1", Virulent Sliver; "Enchanted creature
     // has poisonous 3"): "Whenever this creature deals combat damage to a player, that player gets N poison counters"
     // (CR 702.70a), one ability for each instance (702.70b).
@@ -2314,6 +2317,10 @@ export function compile(d: CardDef): CompiledCard {
       (out.flashOwned ??= []).push({ kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards you own" });
       continue;
     }
+    if (line === "During each opponent's end step, you may cast spells as though they had flash.") {
+      out.flashInOpponentsEndStep = true;
+      continue;
+    }
     // "Any player may cast Sliver spells as though they had flash" (Quick Sliver), "... spells ..." (Tidal Barracuda): every
     // player, not only its controller (CR 702.8a).
     const flashFor = /^(You|Any player) may cast (.*?)spells as though they had flash\.$/.exec(line);
@@ -2387,6 +2394,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
+      continue;
+    }
+    if (line === "Players skip their untap steps.") {
+      out.skipUntapSteps = true;
       continue;
     }
     // Teamwork N: "As an additional cost to cast this spell, you may tap any number of creatures you control with total
@@ -3416,8 +3427,9 @@ export function compile(d: CardDef): CompiledCard {
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))
     out.unsupported.push("(attached to enchanted creature, but it isn't an Aura enchanting a creature)");
-  // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled.
-  if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield"))) out.unsupported.push("(an Aura returning itself to the battlefield)");
+  // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled; "attached to
+  // target creature" (Gryff's Boon) needs none.
+  if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield" && e.attachToTarget === undefined))) out.unsupported.push("(an Aura returning itself to the battlefield)");
   const json = JSON.stringify(out);
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
@@ -3618,9 +3630,11 @@ function linkExile(out: CompiledCard) {
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
-  const exiles = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)]
-    .flatMap((b) => allEffects(b.effects))
-    .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile)) && !("until" in e && e.until));
+  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile)) && !("until" in e && e.until);
+  const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
+  // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
+  // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
+  const exiles = exiles0.length ? exiles0 : out.triggers.filter((t) => !returns.includes(t)).flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => exiling(e) && e.type === "exile" && e.what.ref === "target");
   // "As an additional cost to cast this spell, behold an Elf and exile it" with "When this creature leaves the battlefield,
   // return the exiled card to its owner's hand" (Champions of the Perfect): the card exiled to pay the cost of the spell
   // that became this permanent (CR 607.2q, recorded as it's cast).

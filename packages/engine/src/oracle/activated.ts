@@ -277,6 +277,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, most.index);
       found = true;
     }
+    // "You can't activate this ability during combat." (Djinn of Infinite Deceits, CR 602.5b): any time but then.
+    if (/ You can't activate this ability during combat\.$/.test(effectText) && !activateIf) {
+      activateIf = { kind: "during", window: "combat", not: true };
+      effectText = effectText.slice(0, effectText.length - " You can't activate this ability during combat.".length);
+      found = true;
+    }
     // Restrictions (CR 602.5b, 506.8g): "Activate only as a sorcery", "... only once each turn", "... only during your
     // upkeep", "... only during your turn and only if an opponent lost life this turn", in any combination.
     // With exhaust too: "Exhaust — {4}: Earthbend 4. Activate only during your turn." (Bitter Work), once ever and only then.
@@ -304,7 +310,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (untapSelf && (tap || symbols.filter((x) => x === "Q").length > 1 || inYard)) return "fail";
   // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
-  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
+  // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
+  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to target creature)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).

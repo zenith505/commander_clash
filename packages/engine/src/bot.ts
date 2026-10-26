@@ -1423,6 +1423,25 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     if (forced) return pick ? [pick] : null;
     return pick && s.activePlayer === pid && s.step === "main1" && army(pick.id) > army(pid) + 3 ? [pick] : null;
   }
+  // Exchanging control (Switcheroo, Avarice Totem): our least useful permanent for an opponent's most useful one, worth it
+  // only when theirs is worth clearly more; an exchange between two of their permanents does us no good.
+  const swap = body.effects.find((e): e is Extract<Effect, { type: "exchangeControl" }> => e.type === "exchangeControl");
+  if (swap && body.targets.length <= 2 && (swap.a.ref === "target" || swap.a.ref === "self") && swap.b.ref === "target" && body.targets.every((t) => t.kind === "object")) {
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    const options = (i: number) => legalTargets(s, body.targets[i]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? [obj(s, t.id)] : []));
+    const ours = (i: number) => options(i).filter((o) => controllerOf(s, o) === pid && !o.isCommander).sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+    const theirs = (i: number, not?: GameObject) => options(i).filter((o) => controllerOf(s, o) !== pid && o !== not).sort((a, b) => worth(s, pid, b) - worth(s, pid, a))[0];
+    const picks: [GameObject | undefined, GameObject | undefined][] = swap.a.ref === "self" ? [[me?.isCommander ? undefined : me, theirs(swap.b.index)]] : [[ours(swap.a.index), theirs(swap.b.index)], [theirs(swap.a.index), ours(swap.b.index)]];
+    for (const [a, b] of picks) {
+      const [mine, other] = a && controllerOf(s, a) === pid ? [a, b] : [b, a];
+      if (!a || !b || !mine || !other || worth(s, pid, other) < worth(s, pid, mine) + 2) continue;
+      const t: TargetChoice[] = [];
+      if (swap.a.ref === "target") t[swap.a.index] = { kind: "object", id: a.id };
+      t[swap.b.index] = { kind: "object", id: b.id };
+      return t;
+    }
+    return null;
+  }
   // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {
     const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
@@ -2893,7 +2912,15 @@ function revealedMay(s: GameState, card: string): boolean | undefined {
   const r = s.resolving;
   if (r?.revealed?.id !== card) return undefined;
   const may = allEffects(r.body.effects).find((e) => e.type === "may" && e.effects.some((x) => "what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed"));
-  if (may?.type !== "may") return undefined;
+  if (may?.type !== "may") {
+    // Sorin the Mirthless: the card, for life equal to its mana value, when that leaves plenty.
+    const toHand = allEffects(r.body.effects).find((e) => e.type === "may" && e.effects.some((x) => x.type === "revealTopToHand"));
+    if (toHand) {
+      const n = defMv(defOf(s, obj(s, card)));
+      return n <= 4 && player(s, r.item.controller).life - n >= 10;
+    }
+    return undefined;
+  }
   return may.effects.some((x) => x.type === "bounce" || x.type === "putOntoBattlefield") ? true : undefined;
 }
 
@@ -2990,6 +3017,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // The Second Doctor: "each player may draw a card. Each opponent who does can't attack you ... during their next turn":
   // the card, unless that player is the only opponent left to attack.
   if (r && e?.type === "eachMay" && e.each && after?.type === "attackBanNextTurn" && pid !== r.item.controller) return opponents(s, pid).length > 1;
+  // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
+  if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).
@@ -3657,7 +3686,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const discardX = discardXCount(s, pid, id, ab);
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
-      if (ab.body.effects.some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite: bots don't end their turn early
+      if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;

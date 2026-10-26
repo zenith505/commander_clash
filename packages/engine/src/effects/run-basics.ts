@@ -641,17 +641,23 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "setLife": {
       // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
-      for (const pid of players(s, e.who, ctx)) {
-        const p = player(s, pid);
-        const diff = (e.double ? 2 * p.life : e.n) - p.life;
-        if (diff > 0 && canGainLife(s, pid)) {
-          gainLife(s, pid, diff);
-          log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
-        } else if (diff < 0 && canLoseLife(s, pid)) {
-          loseLife(s, pid, -diff);
-          log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+      // "The lowest life total among all players" (Repay in Kind): counted once, before anyone's changes; the players
+      // lose life at the same time (rulings).
+      const who = players(s, e.who, ctx);
+      const lowest = e.lowest ? Math.min(...livingPlayers(s).map((pid) => player(s, pid).life)) : 0;
+      simultaneousLifeLoss(s, () => {
+        for (const pid of who) {
+          const p = player(s, pid);
+          const diff = (e.double ? 2 * p.life : e.lowest ? lowest : e.n) - p.life;
+          if (diff > 0 && canGainLife(s, pid)) {
+            gainLife(s, pid, diff);
+            log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+          } else if (diff < 0 && canLoseLife(s, pid)) {
+            loseLife(s, pid, -diff);
+            log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+          }
         }
-      }
+      });
       return;
     }
     case "loseLife": {

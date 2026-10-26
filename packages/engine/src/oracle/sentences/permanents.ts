@@ -260,6 +260,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
+  // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
+  // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
+  // doesn't return (rulings).
+  if ((m = /^When (another target creature|target creature) dies this turn, return that card to the battlefield under your control$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield under your control", thisTurn: true }] : null;
+  }
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
   if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);
@@ -974,6 +981,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
     const b = a?.ref === "self" || (a?.ref === "target" && !a.n) ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
+  }
+  // "Exchange control of two target creatures" (Switcheroo), "... two target lands" (Shifting Borders), "... two other
+  // target creatures controlled by different players" (Kitsune, Dragon's Daughter); "Exchange control of ~ and target
+  // nonland permanent" (Avarice Totem): whoever controls them; with both under one player's control, or either target
+  // illegal, nothing happens (CR 701.12b).
+  if ((m = /^[Ee]xchange control of (two (?:other )?target .+|~ and target .+)$/.exec(s))) {
+    const self = m[1]!.startsWith("~");
+    const first = ctx.targets.length;
+    const what = parseObject(self ? m[1]!.replace(/^~ and /, "") : m[1]!, ctx);
+    if (what?.ref !== "target" || ctx.targets.length !== first + (self ? 1 : 2) || ctx.targets.slice(first).some((t) => t.kind !== "object" || t.skip)) return null;
+    return [{ type: "exchangeControl", a: self ? { ref: "self" } : { ref: "target", index: first }, b: { ref: "target", index: self ? first : first + 1 } }];
   }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
   // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,

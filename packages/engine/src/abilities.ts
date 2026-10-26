@@ -122,6 +122,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
+  /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
+  | { kind: "discardedManaValue" }
   /** "The total mana value of those exiled cards" (Ensnared by the Mara): of the cards an "exile the top N cards" before it exiled (GameState.resolving.exiledTopCards). */
   | { kind: "exiledTopManaValue" }
   /** "For each card of the chosen color exiled this way" (Oona, Queen of the Fae): of the cards the "exile the top X cards" before it exiled, those matching `filter` (a chosen color bound as it resolves), still in exile. */
@@ -376,7 +378,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -420,6 +422,8 @@ export interface TargetSpec {
   powerAboveBase?: true;
   /** "With base power or toughness 1" (Sword of the Squeak): a creature whose base power or base toughness is this (see basePowerNow). */
   basePtEither?: number;
+  /** "With base power 1" (Rapid Augmenter): a creature whose base power is this (see basePowerNow). */
+  basePower?: number;
   /** "With toughness greater than its power" (Fecund Greenshell): as it is now (as it enters, for an enters trigger). */
   toughnessAbovePower?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
@@ -985,6 +989,8 @@ export type PlayerRef =
   | { ref: "neighbor"; side: "left" | "right" }
   /** "Its owner" in an ability of ~ about ~ itself (Yes Man): whose ~ is (CR 108.3). */
   | { ref: "selfOwner" }
+  /** "The player whose turn it is" (Obeka, Brute Chronologist): the active player as it resolves. */
+  | { ref: "activePlayer" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
   | { ref: "combatDamagedBySelf" }
   /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
@@ -1674,7 +1680,7 @@ export type StaticCondition =
    * "Cast ~ only during combat", "Activate only during your upkeep" (CR 506.8, 601.3, 602.5b): the part of the turn
    * it may be cast or activated in; `turn`: "your" or "an opponent's" (upkeep, end step, combat, declare attackers step).
    */
-  | { kind: "during"; window: TimingWindow; turn?: "you" | "opponent" }
+  | { kind: "during"; window: TimingWindow; turn?: "you" | "opponent"; /** "You can't activate this ability during combat" (Djinn of Infinite Deceits): any time but then. */ not?: true }
   /**
    * "Only if you've been attacked this step", with "during the declare attackers step": a creature declared as an
    * attacker this step attacks you, not only planeswalkers you control (rulings on Heavy Fog).
@@ -1688,7 +1694,7 @@ export type StaticCondition =
 
 /** A restriction naming a part of the turn (CR 506.8, 602.5b): "only during your upkeep", "only during combat". */
 export const timedCondition = (c: StaticCondition | undefined): boolean =>
-  !!c && (c.kind === "during" || c.kind === "attackedThisStep" || ((c.kind === "allOf" || c.kind === "anyOf") && c.conds.some(timedCondition)));
+  !!c && ((c.kind === "during" && !c.not) || c.kind === "attackedThisStep" || ((c.kind === "allOf" || c.kind === "anyOf") && c.conds.some(timedCondition)));
 
 /**
  * When a restricted spell or ability may be used (CR 506.8): "upkeep", "end" (end step), "afterUpkeep" (the steps after
@@ -1762,7 +1768,7 @@ export type Effect =
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
   /** "Your life total becomes 10" (CR 119.5): that player gains or loses the difference. */
-  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true }
+  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true }
   /**
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
@@ -2089,7 +2095,7 @@ export type Effect =
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
-  | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
+  | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** "Exile all cards from all hands and graveyards" (Worldfire): the hand too, then the graveyard. */ hand?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
    * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
@@ -3388,7 +3394,7 @@ export type SpellCondition =
   | { kind: "wonFlip"; lost?: true }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
-  | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true }
+  | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
   | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true }
@@ -5483,6 +5489,8 @@ export interface CompiledCard {
   millMore?: ({ plus: number } | { twice: true })[];
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
+  /** "Players skip their untap steps." (Stasis, CR 614.10): no player's untap step happens. */
+  skipUntapSteps?: boolean;
   /** "You draw a card during each opponent's draw step" (Teferi, Who Slows the Sunset's emblem): after that player's draw (rulings). */
   drawsInOpponentsDrawStep?: boolean;
   /** "You may choose not to untap ~ during your untap step." (CR 502.3): its controller decides as the step untaps. */
@@ -5492,6 +5500,8 @@ export interface CompiledCard {
    * controller may cast spells like these any time they could cast an instant.
    */
   flashFor?: TargetSpec[];
+  /** "During each opponent's end step, you may cast spells as though they had flash" (Final-Word Phantom, CR 702.8a). */
+  flashInOpponentsEndStep?: true;
   /** "Any player may cast Sliver spells as though they had flash" (Quick Sliver, CR 702.8a): every player may, not only its controller. */
   flashForAll?: TargetSpec[];
   /** "The first creature spell you cast each turn ... can be cast as though it had flash" (Radagast of Rhosgobel): only while you've cast none of these this turn. */

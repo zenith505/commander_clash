@@ -234,6 +234,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // library if it's still on the battlefield, your graveyard into yours (rulings).
   if (/^Shuffle ~ and your graveyard into their owner's library$/.test(s) && !ctx.spell)
     return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }, { type: "shuffleZones", who: { ref: "you" }, graveyard: true }];
+  // Leadership Vacuum: "Target player returns each commander they control from the battlefield to the command zone": any
+  // player's commander they control, without adding to its tax (rulings, CR 903.8); the player is the target, so a
+  // commander with hexproof can be returned (rulings).
+  if ((m = /^(Target player|Target opponent) returns each commander they control from the battlefield to the command zone$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who?.ref === "target" ? [{ type: "toCommandZone", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], commander: true, text: "commander" }, of: who } }] : null;
+  }
+  // Floodpits Drowner: "Shuffle ~ and target creature with a stun counter on it into their owners' libraries": each into
+  // its owner's library; with the target illegal, the ability doesn't resolve and ~ stays (rulings, CR 608.2b).
+  if ((m = /^Shuffle ~ and (target [^,]+?) into their owners' libraries$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what: { ref: "self" } }, { type: "shuffleIntoLibrary", what }] : null;
+  }
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
   // Seasons Past: "Put ~ on the bottom of its owner's library", likewise the resolving spell itself (CR 608.2n).
@@ -321,6 +334,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
   if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ on top of your library)$/.exec(s)))
     return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
+  // Gryff's Boon: "{3}{W}: Return ~ from your graveyard to the battlefield attached to target creature": the target, which
+  // the ability targets (the Aura isn't cast, so it targets nothing itself, CR 303.4f); with that creature an illegal
+  // target, the ability doesn't resolve and the card stays (rulings).
+  if (ctx.selfCard && ctx.activated && /^Return ~ from your graveyard to the battlefield attached to target creature$/.test(s)) {
+    const attachToTarget = ctx.targets.length;
+    const what = parseObject("target creature", ctx);
+    return what?.ref === "target" ? [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToTarget }] : null;
+  }
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
   // Sword of the Meek: "Return ~ from your graveyard to the battlefield, then attach it to that creature": it returns,
@@ -648,6 +669,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who, library: true }] : null;
   }
+  // Worldfire: "Exile all cards from all hands and graveyards."
+  if (s === "Exile all cards from all hands and graveyards") return [{ type: "exileGraveyard", who: { ref: "eachPlayer" }, hand: true }];
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =
@@ -808,6 +831,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // it": the same, the cards its own exile ability took, under their owners' control (CR 607.2a, 610.3).
   if ((m = /^[Ee]ach player returns to (the battlefield|their hand) all cards they own exiled with (?:it|~)$/.exec(s)) && ctx.selfCard)
     return [{ type: "returnLinked", dest: m[1] === "the battlefield" ? "battlefield" : "hand" }];
+  // Admonition Angel: "When ~ leaves the battlefield, return all cards exiled with it to the battlefield under their owners'
+  // control": the same.
+  if (/^[Rr]eturn all cards exiled with (?:it|~) to the battlefield under their owners' control$/.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one

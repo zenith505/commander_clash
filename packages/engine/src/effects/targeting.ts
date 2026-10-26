@@ -132,6 +132,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     const [bp, bt] = set ? [set.power, set.toughness] : [c.printedPower, c.printedToughness];
     if (!c.types.includes("Creature") || (bp !== spec.basePtEither && bt !== spec.basePtEither)) return false;
   }
+  if (spec.basePower !== undefined) {
+    const set = [...c.pt].reverse().find((p) => p.kind === "set");
+    if (!c.types.includes("Creature") || (set ? set.power : c.printedPower) !== spec.basePower) return false;
+  }
   if (spec.toughnessAbovePower && !(c.types.includes("Creature") && toughness(s, o) > power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !hasManaAbility(s, o, c)) return false;
@@ -339,7 +343,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
+  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePower !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
   return true;
 }
 

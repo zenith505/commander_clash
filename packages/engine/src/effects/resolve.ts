@@ -547,6 +547,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       return me && !player(s, me.owner).lost ? [me.owner] : [];
     }
+    case "activePlayer":
+      return player(s, s.activePlayer).lost ? [] : [s.activePlayer];
     case "combatDamagedBySelf": {
       // This object as the ability's source, the same one that dealt the damage (CR 400.7).
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;

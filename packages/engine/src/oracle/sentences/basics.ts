@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { COLOR_WORDS, NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf, counterKind } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -310,6 +310,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
   }
+  // Repay in Kind: "Each player's life total becomes the lowest life total among all players."
+  if (/^Each player's life total becomes the lowest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, lowest: true }];
   // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
   // total becomes half their starting life total, rounded down" (Torgaar): 20 in Commander (CR 903.7, 119.5).
   if ((m = /^(Your|Target player's|Up to one target player's|Target opponent's) life total becomes half (?:your|their) starting life total, rounded (up|down)$/i.exec(s))) {
@@ -543,10 +545,19 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Highway Robbery: "You may discard a card or sacrifice a land. If you do, ...": one or the other, as it resolves, only
   // one that can be done (rulings).
-  if ((m = /^[Dd]iscard a card or sacrifice an? ([a-z]+)$/.exec(s))) {
-    const filter = pickFilter(m[1]!);
-    if (filter?.kind !== "object") return null;
-    return [{ type: "either", options: [[{ type: "discard", who: { ref: "you" }, n: 1 }], [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice" }]], labels: ["Discard a card", `Sacrifice ${/^[aeiou]/.test(m[1]!) ? "an" : "a"} ${m[1]}`], onlyDoable: true }];
+  // "You may sacrifice an artifact or discard a card. If you do, ..." (Vision of Love, K'un-Lun Warrior), "sacrifice a
+  // creature or discard a creature card" (Crypt Lurker): the same, in the printed order.
+  if ((m = /^(?:[Dd]iscard (a card|an? [a-z]+ card) or sacrifice an? ([a-z]+)|[Ss]acrifice an? ([a-z]+) or discard (a card|an? [a-z]+ card))$/.exec(s))) {
+    const what = (m[2] ?? m[3])!;
+    const cardWord = (m[1] ?? m[4])!;
+    const filter = pickFilter(what);
+    const cardFilter = cardWord === "a card" ? undefined : parseSearchFilter(cardWord.replace(/^an? /, ""));
+    if (filter?.kind !== "object" || cardFilter === null) return null;
+    const discard: Effect[] = [{ type: "discard", who: { ref: "you" }, n: 1, ...(cardFilter ? { filter: cardFilter } : {}) }];
+    const sacrifice: Effect[] = [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice" }];
+    const discardLabel = `Discard ${cardWord}`;
+    const sacrificeLabel = `Sacrifice ${/^[aeiou]/.test(what) ? "an" : "a"} ${what}`;
+    return [{ type: "either", options: m[1] ? [discard, sacrifice] : [sacrifice, discard], labels: m[1] ? [discardLabel, sacrificeLabel] : [sacrificeLabel, discardLabel], onlyDoable: true }];
   }
   // "Then discard two cards unless you discard a creature card" (Mystic Meditation, Thirst for Knowledge): a card of
   // that kind, or two cards. With none of that kind, two cards (rulings).
@@ -776,6 +787,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
     const what = p && /^(~|it|that creature|target .+)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
+  }
+  // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent
+  // an opponent controls": the same, until its controller's next turn begins (CR 611.2b).
+  if ((m = /^Until your next turn, (prevent all .+)$/.exec(s))) {
+    const p = parsePreventAll(capital(m[1]!));
+    const what = p && /^target .+$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    return p && what?.ref === "target" ? [{ type: "continuous", what, mods: [p.mod], duration: "yourNextTurn" }] : null;
   }
   // Redirection shields (CR 614.9): "The next 1 damage that would be dealt to ~ this turn is dealt to target creature
   // you control instead" (the en-Kor), "... dealt this turn to target white creature you control is dealt to ~ instead".

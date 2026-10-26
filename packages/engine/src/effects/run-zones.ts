@@ -2456,6 +2456,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} exiles ${p.name}'s library (${n} card${n === 1 ? "" : "s"}).`);
           continue;
         }
+        if (e.hand) {
+          const n = p.hand.length;
+          for (const id of [...p.hand]) moveObject(s, id, "exile");
+          log(s, `${src} exiles ${p.name}'s hand (${n} card${n === 1 ? "" : "s"}).`);
+        }
         const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         const n = cards.length;
         for (const id of cards) {

@@ -265,6 +265,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who has more cards in (?:their )?hand than you$/i.test(p)) return count({ kind: "players", opponents: true, handMoreThanYou: true });
   // Birth of the Imperium: "for each opponent who controls fewer creatures than you", counted as it resolves.
   if (each && /^opponent who controls fewer creatures than you$/i.test(p)) return count({ kind: "players", opponents: true, fewerCreaturesThanYou: true });
+  // Surveyor's Scope: "the number of players who control at least two more lands than you", counted as it resolves.
+  if (each && (m = /^players? who controls? at least (one|two|three) more lands? than you$/i.exec(p))) return count({ kind: "players", moreLandsThanYou: num(m[1]!) });
   // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.
   if (each && /^opponent who has less life than you$/i.test(p)) return count({ kind: "players", opponents: true, lifeLessThanYou: true });
   // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.
@@ -394,6 +396,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "Your Ring-bearer's power" (One Ring to Rule Them All): 0 without one (CR 701.54a, 107.1b).
   if ((m = /^your Ring-bearer's (power|toughness)$/.exec(p))) return count({ kind: m[1] as "power" | "toughness", of: { ref: "ringBearer" } });
+  // Ninja's Blades: "draw a card, then discard a card. That player loses life equal to the discarded card's mana value."
+  if (/^the discarded card's mana value$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
+  // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
+  if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
   if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);

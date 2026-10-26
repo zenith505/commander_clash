@@ -161,6 +161,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return { ...st, text: line, zone: "graveyard", ...(condition ? { condition } : {}) };
   }
   let negate = false;
+  let notCond = false;
   let alsoYourTurn = false;
   if ((m = /^(.+?) as long as (.+)$/.exec(text)) && !/^During your turn, /.test(text)) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
@@ -195,6 +196,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless there are ${NUM} or more cards in exile$`).exec(text))) [statement, cond] = [m[1], `there are fewer than ${m[2]} cards in exile`];
   // Kefnet the Mindful: "~ can't attack or block unless you have seven or more cards in hand": while you have fewer.
   else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless you have ${NUM} or more cards in hand$`).exec(text))) [statement, cond] = [m[1], `you have fewer than ${m[2]} cards in hand`];
+  // Any other "~ can't attack or block unless <condition>" (Lupine Prototype's "unless a player has no cards in hand",
+  // Relic Golem's "unless an opponent has eight or more cards in their graveyard"): the restriction applies while the
+  // condition is false (a "not" condition, see below).
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (.+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2]!.replace(/^it(?='s | has | is )|^its (?=power |toughness )/, (w) => (w === "it" ? "~" : "~'s ")), true];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
@@ -228,6 +233,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   const yourTurn = alsoYourTurn ? parseStaticCondition("it's your turn", st) : undefined;
   const condition0 = !alsoYourTurn ? condition1 : condition1 && yourTurn ? { kind: "allOf" as const, conds: [yourTurn, condition1] } : null;
   // "Unless you control N or more X" is "as long as you control N-1 or fewer X".
+  if (notCond) return condition0 ? { ...st, text: line, condition: { kind: "not", cond: condition0 } } : null;
   const condition = !negate ? condition0 : condition0?.kind === "control" && condition0.min !== undefined && condition0.max === undefined && !condition0.differentNames && !condition0.otherThanSubject ? (({ min, ...rest }) => ({ ...rest, max: min! - 1 }))(condition0) : null;
   return condition ? { ...st, text: line, condition } : null;
 }
@@ -605,6 +611,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const g = parseGroup(`all ${m[2]}`);
     return g ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!), ...(g.other ? { other: true as const } : {}) } : null;
   }
+  // Biovisionary: "if you control four or more creatures named ~": with the source's name (CR 201.5), ~ itself among them.
+  if ((m = new RegExp(`^you control ${NUM} or more creatures named ~$`).exec(text))) {
+    const amount = parseCount("the number of creatures you control named ~", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };
   // "One or fewer cards in hand" (Djeru and Hazoret): fewer than two.
@@ -617,6 +628,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
   if (/^you played a land this turn$/.test(text)) return { kind: "playedLandThisTurn" };
   if ((m = new RegExp(`^a player has ${NUM} or fewer cards in hand$`).exec(text))) return { kind: "someHandAtMost", n: num(m[1]!) };
+  if (/^a player has no cards in hand$/.test(text)) return { kind: "someHandAtMost", n: 0 };
   if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
   // The Cases' "To solve" conditions (CR 719.3a), about this turn.
   if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))
@@ -1713,6 +1725,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
   // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)
   if (/^Creatures with power less than ~'s power can't block creatures you control$/.test(text)) return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [{ kind: "cantBeBlockedByLesserPower", than: "source" }], text: line };
+  // Bower Passage: "Creatures with flying can't block creatures you control": the same blocking restriction as "creatures
+  // you control can't be blocked by creatures with flying" (CR 509.1b).
+  const cantBlockYours = /^(Creatures with(?:out)? [a-z]+) can't block creatures you control$/.exec(text);
+  if (cantBlockYours) {
+    const st = parseStatic(`Creatures you control can't be blocked by ${cantBlockYours[1]!.toLowerCase()}.`);
+    return st && !st.condition && st.mods.every((x) => x.kind === "cantBeBlockedBy") ? { ...st, text: line } : null;
+  }
   // Baeloth Barrityl: "Creatures your opponents control with power less than ~'s power are goaded" (CR 701.15): for as
   // long as their power is less than its own (rulings), both as the layers leave them; it's the source's controller who
   // goads them.

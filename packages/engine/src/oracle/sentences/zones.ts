@@ -731,7 +731,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
     // "Target Cave card" (Glimpse the Core): a land subtype (CR 205.3i).
     const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || (attach && st === "Aura"));
-    if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
+    // "Target artifact creature card" (Scarecrone): every one of its types (allTypes) is a permanent type.
+    const types = spec?.types?.length ? spec.types : spec?.allTypes ?? [];
+    if (!what || !spec || (!artifactSub && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
     if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
     // Aberrant Return: one, two, or three target cards, each "with an additional -1/-1 counter on it".

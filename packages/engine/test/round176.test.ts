@@ -354,7 +354,6 @@ describe("The Tabernacle at Pendrell Vale", () => {
     let asked = 0;
     for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
       if (s.pending?.kind === "chooseMay") s = may(s, asked++ === 0);
-      else if (s.pending?.kind === "chooseOrder") s = act(s, { type: "chooseOrder", player: ap, order: s.pending.items.map((x) => x.id) } as Action);
       else if (s.pending) break;
       else s = act(s, { type: "passPriority", player: waitingOn(s)! });
     }
@@ -600,19 +599,21 @@ describe("Bristlebud Farmer", () => {
     expect(s.players[ap]!.library.length).toBe(lib);
     expect(named(s, ap, "Food").length).toBe(2);
   });
-  it("saying yes sacrifices a Food and mills three", () => {
+  it("saying yes sacrifices a Food and mills three; you may put a permanent card from among them into your hand", () => {
     let { s, ap, opp } = setup([]);
     const f = putOnBattlefield(s, ap, bristlebudFarmer);
     putOnBattlefield(s, ap, card("Food", "Token Artifact — Food", "", { cmc: 0, oracleText: "{2}, {T}, Sacrifice this token: You gain 3 life." }));
+    into(s, ap, shock, "library");
+    into(s, ap, shock, "library");
+    const b = into(s, ap, bear({ name: "Milled Bear" }), "library");
     const lib = s.players[ap]!.library.length;
     s = resolveAll(attack(s, ap, [f], opp));
-    for (let i = 0; i < 5 && s.pending; i++) {
-      const p = s.pending;
-      if (p.kind === "chooseCards" || p.kind === "chooseFromGraveyard") s = act(s, { type: p.kind, player: ap, objectIds: [] } as unknown as Action);
-      else break;
-      s = resolveAll(s);
-    }
+    const p = s.pending;
+    if (p?.kind !== "searchLibrary") throw new Error("no pick");
+    expect([...p.cards].sort()).toEqual([b]);
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [b] }));
     expect(named(s, ap, "Food").length).toBe(0);
     expect(s.players[ap]!.library.length).toBe(lib - 3);
+    expect(zone(s, b)).toBe("hand");
   });
 });

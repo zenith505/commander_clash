@@ -102,6 +102,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent plays a land, (.+)$/, "opponentPlaysLand"],
   [/^Whenever a player plays a land, (.+)$/, "playerPlaysLand"],
   [/^Whenever you're dealt damage, (.+)$/, "youAreDealtDamage"],
+  [/^When(?:ever)? you're dealt combat damage, (.+)$/, "youAreDealtCombatDamage"],
   [/^Whenever damage that would be dealt to you is prevented, (.+)$/, "youDamagePrevented"],
   [/^Whenever an opponent is dealt damage, (.+)$/, "opponentIsDealtDamage"],
   [/^Whenever enchanted player is dealt damage, (.+)$/, "enchantedPlayerDealtDamage"],
@@ -1704,7 +1705,12 @@ const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanent
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
-  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+!? — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
+  // Leyline Phantom: "When ~ deals combat damage, ..." triggers each time, as "whenever" does (CR 603.2).
+  // Zhang Liao: "Whenever ~ deals damage to an opponent, that opponent discards a card": the player dealt it.
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+!? — (?=(When|Whenever|At)\b)/, ""))
+    .replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ")
+    .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
   const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);
@@ -2716,7 +2722,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
+      const playerDealt = event === "youAreDealtDamage" || event === "youAreDealtCombatDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).
       if (event === "chosenPlayerDealtDamage") {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;

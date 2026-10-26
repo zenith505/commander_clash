@@ -192,6 +192,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Sab-Sunen, Luxa Embodied: "~ can't attack or block unless it has an even number of counters on it" (of all kinds).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
+  // Training Drone: "~ can't attack or block unless it's equipped".
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's (equipped|enchanted)$/.exec(text))) [statement, cond] = [m[1], `~ isn't ${m[2]}`];
   // Ketramose, the New Dawn: "~ can't attack or block unless there are seven or more cards in exile": while there are fewer.
   else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless there are ${NUM} or more cards in exile$`).exec(text))) [statement, cond] = [m[1], `there are fewer than ${m[2]} cards in exile`];
   // Kefnet the Mindful: "~ can't attack or block unless you have seven or more cards in hand": while you have fewer.
@@ -849,6 +851,14 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
   if ((m = /^~ has (flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text)))
     return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
+  // Mistform Wall: "~ has defender as long as it's a Wall": its creature types as layer 4 left them (CR 613.1d, 613.1f).
+  if ((m = /^it's an? ([A-Z][a-z]+)$/.exec(text)) && st.affects.kind === "self" && CREATURE_TYPES.has(m[1]!))
+    return { kind: "selfIs", filter: { kind: "object", subtypes: [m[1]!], text: m[1]! } };
+  if ((m = /^~ isn't (equipped|enchanted)$/.exec(text))) return { kind: "self", is: m[1] as "equipped" | "enchanted", not: true };
+  // Intrepid Ace: "~ gets +2/+0 as long as it isn't attacking or blocking" (CR 506.4).
+  if (/^it isn't attacking or blocking$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackingOrBlocking", not: true };
+  // Spectral Cloak: "Enchanted creature has shroud as long as it's untapped": the enchanted creature.
+  if ((m = /^it's (tapped|untapped)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", tapped: m[1] === "tapped", text: `${m[1]} permanent` } };
   // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).
   if ((m = /^~ (is|isn't) prepared$/.exec(text))) return { kind: "self", is: "prepared", ...(m[1] === "isn't" ? { not: true as const } : {}) };
   // "It" is the source only when the ability is about the source itself.
@@ -1150,6 +1160,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(m[5]!)];
     return a && b ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }, ...b] : null;
   }
+  // Grave Servitude: "Enchanted creature gets +3/-1 and is black": black instead of its other colors (layer 5).
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}) and is (white|blue|black|red|green)$`).exec(rest))) {
+    const a = parseStaticMods(m[1]!);
+    return a ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }] : null;
+  }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -1273,6 +1288,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const grants = parseGrants(m[1]!);
     return grants ? [{ kind: "cantBeAttacked" }, ...grants] : null;
   }
+  // Spitfire Handler: an attacker's power compared with its own as blockers are declared (CR 509.1b).
+  if (/^can't block creatures with power greater than ~'s power$/.test(rest)) return [{ kind: "cantBlockGreaterPower" }];
   // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
   if ((m = /^can't block ([A-Z][a-z]+)$/.exec(rest))) {
     const one = singular(m[1]!);
@@ -1340,6 +1357,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return [{ kind: "blockableOnlyBy", filters, text: m[1]! }];
   }
   if (/^can't be blocked by creatures with greater power$/.test(rest)) return [{ kind: "cantBeBlockedByGreaterPower" }];
+  // Temple Thief: "can't be blocked by enchanted creatures or enchantment creatures": by either kind.
+  if ((m = /^can't be blocked by ([a-z]+ creatures) or ([a-z]+ creatures)$/.exec(rest))) {
+    const [a, b] = [parseStaticMods(`can't be blocked by ${m[1]}`), parseStaticMods(`can't be blocked by ${m[2]}`)];
+    return a?.length === 1 && b?.length === 1 && a[0]!.kind === "cantBeBlockedBy" && b[0]!.kind === "cantBeBlockedBy" ? [...a, ...b] : null;
+  }
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".
@@ -1358,6 +1380,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^(?:doesn't untap during (?:its controller's|your) untap step|don't untap during their controllers' untap steps)$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
+  // Grounded: "Enchanted creature loses flying": in layer 6, by timestamp, so a later effect can give it back (CR 613.7).
+  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch)$/.exec(rest))) {
+    const k = parseKeywordList(m[1]!);
+    return k ? [{ kind: "removeKeywords", keywords: k }] : null;
+  }
   // Humility: "All creatures lose all abilities and have base power and toughness 1/1" (layers 6 and 7b, CR 613.1f,
   // 613.4b).
   if ((m = /^loses? all abilities and (?:has|have) base power and toughness (\d+)\/(\d+)$/.exec(rest))) return [{ kind: "loseAllAbilities" }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }];
@@ -1526,7 +1553,8 @@ export function parseIsA(phrase: string, only: boolean): Modification[] | null {
 }
 
 function parseStaticLine(line: string): StaticAbility | null {
-  let text = line.replace(/\.$/, "");
+  // Song of Serenity: "Creatures that are enchanted can't attack or block" is about enchanted creatures.
+  let text = line.replace(/\.$/, "").replace(/^Creatures that are enchanted (?=can't )/, "Enchanted creatures ");
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
   // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the
@@ -1769,7 +1797,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

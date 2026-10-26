@@ -3671,6 +3671,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e199e183-e857-4dc7-87f4-36b32c4dac96",
+  "name": "Cruel Fate",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of target opponent's library. Put one of those cards into that player's graveyard and the rest on top of their library in any order.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "por",
+  "releasedAt": "1997-05-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "15e5136e-ed15-49a8-b027-e09436673fb4",
   "name": "Culling Ritual",
   "manaCost": "{2}{B}{G}",
@@ -3939,6 +3965,35 @@
   "commanderLegal": "legal",
   "set": "rix",
   "releasedAt": "2018-01-19",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "53f7c868-b03e-4fc2-8dcf-a75bbfa3272b",
+  "name": "Dark Ritual",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Add {B}{B}{B}.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -7632,6 +7687,32 @@
   "set": "rex",
   "releasedAt": "2023-11-17",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac2b3adb-45bb-4f56-9d52-e08771164b35",
+  "name": "Imperial Edict",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent chooses a creature they control. Destroy that creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ptk",
+  "releasedAt": "1999-05-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11944,6 +12025,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8955996a-76c9-496a-9238-5fd89bcdaae4",
+  "name": "Perish the Thought",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You choose a card from it. That player shuffles that card into their library.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "roe",
+  "releasedAt": "2010-04-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "62e44e0d-eda0-4275-8367-49dab9a087c3",
   "name": "Pernicious Deed",
   "manaCost": "{1}{B}{G}",
@@ -15184,6 +15291,32 @@
   "set": "tsr",
   "releasedAt": "2021-03-19",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e3480c8f-15ad-451b-bb34-b129805569e1",
+  "name": "Stunted Growth",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player chooses three cards from their hand and puts them on top of their library in any order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

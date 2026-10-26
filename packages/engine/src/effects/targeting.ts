@@ -374,9 +374,10 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
   const d = defOf(s, o);
-  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, ...rest } = spec;
+  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, ...rest } = spec;
   if (!printedMatches(rest, d)) return false;
   if (notCastFromHand && o.castFrom === "hand" && !o.spellCopy) return false;
+  if (castFromGraveyard && (o.castFrom !== "graveyard" || o.spellCopy)) return false;
   if (mv && !inRange(spellManaValue(s, item), mv)) return false;
   // Only creature spells have power and toughness (CR 208.3).
   const pt = (key: "power" | "toughness"): number | undefined => {

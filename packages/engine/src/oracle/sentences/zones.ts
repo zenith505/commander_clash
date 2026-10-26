@@ -593,6 +593,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // Chimney Imp: "target opponent puts a card from their hand on top of their library"; Sadistic Augermage: "each player
+  // puts ..."; Stunted Growth: "Target player chooses three cards from their hand and puts them on top of their library in
+  // any order": each from their own hand, chosen as it resolves.
+  if ((m = new RegExp(`^(.+?) (?:puts? (a) card|chooses (${NUM}) cards) from their hand (?:and puts them )?on top of their library( in any order)?$`, "i").exec(s)) && (m[2] ? !m[4] : !!m[4] && / and puts them /.test(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "handToTop", n: m[2] ? 1 : num(m[3]!), who }] : null;
+  }
   // "Draw three cards, then put a card from your hand on the bottom of your library": in any order (CR 401.4).
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on the bottom of your library( in any order)?$`, "i").exec(s)))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), bottom: true }];
@@ -1067,7 +1074,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[1]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "bounce" }];
   }
-  if ((m = new RegExp(`^Return ${NUM} (.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
+  // (Sea Drake's "return two target lands you control" targets: sentences/permanents.ts.)
+  if ((m = new RegExp(`^Return ${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
   }
@@ -1199,7 +1207,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[3]!);
     return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: amt(m[2]!), action: "exile" }] : null;
   }
-  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUMX} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
+  // Exile into Darkness: "Target player sacrifices a creature of their choice with mana value 3 or less": the same as "a
+  // creature with mana value 3 or less of their choice".
+  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUMX} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s.replace(/ of their choice (with mana value \d+ or (?:less|greater))$/, " $1"))) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filter = pickFilter(m[3]!);
     // "Unless they pay {3}": mana only (a discard would need its own choice).

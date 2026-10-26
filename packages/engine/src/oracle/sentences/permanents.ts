@@ -490,11 +490,28 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (first && second) return [...first, ...second];
     ctx.targets.length = before;
   }
+  // Stand Together: "Put two +1/+1 counters on target creature and two +1/+1 counters on another target creature": two
+  // targets, each getting its counters.
+  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) on (target creature) and (${NUMX} ${COUNTER} counters?) on (another target creature)$`, "i").exec(s))) {
+    const before = ctx.targets.length;
+    const first = parseSentence(`Put ${m[1]} on ${m[4]}`, ctx);
+    const second = first && ctx.targets.length === before + 1 ? parseSentence(`Put ${m[5]} on ${m[8]}`, ctx) : null;
+    if (first && second && ctx.targets.length === before + 2) return [...first, ...second];
+    ctx.targets.length = before;
+    return null;
+  }
   // "Choose an artifact or creature you control. Create a token that's a copy of it" (Season of Weaving): picked as it
   // resolves, not targeted (rulings); "it" is the one picked.
   if ((m = /^Choose (an? .+?) you control$/i.exec(s))) {
     const filter = pickFilter(m[1]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }];
+  }
+  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": that player picks as it
+  // resolves (not targeted); "that creature" is the one picked.
+  if ((m = /^(Target opponent|Target player) chooses (an? [a-z]+) they control$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const filter = pickFilter(m[2]!.replace(/^an? /i, ""));
+    return who?.ref === "target" && filter ? [{ type: "pick", who, filter, n: 1, action: "choose" }] : null;
   }
   // "You may tap five untapped artifacts and/or creatures you control. If you do, transform ~." (Thousand Moons Smithy):
   // picked as it resolves, not targeted, all of them or none (it can't be done with fewer, CR 101.3).

@@ -2057,6 +2057,8 @@ export interface Resolving {
     handExiled?: true;
     digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
+    /** "Each player puts a card from their hand on top of their library": the players whose cards have moved. */
+    handTopDone?: Record<string, true>;
     /** Library of Leng: the discarded cards each player put on top of their library instead, the first ending on top. */
     toTop?: Record<string, ObjectId[]>;
     /** The cards each player discards at random, picked before they're asked about Library of Leng. */

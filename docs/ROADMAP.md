@@ -1,7 +1,7 @@
 # Roadmap
 
-25,148 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,631 of
+25,215 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,632 of
 9,979 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1226,6 +1226,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature blocking or blocked by ~"; "sacrifice it unless you sacrifice two Swamps"; "defending player may draw a
   card"; "deals 2 damage to any target and 3 damage to itself"; "Destroy target creature. If that creature was green
   or white / a Human / wasn't attacking, ..." checked as it last existed (CR 608.2h). +61.
+- Round B3 (ranks about 31,000 up to about 29,500, plus more played cards the same templates cover: Fry, Noxious
+  Grasp, Chittering Rats, Gravity Sphere, Necrite, Volrath's Dungeon, Rashel, Fist of Torm and others): Aura bonuses
+  "as long as it's black / a Zombie / an enchantment. Otherwise, ..." (CR 611.3a) and "as long as it's untapped";
+  "has defender as long as it's a Wall"; "as long as it isn't attacking or blocking"; "loses flying"; "gets +3/-1 and
+  is black"; "+1/+1 for each other creature you control named ~" (counted with the layers so far); "can't attack or
+  block unless it's equipped"; "can't block creatures with power greater than ~'s power" (CR 509.1b); "can't be blocked
+  by enchanted creatures or enchantment creatures"; "Creatures that are enchanted can't attack or block"; "Destroy all
+  Auras"; "green creatures and white creatures"; "nonartifact creatures"; targets "artifact creature or black
+  creature", "black or red creature that's attacking or blocking", "creature or planeswalker that's blue or red",
+  "spell cast from a graveyard"; "Counter target spell if it was kicked"; Imperial Edict ("target opponent chooses a
+  creature they control. Destroy that creature."); "sacrifices a creature of their choice with mana value 3 or less";
+  "If that player does, they lose 2 life"; "you lose 3 life if you don't control a Demon"; "If that creature had a
+  +1/+1 counter on it" and "If that creature is an enchantment" (CR 608.2h); "Tap ~. It gains indestructible";
+  two targets with counters each; "up to two target creatures" prevention; "sacrifice ~ unless you remove a +1/+1
+  counter from it"; "When you're dealt combat damage"; "When ~ deals combat damage"; "that opponent discards a card";
+  punishers "Unless target player pays {3}", "unless any player pays {2}" and "unless its controller pays 2 life"
+  (CR 118.12); "target opponent / each player puts a card from their hand on top of their library", "chooses three
+  cards from their hand and puts them on top in any order"; "That player shuffles that card into their library";
+  "look at the top two (five) cards of target player's library. Put one of them into their graveyard (and the rest
+  on top in any order)"; "return two target lands you control". Bots now aim "target player sacrifices" edicts
+  (Diabolic Edict too), punishers, hand-to-library and Wu Spy's mill at an opponent, not themselves. +69, two of
+  them (Training Drone, Temple Thief) also done by round 175: +67 (25,215 with rounds 174 and 175).
+- Skipped there, with reasons: Kaervek's Hex and Tropical Storm (two amounts to one creature must be one damage
+  event, CR 120.2); Mammoth Harness (a block trigger about "the other creature"); Telekinesis (two effects tied to
+  one target's untap steps); Nulltread Gargantuan ("put a creature you control on top of its owner's library", a
+  pick that moves to the library); Eunuchs' Intrigues ("other creatures they control can't block": the chosen one
+  apart).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1234,10 +1261,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rotting Giant (sacrifice unless you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in
   a graveyard dealing damage), Cut the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of
   Blasting, Tribal Golem, Forethought Amulet; Unforge, Reign of Terror ("for each creature that died this way"),
-  Derelor and Jade Leech (colored cost increases), Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Spitfire
-  Handler, Vaporous Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling
-  Stance (forecast), Krovikan Rot (recover), Takenuma Bleeder, Warden of the Beyond, Fire and Brimstone, Exalted
-  Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
+  Derelor and Jade Leech (colored cost increases), Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Vaporous
+  Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling Stance (forecast),
+  Krovikan Rot (recover), Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
 
 ## Known gaps (from earlier rounds)
@@ -1437,10 +1463,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Attack taxes other than "{N} for each creature they control that's attacking you": domain X (Collective
   Restraint), "{1} for each of those creatures" (Dáin, Summon: Yojimbo), only nonblack creatures (Elephant Grass),
   costs to block.
-- Blocking: "can't block creatures with power greater than ~'s power" (Spitfire Handler), "equal to or greater than
-  the enchanted creature's toughness" (Ironclaw Curse), "unless you pay" (Hipparion), affected groups like "creatures
-  your opponents control without flying or reach" (Sidar Kondo); lures with a filter ("All Walls able to block",
-  Talruum Piper) or a condition (Seton's Desire).
+- Blocking: "can't block creatures with power equal to or greater than the enchanted creature's toughness" (Ironclaw
+  Curse), "unless you pay" (Hipparion), affected groups like "creatures your opponents control without flying or reach"
+  (Sidar Kondo); lures with a filter (Talruum Piper's fliers) or a condition (Seton's Desire).
 - Untapping during other players' untap steps with color pairs ("green and/or blue", Murkfiend Liege), a condition
   (Quest for Renewal) or granted to a land (Urban Burgeoning).
 - Top or bottom of a library for spells and graveyard cards (Aether Gust, Endless Detour) and for several

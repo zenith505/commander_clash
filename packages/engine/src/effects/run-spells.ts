@@ -789,6 +789,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
       }
+      // Ertai's Trickery: kicked as it was cast (CR 702.33d); a copy of a kicked spell is kicked too (CR 707.10).
+      if (e.ifKicked) {
+        const item = s.stack.find((x) => x.id === t.id);
+        if (!item || item.kind !== "spell" || !item.kicked?.length) {
+          log(s, `${src} doesn't counter ${item?.description ?? "it"}: it wasn't kicked.`);
+          return;
+        }
+      }
       // Jester's Scepter: only a spell with the name of the card put into a graveyard for the cost; a split card's either
       // half (rulings).
       if (e.ifCostCardName) {

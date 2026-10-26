@@ -659,6 +659,8 @@ const PLURAL_TYPES: Record<string, string> = {
   clues: "Clue",
   foods: "Food",
   vehicles: "Vehicle",
+  // "Destroy all Auras" (Serene Heart): an enchantment subtype (CR 205.3h).
+  auras: "Aura",
 };
 
 /** Creature types whose plural is the same word ("all Merfolk", "all Samurai"). */
@@ -727,7 +729,11 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const typed = /^(?:[A-Z][a-z]+ )+creatures$/.test(p) && p.split(" ").slice(0, -1).every((w) => CREATURE_TYPES.has(w));
   // "White creatures get +2/+0 until end of turn" (Valorous Charge), "green creatures get -1/-1" (Rank and File): every
   // creature of that color, whoever controls it.
-  const hued = /^(?:non-?)?(?:white|blue|black|red|green) creatures$/i.test(p);
+  // "Nonartifact creatures get -1/-1 until end of turn" (Stench of Decay): every creature that isn't an artifact.
+  // "Green creatures and white creatures can't block this turn" (Flash of Defiance): each creature that's either color.
+  const twoHues = /^(white|blue|black|red|green) creatures and (white|blue|black|red|green) creatures$/i.exec(p);
+  if (twoHues) p = `${twoHues[1]} or ${twoHues[2]} creatures`;
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -817,6 +823,24 @@ export function parseTargetPhrase(
   // Evaporate: "each white and/or blue creature": either color or both, as "white or blue creature" is (counted once).
   const andOr = /^((?:target |each )?)(white|blue|black|red|green) and\/or (white|blue|black|red|green) (creature|permanent)s?$/.exec(phrase.trim());
   if (andOr) return parseTargetPhrase(`${andOr[1]}${andOr[2]} or ${andOr[3]} ${andOr[4]}`, opts);
+  // Surge of Righteousness: "black or red creature that's attacking or blocking" is an attacking or blocking black or red
+  // creature.
+  const thatsCombat = /^(target )?((?:[a-z]+ )*)creature that's (attacking or blocking|attacking|blocking)$/.exec(phrase.trim());
+  if (thatsCombat) return parseTargetPhrase(`${thatsCombat[1] ?? ""}${thatsCombat[3]} ${thatsCombat[2]}creature`, opts);
+  // Terminal Criticism: "creature or planeswalker that's blue or red"; Essence Burn: "black or green creature or
+  // planeswalker": a creature or planeswalker of either color.
+  const huedTypes = /^(target )?(?:(white|blue|black|red|green) or (white|blue|black|red|green) (creature or planeswalker)|(creature or planeswalker) that's (white|blue|black|red|green) or (white|blue|black|red|green))$/.exec(phrase.trim());
+  if (huedTypes) {
+    const head = parseTargetPhrase(`${huedTypes[1] ?? ""}${huedTypes[4] ?? huedTypes[5]}`, opts);
+    const colors = [huedTypes[2] ?? huedTypes[6], huedTypes[3] ?? huedTypes[7]].map((c) => COLOR_WORDS[c!]!);
+    return head?.kind === "object" && !head.colors && !head.anyOf ? { ...head, colors, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
+  // Purge: "artifact creature or black creature": a creature that's an artifact or black, or both.
+  const twoKinds = /^(target )?(artifact|black|white|blue|red|green) creature or (artifact|black|white|blue|red|green) creature$/.exec(phrase.trim());
+  if (twoKinds && twoKinds[2] !== twoKinds[3]) {
+    const anyOf = [twoKinds[2]!, twoKinds[3]!].map((w) => parseTargetPhrase(`${w} creature`, opts));
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf)) return { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase()}` };
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
@@ -903,6 +927,11 @@ export function parseTargetPhrase(
   if (notFromHand) {
     extra.notCastFromHand = true;
     p = p.slice(0, notFromHand.index);
+  }
+  const fromYard = / cast from a graveyard$/.exec(p);
+  if (fromYard) {
+    extra.castFromGraveyard = true;
+    p = p.slice(0, fromYard.index);
   }
   // "Historic spells", "a historic permanent": artifacts, legendaries and Sagas (CR 700.6), any of them (TargetSpec.anyOf).
   if (/(?:^|\s)historic\s/.test(p)) {
@@ -1414,7 +1443,7 @@ export function parseTargetPhrase(
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
   }
-  if (otherThanBasic || (extra.notCastFromHand && !isSpell)) return null;
+  if (otherThanBasic || ((extra.notCastFromHand || extra.castFromGraveyard) && !isSpell)) return null;
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.

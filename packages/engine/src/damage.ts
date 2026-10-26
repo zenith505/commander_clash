@@ -231,7 +231,7 @@ export function dealDamage(
     if (!opts.combat) ((s.turnLog ??= {}).noncombatDamage ??= {})[p.id] = (s.turnLog.noncombatDamage?.[p.id] ?? 0) + n;
     // "Whenever you're dealt damage": once for the damage dealt at the same time (see dealPlanned).
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
-    else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });
+    else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n, combat: !!opts.combat });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n });
@@ -1285,7 +1285,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller });
   const toPlayers = playerBatch;
   playerBatch = outer;
-  for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount });
+  for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });
   firePlayersDealt(s, out);
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {

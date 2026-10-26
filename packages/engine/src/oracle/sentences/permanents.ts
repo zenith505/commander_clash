@@ -554,6 +554,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = Number.isInteger(n) && n > 0 ? parseObject(m[2]!, ctx) : null;
     return what && !isGroup(what) ? [{ type: "battleDefense", what, n }] : null;
   }
+  // Oblivion Stone: "remove all fate counters from all permanents".
+  if ((m = new RegExp(`^Remove all ${COUNTER} counters from all permanents$`, "i").exec(s))) {
+    const what = parseObject("all permanents", ctx);
+    return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
+  }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
@@ -931,6 +936,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || (x.kind === "addAbility" && what.ref === "created"))) return [{ type: "continuous", what, mods, duration: "game" }];
   }
+  // Chance for Glory: "Creatures you control gain indestructible": the creatures there as it resolves (CR 611.2c), for as
+  // long as each stays on the battlefield (CR 611.2a).
+  if ((m = /^(Creatures you control) (gain [a-z ,]+)$/.exec(s)) && ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "each" ? parseChanges(m[2]!) : null;
+    if (what && mods?.length && mods.every((x) => x.kind === "addKeywords")) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
   // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
   // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
   // "Put four +1/+1 counters on target noncreature artifact. It becomes a 0/0 Bird creature" (Case of the Filched Falcon): the target.
@@ -1033,6 +1045,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Goad all creatures you don't control" (Disrupt Decorum), "goad all suspected creatures" (Nelly Borca): the creatures
   // there as it resolves (CR 611.2c; Disrupt Decorum's ruling: creatures entering later aren't goaded).
   // "Goad up to X target creatures your opponents control" (Death Kiss): each of them.
+  // Coronation of Chaos: "Up to three target creatures can't block this turn. Goad them.": the same targets.
+  if ((m = /^Goad (them|it)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
+  }
   if ((m = /^Goad ((?:up to (?:one|two|three|four|five|X) |any number of |two |three |X )?target .+|(?:all|each) .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" || what?.ref === "countersPutThisWay" || (what?.ref === "each" && /^(?:all|each) /i.test(m[1]!)) ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;

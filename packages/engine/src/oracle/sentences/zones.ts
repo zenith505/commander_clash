@@ -889,6 +889,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // (rulings, CR 701.3a-b).
   if (/^For each Aura and Equipment you control, you may attach it to a creature you control$/.test(s))
     return [{ type: "attachToChosen", source: { ref: "each", filter: { kind: "object", subtypes: ["Aura", "Equipment"], controller: "you", text: "Aura or Equipment you control" } }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true }];
+  // Balan, Wandering Knight: "Attach all Equipment you control to ~": each that could be attached to it (CR 701.3a-b).
+  if (/^Attach all Equipment you control to ~$/.test(s) && !ctx.spell) return [{ type: "attachAll", filter: { kind: "object", subtypes: ["Equipment"], controller: "you", text: "Equipment you control" } }];
   // Ardenn: "attach any number of Auras and Equipment you control to target permanent or player": chosen as it resolves
   // (rulings), each that could be attached to it (CR 701.3a-b).
   if ((m = /^(?:you may )?attach any number of Auras and Equipment you control to (target permanent or player)$/i.exec(s)) && !ctx.spell) {

@@ -97,7 +97,7 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
     return;
   }
   let first: boolean[] | undefined;
-  if (!e.untilLose && thumb) {
+  if (!e.untilLose && thumb && !e.n) {
     const [a, b] = (first = flip());
     if (a !== b) {
       sc.thumbFlip = true;
@@ -110,12 +110,13 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   let won = false;
   // Even "until you lose a flip" ends some time; a long run of wins is cut short where paper Magic would be (CR 732).
   // With Krark's Thumb, each flip of the run keeps a won coin if there is one: a lost flip would only end the run.
+  // "Flip three coins": each flip on its own (CR 705.1); with Krark's Thumb each keeps a won coin if there is one.
   for (let i = 0; i < 100; i++) {
     won = (i === 0 && first ? first : flip()).some((w) => w);
     fireEvent(s, { type: "coinFlipped", player: who, won });
     if (won) wins++;
-    if (!won || !e.untilLose) break;
+    if (e.n ? i + 1 >= e.n : !won || !e.untilLose) break;
   }
   s.resolving!.flipped = { won, wins };
-  log(s, e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won.` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip.`);
+  log(s, e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won.` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won.` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip.`);
 }

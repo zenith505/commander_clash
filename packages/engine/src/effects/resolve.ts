@@ -564,6 +564,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const ctl = players(s, { ref: "subjectController" }, ctx)[0];
       return ctl === undefined ? [] : apnap(s, livingPlayers(s).filter((p) => p !== ctl));
     }
+    case "opponentsWithPoison":
+      return opponents(s, ctx.controller).filter((p) => (player(s, p).poison ?? 0) >= ref.n);
     case "opponentsEmptyHanded":
       return opponents(s, ctx.controller).filter((p) => !player(s, p).hand.length);
     case "opponentsCombatDamagedByName": {
@@ -1000,6 +1002,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "attackBanNextTurn":
     case "attach":
     case "attachAny":
+    case "attachAll":
     case "attachLastKnown":
     case "doubleX":
     case "removeExiledCounter":

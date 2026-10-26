@@ -718,6 +718,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // Winds of Change: each draws as many as they shuffled into their own library (rulings).
       if (e.drawThatMany) for (const [pid, n] of shuffled) if (n && !player(s, pid).lost) draw(s, pid, n);
+      // Elixir: the controller gains as much life as cards went into their own library.
+      if (e.gainThatMany) gainLife(s, ctx.controller, shuffled.filter(([pid]) => pid === ctx.controller).reduce((a, [, n]) => a + n, 0));
       return;
     }
     case "handToBottomDraw": {

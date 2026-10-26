@@ -356,7 +356,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "commandersMv":
       return Math.max(0, ...Object.values(s.objects).filter((o) => o.isCommander && o.owner === ctx.controller).map((o) => (o.zone === "battlefield" ? (view(o)?.manaValue ?? 0) : defMv(defOf(s, o)))));
     case "commanderCasts":
-      return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
+      return (c.who ? refPlayers(s, c.who, ctx) : [ctx.controller]).reduce((n, pid) => n + Object.values(s.players[pid]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0), 0);
     case "party":
       return partySize(s, ctx.controller, view);
     case "unspentMana": {

@@ -1339,6 +1339,8 @@ export interface TurnLog {
   sacrificed?: { player: PlayerId; types: string[]; subtypes: string[]; /** It was a token (Evendo Brushrazer's "a nontoken permanent"). */ token?: true }[];
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
+  /** The owners of cards that left their graveyard this turn (Gau, Feral Youth). */
+  leftGraveyard?: PlayerId[];
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
   plusOnes?: { by: PlayerId; controller: PlayerId; creature: boolean; id: ObjectId; zc: number; n: number }[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */

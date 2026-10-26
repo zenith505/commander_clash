@@ -1,7 +1,7 @@
 # Roadmap
 
-24,761 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,505 of
+24,822 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,544 of
 9,979 (85%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -182,24 +182,36 @@ line blocks.
    greatest power among creatures that entered this turn), Kyoshi Island Plaza (Shrines you control), Widespread
    Brutality (the amassed Army deals damage equal to its power). Round 171 went down the list to Hunter's Blowgun (rank
    7,721), skipping over the cards still listed by `npm run popular`.
+   Out after round 172: Primal Growth ("Kicker—Sacrifice a creature": a kicker that isn't mana needs its own cast
+   choice and prompt), Grinning Ignus (a mana ability with "return ~ to its owner's hand" as a cost: mana abilities
+   don't take that cost yet), Plague Reaver ("return it to the battlefield under that player's control at the
+   beginning of their next upkeep": a delayed return under an opponent's control), Elenda, Saint of Dusk (its second
+   sentence, "an additional +5/+5 as long as", is a static of its own). Round 172 took the cards from the list below
+   that parse with small pieces (Tainted Remedy, Balan, Marcus, Serra the Benevolent, Oblivion Stone, Curator's Ward
+   and others) and easy ones further down, to Grinning Ignus (rank 8,293); `npm run popular` from Godsend (rank
+   7,725) on is still to go through.
    Next most played: Godsend, Kiora, the Crashing Wave, The Red Terror, Amped Raptor, Repeated Reverberation, Obeka,
    Brute Chronologist, Outlaws' Merriment, Moldgraf Monstrosity, Myojin of Cryptic Dreams, Radagast the Brown, Caves
    of Chaos Adventurer, Errant and Giada, Quicksilver Elemental, Secret of Bloodbending, Chiss-Goria, Forge Tyrant,
    Molecule Man, Runadi, Behemoth Caller, Confiscation Coup, Gryff's Boon, Zoyowa Lava-Tongue, Don't Move, Role
-   Reversal; and from before round 171: Grindstone, Halo Forager, Moritte of the Frost, Reyhan, Last of the Abzan,
-   Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal Extortion, Hot Pursuit, Reidane, God
-   of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper, Jolted Awake, Dream-Thief's Bandana,
-   Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication, Calamity, Galloping Inferno, Shifting
-   Grift, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant, Kaervek, the Punisher,
-   Crawling Barrens, Balan, Wandering Knight, Marcus, Mutant Mayor, Soul Snare, Primal Growth, Tainted Remedy, Plague
-   Drone, Roar of Challenge, Obsessive Pursuit, Serra the Benevolent, Gemcutter Buccaneer, Oblivion Stone, Nissa of
-   Shadowed Boughs, Chandra, Flameshaper, Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko,
-   Zaxara, the Exemplary, Curator's Ward, Realm of Koh, Mercurial Spelldancer, Vraska, the Silencer, Vren, the
-   Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft Engine, Agatha of the Vile Cauldron, The Ancient One,
-   Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of Herons, Shelob, Dread Weaver, Price of Glory, Roar of
-   Resistance, Heartless Conscription, Bloatfly Swarm, War's Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond,
-   Rot Hulk, Thieving Amalgam.
+   Reversal, Scriv, the Obligator, Craig Boone, Novac Guard, Repay in Kind, Spelltwine, Howlpack Piper, Ultimate
+   Magic: Meteor, Spectral Searchlight, Recommission, Rat King, Verminister, Vampire Gourmand, Sage of Hours,
+   Valgavoth's Onslaught, Motivated Pony; and from before round 172: Grindstone, Halo Forager, Moritte of the Frost,
+   Reyhan, Last of the Abzan, Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal Extortion,
+   Hot Pursuit, Reidane, God of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper, Jolted
+   Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
+   Calamity, Galloping Inferno, Shifting Grift, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six,
+   Crystalline Giant, Kaervek, the Punisher, Obsessive Pursuit, Gemcutter Buccaneer, Nissa of Shadowed Boughs,
+   Chandra, Flameshaper, Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the
+   Exemplary, Realm of Koh, Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker,
+   The Mycotyrant, Lifecraft Engine, Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal
+   Illuminator, Sigarda, Host of Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless
+   Conscription, Bloatfly Swarm, War's Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving
+   Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 172: bots don't avoid gaining life under an opponent's Tainted Remedy or Plague Drone;
+   Kellan, Daring Traveler's test uses its creature face alone; "a card left your graveyard this turn" counts cards,
+   not tokens, by their owner.
    Smaller gaps from round 170: "if that creature was a Cleric" (Taborax) reads the dead creature's last known
    subtypes only when the condition is about types alone; Stranglehold stops searches that pick from the library
    (search and name-a-card effects), not "look at the top N" effects (those aren't searches, CR 701.23); Curator

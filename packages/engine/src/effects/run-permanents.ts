@@ -1282,6 +1282,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attachAll": {
+      // Balan: each Equipment that isn't attached to the source already (CR 701.3c) and could be (CR 701.3b).
+      const host = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!host || host.zone !== "battlefield" || (ctx.sourceZc !== undefined && (host.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      for (const id of [...s.battlefield]) {
+        const o = obj(s, id);
+        if (o.id !== host.id && o.attachedTo !== host.id && objectMatches(s, e.filter, o, ctx.controller, false)) attachTo(s, o, host);
+      }
+      return;
+    }
     case "doubleX": {
       // Unbound Flourishing: the spell's X on the stack (CR 107.3a), doubled; gone from the stack, nothing happens.
       const item = s.stack.find((x) => x.id === ctx.cause && x.kind === "spell");

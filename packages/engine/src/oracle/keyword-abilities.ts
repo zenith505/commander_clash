@@ -705,7 +705,7 @@ export function firebending(n: Amount, text: string): TriggeredAbility {
 
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
-  const plus = (n: number, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
+  const plus = (n: Amount, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
   // "Ward—{2}, Pay 2 life" is one keyword; so is "Mobilize X, where X is ...".
   for (const raw of line.split(/(?<!ward—(?:\{[^}]+\})+)(?<!^mobilize X)[,;]\s*/i)) {
     const p = raw.trim();
@@ -1000,6 +1000,19 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       const n = Number(m[1]);
       const spirit: TokenSpec = { name: "Spirit", power: 1, toughness: 1, colors: ["W", "B"], types: ["Creature"], subtypes: ["Spirit"], keywords: ["Flying"] };
       out.triggers.push({ event: "selfToGraveyard", body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n, token: spirit }], text: `Afterlife ${n}: create ${n === 1 ? "a" : n} 1/1 white and black Spirit creature token${n > 1 ? "s" : ""} with flying.` } });
+    } else if ((m = /^recover ((?:\{[0-9WUBRG]\})+)$/i.exec(p))) {
+      // CR 702.59a: "When a creature is put into your graveyard from the battlefield, you may pay [cost]. If you do, return
+      // this card from your graveyard to your hand. Otherwise, exile this card." It works only from the graveyard; a card
+      // no longer there is neither returned nor exiled, so then there's nothing to ask (checked like an intervening "if",
+      // CR 603.4: paying would do nothing).
+      const cost = m[1]!.toUpperCase();
+      out.triggers.push({
+        event: "permanentDies",
+        dies: { filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], owner: "you", text: "creature you own" } },
+        body: { targets: [], effects: [{ type: "may", pay: { mana: cost }, effects: [{ type: "bounce", what: { ref: "selfCard" } }], otherwise: [{ type: "exile", what: { ref: "selfCard" } }], text: `pay ${cost} to return ~ to your hand (otherwise ~ is exiled)` }], text: `Recover ${cost}: you may pay ${cost}. If you do, return ~ from your graveyard to your hand. Otherwise, exile ~.` },
+        zone: "graveyard",
+        ifCond: { kind: "selfInGraveyard" },
+      });
     } else if ((m = /^bloodthirst (\d+)$/i.exec(p))) out.bloodthirst += Number(m[1]); // CR 702.54a
     else if ((m = /^devour(?: (artifact|food|land))? (\d+)$/i.exec(p))) {
       // CR 702.82a, c: "Devour [quality] N": as it enters, sacrifice any number of [quality] permanents (creatures).
@@ -1174,9 +1187,10 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         body: { targets: [], effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "Draw a card." },
         text: `Cycling—${m[1]}`,
       });
-    } else if ((m = /^reinforce (\d+)—((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+    } else if ((m = /^reinforce (\d+|X)—((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+|\{X\}(?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(p)) && (m[1] === "X") === m[2]!.startsWith("{X}")) {
       // CR 702.77a: "[Cost], Discard this card: Put N +1/+1 counters on target creature." Only from a hand (702.77b).
-      const n = Number(m[1]);
+      // "Reinforce X—{X}{W}{W}" (Swell of Courage): X counters, the X paid (CR 107.3).
+      const n: Amount = m[1] === "X" ? { count: { kind: "x" } } : Number(m[1]);
       out.activated.push({
         manaCost: m[2]!,
         tap: false,
@@ -1184,8 +1198,8 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         sorcerySpeed: false,
         zone: "hand",
         discardSelf: true,
-        body: { targets: [{ kind: "object", types: ["Creature"], text: "target creature" }], effects: [plus(n, { ref: "target", index: 0 })], text: `Put ${n === 1 ? "a +1/+1 counter" : `${n} +1/+1 counters`} on target creature.` },
-        text: `Reinforce ${n}—${m[2]}`,
+        body: { targets: [{ kind: "object", types: ["Creature"], text: "target creature" }], effects: [plus(n, { ref: "target", index: 0 })], text: `Put ${n === 1 ? "a +1/+1 counter" : `${m[1]} +1/+1 counters`} on target creature.` },
+        text: `Reinforce ${m[1]}—${m[2]}`,
       });
     } else if ((m = /^transmute ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.53a: "[Cost], Discard this card: Search your library for a card with the same mana value as the discarded

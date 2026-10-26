@@ -1292,16 +1292,17 @@ export function compile(d: CardDef): CompiledCard {
     // The Volvers: "If ~ was kicked with its {1}{W} kicker, it enters with two +1/+1 counters on it and with "Whenever ~
     // deals damage, you gain that much life."", "... with a +1/+1 counter on it and with flying": both parts of how it
     // enters (CR 614.1c), the ability for as long as it's on the battlefield. With two such lines, the counters add up.
-    const kickedWith = new RegExp(`^If ~ was kicked with its ((?:\\{[^}]+\\})+) kicker, it enters(?: the battlefield)? with ${NUM} (\\+1/\\+1) counters? on it and with (.+?)\\.?$`).exec(line);
+    // Pouncing Kavu: "If ~ was kicked, it enters with two +1/+1 counters on it and with haste": its one kicker.
+    const kickedWith = new RegExp(`^If ~ was kicked(?: with its ((?:\\{[^}]+\\})+) kicker)?, it enters(?: the battlefield)? with ${NUM} (\\+1/\\+1) counters? on it and with (.+?)\\.?$`).exec(line);
     if (kickedWith) {
       const mods = parseGrants(kickedWith[4]!);
       const prior = out.entersWithCounters;
       const priorKicks = prior && typeof prior.n === "object" && prior.n.count.kind === "sum" && prior.n.count.of.every((x) => x.kind === "wasKicked") && !prior.if ? prior.n.count.of : undefined;
       if (!mods || mods.some((m) => m.kind !== "addKeywords" && m.kind !== "addAbility") || (prior && !priorKicks)) out.unsupported.push(raw);
       else {
-        const kick = { kind: "wasKicked", cost: kickedWith[1]! } as unknown as Count;
+        const kick = { kind: "wasKicked", ...(kickedWith[1] ? { cost: kickedWith[1] } : {}) } as unknown as Count;
         out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "sum", of: [...(priorKicks ?? []), ...Array.from({ length: num(kickedWith[2]!) }, () => ({ ...kick }))] } } };
-        (out.entersKicked ??= []).push({ cost: kickedWith[1]!, mods });
+        (out.entersKicked ??= []).push({ ...(kickedWith[1] ? { cost: kickedWith[1] } : {}), mods });
       }
       continue;
     }
@@ -3718,7 +3719,8 @@ function linkExile(out: CompiledCard) {
 function checkCastingLinks(out: CompiledCard) {
   let bad = false;
   for (const k of out.entersKicked ?? []) {
-    const i = out.kicker && k.cost !== undefined ? out.kicker.costs.indexOf(k.cost) : -1;
+    // "If ~ was kicked" with one (not multi-) kicker: that one.
+    const i = out.kicker && k.cost !== undefined ? out.kicker.costs.indexOf(k.cost) : out.kicker?.costs.length === 1 && !out.kicker.multi ? 0 : -1;
     if (i < 0) bad = true;
     k.which = i;
     delete k.cost;

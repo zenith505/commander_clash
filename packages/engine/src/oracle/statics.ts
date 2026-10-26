@@ -270,6 +270,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
     return { costMod: { ...base.costMod, n: 0, colored: colors, text: line } };
   }
+  // The Leeches: "Red spells you cast cost {R} more to cast", Derelor: "Black spells you cast cost {B} more to cast": that
+  // colored mana added to the total cost (CR 601.2f).
+  if ((m = /^((?:White|Blue|Black|Red|Green) spells you cast cost) \{([WUBRG])\} (more to cast)$/.exec(text))) {
+    const base = parseCostChange(`${m[1]} {1} ${m[3]}`);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
+    return { costMod: { ...base.costMod, n: 0, moreColored: [m[2] as Color], text: line } };
+  }
   // The Defilers: "As an additional cost to cast green permanent spells, you may pay 2 life. Those spells cost {G} less to
   // cast if you paid life this way. This effect reduces only the amount of green mana you pay." An optional additional
   // cost of each spell it applies to, once per spell (rulings, CR 601.2b), and a colored reduction if it was paid (601.2f).
@@ -563,6 +570,25 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
+  // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
+  // in your graveyard"; Vengeful Firebrand: "... a Warrior card ...": one or more.
+  if ((m = /^(?:there is an? (\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
+    const amount = parseCount(`the number of ${m[1] ?? m[2]} cards in your graveyard`, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: 1 } : null;
+  }
+  // Bloodfire Enforcers: "as long as an instant card and a sorcery card are in your graveyard": one of each.
+  if ((m = /^an? (\w+) card and an? (\w+) card are in your graveyard$/.exec(text)) && m[1] !== m[2]) {
+    const conds = [m[1]!, m[2]!].map((x) => parseStaticCondition(`an ${x} card is in your graveyard`, st));
+    return conds.every(Boolean) ? { kind: "allOf", conds: conds as StaticCondition[] } : null;
+  }
+  // The Desert-matters cards of Hour of Devastation: "if you control a Desert or there is a Desert card in your graveyard".
+  if (/^you control a Desert or there is a Desert card in your graveyard$/.test(text)) {
+    const a = parseStaticCondition("you control a Desert", st);
+    const b = parseStaticCondition("there is a Desert card in your graveyard", st);
+    return a && b ? { kind: "anyOf", conds: [a, b] } : null;
+  }
+  // Swimmer in Nightmares: "as long as there are ten or more cards in a single graveyard": any player's.
+  if ((m = new RegExp(`^there are ${NUM} or more cards in a single graveyard$`).exec(text))) return parseStaticCondition(`a graveyard has ${m[1]} or more cards in it`, st);
   // Avatar of Woe: "If there are ten or more creature cards total in all graveyards": every player's together.
   if ((m = new RegExp(`^there are ${NUM} or more (\\w+) cards total in all graveyards$`).exec(text))) {
     const amount = parseCount(`the number of ${m[2]} cards in all graveyards`, null);
@@ -659,6 +685,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (text === "a card left your graveyard this turn") return { kind: "cardLeftYourGraveyard" };
   // Slick Sequence: "If you've cast another spell this turn, draw a card": checked as it resolves (rulings).
   if (text === "you've cast another spell this turn") return { kind: "castAnother", resolving: true };
+  // Soul Reap: "if you've cast another black spell this turn": as it resolves, other than itself (rulings).
+  if ((m = /^you've cast another (white|blue|black|red|green) spell this turn$/.exec(text))) return { kind: "castAnother", resolving: true, color: COLOR_WORDS[m[1]!]! };
   // Stella Lee, Wild Card: "if you've cast three or more spells this turn": of any kind.
   if ((m = new RegExp(`^you've cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "castCount", n: num(m[1]!), filter: { kind: "card", text: "spell" } };
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {

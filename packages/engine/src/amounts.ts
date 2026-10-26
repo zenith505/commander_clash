@@ -334,6 +334,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "stateIf":
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
     case "diedThisTurn":
+      if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => d.all || d.subtypes.includes(c.subtype!)).length;
       return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "plusOnesPutThisTurn":
       return (s.turnLog?.plusOnes ?? [])
@@ -830,7 +831,7 @@ function describeCount(c: Count): string {
     case "players":
       return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "diedThisTurn":
-      return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
+      return `#${c.nontoken ? "nontoken " : ""}${c.subtype ?? "creature"}s that died this turn`;
     case "plusOnesPutThisTurn":
       return `#+1/+1 counters ${c.byYou ? "you've " : ""}put on ${c.self ? "~" : `${c.onYours ? "your " : ""}${c.creature ? "creatures" : "permanents"}`} this turn`;
     case "tokensCreatedThisTurn":

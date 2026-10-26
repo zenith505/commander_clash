@@ -149,7 +149,7 @@ export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "re
   const out: ManaType[][] = [];
   const [a, b] = p.colors;
   for (let x = p.min; x <= (o.counters[p.counter] ?? 0); x++)
-    for (let i = x; i >= (b ? 0 : x); i--) out.push([...Array<ManaType>(i).fill(a!), ...Array<ManaType>(x - i).fill(b ?? a!)]);
+    for (let i = x; i >= (b ? 0 : x); i--) out.push([...Array<ManaType>(i + (p.base ?? 0)).fill(a!), ...Array<ManaType>(x - i).fill(b ?? a!)]);
   return out;
 }
 
@@ -361,7 +361,7 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
     const picks: { mana: ManaType; combo?: number }[] = combos ? combos.flatMap((c, combo) => (few && new Set(c).size > 2 ? [] : [{ mana: c[0] ?? manaChoices(s, o, ab)[0]!, combo }])) : manaChoices(s, o, ab).map((mana) => ({ mana }));
     return picks.flatMap(({ mana, combo }) => {
       const adds = manaProduced(s, o, ab, mana, combo);
-      const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length } : {};
+      const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length - (ab.produces.base ?? 0) } : {};
       const pays = ab.produces.kind === "doublePool" ? { pays: combos![combo!]! } : {};
       return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
     });

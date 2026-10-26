@@ -99,6 +99,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const toHand = e.mayElseHand ? unattached : [];
       for (const id of [...stays, ...toHand]) hits.splice(hits.indexOf(id), 1);
       const hit = hits[0];
+      if (hit) s.resolving!.revealedUntilMv = characteristics(s, obj(s, hit)).manaValue;
+      else delete s.resolving!.revealedUntilMv;
       log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
       for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in the library.`);
       // Several found for the battlefield enter at the same time (Open the Way, Kindred Summons).

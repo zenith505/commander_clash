@@ -84,7 +84,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 99, upTo: true, filter, into: "hand", reveal: true });
-    } else if ((m = /^You may (?:reveal (an? .+?) from among them and put it|put (an? .+?) from among them) into your hand$/.exec(s))) {
+    } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) into your hand$/.exec(s))) {
       // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
       const phrase = (m[1] ?? m[2])!.replace(/^an? /, "");
       const ofChosen = / of the chosen type$/.exec(phrase);

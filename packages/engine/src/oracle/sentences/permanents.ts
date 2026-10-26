@@ -398,7 +398,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^(Adapt|Monstrosity) (\d+|X)$/.exec(s))) return ctx.activated ? [{ type: m[1] === "Adapt" ? "adapt" : "monstrosity", n: amt(m[2]!) }] : null;
   // Regeneration (CR 701.19a)
   // "Regenerate each creature you control" (Golgari Charm): a shield for each, as it resolves (CR 701.19a, 611.2c).
-  if ((m = /^Regenerate (~|(?:another )?target .+|enchanted creature|equipped creature|each creature you control|all creatures you control)$/i.exec(s))) {
+  // "Regenerate all Werewolf creatures you control" (Full Moon's Rise), "each other creature you control" (Dark Dabbling).
+  if ((m = /^Regenerate (~|(?:another )?target .+|enchanted creature|equipped creature|each (?:other )?creature you control|all (?:[A-Z][a-z]+ )?creatures you control)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
   }
@@ -806,7 +807,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Gain control of all creatures until end of turn", "... all creatures target opponent controls", "... all artifacts
   // your opponents control": the permanents that match as it resolves, locked in then (CR 611.2c).
-  if ((m = /^Gain control of (all .+?)( until end of turn)?$/i.exec(s))) {
+  // Subjugate the Hobbits: "Gain control of each noncommander creature with mana value 3 or less": the same.
+  if ((m = /^Gain control of (all .+?|each (?!other\b)[^,]+?)( until end of turn)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
@@ -1009,6 +1011,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(self ? m[1]!.replace(/^~ and /, "") : m[1]!, ctx);
     if (what?.ref !== "target" || ctx.targets.length !== first + (self ? 1 : 2) || ctx.targets.slice(first).some((t) => t.kind !== "object" || t.skip)) return null;
     return [{ type: "exchangeControl", a: self ? { ref: "self" } : { ref: "target", index: first }, b: { ref: "target", index: self ? first : first + 1 } }];
+  }
+  // Curious Colossus: "each creature target opponent controls loses all abilities, becomes a Coward in addition to its other
+  // types, and has base power and toughness 1/1": with no duration, for as long as each stays on the battlefield (CR
+  // 611.2a; rulings), the creatures there as it resolves (CR 611.2c).
+  if ((m = /^((?:target|each) .+?) (loses all abilities(?:, [^,]+)*,? and has base power and toughness \d+\/\d+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!)) ? parseChanges(m[2]!.replace(/,? and /, " and ").replace(/, /g, " and ")) : null;
+    if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
   // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,

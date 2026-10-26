@@ -177,10 +177,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
-  if (!each && (m = /^the greatest mana value among (.+?) you control$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });
+  // Emissary Escort: "the greatest mana value among other artifacts you control", the source left out.
+  if (!each && (m = /^the greatest mana value among (other )?(.+?) you control$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[2]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });
     if (spec?.kind !== "object") return null;
-    return { count: { kind: "greatestManaValue", filter: { ...spec, text: `${m[1]} you control` } } };
+    return { count: { kind: "greatestManaValue", ...(m[1] ? { other: true } : {}), filter: { ...spec, text: `${m[2]} you control` } } };
   }
   // "The total mana value of historic permanents you control" (Excalibur, Sword of Eden): the sum, X counting 0 (CR 107.3).
   // Summon: Bahamut: "the total mana value of other permanents you control", the source left out.
@@ -464,7 +465,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit), "counters on permanents you control"
   // (Hydra Trainer): the counters on those permanents added up.
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
-  if ((m = new RegExp(`^(?:${COUNTER} )?counters (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) you control)$`).exec(p))) {
+  // Ferrafor, Young Yew: "counters among creatures target player controls": that player's.
+  if ((m = new RegExp(`^(?:${COUNTER} )?counters (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }

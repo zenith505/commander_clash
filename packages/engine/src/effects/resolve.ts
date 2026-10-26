@@ -408,6 +408,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return players(s, ref.who, ctx)
       .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
       .filter((o): o is GameObject => !!o);
+  if (ref.ref === "inCombatWithSelf") {
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return [];
+    // Blocking it (CR 509.1h), or attacking and blocked by it, while both are in combat.
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => (o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
+  }
   if (ref.ref === "diedDamagedBySelf") {
     const out: GameObject[] = [];
     for (const d of s.turnLog?.diedDamaged ?? []) {

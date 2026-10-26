@@ -120,6 +120,13 @@ export function parseDamageMod(line: string): StaticAbility | null {
     .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage")
     // Glacial Chasm, Solitary Confinement: "Prevent all damage that would be dealt to you" is the same, from any source.
     .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage")
+    // "Prevent all damage that ~ would deal to red creatures" (Indentured Oaf), "... to snow creatures" (Goblin Furrier):
+    // each time it would deal damage to one, as that damage would be dealt (CR 615.1a).
+    .replace(/^Prevent all (combat )?damage that ~ would deal to ((?:white|blue|black|red|green|snow) creature)s$/, "If ~ would deal $1damage to a $2, prevent that damage")
+    // "Prevent all combat damage that would be dealt to ~ by enchanted creatures" (Enchanted Being), "... by creatures
+    // with first strike" (Tresserhorn Skyknight), "... by Walls" (Marble Priest): sources as they deal it (CR 609.7b).
+    .replace(/^Prevent all (combat )?damage that would be dealt to ~ by creatures with (first strike)$/, "If a creature with $2 would deal $1damage to ~, prevent that damage")
+    .replace(/^Prevent all (combat )?damage that would be dealt to ~ by (enchanted creature|Wall)s$/, "If a $2 would deal $1damage to ~, prevent that damage")
     // Collective Inferno: "Double all damage that sources you control of the chosen type would deal" is the same, for each
     // source (CR 614.1a).
     .replace(/^Double all damage that sources you control of the chosen type would deal$/, "If a source of the chosen type you control would deal damage, it deals double that damage instead")

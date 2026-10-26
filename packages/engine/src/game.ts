@@ -1031,6 +1031,10 @@ export function moveObject(
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
   if (to === "battlefield" && opts.entersAs)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs });
+  // The Volvers: kicked with that kicker, it enters with those abilities (CR 614.1c), from an effect as it enters.
+  if (to === "battlefield" && o.kicked?.length)
+    for (const k of compileCard(defOf(s, o)).entersKicked ?? [])
+      if (k.which !== undefined && o.kicked.includes(k.which)) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: k.mods });
   invalidateCharacteristics(s);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
@@ -8025,7 +8029,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
-      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -8117,8 +8121,23 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   for (const f of c.attackIfNot ?? [])
     if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack while defending player controls ${f.text}`;
+  for (const what of c.attackUnlessMore ?? []) {
+    const count = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objIsType(s, obj(s, id), what === "lands" ? "Land" : "Creature")).length;
+    if (count(c.controller) <= count(defender)) return `${c.name} can't attack unless you control more ${what} than defending player`;
+  }
   return null;
 }
+/**
+ * "Can't attack unless a black or green creature also attacks" (Scarred Puma): why this attacker can't attack with these
+ * others (another creature in the declaration that fits, as it is now, CR 508.1c), or null.
+ */
+export function withoutCompany(s: GameState, id: ObjectId, attacks: { attacker: ObjectId }[]): string | null {
+  const o = obj(s, id);
+  for (const f of characteristics(s, o).attackOnlyWith ?? [])
+    if (!attacks.some((a) => a.attacker !== id && objectMatches(s, f, obj(s, a.attacker), controllerOf(s, o), false))) return `${nameOf(s, id)} can't attack unless ${f.text} also attacks`;
+  return null;
+}
+
 /** Did `them` attack `you` during their last turn (their latest one that has begun, or the one before it while it's theirs)? */
 export function attackedYouLastTurn(s: GameState, them: PlayerId, you: PlayerId): boolean {
   const p = player(s, them);
@@ -8235,6 +8254,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   // "Can't attack alone": the only creature declared as an attacker attacks alone (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) throw new RulesError(`${nameOf(s, attacks[0]!.attacker)} can't attack alone`);
+  const lonely = attacks.find((a) => withoutCompany(s, a.attacker, attacks));
+  if (lonely) throw new RulesError(withoutCompany(s, lonely.attacker, attacks)!);
   const loner = attacks.length > 1 ? attacks.find((a) => characteristics(s, obj(s, a.attacker)).onlyAttacksAlone) : undefined;
   if (loner) throw new RulesError(`${nameOf(s, loner.attacker)} can only attack alone`);
   // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
@@ -8259,7 +8280,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   const limit = combatLimit(s, "attack");
   if (attacks.length > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`);
   const shirking = potentialAttackers(s, p.id).find(
-    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && opps.some((d) => free(o, d)),
+    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && !withoutCompany(s, o.id, [...attacks, { attacker: o.id }]) && opps.some((d) => free(o, d)),
   );
   const required = potentialAttackers(s, p.id).filter((o) => characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)));
   if (attacks.length >= limit) {
@@ -8505,7 +8526,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   if (mineEarlier + seen.size > mineLimit) throw new RulesError(`${p.name} can't block with more than ${mineLimit === 1 ? "one creature" : `${mineLimit} creatures`} this combat`);
   const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
     const at = characteristics(s, obj(s, b.attacker));
-    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
+    return at.allMustBlock || at.mustBeBlocked || lureBinds(s, obj(s, b.attacker), obj(s, b.blocker)) || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
   };
   // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
   // cost to block (CR 509.1c).
@@ -8574,7 +8595,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
  */
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
-  const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
+  const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked || !!characteristics(s, a).allMustBlockBy);
   const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o) || characteristics(s, o).mustBlock);
   if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
@@ -8611,10 +8632,23 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
       const shirk = could.find((b) => !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
       if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (all creatures able to block it do so)`;
     }
+    // "All Walls able to block ~ do so" (Marble Priest): each Wall able to block it does (CR 509.1c), with enough other
+    // creatures able to block it beside them against menace.
+    if (ac.allMustBlockBy && !ac.allMustBlock && !ac.maxOneBlocker) {
+      const shirk = could.find((b) => lureBinds(s, at, b) && !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
+      if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (${ac.allMustBlockBy.map((f) => f.text).join(" and ")}s able to block it do so)`;
+    }
+    if (!ac.allMustBlock && !ac.mustBeBlocked) continue;
     const blocked = blocks.some((b) => b.attacker === at.id);
     if (!blocked && could.some((b) => !full(b))) return `${ac.name} must be blocked if able`;
   }
   return null;
+}
+
+/** "All Walls able to block ~ do so" (Marble Priest): is this blocker one the attacker's requirement binds (CR 509.1c)? */
+export function lureBinds(s: GameState, at: GameObject, b: GameObject): boolean {
+  const by = characteristics(s, at).allMustBlockBy;
+  return !!by?.some((f) => objectMatches(s, f, b, controllerOf(s, at), false));
 }
 
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */

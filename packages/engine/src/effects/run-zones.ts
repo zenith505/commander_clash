@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { graveyardWays, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -2415,6 +2415,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const order = e.position === "ownersChoice" ? apnap(s, s.turnOrder) : [];
       const todo = [...objects(s, e.what, ctx)];
       if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));
+      const moved: Record<number, { id: ObjectId; zc: number }[]> = {};
       for (const o of todo) {
         let position = e.position;
         if (position === "ownersChoice") {
@@ -2438,7 +2439,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
         moveObject(s, o.id, "library", { top: position === "top" });
+        if (o.zone === "library" && !o.isToken) (moved[o.owner] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
       }
+      // Two or more cards put on top (or the bottom) of a library at once: their owner arranges them (CR 401.4), as the
+      // instruction ends.
+      for (const [owner, cards] of Object.entries(moved))
+        if (cards.length > 1) (s.graveyardOrders ??= []).push({ owner: Number(owner), cards, library: { bottom: e.position === "bottom", shuffles: player(s, Number(owner)).shuffles ?? 0, source: src } });
       return;
     }
     case "exileGraveyard": {
@@ -2461,7 +2467,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           for (const id of [...p.hand]) moveObject(s, id, "exile");
           log(s, `${src} exiles ${p.name}'s hand (${n} card${n === 1 ? "" : "s"}).`);
         }
-        const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        const flashback = (id: ObjectId) => graveyardWays(s, obj(s, id)).some((w) => w.kind === "flashback" || w.kind === "grantedFlashback");
+        const cards = p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!e.withFlashback || flashback(id)));
         const n = cards.length;
         for (const id of cards) {
           // "Creature cards exiled this way": their power as it was in the graveyard (rulings on Szat's Will).
@@ -2472,7 +2479,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
           if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, graveyard: true });
         }
-        if (e.filter) log(s, `${src} exiles ${n ? cards.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from ${p.name}'s graveyard${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
+        if (e.filter || e.withFlashback) log(s, `${src} exiles ${n ? cards.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from ${p.name}'s graveyard${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
         else log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
       }
       return;

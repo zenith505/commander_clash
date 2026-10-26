@@ -1471,7 +1471,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     })
     // "~ gets +2/+0 until end of turn and deals 1 damage to you" (Electric Eel): two instructions, both about ~.
     .flatMap((x) => {
-      const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
+      // Wormwood Dryad: "~ gains forestwalk until end of turn and deals 1 damage to you": the same.
+      const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn|~ gains [a-z]+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
     })
     .filter(Boolean);
@@ -3961,6 +3962,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = parseOne(capital(bounceWas[4]!), ctx);
       if (!then || ctx.targets.length !== before + 1) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
+      si++;
+      continue;
+    }
+    // "Destroy target creature. If that creature was green or white, its controller discards a card." (Gloomlance), "If
+    // that creature was a Human, ..." (Death's Caress), "If it wasn't attacking, ..." (Prophesied End): the creature as it
+    // last existed on the battlefield (CR 608.2h), so it's checked just before it's destroyed, and the rest happens after.
+    const destroyWas = /^[Dd]estroy target creature$/.test(s) ? /^If (?:that creature|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+))|wasn't attacking), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (destroyWas && (!destroyWas[4] || CREATURE_TYPES.has(destroyWas[4]))) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy") return null;
+      const filter: TargetSpec = destroyWas[2]
+        ? { kind: "object", types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[destroyWas[2]]!, COLOR_WORDS[destroyWas[3]!]!], text: `${destroyWas[2]} or ${destroyWas[3]}` }
+        : destroyWas[4]
+          ? { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [destroyWas[4]], text: `a ${destroyWas[4]}` }
+          : { kind: "object", types: [], notTypes: [], notColors: [], combat: "attacking", text: "attacking" };
+      const then = parseOne(capital(destroyWas[5]!), ctx);
+      if (!then || !then.length || ctx.targets.length !== before + 1) return null;
+      const yes = [...fx, ...then];
+      effects.push(destroyWas[1] === "wasn't attacking"
+        ? { type: "if", cond: { kind: "targetIs", index: before, filter }, effects: structuredClone(fx), otherwise: yes }
+        : { type: "if", cond: { kind: "targetIs", index: before, filter }, effects: yes, otherwise: structuredClone(fx) });
       si++;
       continue;
     }
@@ -7471,6 +7494,8 @@ function lastAllChose(e: Effect | undefined): Extract<Effect, { type: "if" }> | 
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
   s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");
+  // Psionic Entity: "~ deals 2 damage to any target and 3 damage to itself": ~ is dealt the second amount.
+  s = s.replace(/^(~ deals \d+ damage to any target and \d+ damage to) itself$/, "$1 ~");
   // "~ deals 1 damage to each opponent and each creature and planeswalker they control" (End the Festivities): theirs.
   s = s.replace(/^(~ deals (?:\d+|X) damage to each opponent and each [a-z ]+?) they control$/, "$1 your opponents control");
   // "Untap ~ and put a +1/+1 counter on it" (Grimgrin, Corpse-Born): "it" is ~.

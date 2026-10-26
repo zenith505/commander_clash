@@ -329,6 +329,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: i } });
   }
   if (each ? /^1 life your opponents have lost this turn$/i.test(p) : /^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p)) return count({ kind: "opponentsLifeLost" });
+  // Inquisition: "the number of white cards in their hand" (revealed just before).
+  if ((m = /^((?:white|blue|black|red|green|creature|land|nonland|artifact|enchantment|instant|sorcery) cards?) in (your|that player's|target player's|their|target opponent's) hand$/i.exec(p))) {
+    const who = whosePlayer(m[2]!, ctx);
+    const filter = parseSearchFilter(m[1]!.replace(/s$/, ""));
+    return who && filter ? count({ kind: "cardsInHand", who, filter }) : null;
+  }
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });

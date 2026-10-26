@@ -179,6 +179,10 @@ export interface Characteristics {
   attackUnless: TargetSpec[];
   /** "Can't attack if defending player controls ..." (Mogg Jailer): what the defending player mustn't control. */
   attackIfNot?: TargetSpec[];
+  /** "Can't attack unless you control more lands than defending player" (Monstrous Hound). */
+  attackUnlessMore?: ("lands" | "creatures")[];
+  /** "Can't attack unless a black or green creature also attacks" (Scarred Puma): another attacker fitting each. */
+  attackOnlyWith?: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -202,6 +206,8 @@ export interface Characteristics {
   cantAttackPlayersOnly: PlayerId[];
   mustBeBlocked: boolean;
   allMustBlock: boolean;
+  /** "All Walls able to block ~ do so" (Marble Priest): the blockers that must block it, if able (CR 509.1c). */
+  allMustBlockBy?: TargetSpec[];
   mustBlock: boolean;
   /** Doran: assigns combat damage by its toughness, always or only while its toughness is greater than its power. */
   assignsToughness: boolean;
@@ -330,6 +336,9 @@ const copyChars = (c: Characteristics): Characteristics => ({
   cantBlockCreatures: [...c.cantBlockCreatures],
   attackUnless: [...c.attackUnless],
   ...(c.attackIfNot ? { attackIfNot: [...c.attackIfNot] } : {}),
+  ...(c.attackUnlessMore ? { attackUnlessMore: [...c.attackUnlessMore] } : {}),
+  ...(c.attackOnlyWith ? { attackOnlyWith: [...c.attackOnlyWith] } : {}),
+  ...(c.allMustBlockBy ? { allMustBlockBy: [...c.allMustBlockBy] } : {}),
   goadedBy: [...c.goadedBy],
   mustAttack: [...c.mustAttack],
 });
@@ -778,6 +787,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       for (const [id, c] of chars) if (id !== sourceId && s.objects[id]!.owner === you && c.controller === you && c.name === partner && c.types.includes(cond.type)) return true;
       return false;
     }
+    case "moreThanActive": {
+      // The layers' view: a land or creature as the earlier layers left it (CR 613).
+      const count = (p: PlayerId) => [...chars.values()].filter((c) => c.controller === p && c.types.includes(cond.what === "lands" ? "Land" : "Creature")).length;
+      return (count(you) > count(s.activePlayer)) !== !!cond.not;
+    }
     case "onBattlefield": {
       let n = 0;
       for (const [id, c] of chars) if (!(cond.other && id === sourceId) && objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
@@ -1023,7 +1037,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // "Defending player" is the player the source is attacking (CR 506.2); it has none otherwise.
       // "An opponent controls seven or more lands": any one opponent.
       const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
-      return whose.some((who) => {
+      return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.
         const names = new Set<string>();
@@ -1383,6 +1397,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackIf":
       (c.attackIfNot ??= []).push(m.defenderControls);
       return;
+    case "cantAttackUnlessAlso":
+      c.attackOnlyWith = [...(c.attackOnlyWith ?? []), m.filter];
+      return;
+    case "cantAttackUnlessMore":
+      if (!c.attackUnlessMore?.includes(m.what)) c.attackUnlessMore = [...(c.attackUnlessMore ?? []), m.what];
+      return;
     case "cantBeBlockedByLesserPower":
       if (m.than === "source") {
         if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
@@ -1407,9 +1427,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
     case "attackAsThoughHaste":
-    case "allMustBlock":
     case "mustBlock":
       c[m.kind] = true;
+      return;
+    case "allMustBlock":
+      if (m.by) c.allMustBlockBy = [...(c.allMustBlockBy ?? []), m.by];
+      else c.allMustBlock = true;
       return;
     case "cantAttackOwner":
       c.cantAttackOwner = true;

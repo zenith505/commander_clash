@@ -180,6 +180,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Topiary Stomper: "~ can't attack or block unless you control seven or more lands", Desperate Castaways "... unless you
   // control an artifact": the restriction applies while the "you control" condition is false (negated below).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (you control (?!more )[^,]+)$/.exec(text))) [statement, cond, negate] = [m[1], m[2], true];
+  // Wirecat: "~ can't attack or block if an enchantment is on the battlefield"; Branded Brawlers: "~ can't block if you
+  // control an untapped land": the restriction applies while that's so.
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) if (an? [^,]+ is on the battlefield|you control (?!more )[^,]+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  // Glacial Crasher: "~ can't attack unless there is a Mountain on the battlefield": anyone's (rulings).
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless there is (an? [^,]+) on the battlefield$/.exec(text))) [statement, cond] = [m[1], `no ${m[2]!.replace(/^an? /, "").replace(/(?<!s)$/, "s")} are on the battlefield`];
+  // Monstrous Hound: "~ can't block unless you control more lands than attacking player": the active player, the only
+  // one whose creatures attack (CR 506.2, 508.1).
+  else if ((m = /^(~ can't block) unless you control more (lands|creatures) than attacking player$/.exec(text))) [statement, cond] = [m[1], `you don't control more ${m[2]} than the active player`];
   // Flowering Lumberknot: "~ can't attack or block unless it's paired with a creature with soulbond".
   // Sab-Sunen, Luxa Embodied: "~ can't attack or block unless it has an even number of counters on it" (of all kinds).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
@@ -812,6 +820,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount ? { kind: "amount", amount, ...(m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) }) } : null;
   }
   // Pestilence: "if no creatures are on the battlefield".
+  // Wirecat: "if an enchantment is on the battlefield": anyone's.
+  if ((m = /^an? (.+) is on the battlefield$/.exec(text))) {
+    const g = parseGroup(`all ${m[1]}s`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1 } : null;
+  }
+  if ((m = /^you (don't )?control more (lands|creatures) than the active player$/.exec(text))) return { kind: "moreThanActive", what: m[2] as "lands" | "creatures", ...(m[1] ? { not: true as const } : {}) };
   if ((m = /^no (.+) (?:are|is) on the battlefield$/.exec(text))) {
     const g = parseGroup(`all ${m[1]}`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, max: 0 } : null;
@@ -872,6 +886,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you don't control an? (.+)$/.exec(text))) {
     const c = parseStaticCondition(`you control a ${m[1]}`, st);
     return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
+  }
+  // "As long as no opponent controls a creature" (Vexing Beetle), "... a white or blue creature" (Skittish Kavu): none of
+  // them does (an opponent still in the game).
+  if ((m = /^no opponent controls (an? .+)$/.exec(text))) {
+    const c = parseStaticCondition(`an opponent controls ${m[1]}`, st);
+    return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0, every: true } : null;
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
@@ -1125,6 +1145,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = m[4] ? parseStaticMods(m[4]) : [];
     return more && [{ kind: "addTypes", types: ["Creature"], subtypes: m[3] ? [m[3]] : [] }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more];
   }
+  // The Possessed creatures: "gets +1/+1, is black, and has "..."": its color is black instead (layer 5, CR 105.3, 613.1e).
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), is (white|blue|black|red|green),? and ((?:has|have) .+)$`).exec(rest))) {
+    const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(m[5]!)];
+    return a && b ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }, ...b] : null;
+  }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -1226,6 +1251,15 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
+  // Scarred Puma: "can't attack unless a black or green creature also attacks": another one, declared with it (rulings,
+  // CR 508.1c).
+  if ((m = /^can't attack unless (an? .+) also attacks$/.exec(rest))) {
+    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    return filter?.kind === "object" && !filter.controller && filter.types?.includes("Creature") ? [{ kind: "cantAttackUnlessAlso", filter: { ...filter, text: m[1]! } }] : null;
+  }
+  // Monstrous Hound, Mogg Toady: "can't attack unless you control more lands than defending player": the player it would
+  // attack (CR 506.2), compared as attackers are declared.
+  if ((m = /^can't attack unless you control more (lands|creatures) than defending player$/.exec(rest))) return [{ kind: "cantAttackUnlessMore", what: m[1] as "lands" | "creatures" }];
   // Mogg Jailer, Orgg: "can't attack if defending player controls an untapped creature with power 2 or less", whether or
   // not that creature could block (rulings).
   if ((m = /^can't attack if defending player controls (an? .+)$/.exec(rest))) {
@@ -1704,6 +1738,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (/^Creatures your opponents control with power less than ~'s power are goaded$/.test(text))
     return { affects: { kind: "filter", types: ["Creature"], controller: "opponent", lesserPowerThanSource: true }, mods: [{ kind: "goad" }], text: line };
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
+  // Marble Priest: "All Walls able to block ~ do so": only Walls (CR 509.1c), any player's.
+  const lureBy = /^All ([A-Z][a-z]+)s able to block ~ do so$/.exec(text);
+  if (lureBy && CREATURE_TYPES.has(lureBy[1]!))
+    return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock", by: { kind: "object", types: ["Creature"], subtypes: [lureBy[1]!], text: lureBy[1]! } }], text: line };
   if (/^All creatures able to block (enchanted|equipped) creature do so$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line };
   // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).
   const unblocked = [{ kind: "unblockedDamage" }] as const;

@@ -18,7 +18,7 @@ import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseBecomes } from "./sentence";
 import { PLANESWALKER_TYPES, parseGroup, parseTargetPhrase } from "./targets";
-import { backupTriggers } from "./grants";
+import { backupTriggers, parseGrants } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
@@ -1287,6 +1287,22 @@ export function compile(d: CardDef): CompiledCard {
           counter: kickedCounters[3] === "-1/-1" ? "-1/-1" : "+1/+1",
           n: { count: { kind: "wasKicked", ...(kickedCounters[1] ? { cost: kickedCounters[1] } : {}) } as Count, times: num(kickedCounters[2]!) },
         };
+      continue;
+    }
+    // The Volvers: "If ~ was kicked with its {1}{W} kicker, it enters with two +1/+1 counters on it and with "Whenever ~
+    // deals damage, you gain that much life."", "... with a +1/+1 counter on it and with flying": both parts of how it
+    // enters (CR 614.1c), the ability for as long as it's on the battlefield. With two such lines, the counters add up.
+    const kickedWith = new RegExp(`^If ~ was kicked with its ((?:\\{[^}]+\\})+) kicker, it enters(?: the battlefield)? with ${NUM} (\\+1/\\+1) counters? on it and with (.+?)\\.?$`).exec(line);
+    if (kickedWith) {
+      const mods = parseGrants(kickedWith[4]!);
+      const prior = out.entersWithCounters;
+      const priorKicks = prior && typeof prior.n === "object" && prior.n.count.kind === "sum" && prior.n.count.of.every((x) => x.kind === "wasKicked") && !prior.if ? prior.n.count.of : undefined;
+      if (!mods || mods.some((m) => m.kind !== "addKeywords" && m.kind !== "addAbility") || (prior && !priorKicks)) out.unsupported.push(raw);
+      else {
+        const kick = { kind: "wasKicked", cost: kickedWith[1]! } as unknown as Count;
+        out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "sum", of: [...(priorKicks ?? []), ...Array.from({ length: num(kickedWith[2]!) }, () => ({ ...kick }))] } } };
+        (out.entersKicked ??= []).push({ cost: kickedWith[1]!, mods });
+      }
       continue;
     }
     // Adamant: "If at least three white mana was spent to cast ~, ~ enters with a +1/+1 counter on it." (CR 614.1c, 601.2h)
@@ -3123,7 +3139,10 @@ export function compile(d: CardDef): CompiledCard {
     // Jetmir: "Creatures you control also get +1/+0 and have trample as long as ...": "also" only says it adds to the line
     // before it; each line is its own static ability (CR 604.1).
     const also = /^(Creatures you control) also (get .+ as long as .+)$/.exec(line);
-    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(line) ?? parseConditionalStatic(line);
+    // Ivory Guardians: "Creatures named ~ get +1/+1 as long as ...": every creature with its name, anyone's, itself too
+    // (rulings); each such ability applies once.
+    const named = /^Creatures named ~ /.test(line) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
+    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(named) ?? parseConditionalStatic(named);
     if (st) {
       out.statics.push(st);
       continue;
@@ -3680,6 +3699,12 @@ function linkExile(out: CompiledCard) {
  */
 function checkCastingLinks(out: CompiledCard) {
   let bad = false;
+  for (const k of out.entersKicked ?? []) {
+    const i = out.kicker && k.cost !== undefined ? out.kicker.costs.indexOf(k.cost) : -1;
+    if (i < 0) bad = true;
+    k.which = i;
+    delete k.cost;
+  }
   const visit = (v: unknown): void => {
     if (Array.isArray(v)) return v.forEach(visit);
     if (!v || typeof v !== "object") return;

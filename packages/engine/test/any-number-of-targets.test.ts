@@ -115,7 +115,11 @@ describe("any number of targets", () => {
       s0.players[ap]!.graveyard.push(id);
       return id;
     }) as [ObjectId, ObjectId];
-    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a), target(b)])));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a), target(b)])));
+    // Its owner puts the two in the order they like (CR 401.4), then draws.
+    expect(s.pending).toMatchObject({ kind: "orderLibrary", player: ap });
+    s = settle(act(s, { type: "orderLibrary", player: ap, order: [b, a] }));
+    expect(zone(s, b)).toBe("hand");
     const lib = s.players[ap]!.library;
     const drawn = [a, b].filter((id) => zone(s, id) === "hand");
     expect(drawn).toHaveLength(1);

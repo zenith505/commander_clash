@@ -219,7 +219,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.discards ?? []).reduce((n, d) => n + (who.includes(d.player) ? d.cards.length : 0), 0);
     }
     case "cardsInHand":
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (c.filter ? s.players[pid]!.hand.filter((id) => printedMatches(c.filter!, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     case "cardsInLibrary":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
     case "greatestPowerExiled":

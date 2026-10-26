@@ -81,7 +81,7 @@ export function askGraveyardOrder(s: GameState): boolean {
       if ((p.shuffles ?? 0) !== g.library.shuffles || p.lost) continue;
       const there = new Set(g.cards.filter((c) => s.objects[c.id]?.zone === "library" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id));
       if (there.size < 2) continue;
-      s.pending = { kind: "orderLibrary", player: p.id, cards: p.library.filter((id) => there.has(id)), ...(g.library.bottom ? { bottom: true as const } : {}), source: "The cards of a merged permanent put into your library" };
+      s.pending = { kind: "orderLibrary", player: p.id, cards: p.library.filter((id) => there.has(id)), ...(g.library.bottom ? { bottom: true as const } : {}), source: g.library.source ?? "The cards of a merged permanent put into your library" };
       return true;
     }
     const here = new Set(g.cards.filter((c) => s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id));

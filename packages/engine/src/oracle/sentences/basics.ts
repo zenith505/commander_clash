@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -189,6 +189,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((ctx.subjectIt || ctx.subject) && (m = /^[Ii]ts controller may draw a card( if its power is greater than each other creature's power)?$/.exec(s))) {
     const may: Effect = { type: "eachMay", who: { ref: "subjectController" }, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] };
     return m[1] ? [{ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: "power", greatest: true } }, effects: [may] }] : [may];
+  }
+  // Harbor Guardian: "Whenever ~ attacks, defending player may draw a card": that player decides (rulings).
+  if (ctx.defending && /^[Dd]efending player may draw a card$/.test(s)) {
+    const who = parsePlayer("defending player", ctx);
+    return who && [{ type: "eachMay", who, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] }];
   }
   // Brood Sliver: "its controller may create a 1/1 colorless Sliver creature token": the creature's controller decides,
   // and the token is theirs.
@@ -583,10 +588,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Sacrifice ~ unless you sacrifice a land" (Bog Elemental, The Gitrog Monster): sacrificing one keeps it; with none to
   // sacrifice, or choosing not to, it's sacrificed.
-  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
-    const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
+  // "... unless you sacrifice two Swamps" (Mold Demon): both, or it's sacrificed (with fewer, they can't be).
+  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const two = /^two /.test(m[2]!);
+    const filter = pickFilter(two ? singular(m[2]!.slice(4)) : m[2]!.replace(/^(?:an?|another) /, ""));
     if (!filter || / or |,/.test(m[2]!)) return null;
-    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: 1, action: "sacrifice" }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice ${m[2]} to keep ~` }];
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: two ? 2 : 1, action: "sacrifice" }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice ${m[2]} to keep ~` }];
   }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
   if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);

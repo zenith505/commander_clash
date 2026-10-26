@@ -209,6 +209,10 @@ export interface Characteristics {
   attackAsThoughHaste: boolean;
   /** "Can attack players who attacked you during their last turn as though it didn't have defender" (Weathered Sentinels). */
   attackDespiteDefenderVs: boolean;
+  /** "Can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy). */
+  blocksLandwalkers: boolean;
+  /** "Can block creatures with shadow as though it had shadow" (Heartwood Dryad). */
+  blocksShadow: boolean;
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
   extraBlocks: number;
   blockAny: boolean;
@@ -301,6 +305,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackDespiteDefender: false,
     attackAsThoughHaste: false,
     attackDespiteDefenderVs: false,
+    blocksLandwalkers: false,
+    blocksShadow: false,
     extraBlocks: 0,
     blockAny: false,
   };
@@ -954,6 +960,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "self": {
       if (cond.not) return !conditionMet(s, { kind: "self", is: cond.is }, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
       if (cond.is === "attacking") return src.attacking !== undefined;
+      if (cond.is === "blocking") return !!src.blocking?.length;
+      if (cond.is === "attackingOrBlocking") return src.attacking !== undefined || !!src.blocking?.length;
+      // Blocked: it stays blocked once blockers are declared for it, even if they all leave combat (CR 509.1h).
+      if (cond.is === "blocked") return src.attacking !== undefined && src.blockedBy !== undefined;
+      if (cond.is === "hasBlockers") return src.attacking !== undefined && !!src.blockedBy?.length;
       // CR 506.5: "attacking alone" means it's attacking and no other creature is.
       if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
@@ -1378,6 +1389,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "attackDespiteDefender":
       if (m.vsAttackedYou) c.attackDespiteDefenderVs = true;
       else c.attackDespiteDefender = true;
+      return;
+    case "blockAsThough":
+      if (m.walk) c.blocksLandwalkers = true;
+      if (m.shadow) c.blocksShadow = true;
       return;
     case "assignsToughness":
       if (m.ifGreater) c.assignsToughnessIfGreater = true;

@@ -805,8 +805,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).
   if ((m = /^~ (is|isn't) prepared$/.exec(text))) return { kind: "self", is: "prepared", ...(m[1] === "isn't" ? { not: true as const } : {}) };
   // "It" is the source only when the ability is about the source itself.
-  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
-  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
+  if (/^at least one creature is blocking ~$/.test(text)) return { kind: "self", is: "hasBlockers" };
+  // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
+  const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
@@ -1115,7 +1117,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?)(?:,? and|, (?:has|have) (.+?),? and) (can block .+)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const grants = m[4] ? parseGrants(m[4]) : [];
-    const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
+    // "... and can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy).
+    const asThough = /^can block creatures with .+ as though /.test(m[5]!) ? parseStaticMods(m[5]!)?.[0] : undefined;
+    const more = / this turn$/.test(m[5]!) ? null : (asThough ?? parseExtraBlocks(m[5]!));
     return first && grants && more ? [...first, ...grants, more] : null;
   }
   // Assault Suit: "gets +2/+2, has haste, can't attack you or planeswalkers you control, and can't be sacrificed".
@@ -1287,10 +1291,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];
   if (/^can attack as though (?:it|they) didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender" }];
   if (/^can attack as though (?:it|they) had haste$/.test(rest)) return [{ kind: "attackAsThoughHaste" }];
+  if (/^can block creatures with landwalk abilities as though they didn't have those abilities$/.test(rest)) return [{ kind: "blockAsThough", walk: true }];
+  if (/^can block creatures with shadow as though (?:it|they) had shadow$/.test(rest)) return [{ kind: "blockAsThough", shadow: true }];
   if (/^can attack players who attacked you during their last turn as though it didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender", vsAttackedYou: true }];
   // "Gets +0/+2 and assigns combat damage equal to its toughness ..." (Gauntlets of Light), "assigns ... and can attack
   // as though it didn't have defender" (Arcades).
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|assigns? combat damage .+?) and (assigns? combat damage .+|can attack as though .+)$`).exec(rest))) {
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|assigns? combat damage .+?) and (assigns? combat damage .+|can attack as though .+|can block creatures with .+)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;

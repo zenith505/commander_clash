@@ -681,8 +681,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^~ gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it( beyond the first)?$/.exec(s)))
     return [{ type: "pumpPerBlocker", what: { ref: "self" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: !!m[3] }];
   // Prevention (CR 615): shields for the next N damage this turn, and Fog.
-  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to (any target|target .+?) this turn$`, "i").exec(s))) {
-    const to = /^any target$/i.test(m[2]!) ? parseDamageRecipient(m[2]!, ctx) : parseObject(m[2]!, ctx);
+  // "... dealt to ~ this turn" (Revered Elder), "to you" (Conservator), "to target player or planeswalker" (Noble Vestige),
+  // "dealt this turn to target creature you control" (Samite Alchemist), "to enchanted creature" (Fylgja).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt (?:to (any target|target .+?|~|it|you|enchanted creature|equipped creature) this turn|this turn to (target .+?|~|you))$`, "i").exec(s))) {
+    const who = (m[2] ?? m[3])!;
+    // "It" in an ability that says nothing else it could be is its source (Balduvian Hydra).
+    const self = /^it$/i.test(who) && !ctx.spell && !ctx.targets.length && !ctx.subject && !ctx.subjectIt;
+    const to = /^(?:any target|target (?:player|opponent) or planeswalker)$/i.test(who) ? parseDamageRecipient(who, ctx) : /^you$/i.test(who) ? ({ ref: "you" } as const) : self ? ({ ref: "self" } as const) : parseObject(who, ctx);
     return to ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];

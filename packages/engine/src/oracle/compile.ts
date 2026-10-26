@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, isLandwalk, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -2571,6 +2571,12 @@ export function compile(d: CardDef): CompiledCard {
     // Lavinia, Azorius Renegade: X as chosen (rulings), the lands that player controls as they cast it (CR 601.3).
     if (line === "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls.") {
       out.opponentsNoncreatureMvAboveLands = true;
+      continue;
+    }
+    // Undertow, Staff of the Ages (CompiledCard.walkBlockable).
+    const walkable = /^Creatures with (\w+walk|landwalk abilities) can be blocked as though they didn't have (\w+walk|those abilities)\.$/.exec(line);
+    if (walkable && (walkable[1] === walkable[2] || (walkable[1] === "landwalk abilities" && walkable[2] === "those abilities")) && (walkable[1] === "landwalk abilities" || isLandwalk(capital(walkable[1]!)))) {
+      (out.walkBlockable ??= []).push(walkable[1] === "landwalk abilities" ? "*" : capital(walkable[1]!));
       continue;
     }
     if (line === "Your opponents can't block with creatures with even mana values.") {

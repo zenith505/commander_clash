@@ -1280,6 +1280,11 @@ export type Modification =
   | { kind: "assignsToughness"; ifGreater?: true }
   /** "Can attack as though it didn't have defender" (CR 702.3b). */
   | { kind: "attackDespiteDefender"; /** Only players who attacked you during their last turn (Weathered Sentinels). */ vsAttackedYou?: true }
+  /**
+   * "Can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy), "can block
+   * creatures with shadow as though it had shadow" (Heartwood Dryad): evasion it ignores as it blocks (CR 509.1b).
+   */
+  | { kind: "blockAsThough"; walk?: true; shadow?: true }
   /** "Enchanted creature can attack as though it had haste" (Instill Energy): it may attack while summoning sick (CR 302.6); its {T} abilities still can't be activated. */
   | { kind: "attackAsThoughHaste" }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
@@ -1398,7 +1403,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -5028,6 +5033,12 @@ export interface CompiledCard {
   opponentsNoncreatureMvAboveLands?: true;
   /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */
   opponentsCantBlockEven?: true;
+  /**
+   * "Creatures with islandwalk can be blocked as though they didn't have islandwalk" (Undertow), "creatures with landwalk
+   * abilities can be blocked as though they didn't have those abilities" (Staff of the Ages, "*"): any creature may block
+   * them as though they hadn't (CR 509.1b; rulings: it doesn't take the ability away).
+   */
+  walkBlockable?: string[];
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
   /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */

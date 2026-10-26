@@ -29,6 +29,13 @@ export const SUPPORTED_KEYWORDS = [
   "Snow landwalk",
   "Legendary landwalk",
   "Nonbasic landwalk",
+  // A supertype and a land type (CR 702.14c: "snow swampwalk", a snow Swamp), and Desertwalk (Desert Nomads).
+  "Snow plainswalk",
+  "Snow islandwalk",
+  "Snow swampwalk",
+  "Snow mountainwalk",
+  "Snow forestwalk",
+  "Desertwalk",
   "Horsemanship", // CR 702.31b: can't be blocked except by creatures with horsemanship
   "Phasing", // CR 702.26a: phases out and in during its controller's untap step
   "Skulk", // CR 702.118b: can't be blocked by creatures with greater power
@@ -344,3 +351,21 @@ export function subtypeSet(st: string): "Creature" | "Land" | "Artifact" | "Ench
   if (SPELL_TYPES.has(st)) return "Spell";
   return null;
 }
+
+const WALK_TYPES: Record<string, string> = { plains: "Plains", island: "Island", swamp: "Swamp", mountain: "Mountain", forest: "Forest", desert: "Desert" };
+const WALK_SUPERTYPES: Record<string, { supertype: string; non?: true }> = { snow: { supertype: "Snow" }, legendary: { supertype: "Legendary" }, nonbasic: { supertype: "Basic", non: true } };
+
+/**
+ * The lands a landwalk keyword looks for (CR 702.14c): one with the land type ("islandwalk"), with or without the
+ * supertype ("snow landwalk", "nonbasic landwalk"), or with both ("snow swampwalk"). Null if it isn't landwalk.
+ */
+export function landwalkLand(keyword: string): ((land: { types: string[]; subtypes: string[]; supertypes: string[] }) => boolean) | null {
+  const m = /^(?:(snow|legendary|nonbasic) )?(plains|island|swamp|mountain|forest|desert|land)walk$/i.exec(keyword);
+  if (!m || (!m[1] && m[2]!.toLowerCase() === "land")) return null;
+  const sup = m[1] ? WALK_SUPERTYPES[m[1].toLowerCase()]! : undefined;
+  const sub = WALK_TYPES[m[2]!.toLowerCase()];
+  return (l) => l.types.includes("Land") && (!sup || l.supertypes.includes(sup.supertype) !== !!sup.non) && (!sub || l.subtypes.includes(sub));
+}
+
+/** Is this keyword a landwalk ability (CR 702.14a)? */
+export const isLandwalk = (keyword: string): boolean => !!landwalkLand(keyword);

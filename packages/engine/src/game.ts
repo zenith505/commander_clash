@@ -19,7 +19,7 @@ import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, prot
 import { countersBanned, countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, reduceSymbolsByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -27,7 +27,7 @@ import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
-import { CREATURE_TYPES, type SourceQuality } from "./keywords";
+import { CREATURE_TYPES, landwalkLand, type SourceQuality } from "./keywords";
 import { spendPlan } from "./value";
 import { cardNameOptions, currentName, nameActivationBan, nameCastBan, nameLandBan } from "./names";
 import {
@@ -8598,9 +8598,16 @@ export function provokersOf(s: GameState, b: GameObject): GameObject[] {
   return [...first, ...(b.provokedAlso ?? []).flatMap(live).filter((at) => !first.includes(at))];
 }
 
-const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };
-/** Landwalk with a supertype (CR 702.14c): a land with it, or (`non`) without it. */
-const SUPERTYPE_WALK: Record<string, { supertype: string; non?: true }> = { "Snow landwalk": { supertype: "Snow" }, "Legendary landwalk": { supertype: "Legendary" }, "Nonbasic landwalk": { supertype: "Basic", non: true } };
+/**
+ * The landwalk abilities a blocker may ignore (CR 509.1b): "*" for all of them, from its own "can block creatures with
+ * landwalk abilities as though they didn't have those abilities" (Street Savvy) or from a permanent that lets creatures
+ * with some landwalk "be blocked as though they didn't have" it (Undertow, Staff of the Ages).
+ */
+function walksIgnored(s: GameState, b: Characteristics): Set<string> {
+  const out = new Set<string>(b.blocksLandwalkers ? ["*"] : []);
+  for (const id of s.battlefield) for (const w of abilitiesOf(s, s.objects[id]!).walkBlockable ?? []) out.add(w.toLowerCase());
+  return out;
+}
 
 /**
  * Why `blocker` can't block `attacker` on its own, or null. Covers evasion and blocking
@@ -8628,7 +8635,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
   if (cantBeBlockedNow(s, attacker)) return `${a.name} can't be blocked`;
   if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach")) return `${b.name} can't block a creature with flying`; // CR 702.9b
-  if (has(a, "Shadow") !== has(b, "Shadow")) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
+  if (has(a, "Shadow") !== has(b, "Shadow") && !(has(a, "Shadow") && b.blocksShadow)) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
   if (has(a, "Fear") && !b.types.includes("Artifact") && !b.colors.includes("B")) return `${a.name} has fear`; // CR 702.36b
   if (has(a, "Intimidate") && !b.types.includes("Artifact") && !b.colors.some((c) => a.colors.includes(c))) return `${a.name} has intimidate`; // CR 702.13b
   if (protectedFrom(a.keywords, withCastThisTurn(s, blocker, b), protectionHolder(s, attacker))) return `${a.name} has protection from ${b.name}`; // CR 702.16f, 702.16k
@@ -8645,14 +8652,13 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (blocker.cantBlockThis?.some((x) => x.turn === s.turn && x.selfZc === (blocker.zoneChanges ?? 0) && x.id === attacker.id && x.zc === (attacker.zoneChanges ?? 0))) return `${b.name} can't block ${a.name} this turn`; // CR 509.1b
-  if (defender !== undefined)
-    for (const [kw, land] of Object.entries(LANDWALK))
-      if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); return controllerOf(s, l) === defender && characteristics(s, l).subtypes.includes(land); }))
-        return `${a.name} has ${kw.toLowerCase()}`; // CR 702.14c
-  if (defender !== undefined)
-    for (const [kw, w] of Object.entries(SUPERTYPE_WALK))
-      if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); const c = characteristics(s, l); return controllerOf(s, l) === defender && c.types.includes("Land") && c.supertypes.includes(w.supertype) !== !!w.non; }))
-        return `${a.name} has ${kw.toLowerCase()}`; // CR 702.14c
+  // Landwalk (CR 702.14c): not while the defending player controls such a land, unless it can be blocked as though it
+  // didn't have it.
+  const walks = defender !== undefined ? a.keywords.flatMap((kw) => (landwalkLand(kw) ? [[kw, landwalkLand(kw)!] as const] : [])) : [];
+  const ignored = walks.length ? walksIgnored(s, b) : undefined;
+  for (const [kw, land] of walks)
+    if (!ignored!.has("*") && !ignored!.has(kw.toLowerCase()) && s.battlefield.some((id) => { const l = obj(s, id); return controllerOf(s, l) === defender && land(characteristics(s, l)); }))
+      return `${a.name} has ${kw.toLowerCase()}`; // CR 702.14c
   return null;
 }
 

@@ -341,7 +341,7 @@ export type Count =
   /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
   | { kind: "mutations" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
-  | { kind: "diedThisTurn"; yours?: true; nontoken?: true }
+  | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /**
@@ -1669,7 +1669,7 @@ export type StaticCondition =
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   | { kind: "cardLeftYourGraveyard" }
-  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true }
+  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color }
   /**
    * Prowl (CR 702.76a): a player was dealt combat damage this turn by a source that, as it dealt it, was under your control
    * and had any of this spell's creature types.
@@ -4396,7 +4396,7 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number }
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number; /** The Mana Batteries: "Add {G}, then add an additional {G} for each charge counter removed this way": this much more, of the one color. */ base?: number }
   /**
    * Metalworker: "Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." How many
    * are revealed is chosen as it's activated (rulings: zero too); each number is a combination, numbered as for "combos"
@@ -4616,6 +4616,8 @@ export interface CostMod {
   times?: AmountExpr;
   /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
   colored?: Color[];
+  /** The Leeches: "Red spells you cast cost {R} more to cast": this colored mana added to the total cost (CR 601.2f); `n` is 0. */
+  moreColored?: Color[];
   /** Eluge: "costs {U} (or {1}) less ... for each": `times` that color, each one {1} once the cost has none of it left. */
   coloredOrGeneric?: Color;
   /** The Defilers: only if the caster chose to pay this much life for it as an additional cost (CostChoices.lifeFor). */

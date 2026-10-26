@@ -6965,6 +6965,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b953d19f-6ba7-4aee-b353-c60dc9572610",
+  "name": "Green Mana Battery",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}: Put a charge counter on this artifact.\n{T}, Remove any number of charge counters from this artifact: Add {G}, then add an additional {G} for each charge counter removed this way.",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5a6bbc45-6cb8-40ff-9f7c-7b2c5713dd78",
   "name": "Griptide",
   "manaCost": "{3}{U}",
@@ -13041,6 +13068,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2c092ed4-4dbb-41ec-9e07-e59b9676802e",
+  "name": "Resize",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature gets +3/+3 until end of turn.\nRecover {1}{G} (When a creature is put into your graveyard from the battlefield, you may pay {1}{G}. If you do, return this card from your graveyard to your hand. Otherwise, exile this card.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Recover"
+  ],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ec8a4b26-633a-4e88-aa8a-82e9704b3439",
   "name": "Resonance Technician",
   "manaCost": "{3}{U/R}{U/R}",
@@ -18037,6 +18092,39 @@
   "set": "v14",
   "releasedAt": "2014-08-22",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a2196bc3-2fe6-49d4-8c79-d6beb3d6c5d8",
+  "name": "Wren's Run Hydra",
+  "manaCost": "{X}{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Hydra",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Hydra"
+  ],
+  "oracleText": "Reach\nThis creature enters with X +1/+1 counters on it.\nReinforce X—{X}{G}{G} ({X}{G}{G}, Discard this card: Put X +1/+1 counters on target creature.)",
+  "power": "0",
+  "toughness": "0",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach",
+   "Reinforce"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -772,10 +772,16 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "cardLeftYourGraveyard":
       return (s.turnLog?.leftGraveyard ?? []).includes(you);
     case "castAnother": { // checked before the spell counts itself (CR 601.2f, 601.2i)
-      const casts = (s.castThisTurn ?? []).filter((c) => c.player === you).length;
-      // As a spell resolves it has counted itself, unless it's a copy, which wasn't cast (CR 707.12).
+      const mine = (s.castThisTurn ?? []).filter((c) => c.player === you && (!cond.color || c.colors?.includes(cond.color)));
+      // As a spell resolves it has counted itself, unless it's a copy, which wasn't cast (CR 707.12). With a color, only if
+      // it was cast that color.
       const item = cond.resolving ? s.resolving?.item : undefined;
-      return casts - (item?.kind === "spell" && !item.copy && item.controller === you ? 1 : 0) > 0;
+      // Only the spell or ability checking it counts itself out: Dream Thief's "when ~ enters, draw a card if you've cast
+      // another blue spell this turn" leaves out ~ itself, cast this turn (rulings).
+      const ownSpell = item?.kind === "spell" && !item.copy && item.objectId === sourceId;
+      const ownTrigger = item?.kind === "ability" && item.sourceId === sourceId && src.zone === "battlefield" && !!src.wasCast && src.enteredTurn === s.turn;
+      const itself = !!item && item.controller === you && (ownSpell || ownTrigger) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId));
+      return mine.length - (itself ? 1 : 0) > 0;
     }
     case "creatureDied":
       if (cond.notNamedSelf) return (s.diedNamesThisTurn ?? []).some((n) => !n || !sameName(n, defOf(s, src).name));

@@ -731,9 +731,10 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // creature of that color, whoever controls it.
   // "Nonartifact creatures get -1/-1 until end of turn" (Stench of Decay): every creature that isn't an artifact.
   // "Green creatures and white creatures can't block this turn" (Flash of Defiance): each creature that's either color.
+  // "Creatures with no counters on them get -2/-2 until end of turn" (Hazardous Conditions): every one, as it resolves.
   const twoHues = /^(white|blue|black|red|green) creatures and (white|blue|black|red|green) creatures$/i.exec(p);
   if (twoHues) p = `${twoHues[1]} or ${twoHues[2]} creatures`;
-  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p);
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p) || /^creatures with no counters on them$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -1286,6 +1287,9 @@ export function parseTargetPhrase(
     extra.anyOf = [{ kind: "object", subtypes: ["Saga"], text: "Saga" }, { kind: "object", types: ["Creature"], text: "enchantment creature" }];
     p = "enchantment";
   }
+  // Urgent Exorcism: "Spirit or enchantment" is "enchantment or Spirit".
+  const kindLast = /^([a-z]+) or (land|artifact|enchantment)$/.exec(p);
+  if (kindLast && !extra.orSubtypes && CREATURE_TYPES.has(capital(kindLast[1]!))) p = `${kindLast[2]} or ${kindLast[1]}`;
   const orKind = /^(land|artifact|enchantment) or ([a-z]+)$/.exec(p);
   if (orKind && !extra.orSubtypes && CREATURE_TYPES.has(capital(orKind[2]!))) {
     extra.orSubtypes = [capital(orKind[2]!)];

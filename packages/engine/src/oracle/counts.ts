@@ -349,9 +349,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return filter ? count({ kind: "spellsCastThisTurn", filter, eventPlayer: true }) : null;
   }
   // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
-  if ((m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells you've cast this turn$/i.exec(p))) {
-    const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
-    return filter ? count({ kind: "spellsCastThisTurn", filter }) : null;
+  // "For each other instant and sorcery spell you've cast this turn" (Lock and Load, a spell): not its own cast.
+  if ((m = /^(other )?((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells? you've cast this turn$/i.exec(p)) && (!m[1] || (each && ctx?.spell))) {
+    const filter = parseSearchFilter(`${m[2]!.replace(/ and /, " or ")} card`);
+    return filter ? count({ kind: "spellsCastThisTurn", filter, ...(m[1] ? { other: true as const } : {}) }) : null;
   }
   if ((m = /^the total mana value of (other )?spells you've cast this turn$/i.exec(p))) return count({ kind: "manaValueCastThisTurn", ...(m[1] ? { other: true as const } : {}) });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
@@ -444,13 +445,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
   // "Nontoken creatures you control that entered this turn" (Tromell, Seymour's Butler): ones that entered this turn.
-  // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
+  // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents; "... that
+  // didn't attack this turn" (Kratos, God of War).
   // "Damage to defending player equal to the number of artifacts they control" (Generous Plunderer): the defending player's.
   if (ctx?.defending) p = p.replace(/ (?:they control|defending player controls)$/, " that player controls");
   // "Target player draws X cards and loses X life, where X is the number of creatures they control of the chosen type"
   // (Pact of the Serpent): the player targeted.
   else if (ctx?.lastPlayerTarget !== undefined && !ctx.eventPlayer) p = p.replace(/ they control( of the chosen type)?$/, " that player controls$1");
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
     const theirs = /^(target|that|those) /.test(who);

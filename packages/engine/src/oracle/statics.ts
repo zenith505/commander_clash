@@ -114,8 +114,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], tapped: m[2] === "tapped", text: `${m[2]} creature` } } };
   }
   // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
+  // Tenza, Godo's Maul: "As long as it's legendary, it gets an additional +2/+2": a second bonus, only while legendary.
   if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
-    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]!.replace(/^an additional /, "")}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], supertypes: ["Legendary"], text: "legendary creature" } } };
   }
@@ -813,6 +814,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const c = parseStaticCondition(`you control another ${m[1]}`, st);
     return c?.kind === "control" && c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
   }
+  // Dire Tactics: "If you don't control a Human, ...", Pest Rescuer: "if you don't control a Pest creature token": none.
+  if ((m = /^you don't control an? (.+)$/.exec(text))) {
+    const c = parseStaticCondition(`you control a ${m[1]}`, st);
+    return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
+  }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
@@ -1408,6 +1414,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
   if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  // On Serra's Wings: "Enchanted creature is legendary, gets +1/+1, and has flying, ...": the legendary supertype added
+  // in the type-changing layer (CR 205.4a, 613.1d), with the rest of the line's bonuses.
+  const legendaryAura = /^Enchanted creature is legendary, (gets [^,]+), and (has .+)$/.exec(text);
+  if (legendaryAura) {
+    const rest = parseStaticLine(`Enchanted creature ${legendaryAura[1]} and ${legendaryAura[2]}.`);
+    return rest && rest.affects.kind === "attached" && !rest.condition ? { ...rest, mods: [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Legendary"] }, ...rest.mods], text: line } : null;
+  }
   // Unable to Scream: "As long as enchanted creature is face down, it can't be turned face up." Only a face-down
   // permanent can be turned face up (CR 702.37e, 701.40b), so it's the same as having it always.
   if (text === "As long as enchanted creature is face down, it can't be turned face up") return { affects: { kind: "attached" }, mods: [{ kind: "cantTurnFaceUp" }], text: line };

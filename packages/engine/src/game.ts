@@ -2898,6 +2898,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
+  s.cantBeBlockedThisTurn = undefined;
   if (!s.costModsThisTurn?.length) s.costModsThisTurn = undefined;
   s.keepManaThisTurn = undefined;
   s.nextCast = undefined;
@@ -8585,6 +8586,10 @@ const SUPERTYPE_WALK: Record<string, { supertype: string; non?: true }> = { "Sno
  * Why `blocker` can't block `attacker` on its own, or null. Covers evasion and blocking
  * restrictions; menace (needs two blockers) is checked over the whole declaration.
  */
+/** "Can't be blocked": from its abilities, or from a rule for the turn like Venser, the Sojourner's. */
+export function cantBeBlockedNow(s: GameState, o: GameObject): boolean {
+  return characteristics(s, o).cantBeBlocked || (s.cantBeBlockedThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false));
+}
 /** "Can't block": from its abilities, or from a rule for the turn like Falter's. */
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
   // Decayed means "This creature can't block" (CR 702.147a).
@@ -8601,7 +8606,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   // A battle can't block, even one that's also a creature (CR 509.1a; rulings).
   if (!b.types.includes("Creature") || b.types.includes("Battle") || blocker.tapped) return `${b.name} can't block`;
   if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
-  if (a.cantBeBlocked) return `${a.name} can't be blocked`;
+  if (cantBeBlockedNow(s, attacker)) return `${a.name} can't be blocked`;
   if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach")) return `${b.name} can't block a creature with flying`; // CR 702.9b
   if (has(a, "Shadow") !== has(b, "Shadow")) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
   if (has(a, "Fear") && !b.types.includes("Artifact") && !b.colors.includes("B")) return `${a.name} has fear`; // CR 702.36b

@@ -70,7 +70,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // player" is the defending player. See TriggeredAbility.attacksPlayer.
   [/^Whenever ~ attacks a player and isn't blocked, (.+)$/, "selfAttacksUnblocked"],
   [/^Whenever ~ attacks alone, (.+)$/, "selfAttacksAlone"],
-  [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
+  // "When ~ blocks, return it to its owner's hand at end of combat" (Wall of Junk): the same event (CR 603.2).
+  [/^When(?:ever)? ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   // The Millennium Calendar: the permanents you untap in your untap step's turn-based action (CR 502.3), all at once.
   [/^Whenever you untap one or more permanents during your untap step, (.+)$/, "youUntapInUntapStep"],
@@ -429,11 +430,12 @@ function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null 
 function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature blocks" (anyone's), "Whenever a Rat you control becomes blocked": "it" and "that creature" are
   // that creature, once for each (CR 509.3a, 509.3c).
-  const other = /^Whenever (an?) ((?:[a-z]+ )?creature) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line);
+  // "Whenever a creature you control blocks" (Noble Stand), "... with defender blocks" (Perimeter Captain): yours only.
+  const other = /^Whenever (an?) ((?:[a-z]+ )?creature(?: you control)?(?: with [a-z]+)?) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line);
   if (other) {
     const blocks = / blocks, /.test(line);
     const filter = parseTargetPhrase(other[2]!);
-    if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
+    if (!filter || filter.kind !== "object" || (filter.controller && !(blocks && filter.controller === "you")) || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
     const body = parseBody(other[3]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
     if (!body) return "fail";
     return { event: blocks ? "creatureBlocks" : "creatureBecomesBlocked", body, subjectFilter: { ...filter, ...(blocks ? {} : { controller: "you" as const }), text: blocks ? other[2]! : `${other[2]} you control` } };
@@ -482,7 +484,8 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
   const counter = /^counter that spell or ability\.?$/.exec(m[5]!) && m[2];
   if (m[1] === "~") {
-    const text = m[5]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ");
+    // Bonecrusher Giant: "~ deals 2 damage to that spell's controller": the player who controls it, "that player".
+    const text = m[5]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ").replace(m[2] ? /^$/ : /\bthat spell's controller\b/g, "that player");
     const body = counter ? { targets: [], effects: [{ type: "counterCause" as const }], text: "Counter that spell or ability." } : parseBody(text, { selfIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
     return body ? { event: "selfBecomesTarget", targeted, body } : "fail";
   }
@@ -530,7 +533,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     return body ? { event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" }, firstOfKinds: kinds }, body } : "fail";
   }
   // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
-  const m = CAST_TRIGGER.exec(line.replace(/ with mana value (\d+), (\d+), or (\d+),/, (all, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with mana value ${a} through ${c},` : all)));
+  // "With power 4, 5, or 6" (Sarkhan's Unsealing) the same way as Kozilek's Unsealing's mana values.
+  const m = CAST_TRIGGER.exec(line.replace(/ with (mana value|power) (\d+), (\d+), or (\d+),/, (all, key: string, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with ${key} ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
   // "Whenever you cast an instant or sorcery spell during your turn" (Ral, Monsoon Mage): only while you're the active player.
@@ -586,7 +590,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     }
   }
   // "A creature spell with power 5 or greater" (Monstrous Vortex): the spell's power on the stack (spellMatches).
-  const pw = / with (power|toughness) (\d+) or (greater|less)$/.exec(what);
+  // "With power 4, 5, or 6" (Sarkhan's Unsealing): "4 through 6" by now.
+  const pw = / with (power|toughness) (\d+) (?:or (greater|less)|through (\d+))$/.exec(what);
   if (pw) what = what.slice(0, pw.index);
   // "A spell that has convoke" (Joyful Stormsculptor), "a creature spell with flying", "with infect": the spell as it
   // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
@@ -605,7 +610,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const sides = orKind ? [parseTargetPhrase(`${orKind[1]} spell`), parseTargetPhrase(`${orKind[2]} spell`)] : [];
   const parsed = orKind && sides.every((x) => x?.kind === "spell" && !x.anyOf) ? { kind: "spell" as const, types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: `${orKind[1]} or ${orKind[2]} spell` } : parsed0;
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
-  const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
+  const range = pw && (pw[4] ? { min: Number(pw[2]), max: Number(pw[4]) } : pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
   if (pw) what = m[3]!.replace(/^(?:an?|another) /, "").replace(/ that targets .+$/, "");
   // "Whenever you cast a spell, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR
@@ -728,6 +733,15 @@ const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or i
  * dies": "it" and "that card" are the card in the graveyard, "its power" as it last existed (CR 603.10a).
  */
 function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Iron Apprentice: "When ~ dies, if it had counters on it, put those counters on target creature you control.": an
+  // intervening if on ~ as it last existed (CR 603.4, 603.10a), the same as "~ or another creature" about ~ alone.
+  const selfHad = /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+)$/.exec(line);
+  if (selfHad) {
+    const t = parseDiesTrigger(`When ~ or another creature dies, ${selfHad[1]}`);
+    if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
+    const { orSelf: _, ...dies } = t.dies;
+    return { ...t, dies: { ...dies, self: true } };
+  }
   // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
   const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile), (.+)$/.exec(line);
   const attached = attachedM && [attachedM[0], attachedM[1]!, attachedM[4]!];
@@ -938,7 +952,7 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // attacks.
   const line = line0.replace(/^Whenever a creature you control that's (enchanted or equipped|enchanted|equipped) attacks,/, (_, st: string) => `Whenever an ${st.replace(/ /g, "-")} creature you control attacks,`);
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
-  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less))?) attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it)?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
@@ -983,8 +997,9 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   const w = m ?? any;
   if (!w) return null;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
-  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
-  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$|$)/, "");
+  // "A creature you control with a +1/+1 counter on it" (Byrke, Long Ear of the Law): one with it as it's declared.
+  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
+  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$|$)/, "");
   if (!filter || filter.kind !== "object" || filter.controller || (filter.chosen && filter.chosen !== "type") || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   const body = parseBody(w[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
   if (!body) return "fail";

@@ -2973,6 +2973,22 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push(st);
       continue;
     }
+    // Blessed Sanctuary: "Prevent all noncombat damage that would be dealt to you and creatures you control.": a prevention
+    // for you and one for each of those creatures (CR 615.1), read as two.
+    const preventYouAnd = /^Prevent all (combat |noncombat )?damage that would be dealt to you and (creatures|permanents) you control\.$/.exec(line);
+    const youAndParts = preventYouAnd && [parseStatic(`If a source would deal ${preventYouAnd[1] ?? ""}damage to you, prevent that damage.`), parseStatic(`Prevent all ${preventYouAnd[1] ?? ""}damage that would be dealt to ${preventYouAnd[2]} you control.`)];
+    if (youAndParts?.every((p) => p && !p.condition)) {
+      for (const p of youAndParts) out.statics.push({ ...p!, text: line });
+      continue;
+    }
+    // Tenza, Godo's Maul: "Equipped creature gets +1/+1. As long as it's legendary, it gets an additional +2/+2. As long as
+    // it's red, it has trample.": one static ability for each sentence, each "it" the equipped creature.
+    const attachedParts = /^(Equipped|Enchanted) creature [^.]+\.(?: As long as it's [^,.]+, it [^.]+\.)+$/.test(line) ? line.split(/(?<=\.) /) : null;
+    const attachedStatics = attachedParts?.map((p, i) => (i === 0 ? parseStatic(p) : parseConditionalStatic(p.replace(/^As long as it's /, `As long as ${attachedParts[0]!.split(" ")[0]!.toLowerCase()} creature is `))));
+    if (attachedStatics?.every((p) => p && p.affects.kind === "attached")) {
+      for (const p of attachedStatics) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // "Lieutenant — As long as you control your commander, ~ gets +2/+2 and creatures you control have vigilance"
     // (Angelic Field Marshal), "... and other creatures you control get +2/+2 and have trample" (Thunderfoot Baloth):
     // two effects of one static ability with one condition, each read as its own (CR 604.2, 611.3).
@@ -3031,7 +3047,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
-      /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
+      // "When ~ enters and whenever it deals combat damage to a player, create a Blood token." (Ivora, Insatiable Heir)
+      /^When ~ enters and whenever it (attacks while saddled|attacks|deals combat damage to a player), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).
       // Tectonic Giant: "... or becomes the target of a spell an opponent controls".
       /^Whenever ~ (attacks) or (becomes the target of a spell(?: an opponent controls)?), (.+)$/.exec(line) ??

@@ -563,6 +563,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       (s.cantBlockThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't block this turn.`);
       return;
+    case "cantBeBlockedRule":
+      (s.cantBeBlockedThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
+      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't be blocked this turn.`);
+      return;
     case "addCombatMana": {
       // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
       const n = amountNow(s, e.n, ctx);

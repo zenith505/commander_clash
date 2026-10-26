@@ -238,7 +238,7 @@ export type Count =
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
-  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true }
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -472,7 +472,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -2738,6 +2738,8 @@ export type Effect =
   | { type: "cantBlockRule"; filter: TargetSpec }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
   | { type: "cantAttackRule"; filter: TargetSpec }
+  /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
+  | { type: "cantBeBlockedRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
   | { type: "shuffle"; who: PlayerRef; /** "If you search your library this way, shuffle" after searches with `noShuffle` (Claim Jumper): only if one of them searched it. */ ifSearched?: true }
   /**
@@ -3980,7 +3982,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "When ~ dies, if it had counters on it" (Iron Apprentice): ~ only, matching `filter`. */ self?: true; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").

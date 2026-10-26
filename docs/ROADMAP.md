@@ -1,8 +1,8 @@
 # Roadmap
 
-24,522 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,343 of
-9,979 (83%).
+24,585 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,383 of
+9,979 (84%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -141,12 +141,26 @@ line blocks.
    ("spend only black mana on X": a spend rule for part of a cost), Summons of Saruman (casting from among the milled
    cards). Round 168 went down the list to Glen Elendra Guardian (rank 5,741), skipping over the cards still listed by
    `npm run popular`.
-   Next most played: Bloatfly Swarm, War's Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving
-   Amalgam, Nicanzil, Current Conductor, Gatta and Luzzu, Aether Refinery, Emeritus of Ideation, Green Slime, Welcome to
-   . . . // Jurassic Park, Finale of Promise, Troyan, Gutsy Explorer, Radiant Destiny, Case of the Uneaten Feast, Raul,
-   Trouble Shooter, Entropic Battlecruiser, Cait Sith, Tamiyo, the Moon Sage, Scouring Swarm, Liesa, Feather, Bring to
-   Light, Staff of Eden, Thada Adel, Doran, Besieged by Time.
+   Out after round 169: Thieves' Tools ("can't be blocked as long as its power is 3 or less": a static condition on
+   power, a layer 7 value, for a rules effect; conditions are checked as the layers apply), Siren's Ruse ("if a Pirate
+   was exiled this way": the creature as it was exiled, after the flicker made a new object), Security Bypass ("as long
+   as enchanted creature is attacking alone"), Ephara, God of the Polis (creatures that entered last turn aren't kept),
+   Tangled Colony ("the amount of damage dealt to it this turn" isn't kept), Pontiff of Blight (granting extort, a
+   triggered keyword, to other creatures), Killing Wave (each controller pays X life or sacrifices, a choice per
+   creature), Dreadhound ("a creature card is put into a graveyard from a library" triggers), Carnivorous Canopy (the
+   destroyed permanent's last known mana value), Skyfisher Spider ("you may gain N life. If you do": not a checkable
+   may), Endurance Bobblehead (up to X targets with X counted as it's activated), Esix, Fractal Bloom (a token
+   replacement that copies a creature you choose). Round 169 went down the list to Venser, the Sojourner (rank 6,376),
+   skipping over the cards still listed by `npm run popular`.
+   Next most played: Obsessive Pursuit, Serra the Benevolent, Gemcutter Buccaneer, Oblivion Stone, Nissa of Shadowed
+   Boughs, Chandra, Flameshaper, Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the
+   Exemplary, Curator's Ward, Realm of Koh, Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless,
+   Hauntwoods Shrieker, The Mycotyrant, Lifecraft Engine, Agatha of the Vile Cauldron, Cloudpost, The Ancient One,
+   Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of Herons, Shelob, Dread Weaver, Price of Glory, Roar of
+   Resistance, Heartless Conscription; and from before round 169: Bloatfly Swarm, War's Toll, Quintorius Kand,
+   Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 169: Bonecrusher Giant's test uses its creature face alone (the card data has both faces).
    Smaller gaps from round 168: bots activate The Wandering Emperor's loyalty abilities only on their own turn; bots
    don't activate Vexing Shusher; Glen Elendra Guardian's counter picker is the one for "remove counters from among",
    which asks even when the Guardian has one kind of counter.

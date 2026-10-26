@@ -359,7 +359,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     // "Tap all creatures your opponents control. Those creatures don't untap ..." (Cone of Cold): the group just tapped.
     const tapped = what && what === ctx.lastGroup && /^(?:those creatures|they)$/i.test(m[1]!);
-    return what && (!isGroup(what) || tapped) ? [{ type: "skipUntap", what }] : null;
+    // Tangle: "Each attacking creature doesn't untap during its controller's next untap step": those attacking as it
+    // resolves (CR 611.2c).
+    const attackers = /^each attacking creature$/i.test(m[1]!);
+    return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what }] : null;
+  }
+  // Sleep: "Tap all creatures target player controls. Those creatures don't untap during that player's next untap step":
+  // the creatures that player controls, so their controller's untap step.
+  if ((m = /^(those creatures|they) don't untap during that player's next untap step$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const theirs = what && what === ctx.lastGroup && what.ref === "each" && what.of?.ref === "target" && ctx.targets[what.of.index]?.kind === "player";
+    return what && theirs ? [{ type: "skipUntap", what }] : null;
   }
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
   if ((m = /^(.+?) phases? out$/i.exec(s))) {
@@ -393,6 +403,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Return ((?:all|each) .+?) to (?:their|its) owners?'s? hands?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
+  }
+  // Get Out: "Return one or two target creatures and/or enchantments you own to your hand": targets you own (CR 108.3),
+  // to their owner's hand, yours.
+  if ((m = /^Return ((?:one or two |up to (?:one|two|three) )?target (?!.*\bspells?\b).+?) you own to your hand$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`Return ${m[1]} to their owners' hands`, ctx);
+    const added = ctx.targets.slice(before);
+    if (!fx || !added.length || added.some((t) => t.kind !== "object" || t.owner || t.controller)) {
+      ctx.targets.length = before;
+      return null;
+    }
+    for (let i = before; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, owner: "you" } as typeof ctx.targets[number];
+    return fx;
   }
   if (!/^Return target (?:[a-z]+ )*spell(?: you don't control| an opponent controls| or [^,]+)? to/i.test(s) && (m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?|~|it|that card|that creature|those creatures|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands|their owner's hand)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

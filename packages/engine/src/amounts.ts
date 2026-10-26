@@ -611,8 +611,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
-    case "spellsCastThisTurn":
-      return (s.castThisTurn ?? []).filter((x) => x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+    case "spellsCastThisTurn": {
+      // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
+      const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
+      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+    }
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
@@ -837,7 +840,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn`;
+      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":

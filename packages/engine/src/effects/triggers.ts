@@ -298,7 +298,7 @@ function diesMatches(
   if (srcId === dying.o.id) {
     if (d.orSelf) return true;
     if (d.other) return false;
-  }
+  } else if (d.self) return false;
   // "A creature of the chosen type" (Species Specialist): the type chosen for the watcher, as it last existed if it's
   // dying too (rulings; CR 603.10a).
   return objectMatches(s, bindChosen(bindEnchanted(d.filter, s.objects[srcId]), chosen), dying.o, you, false, undefined, dying.c);

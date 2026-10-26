@@ -827,6 +827,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Aria of Flame: "put a verse counter on ~, then it deals damage equal to the number of verse counters on it to ...":
   // "it" is ~.
   text = text.replace(/\b(put an? [a-z]+ counter on ~, then) it deals damage equal to the number of ([a-z]+) counters on it to\b/gi, "$1 ~ deals damage equal to the number of $2 counters on ~ to");
+  // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
+  // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
+  text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
   // Nalia de'Arnise: "put a +1/+1 counter on each creature you control and those creatures gain deathtouch until end of
   // turn": the same as two sentences, "those creatures" the same group.
   text = text.replace(/\b(put an? [^.]+? counter on each [^.]+? you control) and those creatures gain ([^.]+? until end of turn)\./gi, "$1. Those creatures gain $2.");
@@ -1525,6 +1528,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
+    // Jadelight Ranger: "it explores, then it explores again": one exploration after the other (CR 701.44), the same
+    // creature.
+    if (/^(?:[Tt]hen )?[Ii]t explores again\.?$/.test(s)) {
+      if (last?.type !== "explore") return null;
+      effects.push({ ...last });
+      continue;
+    }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
     ctx.afterExileTop = last?.type === "exileTop";
@@ -3788,6 +3798,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         : null;
       if (!more || !prev) return null;
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [more], otherwise: [prev] };
+      continue;
+    }
+    // Uglúk of the White Hand: "Whenever another creature you control dies, put a +1/+1 counter on ~. If that creature was
+    // a Goblin or Orc, put two +1/+1 counters on ~ instead.": the creature as it last existed (CR 608.2h).
+    const wasEither = (ctx.subject || ctx.subjectIt) ? /^If that creature was an? ([A-Z][a-z]+) or ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on ~ instead$/.exec(s) : null;
+    if (wasEither && CREATURE_TYPES.has(wasEither[1]!) && CREATURE_TYPES.has(wasEither[2]!)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "counters" || prev.what.ref !== "self" || prev.counter !== "+1/+1" || prev.n !== 1) return null;
+      // Either one: a filter's subtypes match any of them.
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [wasEither[1]!, wasEither[2]!], text: `${wasEither[1]} or ${wasEither[2]}` };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, n: num(wasEither[3]!) }], otherwise: [prev] };
       continue;
     }
     // Andúril, Flame of the West: "Create two tapped 1/1 white Spirit creature tokens with flying. If that creature is
@@ -6918,6 +6939,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const last = effects[effects.length - 1];
       if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1) return null;
       last.loseAtEnd = true;
+      continue;
+    }
+    // "Take an extra turn after this one. Skip the untap step of that turn." (Savor the Moment, CR 614.10)
+    if (/^Skip the untap step of that turn$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1) return null;
+      last.skipUntap = true;
       continue;
     }
     // The Pacts: "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." A delayed trigger

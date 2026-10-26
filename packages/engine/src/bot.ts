@@ -3647,7 +3647,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
-      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
+      // Removing all of them (Sage of Hours) can't loop either: it's weighed below.
+      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && (ab.removeCounters.all || !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter)));
       // A coin flip's own cost is weighed with what winning and losing do (flipWorth).
       const flips = flipBranches(ab.body);
       // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.

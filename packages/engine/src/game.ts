@@ -3029,8 +3029,9 @@ function beginStep(s: GameState, step: Step): void {
   }
   switch (step) {
     case "untap": {
-      // "Players skip their untap steps" (Stasis) replaces the whole step (CR 614.10): no phasing, no untapping.
-      if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).skipUntapSteps)) {
+      // "Players skip their untap steps" (Stasis) replaces the whole step (CR 614.10): no phasing, no untapping. So does
+      // "Take an extra turn after this one. Skip the untap step of that turn." (Savor the Moment).
+      if (s.extraTurn?.skipUntap || s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).skipUntapSteps)) {
         log(s, `${player(s, ap).name} skips their untap step.`);
         return advanceStep(s);
       }

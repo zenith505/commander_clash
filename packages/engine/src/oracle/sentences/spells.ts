@@ -50,8 +50,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Elspeth Conquers Death: "Noncreature spells your opponents cast cost {2} more to cast until your next turn": the same,
   // until its controller's next turn begins (CR 611.2b).
-  if ((m = /^(.+? spells) your opponents cast cost (\{\d+\}) more to cast until your next turn$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
-    const change = parseCostChange(`${m[1]} your opponents cast cost ${m[2]} more to cast`);
+  // "Until your next turn, spells your opponents cast cost {1} more to cast" (Tax Collector) likewise.
+  if ((m = /^(.+? spells) your opponents cast cost (\{\d+\}) more to cast until your next turn$/.exec(s) ?? /^Until your next turn, ((?:.+? )?spells) your opponents cast cost (\{\d+\}) more to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
+    const change = parseCostChange(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} your opponents cast cost ${m[2]} more to cast`);
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "opponents" || change.costMod.turn || change.costMod.fromGraveyard) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, untilYourNextTurn: true }];
   }

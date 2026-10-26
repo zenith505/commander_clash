@@ -265,14 +265,33 @@ describe("Remove all counters (Sage of Hours, Molten Hydra, Vish Kal, Essence Bo
     expect(counters(s, sage)).toBe(0);
     expect(s.extraTurns?.length).toBe(2);
   });
-  it("Sage of Hours: four counters give none, and a bot doesn't remove them", () => {
+  it("Sage of Hours: four counters give none", () => {
     let { s, ap } = setup([]);
     const sage = putOnBattlefield(s, ap, sageOfHours);
     s.objects[sage]!.counters["+1/+1"] = 4;
     invalidateCharacteristics(s);
-    expect(botActions(s, ap).some((a) => a.type === "activate" && a.objectId === sage)).toBe(false);
     s = resolveAll(run(s, planActivate(s, ap, sage, 0)));
     expect(s.extraTurns?.length ?? 0).toBe(0);
+  });
+  it("a bot removes Sage of Hours' counters only with five or more", () => {
+    const botMain = (n: number) => {
+      let { s, ap } = setup([]);
+      const sage = putOnBattlefield(s, ap, sageOfHours);
+      s.objects[sage]!.counters["+1/+1"] = n;
+      invalidateCharacteristics(s);
+      // Bots use activated abilities in their second main phase.
+      s = passUntil(s, "main2", ap);
+      for (let i = 0; i < 40 && s.activePlayer === ap && s.step === "main2"; i++) {
+        const pid = waitingOn(s)!;
+        for (const a of botActions(s, pid)) s = act(s, a);
+      }
+      return { s, sage };
+    };
+    const four = botMain(4);
+    expect(counters(four.s, four.sage)).toBe(4);
+    const five = botMain(5);
+    expect(counters(five.s, five.sage)).toBe(0);
+    expect(five.s.extraTurns?.length).toBe(1);
   });
   it("Molten Hydra deals damage equal to the counters removed", () => {
     let { s, ap, opp } = setup([]);
@@ -536,5 +555,180 @@ describe("Champion's Drake and Geometric Nexus", () => {
     expect(f).toBeDefined();
     expect(counters(s, f!)).toBe(5);
     expect(s.objects[n]!.counters.charge ?? 0).toBe(0);
+  });
+});
+
+// The second pass, further down the list.
+const riskFactor = card("Risk Factor", "Instant", "{2}{R}", {cmc: 3,keywords: ["Jump","Jump-start"],oracleText: "Target opponent may have Risk Factor deal 4 damage to them. If that player doesn't, you draw three cards.\nJump-start (You may cast this card from your graveyard by discarding a card in addition to paying its other costs. Then exile this card.)"});
+const whatMustBeDone = card("What Must Be Done", "Sorcery", "{3}{W}{W}", {cmc: 5,keywords: ["Release Juno","Let the World Burn"],oracleText: "Choose one —\n• Let the World Burn — Destroy all artifacts and creatures.\n• Release Juno — Return target historic permanent card from your graveyard to the battlefield. It enters with two additional +1/+1 counters on it if it's a creature. (Artifacts, legendaries, and Sagas are historic.)"});
+const necklaceOfGirion = card("Necklace of Girion", "Legendary Artifact", "{2}{G}", {cmc: 3,oracleText: "Whenever you cast a green spell and whenever a Forest you control enters, put a +1/+1 counter on target creature you control.\n{T}: Add {G}."});
+const savorTheMoment = card("Savor the Moment", "Sorcery", "{1}{U}{U}", {cmc: 3,oracleText: "Take an extra turn after this one. Skip the untap step of that turn."});
+const uglkOfTheWhiteHand = card("Uglúk of the White Hand", "Legendary Creature — Orc Soldier", "{2}{B}{R}", {cmc: 4,power: "3",toughness: "3",oracleText: "Whenever another creature you control dies, put a +1/+1 counter on Uglúk. If that creature was a Goblin or Orc, put two +1/+1 counters on Uglúk instead."});
+const midnightTilling = card("Midnight Tilling", "Instant", "{1}{G}", {cmc: 2,keywords: ["Mill"],oracleText: "Mill four cards, then you may return a permanent card from among them to your hand. (To mill four cards, put the top four cards of your library into your graveyard.)"});
+const taxCollector = card("Tax Collector", "Creature — Human Advisor", "{1}{W}", {cmc: 2,power: "2",toughness: "2",keywords: ["Detain","Tax","Arrest"],oracleText: "When this creature enters, choose one —\n• Tax — Until your next turn, spells your opponents cast cost {1} more to cast.\n• Arrest — Detain target creature an opponent controls. (Until your next turn, that creature can't attack or block and its activated abilities can't be activated.)"});
+const jadelightRanger = card("Jadelight Ranger", "Creature — Merfolk Scout Ranger", "{1}{G}{G}", {cmc: 3,power: "2",toughness: "1",keywords: ["Explore"],oracleText: "When this creature enters, it explores, then it explores again. (Reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on this creature, then put the card back or put it into your graveyard. Then repeat this process.)"});
+const overTheEdge = card("Over the Edge", "Sorcery", "{1}{G}", {cmc: 2,keywords: ["Explore"],oracleText: "Choose one —\n• Destroy target artifact or enchantment.\n• Target creature you control explores, then it explores again. (Reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on that creature, then put the card back or put it into your graveyard. Then repeat this process.)"});
+const defossilize = card("Defossilize", "Sorcery", "{4}{B}", {cmc: 5,keywords: ["Explore"],oracleText: "Return target creature card from your graveyard to the battlefield. That creature explores, then it explores again. (Reveal the top card of your library. Put that card into your hand if it's a land. Otherwise, put a +1/+1 counter on that creature, then put the card back or put it into your graveyard. Then repeat this process.)"});
+const land = (name: string, sub: string, mana: string) => card(name, `Basic Land — ${sub}`, "", { oracleText: `({T}: Add {${mana}}.)` });
+
+describe("Round 174 cards, second pass", () => {
+  it("are fully supported", () => supported(riskFactor, whatMustBeDone, necklaceOfGirion, savorTheMoment, uglkOfTheWhiteHand, midnightTilling, taxCollector, jadelightRanger, overTheEdge, defossilize));
+});
+
+describe("Risk Factor", () => {
+  it("the opponent takes 4 damage, or you draw three cards; a bot with plenty of life takes the damage", () => {
+    let { s, ap, ids, opp } = setup([riskFactor]);
+    s = run(s, planCast(s, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    s = untilPending(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: opp });
+    const [life, hand] = [lifeOf(s, opp), s.players[ap]!.hand.length];
+    s = resolveAll(act(s, botActions(s, opp)[0]!));
+    expect(lifeOf(s, opp)).toBe(life - 4);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+  it("if they don't, you draw three", () => {
+    let { s, ap, ids, opp } = setup([riskFactor]);
+    s.players[opp]!.life = 12;
+    s = run(s, planCast(s, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    s = untilPending(s);
+    const hand = s.players[ap]!.hand.length;
+    s = resolveAll(act(s, botActions(s, opp)[0]!));
+    expect(lifeOf(s, opp)).toBe(12);
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+  });
+});
+
+describe("What Must Be Done", () => {
+  it("Release Juno: a historic creature returns with two additional +1/+1 counters; an artifact with none", () => {
+    let { s, ap, ids } = setup([whatMustBeDone]);
+    const legend = into(s, ap, bear({ name: "Legend", supertypes: ["Legendary"] }), "graveyard");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(legend)], [1])));
+    expect(zone(s, legend)).toBe("battlefield");
+    expect(counters(s, legend)).toBe(2);
+    let t = setup([whatMustBeDone]);
+    const rock = into(t.s, t.ap, card("Rock", "Artifact", "{2}", { cmc: 2 }), "graveyard");
+    t.s = resolveAll(run(t.s, planCast(t.s, t.ap, t.ids[0]!, [tgt(rock)], [1])));
+    expect(zone(t.s, rock)).toBe("battlefield");
+    expect(counters(t.s, rock)).toBe(0);
+  });
+});
+
+describe("Necklace of Girion", () => {
+  it("a green spell, and a Forest you control entering, each put a +1/+1 counter on target creature you control", () => {
+    let { s, ap, ids } = setup([bear(), land("Forest", "Forest", "G")]);
+    putOnBattlefield(s, ap, necklaceOfGirion);
+    const mine = putOnBattlefield(s, ap, bear());
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = untilPending(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(mine)] }));
+    expect(counters(s, mine)).toBe(1);
+    s = act(s, { type: "playLand", player: ap, objectId: ids[1]! });
+    s = untilPending(s);
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(mine)] }));
+    expect(counters(s, mine)).toBe(2);
+  });
+});
+
+describe("Savor the Moment", () => {
+  it("an extra turn whose untap step is skipped (CR 614.10)", () => {
+    let { s, ap, ids } = setup([savorTheMoment]);
+    const tapped = putOnBattlefield(s, ap, bear());
+    s.objects[tapped]!.tapped = true;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    const turn = s.turn;
+    s = passUntil(s, "upkeep");
+    expect(s.activePlayer).toBe(ap);
+    expect(s.turn).toBe(turn + 1);
+    expect(s.objects[tapped]!.tapped).toBe(true);
+    // Its next turn is a normal one.
+    s = passUntil(s, "upkeep", next(s, ap));
+    s = passUntil(s, "upkeep", ap);
+    expect(s.objects[tapped]!.tapped).toBe(false);
+  });
+});
+
+describe("Uglúk of the White Hand", () => {
+  it("one counter for another creature dying, two for a Goblin or Orc", () => {
+    let { s, ap, ids } = setup([card("Doom", "Sorcery", "{B}", { cmc: 1, oracleText: "Destroy target creature." }), card("Doom", "Sorcery", "{B}", { cmc: 1, oracleText: "Destroy target creature." })]);
+    const u = putOnBattlefield(s, ap, uglkOfTheWhiteHand);
+    const bearId = putOnBattlefield(s, ap, bear());
+    const goblin = putOnBattlefield(s, ap, bear({ name: "Goblin", subtypes: ["Goblin"] }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(bearId)])));
+    expect(counters(s, u)).toBe(1);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(goblin)])));
+    expect(counters(s, u)).toBe(3);
+  });
+});
+
+describe("Midnight Tilling", () => {
+  it("mills four, then a permanent card from among them may go to your hand", () => {
+    let { s, ap, ids } = setup([midnightTilling]);
+    const spell = into(s, ap, bolt, "library");
+    const creature = into(s, ap, bear({ name: "Milled Bear" }), "library");
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = untilPending(s);
+    for (let i = 0; i < 5 && s.pending && s.pending.kind !== "searchLibrary"; i++) s = act(s, botActions(s, waitingOn(s)!)[0]!);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    if (s.pending?.kind === "searchLibrary") expect(s.pending.cards).not.toContain(spell);
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [creature] }));
+    expect(zone(s, creature)).toBe("hand");
+    expect(zone(s, spell)).toBe("graveyard");
+  });
+});
+
+describe("Tax Collector", () => {
+  it("Tax: until your next turn, opponents' spells cost {1} more", () => {
+    let { s, ap, ids, opp } = setup([taxCollector]);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = untilPending(s);
+    if (s.pending?.kind === "chooseModes") s = act(s, { type: "chooseModes", player: ap, modes: [0] } as Action);
+    s = resolveAll(s);
+    const shock = into(s, opp, bolt, "hand");
+    putOnBattlefield(s, opp, mountainCard);
+    s = passUntil(s, "main1", opp);
+    expect(planCast(s, opp, shock, [{ kind: "player", id: ap }])).toBeNull();
+    putOnBattlefield(s, opp, mountainCard);
+    expect(planCast(s, opp, shock, [{ kind: "player", id: ap }])).not.toBeNull();
+  });
+});
+
+describe("explores, then explores again (Jadelight Ranger, Over the Edge, Defossilize)", () => {
+  it("two nonland cards on top: two counters, the second exploration revealing the new top card", () => {
+    let { s, ap, ids } = setup([jadelightRanger]);
+    const second = into(s, ap, bolt, "library");
+    const first = into(s, ap, bear({ name: "Top" }), "library");
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = untilPending(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(zone(s, first)).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: false }), false);
+    expect(zone(s, second)).toBe("library");
+    expect(counters(s, ids[0]!)).toBe(2);
+  });
+  it("a nonland card kept on top is revealed again (rulings)", () => {
+    let { s, ap, ids } = setup([overTheEdge]);
+    const mine = putOnBattlefield(s, ap, bear());
+    const top = into(s, ap, bear({ name: "Top" }), "library");
+    s = run(s, planCast(s, ap, ids[0]!, [tgt(mine)], [1]));
+    s = untilPending(s);
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: false }), false);
+    expect(zone(s, top)).toBe("library");
+    expect(counters(s, mine)).toBe(2);
+  });
+  it("Defossilize: the returned creature explores twice; lands go to hand", () => {
+    let { s, ap, ids } = setup([defossilize]);
+    const b = into(s, ap, bear(), "graveyard");
+    const l2 = into(s, ap, land("Forest", "Forest", "G"), "library");
+    const l1 = into(s, ap, land("Forest", "Forest", "G"), "library");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+    expect(zone(s, b)).toBe("battlefield");
+    expect(zone(s, l1)).toBe("hand");
+    expect(zone(s, l2)).toBe("hand");
+    expect(counters(s, b)).toBe(0);
   });
 });

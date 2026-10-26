@@ -469,8 +469,9 @@ export function compile(d: CardDef): CompiledCard {
       .replace(/\bIf ~'s additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "If ~ was kicked" : x))
       .replace(/\bunless (?:her|his|its|~'s) additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "unless ~'s waterbend cost was paid" : x))
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
-      // ability with two trigger events (CR 603.1), the same as an ability for each.
-      .replace(/^Whenever you cast (an? [a-z]+ spell) or (an? [A-Z][a-z]+ you control) enters, ([^\n]+)$/m, "Whenever you cast $1, $3\nWhenever $2 enters, $3")
+      // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
+      // whenever a Forest you control enters, ..." (Necklace of Girion) too.
+      .replace(/^Whenever you cast (an? [a-z]+ spell)(?: or| and whenever) (an? [A-Z][a-z]+ you control) enters, ([^\n]+)$/m, "Whenever you cast $1, $3\nWhenever $2 enters, $3")
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")

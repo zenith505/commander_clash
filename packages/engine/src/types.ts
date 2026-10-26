@@ -951,6 +951,8 @@ export interface ExtraTurn {
   player: PlayerId;
   /** "At the beginning of that turn's end step, you lose the game": the spell's controller and card. */
   loseAtEnd?: { controller: PlayerId; sourceCardId: string; subject: { id: ObjectId; zc: number } };
+  /** "Skip the untap step of that turn" (Savor the Moment, CR 614.10). */
+  skipUntap?: true;
 }
 
 /** A triggered ability waiting to be put on the stack. CR 603.3 */

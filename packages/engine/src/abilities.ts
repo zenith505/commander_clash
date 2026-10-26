@@ -3180,7 +3180,7 @@ export type Effect =
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
-  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true }
+  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true; /** "Skip the untap step of that turn" (Savor the Moment). */ skipUntap?: true }
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player

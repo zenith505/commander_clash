@@ -626,6 +626,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return eventPlayer !== undefined && (s.activePlayer === eventPlayer) !== !!cond.not;
     case "anyOf":
       return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
+    case "not":
+      return !conditionMet(s, cond.cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc);
     case "beforeAttackers":
       return s.activePlayer === you && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
     case "during": // CR 506.8, 601.3, 602.5b

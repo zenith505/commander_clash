@@ -1,7 +1,7 @@
 # Roadmap
 
-25,160 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,600 of
+25,295 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,634 of
 9,979 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -227,12 +227,46 @@ line blocks.
    the easy cards from there to about rank 8,880 (Risk Factor, What Must Be Done, Necklace of Girion, Savor the
    Moment, Uglúk, Midnight Tilling, Tax Collector, Over the Edge), plus Jadelight Ranger and Defossilize ("explores,
    then it explores again"); `npm run popular` from Detention Sphere on is still to go through.
-   Next most played: Detention Sphere, Yuna's Whistle, Tangle Wire, Steward of the Harvest, Solitary Sanctuary,
-   Werewolf Pack Leader, Agent's Toolkit, Nessian Wanderer, Heroes in a Half Shell, Ran and Shaw, Rampaging
-   Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, Ferrafor, Young Yew, From the Catacombs,
-   Loki, God of Mischief, Katsumasa, the Animator, Kabira Evangel, Curious Colossus, Slagstone Refinery, Inalla,
-   Archmage Ritualist, Threats Undetected, Leader, Super-Genius, Scarecrone, Redcap Gutter-Dweller, Nev, the Practical
-   Dean, Witherbloom Command; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
+   Out after round 175: Detention Sphere (exiles every permanent with the same name, and returns them all: one exile
+   linked to several cards), Tangle Wire (the upkeep player taps one permanent of their choice for each fade counter),
+   Steward of the Harvest (gaining the activated abilities of exiled land cards), Solitary Sanctuary ("whenever you
+   tap an untapped creature an opponent controls": who tapped it isn't recorded), Werewolf Pack Leader (pack tactics,
+   and "isn't a Human"), Agent's Toolkit (moving one counter of a chosen kind), Heroes in a Half Shell ("one or more
+   ... deal combat damage" with "each of those creatures"), Ran and Shaw ("if you cast them and" a graveyard count),
+   Rampaging Aetherhood (paying any amount of {E} for counters), Unstable Glyphbridge (a creature chosen for each
+   player, then destroy the rest), Flitterwing Nuisance (an activated ability that makes a this-turn trigger), Curious
+   Forager (forage with a reflexive trigger), From the Catacombs (a corpse counter, the initiative and an exile
+   replacement together), Loki, God of Mischief ("becomes the target of an ability you control"), Katsumasa, the
+   Animator ("if it's not a Vehicle"), Slagstone Refinery (put into a graveyard or exile from the battlefield, one
+   trigger), Inalla, Archmage Ritualist (an eminence copy with haste, exiled at end step), Threats Undetected (four
+   creature cards with different powers, an opponent chooses two), Leader, Super-Genius (a connive replacement), This
+   Is How It Ends (villainous choice after a shuffle), Azor's Gateway (counting mana values among cards exiled with
+   it), Tamiyo, Collector of Tales, Anchor to Reality (the sacrificed permanent's mana value after a search), Detective's
+   Phoenix (bestow with collect evidence, cast from the graveyard), Visions of Ruin (flashback cheaper by a
+   commander's mana value), Strata Scythe (imprint a land from the library), Wickersmith's Tools ("one or more -1/-1
+   counters are put on a creature"), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
+   Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
+   among exiled cards), Azra Oddsmaker ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
+   attacked player, activated by that player), Rotating Fireplace (time travel), Aggressive Mining ("you can't play
+   lands"), Essence Sliver (any damage by a Sliver), Hunting Wilds (Forests put onto the battlefield this way become
+   3/3), Overwhelming Splendor (a player can't activate abilities that aren't mana abilities), Gandalf, Goblins' Bane
+   (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
+   Sisma Behemoth (an attack cost of its own), The Ancient One (a reflexive mill from a discard), Deathgorge Scavenger
+   ("you may exile" with two "if it's a" results), Tithe. Round 175 went down the list from Detention Sphere to
+   Capricopian (rank 8,592), then took the easy cards from there to about rank 9,100 (Plate Armor, Indebted Spirit,
+   Subjugate the Hobbits, Biovisionary, Bower Passage, Karametra's Blessing, Zuko's Conviction and others), plus the
+   cards that share their mechanics: "can't attack or block unless" any condition (Bontu the Glorified, Hazoret the
+   Fervent, Lupine Prototype, Technodrome, Training Drone and others), "whenever you cast a spell with {X} in its mana
+   cost" (Zaxara, Nev, Owlin Spiralmancer, Lattice Library, Geometer's Arthropod), "enchanted creature or enchantment
+   creature" (Feast of Dreams, Nyx Herald, Kestia, Temple Thief).
+   Next most played: Bristlebud Farmer, Kelsien, the Plague, Extract Brain, Astelli Reclaimer, Great Hall of the
+   Biblioplex, Divergent Transformations, Rune of Might, Black Panther, Wakandan King, Grell Philosopher, Pulmonic
+   Sliver, Etrata, Deadly Fugitive, Questing Druid, The Creation of Avacyn, Worldslayer, Progenitor Exarch, Diviner of
+   Mist, Honest Work, Pawpatch Recruit, Jhoira's Timebug, Huntmaster of the Fells, Archelos, Lagoon Mystic; the ones
+   skipped in round 175: Detention Sphere, Tangle Wire, Steward of the Harvest, Solitary Sanctuary, Werewolf Pack
+   Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and Shaw, Rampaging Aetherhood, Unstable Glyphbridge,
+   Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki, God of Mischief, Katsumasa, the Animator, Slagstone
+   Refinery, Inalla, Archmage Ritualist, Threats Undetected, Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Scriv,
    the Obligator, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister, Valgavoth's Onslaught, Motivated Pony; and from before round 172: Grindstone, Halo Forager, Moritte of the
@@ -241,7 +275,7 @@ line blocks.
    Jolted Awake, Dream-Thief's Bandana, Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication,
    Calamity, Galloping Inferno, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant,
    Kaervek, the Punisher, Obsessive Pursuit, Gemcutter Buccaneer, Nissa of Shadowed Boughs, Chandra, Flameshaper,
-   Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the Exemplary, Realm of Koh,
+   Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Realm of Koh,
    Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft
    Engine, Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of
    Herons, Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's
@@ -1222,8 +1256,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Wren's Run Hydra, Saheeli, Radiant Creator, Trystan, Lys Alana Dignitary, Dawnhand Eulogist, Ramunap Hydra and
   others): "you control a Desert or there is a Desert card in your graveyard", "there is a land / an artifact / a
   Warrior card in your graveyard", "an instant card and a sorcery card are in your graveyard", "ten or more cards in a
-  single graveyard"; "can't attack unless there are seven or more cards in your graveyard / you've cast a creature
-  (noncreature) spell this turn"; "Spirit or enchantment" (also "Human or artifact"); "creatures with no counters on
+  single graveyard"; "Spirit or enchantment" (also "Human or artifact"); "creatures with no counters on
   them"; threshold "instead" with "the damage can't be prevented", "destroy that creature. It can't be regenerated" and
   "deals 5 damage to each creature without flying"; "If that land was a snow land"; "If that creature is white or blue
   / is an enchantment / has infect" (CR 608.2h); "if you've cast another black (blue, green, white) spell this turn",
@@ -1232,7 +1265,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   N +1/+1 counters on it and with haste" (a single kicker); the Mana Batteries ({G}, plus one more for each charge
   counter removed); the Zubera ("for each Zubera that died this turn", any player's, changelings included); the Leeches
   ("Red spells you cast cost {R} more"); the Opal, Hidden, Veiled and Lurking enchantments ("When an opponent casts a
-  creature spell, if ~ is an enchantment, it becomes a 2/2 Soldier creature", CR 603.4, 205.1a). +85.
+  creature spell, if ~ is an enchantment, it becomes a 2/2 Soldier creature", CR 603.4, 205.1a). +80 (25,295 with
+  round 175).
 - Skipped there, with reasons: Burning Wish, Living Wish, Death Wish, Cunning Wish, Glittering Wish and Ring
   of Ma'rûf (nothing outside the game in Commander here: they'd only exile themselves); Thraben Exorcism ("creature
   with disturb"); Public Execution ("each other creature that player controls" after a target creature); Feast of

@@ -175,6 +175,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Sab-Sunen, Luxa Embodied: "~ can't attack or block unless it has an even number of counters on it" (of all kinds).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
+  // Ketramose, the New Dawn: "~ can't attack or block unless there are seven or more cards in exile": while there are fewer.
+  else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless there are ${NUM} or more cards in exile$`).exec(text))) [statement, cond] = [m[1], `there are fewer than ${m[2]} cards in exile`];
   // Kefnet the Mindful: "~ can't attack or block unless you have seven or more cards in hand": while you have fewer.
   else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless you have ${NUM} or more cards in hand$`).exec(text))) [statement, cond] = [m[1], `you have fewer than ${m[2]} cards in hand`];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
@@ -576,10 +578,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const n = m[2] ? 1 : m[1] ? num(m[1]) : 1;
     return { kind: "onBattlefield", filter: { ...spec, text: `attacking ${m[3]}` }, min: n, ...(m[2] ? { max: 1 } : {}) };
   }
+  if ((m = new RegExp(`^there are fewer than ${NUM} cards in exile$`).exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInExile" } }, max: num(m[1]!) - 1 };
   // "If there are thirteen or more creatures on the battlefield" (Blasphemous Edict).
   if ((m = new RegExp(`^there are ${NUM} or more (.+) on the battlefield$`).exec(text))) {
     const g = parseGroup(`all ${m[2]}`);
-    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!) } : null;
+    return g ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!), ...(g.other ? { other: true as const } : {}) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };

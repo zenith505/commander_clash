@@ -262,6 +262,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Consuming Tide: "for each opponent who has more cards in their hand than you", counted as it resolves.
   if (each && /^opponent who has more cards in (?:their )?hand than you$/i.test(p)) return count({ kind: "players", opponents: true, handMoreThanYou: true });
+  // Birth of the Imperium: "for each opponent who controls fewer creatures than you", counted as it resolves.
+  if (each && /^opponent who controls fewer creatures than you$/i.test(p)) return count({ kind: "players", opponents: true, fewerCreaturesThanYou: true });
   // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.
   if (each && /^opponent who has less life than you$/i.test(p)) return count({ kind: "players", opponents: true, lifeLessThanYou: true });
   // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.

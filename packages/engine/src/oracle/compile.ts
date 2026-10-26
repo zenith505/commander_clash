@@ -1458,6 +1458,11 @@ export function compile(d: CardDef): CompiledCard {
       else out.graveyardExile = { whose: yardExile[3] === "a" ? "any" : yardExile[3] === "your" ? "yours" : "opponents", ...(yardExile[1] === "card or token" ? { tokens: true as const } : {}), ...(filter ? { filter } : {}), ...(yardExile[4] ? { counter: counterKind(yardExile[4]) } : {}) };
       continue;
     }
+    // Ugin's Nexus: a replacement effect of the permanent's own (CR 614.1a); its controller takes the turn (CR 500.7).
+    if (line === "If ~ would be put into a graveyard from the battlefield, instead exile it and take an extra turn after this one.") {
+      out.exileForExtraTurn = true;
+      continue;
+    }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {
       out.exileInsteadOfGraveyard = true;
       continue;
@@ -2674,6 +2679,25 @@ export function compile(d: CardDef): CompiledCard {
     // Solemnity (CR 122.1): the counters already there stay (rulings); see counters.ts.
     if (line === "Players can't get counters.") {
       out.noPlayerCounters = true;
+      continue;
+    }
+    // O-Naginata, Konda's Banner: an Equipment that can't become attached to anything else, and becomes unattached once its
+    // creature stops fitting, its own bonus included (rulings; CR 301.5c, 704.5n).
+    {
+      const only = d.subtypes.includes("Equipment") ? /^~ can be attached only to an? ((?:legendary )?creature(?: with (?:power|toughness) \d+ or greater)?)\.$/.exec(line) : null;
+      const spec = only && parseTargetPhrase(only[1]!);
+      if (spec?.kind === "object") {
+        out.attachOnly = { ...spec, text: only![1]! };
+        continue;
+      }
+    }
+    // Aeve, Progenitor Ooze: a token copy of it isn't legendary (a type-changing effect of its own, CR 205.4, 613.1d).
+    if (line === "~ isn't legendary if it's a token.") {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "loseTypes", types: ["Legendary"] }], condition: { kind: "self", is: "token" }, text: raw });
+      continue;
+    }
+    if (line === "Creatures your opponents control can't have +1/+1 counters put on them.") {
+      out.opponentsCreaturesNoCounters = "+1/+1";
       continue;
     }
     if (line === "Counters can't be put on artifacts, creatures, enchantments, or lands.") {

@@ -1,8 +1,8 @@
 // Round 171: the most played cards, in popularity order, after round 170 (from Haakon, Stromgald Scourge, rank 7,022, on).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, island, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
-import { draw, compileCard, attackProblem, moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { act, addEffect, bear, card, forest, island, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
+import { gainLife, draw, compileCard, attackProblem, moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -728,5 +728,385 @@ describe("Barbara Wright", () => {
     const saga = into(s, ap, eldest, "hand");
     s = settle(run(s, planCast(s, ap, saga)), ap);
     expect(s.objects[saga]!.counters.lore).toBe(1);
+  });
+});
+
+const beetle = card("Blightbeetle", "Creature — Insect", "{1}{B}", {cmc: 2,power: "1",toughness: "1",keywords: ["Protection"],oracleText: "Protection from green (This creature can't be blocked, targeted, dealt damage, enchanted, or equipped by anything green.)\nCreatures your opponents control can't have +1/+1 counters put on them."});
+const rebirth = card("Pattern of Rebirth", "Enchantment — Aura", "{3}{G}", {cmc: 4,keywords: ["Enchant"],oracleText: "Enchant creature\nWhen enchanted creature dies, that creature's controller may search their library for a creature card, put that card onto the battlefield, then shuffle."});
+const ragga = card("Raggadragga, Goreguts Boss", "Legendary Creature — Human Boar", "{2}{R}{G}", {cmc: 4,power: "4",toughness: "4",oracleText: "Each creature you control with a mana ability gets +2/+2.\nWhenever a creature you control with a mana ability attacks, untap it.\nWhenever you cast a spell, if at least seven mana was spent to cast it, untap target creature. It gets +7/+7 and gains trample until end of turn."});
+const naginata = card("O-Naginata", "Artifact — Equipment", "{1}", {cmc: 1,keywords: ["Equip"],oracleText: "This Equipment can be attached only to a creature with power 3 or greater.\nEquipped creature gets +3/+0 and has trample.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)"});
+const nexus = card("Ugin's Nexus", "Legendary Artifact", "{5}", {cmc: 5,oracleText: "If a player would begin an extra turn, that player skips that turn instead.\nIf Ugin's Nexus would be put into a graveyard from the battlefield, instead exile it and take an extra turn after this one."});
+const catc = card("Cat Collector", "Creature — Human Citizen", "{2}{W}", {cmc: 3,power: "3",toughness: "2",keywords: ["Food"],oracleText: "When this creature enters, create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\nWhenever you gain life for the first time during each of your turns, create a 1/1 white Cat creature token."});
+const sokka = card("Sokka, Lateral Strategist", "Legendary Creature — Human Warrior Ally", "{1}{W/U}{W/U}", {cmc: 3,power: "2",toughness: "4",keywords: ["Vigilance"],oracleText: "Vigilance\nWhenever Sokka and at least one other creature attack, draw a card."});
+const woeEater = card("Daemogoth Woe-Eater", "Creature — Demon", "{1}{B}{B/G}{G}", {cmc: 4,power: "7",toughness: "6",oracleText: "At the beginning of your upkeep, sacrifice a creature.\nWhen you sacrifice this creature, each opponent discards a card, you draw a card, and you gain 2 life."});
+const anje = card("Anje, Maid of Dishonor", "Legendary Creature — Vampire", "{2}{B}{R}", {cmc: 4,power: "4",toughness: "5",oracleText: "Whenever Anje and/or one or more other Vampires you control enter, create a Blood token. This ability triggers only once each turn. (It's an artifact with \"{1}, {T}, Discard a card, Sacrifice this token: Draw a card.\")\n{2}, Sacrifice another creature or a Blood token: Each opponent loses 2 life and you gain 2 life."});
+const voidwing = card("Voidwing Hybrid", "Creature — Phyrexian Bat", "{U}{B}", {cmc: 2,power: "2",toughness: "1",keywords: ["Flying","Toxic","Proliferate"],oracleText: "Flying\nToxic 1 (Players dealt combat damage by this creature also get a poison counter.)\nWhen you proliferate, return this card from your graveyard to your hand."});
+const launderer = card("Body Launderer", "Creature — Ogre Rogue", "{2}{B}{B}", {cmc: 4,power: "3",toughness: "3",keywords: ["Connive","Deathtouch"],oracleText: "Deathtouch\nWhenever another nontoken creature you control dies, this creature connives.\nWhen this creature dies, return another target non-Rogue creature card with equal or lesser power from your graveyard to the battlefield."});
+const canyons = card("Winding Canyons", "Land", "", {cmc: 0,oracleText: "{T}: Add {C}.\n{2}, {T}: You may cast creature spells this turn as though they had flash."});
+const temur = card("Temur Charm", "Instant", "{G}{U}{R}", {cmc: 3,keywords: ["Fight"],oracleText: "Choose one —\n• Target creature you control gets +1/+1 until end of turn. It fights target creature you don't control.\n• Counter target spell unless its controller pays {3}.\n• Creatures with power 3 or less can't block this turn."});
+const aeve = card("Aeve, Progenitor Ooze", "Legendary Creature — Ooze", "{2}{G}{G}{G}", {cmc: 5,power: "2",toughness: "2",keywords: ["Storm"],oracleText: "Storm (When you cast this spell, copy it for each spell cast before it this turn. Copies become tokens.)\nAeve isn't legendary if it's a token.\nAeve enters with a +1/+1 counter on it for each other Ooze you control."});
+const regent = card("Deathbringer Regent", "Creature — Dragon", "{5}{B}{B}", {cmc: 7,power: "5",toughness: "6",keywords: ["Flying"],oracleText: "Flying\nWhen this creature enters, if you cast it from your hand and there are five or more other creatures on the battlefield, destroy all other creatures."});
+const mirage = card("Hate Mirage", "Sorcery", "{3}{R}", {cmc: 4,oracleText: "Choose up to two target creatures you don't control. For each of those creatures, create a token that's a copy of that creature. Those tokens gain haste. Exile them at the beginning of the next end step."});
+const eowyn = card("Éowyn, Lady of Rohan", "Legendary Creature — Human Noble", "{2}{W}", {cmc: 3,power: "2",toughness: "4",oracleText: "At the beginning of combat on your turn, target creature gains your choice of first strike or vigilance until end of turn. If that creature is equipped, it gains first strike and vigilance until end of turn instead.\nEquip abilities you activate cost {1} less to activate."});
+const blessing = card("Apostle's Blessing", "Instant", "{1}{W/P}", {cmc: 2,oracleText: "({W/P} can be paid with either {W} or 2 life.)\nTarget artifact or creature you control gains protection from artifacts or from the color of your choice until end of turn."});
+const ketramose = card("Ketramose, the New Dawn", "Legendary Creature — God", "{1}{W}{B}", {cmc: 3,power: "4",toughness: "4",keywords: ["Lifelink","Indestructible","Menace"],oracleText: "Menace, lifelink, indestructible\nKetramose can't attack or block unless there are seven or more cards in exile.\nWhenever one or more cards are put into exile from graveyards and/or the battlefield during your turn, you draw a card and lose 1 life."});
+const imperium = card("Birth of the Imperium", "Enchantment — Saga", "{2}{W}{U}{B}", {cmc: 5,oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 2/2 white Astartes Warrior creature token with vigilance for each opponent you have.\nII — Each opponent sacrifices a creature of their choice.\nIII — Draw two cards for each opponent who controls fewer creatures than you."});
+const elves = card("Llanowar Elves", "Creature — Elf Druid", "{G}", {cmc: 1,power: "1",toughness: "1",oracleText: "{T}: Add {G}."});
+const reverence = card("Reverence", "Enchantment", "{2}{W}{W}", {cmc: 4,oracleText: "Creatures with power 2 or less can't attack you."});
+const prolif = card("Grow Test", "Sorcery", "{1}", { cmc: 1, oracleText: "Proliferate." });
+const voice = card("Voice of Many", "Creature — Elf Druid", "{2}{G}{G}", { cmc: 4, power: "3", toughness: "3", oracleText: "When this creature enters, draw a card for each opponent who controls fewer creatures than you." });
+const others = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && characteristics(s, s.objects[id]!).types.includes("Creature")).length;
+
+describe("Round 171, fourth cards", () => {
+  it("are fully supported", () => supported(beetle, rebirth, ragga, naginata, nexus, catc, sokka, woeEater, anje, voidwing, launderer, canyons, temur, aeve, regent, mirage, eowyn, blessing, ketramose, imperium, voice, reverence));
+});
+
+describe("Blightbeetle", () => {
+  it("creatures your opponents control can't have +1/+1 counters put on them; the ones there stay", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, beetle);
+    const theirs = putOnBattlefield(s, opp, bear());
+    const old = putOnBattlefield(s, opp, bear());
+    s.objects[old]!.counters["+1/+1"] = 1;
+    const mine = putOnBattlefield(s, ap, bear());
+    const grow = into(s, ap, card("Grow All", "Sorcery", "{1}", { cmc: 1, oracleText: "Put a +1/+1 counter on each creature." }), "hand");
+    s = resolveAll(run(s, planCast(s, ap, grow)));
+    expect(s.objects[theirs]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[old]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+describe("Pattern of Rebirth", () => {
+  it("enchanted creature dies: its controller may search for a creature card and put it onto the battlefield", () => {
+    let { s, ap, opp } = setup([]);
+    const b = putOnBattlefield(s, opp, bear());
+    const aura = putOnBattlefield(s, ap, rebirth);
+    s.objects[aura]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    const before = others(s, opp);
+    moveObject(s, b, "graveyard");
+    s = settle(s, ap);
+    expect(others(s, opp)).toBe(before); // the bear died, another one came
+    expect(zone(s, b)).toBe("graveyard");
+  });
+});
+
+describe("Raggadragga, Goreguts Boss", () => {
+  it("creatures you control with a mana ability get +2/+2 and untap as they attack", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, ragga);
+    const e = putOnBattlefield(s, ap, elves);
+    const b = putOnBattlefield(s, ap, bear());
+    expect(pt(s, e)).toBe("3/3");
+    expect(pt(s, b)).toBe("2/2");
+    s = resolveAll(attack(s, ap, [{ attacker: e, defender: opp }, { attacker: b, defender: opp }]));
+    expect(s.objects[e]!.tapped).toBeFalsy();
+    expect(s.objects[b]!.tapped).toBe(true);
+  });
+  it("a mana ability granted by another permanent counts", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, ragga);
+    const b = putOnBattlefield(s, ap, bear());
+    addEffect(s, ap, [b], [{ kind: "addAbility", text: "{T}: Add {G}." }]);
+    expect(pt(s, b)).toBe("4/4");
+  });
+});
+
+describe("O-Naginata", () => {
+  it("can be attached only to a creature with power 3 or greater, and falls off when its creature shrinks", () => {
+    let { s, ap } = setup([]);
+    const eq = putOnBattlefield(s, ap, naginata);
+    const small = putOnBattlefield(s, ap, bear());
+    const big = putOnBattlefield(s, ap, plain("Ogre", "Ogre", "3", "3"));
+    s = resolveAll(run(s, planActivate(s, ap, eq, 0, [tgt(small)])));
+    expect(s.objects[eq]!.attachedTo).toBeUndefined();
+    s = resolveAll(run(s, planActivate(s, ap, eq, 0, [tgt(big)])));
+    expect(s.objects[eq]!.attachedTo).toBe(big);
+    expect(pt(s, big)).toBe("6/3");
+    addEffect(s, ap, [big], [{ kind: "modifyPT", power: -4, toughness: 0 }]);
+    s = act(s, { type: "passPriority", player: waitingOn(s)! }); // state-based actions
+    expect(s.objects[eq]!.attachedTo).toBeUndefined();
+  });
+});
+
+describe("Ugin's Nexus", () => {
+  it("put into a graveyard from the battlefield: exiled instead, and its controller takes an extra turn", () => {
+    let { s, ap } = setup([]);
+    const n = putOnBattlefield(s, ap, nexus);
+    moveObject(s, n, "graveyard");
+    expect(zone(s, n)).toBe("exile");
+    expect(s.extraTurns?.map((t) => t.player)).toEqual([ap]);
+  });
+});
+
+describe("Cat Collector", () => {
+  it("you gain life for the first time during your turn: a Cat", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, catc);
+    gainLife(s, ap, 1);
+    s = resolveAll(s);
+    gainLife(s, ap, 1);
+    s = resolveAll(s);
+    expect(mine(s, ap, "Cat Token")).toHaveLength(1);
+  });
+  it("not during an opponent's turn", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, opp, catc);
+    gainLife(s, opp, 1);
+    s = resolveAll(s);
+    expect(mine(s, opp, "Cat Token")).toHaveLength(0);
+  });
+});
+
+describe("Sokka, Lateral Strategist", () => {
+  it("draws when it and at least one other creature attack", () => {
+    let { s, ap, opp } = setup([]);
+    const k = putOnBattlefield(s, ap, sokka);
+    const b = putOnBattlefield(s, ap, bear());
+    const hand = handOf(s, ap).length;
+    s = resolveAll(attack(s, ap, [{ attacker: k, defender: opp }, { attacker: b, defender: opp }]));
+    expect(handOf(s, ap).length).toBe(hand + 1);
+  });
+  it("not alone", () => {
+    let { s, ap, opp } = setup([]);
+    const k = putOnBattlefield(s, ap, sokka);
+    putOnBattlefield(s, ap, bear());
+    const hand = handOf(s, ap).length;
+    s = resolveAll(attack(s, ap, [{ attacker: k, defender: opp }]));
+    expect(handOf(s, ap).length).toBe(hand);
+  });
+});
+
+describe("Anje, Maid of Dishonor and Daemogoth Woe-Eater", () => {
+  it("Anje: sacrifice a Blood token: each opponent loses 2 life and you gain 2 life", () => {
+    let { s, ap, opp } = setup([]);
+    const a = into(s, ap, anje, "hand");
+    s = resolveAll(run(s, planCast(s, ap, a)));
+    const blood = mine(s, ap, "Blood Token")[0]!;
+    expect(blood).toBeDefined();
+    s = resolveAll(run(s, planActivate(s, ap, a, 0, undefined, undefined, undefined, undefined, { sacrifice: [blood] })));
+    expect(zone(s, blood)).not.toBe("battlefield");
+    expect(lifeOf(s, opp)).toBe(38);
+    expect(lifeOf(s, ap)).toBe(42);
+  });
+  it("sacrificing the Woe-Eater: each opponent discards a card, you draw a card, and you gain 2 life", () => {
+    let { s, ap, opp } = setup([]);
+    const a = putOnBattlefield(s, ap, anje);
+    const w = putOnBattlefield(s, ap, woeEater);
+    into(s, opp, bear(), "hand");
+    const theirHand = handOf(s, opp).length;
+    const hand = handOf(s, ap).length;
+    s = settle(run(s, planActivate(s, ap, a, 0, undefined, undefined, undefined, undefined, { sacrifice: [w] })), ap);
+    expect(zone(s, w)).toBe("graveyard");
+    expect(handOf(s, opp).length).toBe(theirHand - 1);
+    expect(handOf(s, ap).length).toBe(hand + 1);
+    expect(lifeOf(s, ap)).toBe(44);
+  });
+});
+
+describe("Voidwing Hybrid", () => {
+  it("you proliferate: it returns from your graveyard to your hand", () => {
+    let { s, ap } = setup([]);
+    const v = into(s, ap, voidwing, "graveyard");
+    const p = into(s, ap, prolif, "hand");
+    s = resolveAll(run(s, planCast(s, ap, p)));
+    if (s.pending) s = resolveAll(run(s, botActions(s, ap)));
+    expect(zone(s, v)).toBe("hand");
+  });
+});
+
+describe("Body Launderer", () => {
+  it("dies: returns another non-Rogue creature card with power no greater than its own", () => {
+    let { s, ap } = setup([]);
+    const l = putOnBattlefield(s, ap, launderer);
+    const ok = into(s, ap, plain("Ogre", "Ogre", "3", "3"), "graveyard");
+    const big = into(s, ap, plain("Giant", "Giant", "4", "4"), "graveyard");
+    const rogue = into(s, ap, plain("Thief", "Human Rogue", "1", "1"), "graveyard");
+    moveObject(s, l, "graveyard");
+    s = resolveAll(s);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(big)] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(rogue)] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(l)] })).toThrow();
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(ok)] }));
+    expect(zone(s, ok)).toBe("battlefield");
+  });
+});
+
+describe("Winding Canyons", () => {
+  it("creature spells as though they had flash, this turn only", () => {
+    let { s, ap } = setup([]);
+    const w = putOnBattlefield(s, ap, canyons);
+    const b = into(s, ap, bear(), "hand");
+    s = passUntil(s, "beginCombat", ap);
+    s = priorityTo(s, ap);
+    expect(planCast(s, ap, b)).toBeNull();
+    s = run(s, planActivate(s, ap, w, 0));
+    s = resolveAll(s);
+    s = priorityTo(s, ap);
+    expect(planCast(s, ap, b)).not.toBeNull();
+    s = passUntil(s, "upkeep", next(s, ap));
+    expect(planCast(s, ap, b)).toBeNull();
+  });
+});
+
+describe("Temur Charm", () => {
+  it("creatures with power 3 or less can't block this turn, ones entering later too", () => {
+    let { s, ap, opp } = setup([]);
+    const charm = into(s, ap, temur, "hand");
+    const a = putOnBattlefield(s, ap, plain("Ogre", "Ogre", "3", "3"));
+    const big = putOnBattlefield(s, opp, plain("Giant", "Giant", "4", "4"));
+    s = resolveAll(run(s, planCast(s, ap, charm, [], [2])));
+    const later = putOnBattlefield(s, opp, bear());
+    s = attack(s, ap, [{ attacker: a, defender: opp }]);
+    expect(blockProblem(s, s.objects[later]!, s.objects[a]!)).not.toBeNull();
+    expect(blockProblem(s, s.objects[big]!, s.objects[a]!)).toBeNull();
+  });
+});
+
+describe("Aeve, Progenitor Ooze", () => {
+  it("isn't legendary as a token", () => {
+    let { s, ap } = setup([]);
+    const a = putOnBattlefield(s, ap, aeve);
+    const t = putOnBattlefield(s, ap, aeve);
+    s.objects[t]!.isToken = true;
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[a]!).supertypes).toContain("Legendary");
+    expect(characteristics(s, s.objects[t]!).supertypes).not.toContain("Legendary");
+    s = act(s, { type: "passPriority", player: waitingOn(s)! }); // the legend rule doesn't apply
+    expect(zone(s, a)).toBe("battlefield");
+    expect(zone(s, t)).toBe("battlefield");
+  });
+});
+
+describe("Deathbringer Regent", () => {
+  it("cast from your hand with five or more other creatures: destroys all other creatures", () => {
+    let { s, ap, opp } = setup([]);
+    const r = into(s, ap, regent, "hand");
+    const bears = [0, 1, 2].map(() => putOnBattlefield(s, opp, bear())).concat([0, 1].map(() => putOnBattlefield(s, ap, bear())));
+    s = resolveAll(run(s, planCast(s, ap, r)));
+    expect(bears.every((b) => zone(s, b) === "graveyard")).toBe(true);
+    expect(zone(s, r)).toBe("battlefield");
+  });
+  it("not with four", () => {
+    let { s, ap, opp } = setup([]);
+    const r = into(s, ap, regent, "hand");
+    const bears = [0, 1, 2, 3].map(() => putOnBattlefield(s, opp, bear()));
+    s = resolveAll(run(s, planCast(s, ap, r)));
+    expect(bears.every((b) => zone(s, b) === "battlefield")).toBe(true);
+  });
+});
+
+describe("Hate Mirage", () => {
+  it("a hasty token copy of each of up to two creatures you don't control, exiled at the next end step", () => {
+    let { s, ap, opp } = setup([]);
+    const m = into(s, ap, mirage, "hand");
+    const a = putOnBattlefield(s, opp, plain("Ogre", "Ogre", "3", "3"));
+    const b = putOnBattlefield(s, next(s, opp), bear());
+    s = resolveAll(run(s, planCast(s, ap, m, [tgt(a), tgt(b)])));
+    const copies = [...mine(s, ap, "Ogre"), ...mine(s, ap, "Grizzly Bears")].filter((id) => s.objects[id]!.isToken);
+    expect(copies).toHaveLength(2);
+    expect(copies.every((id) => kw(s, id, "Haste"))).toBe(true);
+    s = settle(passUntil(s, "end", ap), ap);
+    expect(copies.every((id) => zone(s, id) !== "battlefield")).toBe(true);
+  });
+});
+
+describe("Éowyn, Lady of Rohan", () => {
+  it("beginning of combat: your choice of first strike or vigilance", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, eowyn);
+    const b = putOnBattlefield(s, ap, bear());
+    s = passUntil(s, "beginCombat", ap);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(b)] }));
+    expect(s.pending?.kind).toBe("chooseOption");
+    expect(pending(s).options).toEqual(["First strike", "Vigilance"]);
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "Vigilance" }));
+    expect(kw(s, b, "Vigilance")).toBe(true);
+    expect(kw(s, b, "First strike")).toBe(false);
+  });
+  it("an equipped creature gets both, with no choice", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, eowyn);
+    const b = putOnBattlefield(s, ap, bear());
+    const eq = putOnBattlefield(s, ap, card("Spear", "Artifact — Equipment", "{1}", { cmc: 1, oracleText: "Equip {1}" }));
+    s.objects[eq]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    s = passUntil(s, "beginCombat", ap);
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(b)] }));
+    expect(s.pending).toBeFalsy();
+    expect(kw(s, b, "Vigilance")).toBe(true);
+    expect(kw(s, b, "First strike")).toBe(true);
+  });
+});
+
+describe("Apostle's Blessing", () => {
+  it("protection from artifacts or from the color of your choice", () => {
+    let { s, ap } = setup([]);
+    const sp = into(s, ap, blessing, "hand");
+    const b = putOnBattlefield(s, ap, bear());
+    s = resolveAll(run(s, planCast(s, ap, sp, [tgt(b)])));
+    expect(s.pending?.kind).toBe("chooseOption");
+    expect(pending<{ options: string[] }>(s).options).toContain("Protection from artifacts");
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "Protection from artifacts" }));
+    expect(kw(s, b, "Protection from artifacts")).toBe(true);
+  });
+});
+
+describe("Ketramose, the New Dawn", () => {
+  it("can't attack unless there are seven or more cards in exile; exiling from a graveyard on your turn draws", () => {
+    let { s, ap, opp } = setup([]);
+    const k = putOnBattlefield(s, ap, ketramose);
+    for (let i = 0; i < 6; i++) s.players[opp]!.exile.push(into(s, opp, bear(), "exile"));
+    invalidateCharacteristics(s);
+    expect(potentialAttackers(s, ap).map((o) => o.id)).not.toContain(k);
+    const c = into(s, opp, bear(), "graveyard");
+    const purge = into(s, ap, card("Purge", "Instant", "{1}", { cmc: 1, oracleText: "Exile target card from a graveyard." }), "hand");
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, purge, [tgt(c)])));
+    expect(zone(s, c)).toBe("exile");
+    expect(handOf(s, ap).length).toBe(hand - 1 + 1);
+    expect(lifeOf(s, ap)).toBe(39);
+    expect(potentialAttackers(s, ap).map((o) => o.id)).toContain(k);
+  });
+});
+
+describe("Voice of Many and Birth of the Imperium", () => {
+  it("draws a card for each opponent who controls fewer creatures than you", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, bear());
+    putOnBattlefield(s, opp, bear());
+    putOnBattlefield(s, opp, bear());
+    const v = into(s, ap, voice, "hand");
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, v)));
+    // With Voice of Many, two creatures: the two opponents with none.
+    expect(handOf(s, ap).length).toBe(hand - 1 + 2);
+  });
+});
+
+describe("Reverence", () => {
+  it("creatures with power 2 or less can't attack you", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, opp, reverence);
+    const b = putOnBattlefield(s, ap, bear());
+    const o = putOnBattlefield(s, ap, plain("Ogre", "Ogre", "3", "3"));
+    expect(attackProblem(s, s.objects[b]!, opp)).not.toBeNull();
+    expect(attackProblem(s, s.objects[o]!, opp)).toBeNull();
+  });
+});
+
+describe("O-Naginata and bots", () => {
+  it("a bot doesn't equip it to a creature it can't be attached to", () => {
+    let { s, ap } = setup([]);
+    const eq = putOnBattlefield(s, ap, naginata);
+    putOnBattlefield(s, ap, bear());
+    for (const id of [...handOf(s, ap)]) moveObject(s, id, "library");
+    s.players[ap]!.command = []; // no commander to cast instead
+    s = priorityTo(s, ap);
+    const acts = botActions(s, ap);
+    expect(acts.some((a) => a.type === "activateAbility" && (a as { objectId?: string }).objectId === eq)).toBe(false);
   });
 });

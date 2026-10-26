@@ -1230,6 +1230,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "A token that's a copy of that creature except it's an artifact ..." (Faerie Artisans): the usual comma.
   text = text.replace(/\b(a token that's a copy of that creature) except it's /g, "$1, except it's ");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "Each opponent discards a card, you draw a card, and you gain 2 life" (Daemogoth Woe-Eater): three instructions, in order.
+  text = text.replace(/(^|\. )([Ee]ach opponent|[Yy]ou) (discards? a card|draws? a card|gains? \d+ life|loses? \d+ life), (each opponent|you) (discards? a card|draws? a card|gains? \d+ life|loses? \d+ life), and (each opponent|you) (discards? a card|draws? a card|gains? \d+ life|loses? \d+ life)\./g, (_, a: string, b: string, c: string, d: string, e: string, f: string, g: string) => `${a}${capital(b)} ${c}. ${capital(d)} ${e}. ${capital(f)} ${g}.`);
   // "Search your library for two cards. Put one into your hand and the other into your graveyard. Then shuffle." (Final
   // Parting): one search, as Cultivate's.
   text = text.replace(/\bSearch your library for two cards\. Put one (into your hand|onto the battlefield) and the other into your graveyard\. Then shuffle\./g, "Search your library for two cards, put one $1 and the other into your graveyard, then shuffle.");
@@ -1310,7 +1312,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
   // except it has haste." (Twinflame): a copy of each of them.
-  text = text.replace(/^Choose any number of target ([^.]+?)\. For each of them, create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of any number of target $1$2.");
+  // "Choose up to two target creatures you don't control. For each of those creatures, create a token that's a copy of that
+  // creature." (Hate Mirage) likewise.
+  text = text.replace(/^Choose (any number of|up to two) target ([^.]+?)\. For each (?:of them|of those creatures), create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of $1 target $2$3.");
   // "Target creature you control other than ~" (Rosie Cotton) is "another target creature you control"; "each creature you
   // control other than ~" (Dawnstrike Vanguard) is "each other creature you control".
   text = text.replace(/\b([Tt])arget (creature|permanent) you control other than ~/g, (_, t: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${w} you control`);
@@ -3849,6 +3853,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Éowyn, Lady of Rohan: "Target creature gains your choice of first strike or vigilance until end of turn. If that
+    // creature is equipped, it gains first strike and vigilance until end of turn instead.": whether it's equipped as this
+    // resolves; then no choice is made.
+    const eitherKw = /^[Tt]arget creature gains your choice of ([a-z ]+) or ([a-z ]+) until end of turn$/.exec(s);
+    const bothKw = eitherKw && /^If that creature is equipped, it gains ([a-z ]+) and ([a-z ]+) until end of turn instead\.?$/.exec(sentences[si + 1] ?? "");
+    if (eitherKw && bothKw && eitherKw[1] === bothKw[1] && eitherKw[2] === bothKw[2]) {
+      const before = ctx.targets.length;
+      const both = parseOne(`Target creature gains ${bothKw[1]} and ${bothKw[2]} until end of turn`, ctx);
+      const kws = [keywordOf(eitherKw[1]!), keywordOf(eitherKw[2]!)];
+      const gain = both?.length === 1 ? both[0]! : undefined;
+      if (gain?.type !== "continuous" || ctx.targets.length !== before + 1 || kws.some((k) => !k || k === CHOSEN_PROTECTION)) return null;
+      const one: Effect = { ...gain, mods: [{ kind: "addKeywords", keywords: [CHOSEN_KEYWORD] }] };
+      const equipped: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], status: "equipped", text: "equipped" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: equipped }, effects: [gain], otherwise: [{ type: "choose", choice: "keyword", options: kws as string[] }, one] });
+      si++;
+      continue;
+    }
     // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
     // Hidden Blade: "Attach it to target creature you control. If that creature is an Assassin, it gains deathtouch ...".
     const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
@@ -6222,7 +6243,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -6555,7 +6576,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Target creature gains your choice of menace or lifelink until end of turn", "... flying, vigilance, deathtouch, or
     // haste": one of those keywords, chosen as it resolves (CR 608.2d).
     // "Gains protection from colorless or from the color of your choice" (Giver of Runes): one of six, chosen as it resolves.
-    s = s.replace(/ (gains?) protection from colorless or from the color of your choice\b/, " $1 your choice of protection from colorless, protection from white, protection from blue, protection from black, protection from red, or protection from green");
+    // "Gains protection from artifacts or from the color of your choice" (Apostle's Blessing) likewise.
+    s = s.replace(/ (gains?) protection from (colorless|artifacts) or from the color of your choice\b/, " $1 your choice of protection from $2, protection from white, protection from blue, protection from black, protection from red, or protection from green");
     const choiceOf = / (gains?|gain) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?)(?= until end of turn\b| and |$)/.exec(s);
     if (choiceOf) {
       const options = choiceOf[2]!.split(/,? or |, /).map((w) => keywordOf(w));

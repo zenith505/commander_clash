@@ -96,9 +96,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const both = pickFilter(`${c[1]} or ${c[2]}`);
       if (!a || !b || !both || a.kind !== "object" || b.kind !== "object") return "fail";
       extra.push({ kind: "sacrifice", filter: { ...both, text: `${c[1]} and a ${c[2]}` }, n: 2, oneOfEach: [a, b] });
-    } else if ((c = /^Sacrifice another (\w+) or an? (\w+)$/.exec(part))) {
+    } else if ((c = /^Sacrifice another (\w+) or an? (\w+(?: token)?)$/.exec(part))) {
       // "Sacrifice another creature or an artifact" (Street Urchin): this permanent too if it's an artifact (rulings).
-      // "Sacrifice another creature or a Treasure" (Skullport Merchant): a card type or a subtype, either one.
+      // "Sacrifice another creature or a Treasure" (Skullport Merchant): a card type or a subtype, either one. "Or a Blood
+      // token" (Anje, Maid of Dishonor).
       const parts = [pickFilter(c[1]!), pickFilter(c[2]!)];
       const filter = pickFilter(`${c[1]} or ${c[2]}`) ?? (parts.every((x) => x?.kind === "object") ? { kind: "object" as const, types: [], notTypes: [], notColors: [], anyOf: parts as TargetSpec[], text: `${c[1]} or ${c[2]}` } : null);
       const selfIf = pickFilter(c[2]!);

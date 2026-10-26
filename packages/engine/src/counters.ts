@@ -68,7 +68,7 @@ const putterFits = (s: GameState, mod: CountMod, controller: PlayerId, putter: P
  */
 export function countersToPut(s: GameState, o: GameObject, kind: string, n: number, entering = false): number {
   if (n <= 0 || o.zone !== "battlefield") return n;
-  if (countersBanned(s, o)) return 0;
+  if (countersBanned(s, o, kind)) return 0;
   const owner = controllerOf(s, o);
   const putter = putterNow ?? owner;
   const { types, subtypes, allCreatureTypes } = characteristics(s, o);
@@ -241,10 +241,15 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
  * types gets none: as it enters, from an effect, or as a cost, which then can't be paid (rulings). Cards elsewhere still
  * do (suspend's time counters).
  */
-export function countersBanned(s: GameState, o: GameObject): boolean {
+export function countersBanned(s: GameState, o: GameObject, kind?: string): boolean {
   if (o.zone !== "battlefield") return false;
   const types = characteristics(s, o).types;
-  return s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noCountersOn?.some((t) => types.includes(t)));
+  if (s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noCountersOn?.some((t) => types.includes(t)))) return true;
+  // Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." The ones already there stay;
+  // one entering with them gets none, and a cost putting them can't be paid (rulings).
+  if (kind === undefined || !types.includes("Creature")) return false;
+  const pid = controllerOf(s, o);
+  return s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).opponentsCreaturesNoCounters === kind && controllerOf(s, s.objects[id]!) !== pid);
 }
 
 /** Solemnity: "Players can't get counters." No poison (infect damage then does nothing to a player), energy, experience or rad counters (rulings). */

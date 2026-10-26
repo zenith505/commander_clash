@@ -1619,7 +1619,7 @@ export interface GameState {
   blocksChosenBy?: { player: PlayerId; turn: number; combat: number };
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
-  flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
+  flashUntil?: { controller: PlayerId; filter: TargetSpec; /** Only during this turn (Winding Canyons). */ turn?: number }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
   graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string; rider?: GraveCastRider; /** Locke: only these cards (as they were then), in any player's graveyard. */ cards?: { id: ObjectId; zc: number }[] }[];

@@ -3699,6 +3699,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       // "Discard your hand" (Tarrian's Journal): only with at most one card in it, which then becomes a land worth tapping.
       if (ab.discardHand && hand > 1) continue;
+      // "Remove all +1/+1 counters from ~": only with some to remove, five for each extra turn (Sage of Hours).
+      if (ab.removeCounters?.all && (o.counters[ab.removeCounters.counter] ?? 0) < (allEffects(ab.body.effects).some((e) => e.type === "extraTurn" && typeof e.n === "object" && !!e.n.per) ? 5 : 1)) continue;
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0) && !(ab.discardHand && objIsType(s, o, "Artifact"))) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)

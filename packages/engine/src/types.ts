@@ -870,6 +870,8 @@ export interface StackItem {
   costCardNames?: string[];
   /** The cards a discard cost discarded (keys into `cards`): "if the discarded card wasn't a land card" (Grab the Prize). */
   costDiscarded?: string[];
+  /** "Remove all +1/+1 counters from ~" paid as a cost: how many were removed (Sage of Hours, "counters removed this way"). */
+  countersRemoved?: number;
   /** The cards an "Exile a card from your hand" cost exiled, as the objects they became there: "the exiled card" (Jhoira of the Ghitu). */
   costExiled?: { id: ObjectId; zc: number }[];
   /**

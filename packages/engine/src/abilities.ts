@@ -84,6 +84,8 @@ export interface AmountExpr {
   half?: "up" | "down";
   /** "A third of their life, rounded up" (Dire Fleet Ravager): a third instead of half, rounded the same way. */
   third?: true;
+  /** "For each five counters removed this way" (Sage of Hours): once for each whole group of this many, rounded down. */
+  per?: number;
   /** It may be below 0: doubling a creature's power gives it +X/+0 for a negative X too (CR 107.1b, 701.10c). */
   signed?: true;
   /** "If X is 6 or more, ... twice X damage ... instead" (Shatterskull Smashing): twice as much when the X announced is this or more. */
@@ -666,6 +668,8 @@ export interface TargetSpec {
   notSubtypes?: string[];
   /** "creature with a +1/+1 counter on it", "permanents with ice counters on them"; ANY_COUNTER: "with a counter on it". */
   counter?: CounterKind;
+  /** "Creatures you control with three or more +1/+1 counters on them" (Runadi): at least this many of `counter`. */
+  counterMin?: number;
   /** "creatures with no counters on them" (Damning Verdict). */
   noCounters?: true;
   /** "each creature without a +1/+1 counter on it" (Wave Goodbye). */
@@ -1810,7 +1814,7 @@ export type Effect =
        */
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
       /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
-      youMay?: { anyType?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
+      youMay?: { anyType?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "Until the end of your next turn, you may play that card" (Thor, God of Thunder). */ nextTurn?: true; /** "You may play that card": a land too (Savvy Trader). */ play?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
       /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
       suspend?: number;
       /** "Exile it with a hit counter on it" (Mari, Tinybones): put on the card in exile (CR 122.1), not a permanent's. */
@@ -2072,6 +2076,8 @@ export type Effect =
       haste?: "endOfTurn" | "game";
       /** "Exile it at the beginning of the next end step", "Sacrifice it ...": a delayed trigger for it (CR 603.7), while it's that object. */
       atEndStep?: "exile" | "sacrifice";
+      /** With `counters`: only if it enters as a creature (Recommission, CR 614.12). */
+      countersIfCreature?: true;
       /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
       counters?: Record<string, number>;
       /** "With one fewer revival counter on it" (Nine-Lives Familiar): as many of that kind as it had as it last existed on the battlefield, plus `plus`. */
@@ -4311,8 +4317,8 @@ export interface ActivatedAbility {
   toLibraryBottom?: true;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];
-  /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
-  removeCounters?: { counter: CounterKind; n: number };
+  /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). `all`: "Remove all +1/+1 counters from ~" (Sage of Hours), however many (none too); the number removed is "the number of counters removed this way". */
+  removeCounters?: { counter: CounterKind; n: number; all?: true };
   /** "{T}, Exert ~: ..." (CR 701.43a): it won't untap during your next untap step; possible even if already exerted (701.43b). */
   exertCost?: true;
   /** The untap symbol {Q} (CR 107.6): untapping this permanent is part of the cost; it must be tapped, and a creature not summoning sick (CR 302.6). */
@@ -5127,7 +5133,7 @@ export interface CompiledCard {
    * of sources with the chosen name cost {2} more ..." (Anointed Peacekeeper): generic mana added to the ability's cost
    * (CR 602.2b applies 601.2f), for sources matching `filter` (by name in any zone); mana abilities aren't taxed.
    */
-  activationTaxes?: { filter?: TargetSpec; n: number; text: string }[];
+  activationTaxes?: { filter?: TargetSpec; n: number; text: string; /** Only abilities its controller's opponents activate (Tithe Taker). */ opponents?: true; /** Only during its controller's turn. */ yourTurn?: true }[];
   /**
    * The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). Gemstone
    * Caverns: only if you're not the starting player, with a counter on it, and "if you do, exile a card from your hand".

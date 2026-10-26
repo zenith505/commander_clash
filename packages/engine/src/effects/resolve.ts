@@ -126,6 +126,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
     ...(spellControllers.some((c) => c !== null) ? { spellControllers } : {}),
     ...(spellObjects.some((c) => c !== null) ? { spellObjects } : {}),
     ...(nth !== undefined ? { nth } : {}),
+    ...(item.countersRemoved !== undefined ? { countersRemoved: item.countersRemoved } : {}),
   };
   return continueResolution(s);
 }

@@ -826,6 +826,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const event = o.blocking ? "creatureBlocks" : o.attacking !== undefined && o.blockedBy?.length ? "creatureBecomesBlocked" : undefined;
       if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
+      // "Whenever a creature blocks this turn, ..." (Noxious Assault): a delayed trigger (CR 603.7b).
+      if (event === "creatureBlocks") fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === event && fits(t, o, ctrl), triggers, undefined, o));
     }
     // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked (rulings).
     for (const w of watchers) {
@@ -1036,6 +1038,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && !(t.notDeclaringAttack && ev.attacking) && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(tapWatch);
+    // Don't Move: "Until your next turn, whenever a creature becomes tapped, destroy it" (a delayed trigger, CR 603.7b).
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), triggers, undefined, o));
   } else if (ev.type === "untapped") {
     // "Whenever ~ becomes untapped" (inspired), "whenever equipped creature becomes untapped", "whenever a permanent
     // you control becomes untapped" (the untapped permanent is the subject).

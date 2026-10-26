@@ -29,6 +29,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (what?.ref !== "each" || what.filter.kind !== "object" || (m[3] === "they" && what.filter.controller)) return null;
     return [{ type: "sacrifice", what, ...(m[3] === "they" ? { byController: true as const } : {}) }];
   }
+  // Plague Reaver: "sacrifice each other creature you control", the same as "all other creatures".
+  if ((m = /^[Ss]acrifice each ((?:other )?[a-z]+ you control)$/.exec(s))) {
+    const what = parseObject(`each ${m[1]}`, ctx);
+    return what?.ref === "each" && what.filter.kind === "object" && what.filter.controller === "you" ? [{ type: "sacrifice", what }] : null;
+  }
   // "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): a cost change
   // for the spells its controller casts later this turn (CR 601.2f, 611.2a). Only generic mana comes off (CR 118.7a).
   if ((m = /^(.+? spells) you cast this turn cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
@@ -298,6 +303,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "target" && b && !isGroup(b) && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
   }
+  // Signature Slam: "each modified creature you control deals damage equal to its power to target creature you don't
+  // control": each of them as this resolves, all at once, each the source of its own damage; none if the target is illegal.
+  if ((m = /^[Ee]ach (modified )?creature you control deals damage equal to its power to (target creature (?:you don't control|an opponent controls))$/.exec(s))) {
+    const a = parseObject(`each ${m[1] ?? ""}creature you control`, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a?.ref === "each" && b?.ref === "target" && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
+  }
   // "Up to two target creatures you control each deal damage equal to their power to another target creature" (Band
   // Together), "... each get +1/+0 until end of turn. They each deal damage equal to their power to ..." (Tandem
   // Takedown): each target still legal, all at once, each the source of its own damage; none if the last target is
@@ -405,10 +417,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // the copy's copiable values aren't legendary, nor is the token it becomes (CR 608.3f).
   // Resonance Technician: "Copy target instant or sorcery spell you control with mana value X", the X of the ability's
   // "Tap X untapped artifacts you control" (CR 107.3a, TargetSpec.xRange).
-  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less))?)(, except it isn't legendary if the spell is legendary)?$/i.exec(s))) {
+  // Myojin of Cryptic Dreams: "Copy target permanent spell you control three times" (each copy becomes a token, CR 608.3f).
+  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value (?:X|\d+ or less))?)(, except it isn't legendary if the spell is legendary)?( twice| three times)?$/i.exec(s))) {
     if (/ X$/.test(m[1]!) && !ctx.activated) return null;
     const spec = parseTargetPhrase(m[1]!, { x: true });
-    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true } } : {}) }] : null;
+    const n = m[3] === " twice" ? 2 : m[3] ? 3 : 1;
+    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n, newTargets: false, ...(m[2] ? { except: { notLegendary: true } } : {}) }] : null;
   }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).

@@ -468,6 +468,12 @@ export function compile(d: CardDef): CompiledCard {
       // "If this spell's additional cost was paid" with "you may waterbend" as that cost: whether it was paid, like kicker.
       .replace(/\bIf ~'s additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "If ~ was kicked" : x))
       .replace(/\bunless (?:her|his|its|~'s) additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "unless ~'s waterbend cost was paid" : x))
+      // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
+      // ability with two trigger events (CR 603.1), the same as an ability for each.
+      .replace(/^Whenever you cast (an? [a-z]+ spell) or (an? [A-Z][a-z]+ you control) enters, ([^\n]+)$/m, "Whenever you cast $1, $3\nWhenever $2 enters, $3")
+      // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
+      // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
+      .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")
       .split("\n")
       .map((l) => {
         const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
@@ -1015,7 +1021,10 @@ export function compile(d: CardDef): CompiledCard {
       const g = parseGroup(`each ${(pluralAll ? othersPlural[1]!.toLowerCase() : othersPlural[1]!).replace(/s you control$/, " you control")}`);
       const f = g?.filter.kind === "object" ? g.filter : undefined;
       const selfMatches = !f || f.colorCount === "colorless" ? !d.colors.length : !f.colors?.length || f.colors.some((c) => d.colors.includes(c as never));
-      if (pluralAll && (!f || f.types?.length !== 1 || f.types[0] !== "Creature" || f.subtypes?.length || (f.colorCount !== "colorless" && !f.colors?.length) || (f.colorCount !== undefined && f.colorCount !== "colorless") || (d.types.includes("Creature") && selfMatches))) {
+      // Bard Class: "Legendary creatures you control enter with an additional +1/+1 counter on them", from a permanent that
+      // isn't a creature, so never about itself.
+      const legends = !!f && f.supertypes?.length === 1 && f.supertypes[0] === "Legendary" && !f.colors?.length && f.colorCount === undefined && !d.types.includes("Creature");
+      if (pluralAll && (!f || f.types?.length !== 1 || f.types[0] !== "Creature" || f.subtypes?.length || (!legends && ((f.colorCount !== "colorless" && !f.colors?.length) || (f.colorCount !== undefined && f.colorCount !== "colorless") || (d.types.includes("Creature") && selfMatches))))) {
         out.unsupported.push(raw);
         continue;
       }
@@ -1154,6 +1163,12 @@ export function compile(d: CardDef): CompiledCard {
     const tax = /^Activated abilities( of sources with the chosen name)? cost \{(\d+)\} more to activate unless they're mana abilities\.$/.exec(line);
     if (tax) {
       (out.activationTaxes ??= []).push({ ...(tax[1] ? { filter: { kind: "card", chosen: "name", text: "sources with the chosen name" } } : {}), n: Number(tax[2]), text: line });
+      continue;
+    }
+    // Tithe Taker (the second half of its line, split above).
+    const theirs = /^During your turn, abilities your opponents activate cost \{(\d+)\} more to activate unless they're mana abilities\.$/.exec(line);
+    if (theirs) {
+      (out.activationTaxes ??= []).push({ n: Number(theirs[1]), opponents: true, yourTurn: true, text: line });
       continue;
     }
     // Thromok: "Devour X, where X is the number of creatures devoured this way" (CR 702.82a; X counters for each).

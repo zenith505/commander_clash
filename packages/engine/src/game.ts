@@ -1041,6 +1041,11 @@ export function moveObject(
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
+  // "If a card left your graveyard this turn" (Gau, Feral Youth): a card, not a token (CR 111.1).
+  if (fromZone === "graveyard" && to !== "graveyard" && !o.isToken) {
+    const left = ((s.turnLog ??= {}).leftGraveyard ??= []);
+    if (!left.includes(o.owner)) left.push(o.owner);
+  }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
   if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (fromZone === "library" && to === "exile"))
     (s.zoneBatch ??= []).push({
@@ -1695,6 +1700,13 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   // others below, no life is gained (CR 616.1). Unlike "can't gain life", it doesn't stop costs or exchanges.
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).gainsNoLife)) {
     log(s, `${player(s, pid).name} gains no life instead.`);
+    return;
+  }
+  // "That player loses that much life instead" (Tainted Remedy, CR 614.1a): the player chooses the order of the
+  // replacements (CR 616.1, rulings); this one first replaces the gain before anything doubles it, so the least is lost.
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).opponentsGainLose && controllerOf(s, obj(s, id)) !== pid)) {
+    log(s, `${player(s, pid).name} loses ${n} life instead of gaining it.`);
+    loseLife(s, pid, n);
     return;
   }
   // "You gain that much life plus 1 instead" (rulings: one more for each), then "twice that much" (CR 614.1a): the

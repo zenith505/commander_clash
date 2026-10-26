@@ -204,6 +204,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Flipping a coin (CR 705): see "If you win the flip, ..." in body.ts.
   if (/^[Ff]lip a coin$/.test(s)) return [{ type: "flipCoin" }];
   if (/^[Ff]lip a coin until you lose a flip$/.test(s)) return [{ type: "flipCoin", untilLose: true }];
+  // Goblin Traprunner: "flip three coins", then "for each flip you win" counts the wins (CR 705).
+  if ((m = /^[Ff]lip (two|three|four|five) coins$/.exec(s))) return [{ type: "flipCoin", n: num(m[1]!) }];
   // Clash (CR 701.30b): see "If you win, ..." in body.ts.
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
   // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards
@@ -318,6 +320,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (a?.ref !== "target" || a.n) return null;
     const to = parseDamageRecipient(m[2]!, ctx);
     return to?.ref === "anyTarget" ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, also: [{ ref: "target", index: a.index }], by: { target: a.index } }] : null;
+  }
+  // "Target creature you control deals damage equal to twice its power to target creature you don't control" (Polliwallop).
+  if ((m = /^(target creature you control) deals damage equal to twice its power to (target .+)$/i.exec(s))) {
+    const a = parseObject(m[1]!, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a?.ref === "target" && b?.ref === "target" && !a.n && !b.n ? [{ type: "bite", a, b, times: 2 }] : null;
   }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
@@ -453,10 +461,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // its cost (CR 606.3), on the stack.
   if (/^Counter target loyalty ability of a planeswalker$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { ...stackSpec("activated ability"), loyaltyOnly: true, text: "target loyalty ability of a planeswalker" }) }];
   // Siren Stormtamer: "Counter target spell or ability that targets you or a creature you control".
-  if ((m = /^Counter target (spell|spell or ability) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
+  // Avoid Fate: "Counter target instant or Aura spell that targets a permanent you control": a spell of those kinds.
+  if ((m = /^Counter target (spell|spell or ability|instant or Aura spell) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
     const what = m[3] === "you" ? "you" : parseTargetPhrase(m[3]!.replace(/^an? /, ""));
     if (what !== "you" && what?.kind !== "object") return null;
-    const base = m[1]!.toLowerCase() === "spell" ? { kind: "spell" as const } : stackSpec("spell or ability");
+    const kinds = /^instant or Aura spell$/.test(m[1]!) ? parseTargetPhrase(m[1]!) : null;
+    if (/^instant or Aura spell$/.test(m[1]!) && kinds?.kind !== "spell") return null;
+    const base = kinds ? { ...kinds } : m[1]!.toLowerCase() === "spell" ? { kind: "spell" as const } : stackSpec("spell or ability");
     return [{ type: "counterSpell", index: addTarget(ctx, { ...base, targetsWhat: what, ...(m[2] ? { targetsYouToo: true as const } : {}), text: `target ${m[1]!.toLowerCase()} that targets ${m[2] ?? ""}${m[3]}` }) }];
   }
   // A mix of abilities and spells (CR 115.1c-d): "Counter target triggered ability or colorless spell" (Consign to Memory),

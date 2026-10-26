@@ -14,7 +14,7 @@ import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
-const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : n === 0);
+const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : want === "all" ? n >= 5 : n === 0);
 
 /**
  * Does this permanent fit `spec` from `controller`'s point of view, using its current
@@ -37,6 +37,14 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
   return s.battlefield
     .map((id) => obj(s, id))
     .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
+}
+
+/** Is `o` attacking `pid` or a planeswalker `pid` controls now (CR 506.3)? Not a battle. */
+function attacksYouOrYourPlaneswalker(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.attacking === undefined) return false;
+  if (!o.attackingPermanent) return o.attacking === pid;
+  const pw = s.objects[o.attackingPermanent.id];
+  return !!pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === o.attackingPermanent.zc && characteristics(s, pw).types.includes("Planeswalker") && controllerOf(s, pw) === pid;
 }
 
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
@@ -93,6 +101,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
+  // Soul Snare: "attacking you or a planeswalker you control": a planeswalker that's still there and still yours (rulings).
+  if (spec.combat === "attackingYouOrYourPlaneswalker" && !attacksYouOrYourPlaneswalker(s, o, controller)) return false;
   if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
   if (spec.attackingWhom !== undefined && (spec.attackingWhom === "eventPlayer" || o.attacking !== spec.attackingWhom || o.attackingPermanent)) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;

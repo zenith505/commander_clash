@@ -713,7 +713,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const events: DamageEvent[] = as.flatMap((x) =>
           (e.self ? [x] : bs).flatMap((b): DamageEvent[] => {
             const src = objectSource(s, x);
-            const n = power(s, x);
+            const n = power(s, x) * (e.times ?? 1);
             // Ram Through: with trample, the damage beyond lethal goes to the creature's controller (CR 120.4a).
             const excess = e.excessIfTrample && objHasKeyword(s, x, "Trample") ? excessOver(lethalAmounts(s, src, b), n) : 0;
             return excess ? [{ src, to: { object: b.id }, n: n - excess }, { src, to: { player: controllerOf(s, b) }, n: excess }] : [{ src, to: { object: b.id }, n }];

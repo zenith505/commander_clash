@@ -76,7 +76,10 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet")));
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
-      if (mod.what !== "counters" || "onPlayer" in mod || ((("other" in mod && mod.other) || entering) && source === o.id)) return false;
+      if (mod.what !== "counters" || "onPlayer" in mod) return false;
+      // Mowu, Loyal Companion: only on itself, as it enters too (it affects only that permanent, CR 614.12; rulings).
+      if ("self" in mod && mod.self) return source === o.id && (mod.counter === undefined || mod.counter === kind);
+      if ((("other" in mod && mod.other) || entering) && source === o.id) return false;
       if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter) && (!mod.putOn || (owner === controller && (mod.putOn === "permanentYouControl" || isCreature || types.includes("Planeswalker"))));
       return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (!mod.subtypes || mod.subtypes.some((st) => subtypes.includes(st) || (!!allCreatureTypes && CREATURE_TYPES.has(st)))) && (mod.who === "any" || controller === owner);
     })

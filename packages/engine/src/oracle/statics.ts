@@ -24,7 +24,8 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if (/^you control a legendary creature$/.test(text)) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], min: 1 };
   // "Unless you control a legendary green creature" (Argoth, Sanctum of Nature).
   if ((m = /^you control a legendary (white|blue|black|red|green) creature$/.exec(text))) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], colors: [COLOR_WORDS[m[1]!]!], min: 1 };
-  if ((m = /^you control an? (\w+)(?: or an? (\w+))?$/.exec(text)) && [m[1], m[2]].every((x) => x === undefined || BASIC_TYPES.includes(x)))
+  // The Lonely Mountain: "unless you control an Equipment" (a permanent with that subtype, CR 205.3).
+  if ((m = /^you control an? (\w+)(?: or an? (\w+))?$/.exec(text)) && [m[1], m[2]].every((x) => x === undefined || BASIC_TYPES.includes(x) || x === "Equipment"))
     return { kind: "control", who: "you", subtypes: [m[1]!, ...(m[2] ? [m[2]] : [])], min: 1 };
   // "Unless you control three or more other Islands" (Mystic Sanctuary and the other Eldraine lands).
   if ((m = new RegExp(`^you control ${NUM} or more other (Plains|Islands|Swamps|Mountains|Forests)$`).exec(text))) return { kind: "control", who: "you", subtypes: [m[2] === "Plains" ? "Plains" : m[2]!.replace(/s$/, "")], other: true, min: num(m[1]!) };
@@ -567,6 +568,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Excess damage (CR 120.10): "if that creature was dealt excess damage this turn" (the trigger's subject), Rith's "if a
   // creature or planeswalker an opponent controlled was dealt excess damage this turn".
   if (/^that creature was dealt excess damage this turn$/.test(text)) return { kind: "subjectDealtExcess" };
+  // Marcus, Mutant Mayor: "if that creature has a +1/+1 counter on it": the trigger's subject as it resolves, or as it
+  // last existed (CR 608.2h).
+  if ((m = new RegExp(`^that creature has an? ${COUNTER} counter on it$`).exec(text))) return { kind: "subjectCounter", counter: counterKind(m[1]!) };
   if ((m = /^an? (creature|planeswalker)(?: or (planeswalker))? an opponent controlled was dealt excess damage this turn$/.exec(text)))
     return { kind: "opponentsDealtExcess", types: [m[1], m[2]].filter(Boolean).map((x) => x!.charAt(0).toUpperCase() + x!.slice(1)) };
   // Liberator, Urza's Battlethopter: "if the amount of mana spent to cast that spell is greater than ~'s power", as
@@ -630,6 +634,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const filter = parseSearchFilter(`${m[1]!} card`);
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
+  if (text === "a card left your graveyard this turn") return { kind: "cardLeftYourGraveyard" };
+  // Slick Sequence: "If you've cast another spell this turn, draw a card": checked as it resolves (rulings).
+  if (text === "you've cast another spell this turn") return { kind: "castAnother", resolving: true };
   // Stella Lee, Wild Card: "if you've cast three or more spells this turn": of any kind.
   if ((m = new RegExp(`^you've cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "castCount", n: num(m[1]!), filter: { kind: "card", text: "spell" } };
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
@@ -811,6 +818,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Brass Knuckles: "Equipped creature has double strike as long as two or more Equipment are attached to it": to the
   // equipped creature, this one included.
   if ((m = new RegExp(`^${NUM} or more Equipment are attached to it$`).exec(text)) && st.affects.kind === "attached") return { kind: "amount", amount: { count: { kind: "attachedToHost", subtypes: ["Equipment"] } }, min: num(m[1]!) };
+  // Balan, Wandering Knight: "~ has double strike as long as two or more Equipment are attached to it": to itself.
+  if ((m = new RegExp(`^${NUM} or more Equipment are attached to it$`).exec(text)) && st.affects.kind === "self") return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Equipment"] } }, min: num(m[1]!) };
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
   if ((m = /^~ has (flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text)))
     return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };

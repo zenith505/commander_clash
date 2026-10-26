@@ -49,6 +49,16 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
     const anyOf = specs as TargetSpec[];
     return [{ type: "search", filter: { kind: "card", anyOf, text: `${pair[1]} and a ${pair[2]}` }, n: 2, upTo: true, oneOfEach: anyOf, reveal, dest: searchDest(r[1]!) }];
   }
+  // Conflux: "a white card, a blue card, a black card, a red card, and a green card": up to one for each, a multicolored
+  // card being any one of its colors but not two of them (CR 701.23b).
+  const list = /, and an? /.test(m[3]!) ? `${m[2]} ${m[3]}`.split(/, (?:and )?/) : null;
+  if (list && list.length >= 3 && n === 1 && !m[1] && list.every((x) => /^an? (?:white|blue|black|red|green) card$/.test(x))) {
+    const r = new RegExp(`^(?:reveal them, )?put (?:them|those cards) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest);
+    const specs = list.map((p) => parseSearchFilter(p.replace(/^an? /, "")));
+    if (!r || specs.some((f) => !f)) return null;
+    const anyOf = specs as TargetSpec[];
+    return [{ type: "search", filter: { kind: "card", anyOf, text: list.map((x) => x.replace(/^an? /, "")).join(", ") }, n: list.length, upTo: true, oneOfEach: anyOf, reveal, dest: searchDest(r[1]!) }];
+  }
   // "Up to four Minotaur creature cards with different names" (Deathbellow War Cry): no two with the same name, which is
   // one of each name offered (oneEach). Several of them only.
   // "Up to X creature cards with different names that each have mana value X" (Uncage the Menagerie): the X it was cast

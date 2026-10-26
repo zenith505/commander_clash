@@ -169,7 +169,9 @@ export function parseGrants(text: string): Modification[] | null {
     // Myriad too: several instances each trigger (CR 702.116b); prowess the same (CR 702.108b): "Other creatures you
     // control have prowess" (Bria, Riptide Rogue).
     // Dethrone (CR 702.105b) and exalted (702.83b) too: "Other creatures you control have dethrone" (Marchesa, the Black Rose).
-    if (/^(?:myriad|prowess|dethrone|exalted)$/i.test(w)) {
+    // Exploit (CR 702.110a) is an enters trigger: "Other legendary creatures you control have exploit" (Colonel Autumn)
+    // gives it to a creature as it enters, so it triggers (CR 603.6a, 603.10).
+    if (/^(?:myriad|prowess|dethrone|exalted|exploit)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
@@ -250,9 +252,11 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
 export function emblemAbilityOk(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, ...rest } = c;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, ...rest } = c;
   if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
-  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep) return false;
+  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor) return false;
+  // Serra the Benevolent's: a life floor for its owner (read from emblems in damage.ts), maybe while they control a creature.
+  if (lifeFloorIf && lifeFloorIf.kind !== "control") return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its
   // owner's graveyard, read from emblems as well as permanents (game.ts).
   if (graveyardGrants?.some((g) => g.way.kind !== "permission" || g.once || g.yourTurn || g.if)) return false;

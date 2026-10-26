@@ -209,7 +209,12 @@ export function dealDamage(
       // "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): the damage is
       // all dealt, only the life lost changes; not if they're below 1 already (rulings).
       // Angel's Grace: the same until end of turn.
-      const floor = Math.max(p.lifeFloorTurn === s.turn ? 1 : 0, ...s.battlefield.map((id) => (controllerOf(s, obj(s, id)) === p.id ? (abilitiesOf(s, obj(s, id)).lifeFloor ?? 0) : 0)));
+      // Serra the Benevolent's emblem: "If you control a creature, ...", checked as the damage is dealt.
+      const floorOf = (o: GameObject) => {
+        const a = abilitiesOf(s, o);
+        return a.lifeFloor && (!a.lifeFloorIf || staticConditionNow(s, a.lifeFloorIf, o.id, p.id)) ? a.lifeFloor : 0;
+      };
+      const floor = Math.max(p.lifeFloorTurn === s.turn ? 1 : 0, ...s.battlefield.map((id) => (controllerOf(s, obj(s, id)) === p.id ? floorOf(obj(s, id)) : 0)), ...liveEmblems(s).map((o) => (o.owner === p.id ? floorOf(o) : 0)));
       const lost = floor && p.life >= floor && p.life - n < floor ? p.life - floor : n;
       loseLife(s, p.id, lost);
       log(s, `${src.name} deals ${n} damage to ${p.name}${lost < n ? ` (their life total can't go below ${floor})` : ""}.`);

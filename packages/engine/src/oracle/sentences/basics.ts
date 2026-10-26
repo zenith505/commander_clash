@@ -688,6 +688,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "~ gets +1/+1 until end of turn for each creature blocking it (beyond the first)" (rampage, CR 702.23)
   if ((m = /^~ gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it( beyond the first)?$/.exec(s)))
     return [{ type: "pumpPerBlocker", what: { ref: "self" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: !!m[3] }];
+  // General Marhault Elsdragon: "Whenever a creature you control becomes blocked, it gets +3/+3 until end of turn for each
+  // creature blocking it": the trigger's subject, its blockers counted as it resolves (rulings).
+  if ((m = /^(?:it|that creature) gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.subjectIt && !ctx.spell)
+    return [{ type: "pumpPerBlocker", what: { ref: "subject" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: false }];
   // Prevention (CR 615): shields for the next N damage this turn, and Fog.
   // "... dealt to ~ this turn" (Revered Elder), "to you" (Conservator), "to target player or planeswalker" (Noble Vestige),
   // "dealt this turn to target creature you control" (Samite Alchemist), "to enchanted creature" (Fylgja).
@@ -833,6 +837,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const d = fx?.length === 1 ? fx[0] : undefined;
     if (d?.type !== "damage" || typeof d.amount === "number" || d.amount.count.kind !== "x" || d.amount.plus || d.amount.times) return null;
     return [{ ...d, amount: { ...d.amount, times: m[2] === "twice" ? 2 : num(m[2]!.replace(/ times$/, "")) } }];
+  }
+  // Commander's Insight: "Target player draws X cards plus an additional card for each time they've cast a commander from
+  // the command zone this game": their own commander casts (CR 903.8), counted as it resolves.
+  if (/^Target player draws X cards plus an additional card for each time they've cast a commander from the command zone this game$/.test(s)) {
+    const index = addTarget(ctx, { kind: "player", text: "target player" });
+    return [{ type: "draw", who: { ref: "target", index }, n: { count: { kind: "sum", of: [{ kind: "x" }, { kind: "commanderCasts", who: { ref: "target", index } }] } } }];
   }
   // "~ deals damage to each player equal to twice the number of nonbasic lands that player controls" (Price of
   // Progress): each player their own amount, all dealt at once (CR 120.3).

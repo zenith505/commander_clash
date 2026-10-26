@@ -757,8 +757,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const dealt = s.turnLog?.combatDamageTypesBy?.[you] ?? [];
       return dealt.some((t) => (t === "*" ? all || mine.length > 0 : all ? CREATURE_TYPES.has(t) : mine.includes(t)));
     }
-    case "castAnother": // checked before the spell counts itself (CR 601.2f, 601.2i)
-      return (s.castThisTurn ?? []).some((c) => c.player === you);
+    case "cardLeftYourGraveyard":
+      return (s.turnLog?.leftGraveyard ?? []).includes(you);
+    case "castAnother": { // checked before the spell counts itself (CR 601.2f, 601.2i)
+      const casts = (s.castThisTurn ?? []).filter((c) => c.player === you).length;
+      // As a spell resolves it has counted itself, unless it's a copy, which wasn't cast (CR 707.12).
+      const item = cond.resolving ? s.resolving?.item : undefined;
+      return casts - (item?.kind === "spell" && !item.copy && item.controller === you ? 1 : 0) > 0;
+    }
     case "creatureDied":
       if (cond.notNamedSelf) return (s.diedNamesThisTurn ?? []).some((n) => !n || !sameName(n, defOf(s, src).name));
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
@@ -816,6 +822,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.damagedBy?.[you]?.length ?? 0) >= cond.n;
     case "damagedBySelfDied":
       return (s.turnLog?.diedDamaged ?? []).some((d) => d.by.includes(sourceId));
+    case "subjectCounter": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) return (sub.counters[cond.counter] ?? 0) > 0;
+      const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      return !!lk && lk.zc === subjectZc && (lk.counters?.[cond.counter] ?? 0) > 0;
+    }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
     case "opponentsDealtExcess":

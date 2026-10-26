@@ -365,7 +365,7 @@ export type Count =
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
   | { kind: "attackersThisTurn" }
   /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
-  | { kind: "commanderCasts" }
+  | { kind: "commanderCasts"; /** "Each time they've cast a commander" (Commander's Insight): that player's instead. */ who?: PlayerRef }
   /** The mana value of the commander Effect "chooseOwnCommander" chose in this resolution (0 if none). */
   | { kind: "chosenCommanderMv" }
   /** "The greatest mana value among your commanders" (Cactus Preserve): the commanders you own wherever they are, with
@@ -435,7 +435,7 @@ export interface TargetSpec {
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
-  colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo";
+  colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo" | /** "all colors" (Jenson Carthalion): all five */ "all";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -492,7 +492,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -993,6 +993,8 @@ export type PlayerRef =
   | { ref: "opponentsLostLife"; n: number }
   /** "Each opponent with no cards in hand" (Tinybones, Trinket Thief): as it resolves (rulings). */
   | { ref: "opponentsEmptyHanded" }
+  /** "Each opponent who has three or more poison counters" (Phyrexian Atlas): as it resolves. */
+  | { ref: "opponentsWithPoison"; n: number }
   /** "Each opponent dealt combat damage this game by a creature named ~" (Gollum, Obsessed Stalker): by any creature with this source's name, whoever controlled it (rulings; Player.combatDamagedByNames). */
   | { ref: "opponentsCombatDamagedByName" }
   /** "Each of its controller's opponents" (Bounty Board): every other player than the subject's controller (CR 102.2, 800.4), as it last existed. */
@@ -1376,6 +1378,8 @@ export type StaticCondition =
   | { kind: "damagedBySelfDied" }
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
   | { kind: "subjectDealtExcess" }
+  /** "If that creature has a +1/+1 counter on it" (Marcus, Mutant Mayor): the trigger's subject, or as it last existed. */
+  | { kind: "subjectCounter"; counter: CounterKind }
   /**
    * Guardian Project: "if it doesn't have the same name as another creature you control or a creature card in your
    * graveyard", about the creature that entered. A face-down creature has no name (CR 708.2), so it shares none (rulings).
@@ -1641,7 +1645,9 @@ export type StaticCondition =
   /** "While you have the most life or are tied for most life" (Preacher of the Schism). */
   | { kind: "youMostLife" }
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
-  | { kind: "castAnother" }
+  /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
+  | { kind: "cardLeftYourGraveyard" }
+  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true }
   /**
    * Prowl (CR 702.76a): a player was dealt combat damage this turn by a source that, as it dealt it, was under your control
    * and had any of this spell's creature types.
@@ -2490,6 +2496,8 @@ export type Effect =
    * (rulings) among those that could be attached to target `host` (CR 701.3a-b), then attached to it.
    */
   | { type: "attachAny"; host: number }
+  /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
+  | { type: "attachAll"; filter: TargetSpec }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */
   | { type: "doubleX" }
   /**
@@ -2711,7 +2719,7 @@ export type Effect =
    * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
    * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
    */
-  | { type: "flipCoin"; untilLose?: true }
+  | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
    * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
@@ -2794,7 +2802,7 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef; /** "Into your library": yours is shuffled even if no card is put into it. */ yours?: true; /** "Target player shuffles ... into their library" (Memory's Journey): that player's is, the same way. */ who?: PlayerRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
-  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true }
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens
@@ -2806,7 +2814,7 @@ export type Effect =
    * a deals damage equal to its power to b. `excessIfTrample`: "If the creature you control has trample, excess damage is
    * dealt to that creature's controller instead" (Ram Through; CR 120.4a).
    */
-  | { type: "bite"; a: ObjRef; b: ObjRef; excessIfTrample?: true; /** "Each creature deals damage to itself equal to its power" (Wave of Reckoning): each of `a` to itself, all at once (`b` is `a`). */ self?: true }
+  | { type: "bite"; a: ObjRef; b: ObjRef; excessIfTrample?: true; /** "Deals damage equal to twice its power" (Polliwallop): that multiple. */ times?: number; /** "Each creature deals damage to itself equal to its power" (Wave of Reckoning): each of `a` to itself, all at once (`b` is `a`). */ self?: true }
   /**
    * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
    * top of its owner's library instead".
@@ -4752,7 +4760,7 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[] }
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
   | { what: "counters"; onPlayer: true; op: "plusOne" }
   /**
@@ -4775,6 +4783,7 @@ export type CountMod =
       who?: undefined;
       other?: undefined;
       subtypes?: undefined;
+      self?: undefined;
     };
 
 /**
@@ -5156,6 +5165,8 @@ export interface CompiledCard {
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
   lifeFloor?: number;
+  /** "If you control a creature, damage that would ..." (Serra the Benevolent's emblem): `lifeFloor` only while this holds. */
+  lifeFloorIf?: StaticCondition;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
    * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
   drawTwoInstead?: true | "always";
@@ -5225,6 +5236,8 @@ export interface CompiledCard {
   lifeCantChange?: true;
   /** "If a player would gain life, that player gains no life instead" (Sulfuric Vortex): a replacement (CR 614.1a), not "can't gain life". */
   gainsNoLife?: true;
+  /** "If an opponent would gain life, that player loses that much life instead" (Tainted Remedy, CR 614.1a). */
+  opponentsGainLose?: true;
   /**
    * "If an opponent would begin an extra turn, that player skips that turn instead" (Trouble in Pairs, Stranglehold), "If a
    * player would ..." (Ugin's Nexus): a replacement effect skipping it as it would begin (CR 614.10, 500.7); one created

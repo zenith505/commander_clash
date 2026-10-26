@@ -127,7 +127,8 @@ export function canonicalKeyword(text: string): string | undefined {
   if (p === CHOSEN_KEYWORD) return CHOSEN_KEYWORD;
   // "Hexproof from blue" (CR 702.11d): from a color, or from all of them, one or more than one.
   // "Hexproof from activated and triggered abilities" (Volatile Stormdrake): from abilities, not spells.
-  const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored|activated and triggered abilities)$/.exec(p);
+  // "Hexproof from planeswalkers" (Eradicator Valkyrie): from sources of a card type.
+  const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored|activated and triggered abilities|artifacts|creatures|enchantments|instants|planeswalkers|sorceries)$/.exec(p);
   if (hx) return `Hexproof from ${hx[1]}`;
   if (p === "hexproof from the chosen color") return CHOSEN_HEXPROOF;
   // "Gains toxic 1" (Skrelv): a keyword with a number (CR 702.164a).
@@ -253,6 +254,8 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
  * "Hexproof from [quality]" (CR 702.11d): can't be the target of [quality] spells its opponents control or abilities
  * they control from [quality] sources. `src` is the spell or the ability's source; who controls it is checked by the caller.
  */
+const HEXPROOF_TYPES: Record<string, string> = { artifacts: "Artifact", creatures: "Creature", enchantments: "Enchantment", instants: "Instant", planeswalkers: "Planeswalker", sorceries: "Sorcery" };
+
 export function hexproofFrom(keywords: readonly string[], src: SourceQuality): boolean {
   for (const k of keywords) {
     const q = /^hexproof from (.+)$/i.exec(k)?.[1]?.toLowerCase();
@@ -263,6 +266,9 @@ export function hexproofFrom(keywords: readonly string[], src: SourceQuality): b
     if (q === "monocolored" && src.colors.length === 1) return true;
     // Volatile Stormdrake: any ability that targets is an activated or triggered one (spells' own abilities are the spell).
     if (q === "activated and triggered abilities" && !src.spell) return true;
+    // "Hexproof from planeswalkers": a source with that card type (CR 702.11d), its abilities included.
+    const type = HEXPROOF_TYPES[q];
+    if (type && src.types?.includes(type)) return true;
   }
   return false;
 }

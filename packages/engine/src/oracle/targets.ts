@@ -272,6 +272,8 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
+  // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
+  if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
@@ -803,6 +805,9 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // Evaporate: "each white and/or blue creature": either color or both, as "white or blue creature" is (counted once).
+  const andOr = /^((?:target |each )?)(white|blue|black|red|green) and\/or (white|blue|black|red|green) (creature|permanent)s?$/.exec(phrase.trim());
+  if (andOr) return parseTargetPhrase(`${andOr[1]}${andOr[2]} or ${andOr[3]} ${andOr[4]}`, opts);
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
@@ -1190,8 +1195,11 @@ export function parseTargetPhrase(
   if (p.startsWith("attacking or blocking ")) {
     extra.combat = "attackingOrBlocking";
     p = p.slice("attacking or blocking ".length);
-  } else if ((m = /^(attacking|blocking) /.exec(p))) {
-    extra.combat = m[1] as "attacking" | "blocking";
+  } else if ((m = /^(attacking|blocking|blocked|unblocked) /.exec(p))) {
+    extra.combat = m[1] as "attacking" | "blocking" | "blocked" | "unblocked";
+    p = p.slice(m[0].length);
+  } else if ((m = /^nonattacking,? nonblocking /.exec(p))) {
+    extra.combat = "notInCombat";
     p = p.slice(m[0].length);
   }
   const isSpell = / ?spell$/.test(p);

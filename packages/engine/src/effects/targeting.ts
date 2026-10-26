@@ -106,6 +106,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
   if (spec.attackingWhom !== undefined && (spec.attackingWhom === "eventPlayer" || o.attacking !== spec.attackingWhom || o.attackingPermanent)) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
+  if (spec.combat === "blocked" && !(o.attacking !== undefined && o.blockedBy !== undefined)) return false;
+  // Unblocked: attacking once blockers have been declared, and not blocked (CR 509.1h).
+  if (spec.combat === "unblocked" && !(o.attacking !== undefined && o.blockedBy === undefined && ["declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step) && s.pending?.kind !== "declareBlockers")) return false;
+  if (spec.combat === "notInCombat" && (o.attacking !== undefined || o.blocking)) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;

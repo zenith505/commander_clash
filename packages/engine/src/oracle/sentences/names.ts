@@ -4,6 +4,7 @@
 import type { Effect, TargetSpec } from "../../abilities";
 import { num } from "../words";
 import { parsePlayer } from "../targets";
+import { parseSearchFilter } from "../search";
 import type { Ctx } from "../body";
 
 /** "Cards with that name" after "choose a card name". */
@@ -40,6 +41,12 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = /^(Target player|Target opponent|That player) reveals their hand and discards all cards with (?:that|the chosen) name$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter: CHOSEN_NAME }] : null;
+  }
+  // "Target player reveals their hand and discards all Trap cards" (Trapfinder's Trick): every card like that there.
+  if ((m = /^(Target player|Target opponent) reveals their hand and discards all (.+?) cards$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseSearchFilter(`${m[2]} card`);
+    return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
   }
   // "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
   // (Conjurer's Ban), "Opponents can't cast spells with the chosen name until your next turn" (Academic Probation).

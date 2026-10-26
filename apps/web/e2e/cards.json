@@ -1354,6 +1354,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b76d1ae6-ad1d-4bac-b4c3-2e03e0e84d9b",
+  "name": "Bayou",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Swamp Forest",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Swamp",
+   "Forest"
+  ],
+  "oracleText": "({T}: Add {B} or {G}.)",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a465f8a9-d5aa-4dfa-b674-7aa1798cb0bd",
   "name": "Beast Mode",
   "manaCost": "{1}{G}",
@@ -10413,6 +10445,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7ce9513e-50f3-4d36-889b-b180a8a16252",
+  "name": "Mold Demon",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Fungus Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Fungus",
+   "Demon"
+  ],
+  "oracleText": "When this creature enters, sacrifice it unless you sacrifice two Swamps.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "leg",
+  "releasedAt": "1994-06-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1b524149-340e-4f94-9520-6a5258fabb00",
   "name": "Monk's Fist",
   "manaCost": "{2}",
@@ -12178,6 +12241,32 @@
   "commanderLegal": "legal",
   "set": "mat",
   "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "23b36aef-961f-4a78-9652-8594ad73102e",
+  "name": "Plow Under",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Put two target lands on top of their owners' libraries.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "uds",
+  "releasedAt": "1999-06-07",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -14369,6 +14458,38 @@
   "keywords": [],
   "producedMana": [
    "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d8239a86-7184-4005-ba1e-2dddcd756c47",
+  "name": "Snow-Covered Swamp",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Basic Snow Land — Swamp",
+  "supertypes": [
+   "Basic",
+   "Snow"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Swamp"
+  ],
+  "oracleText": "({T}: Add {B}.)",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
   ],
   "commanderLegal": "legal",
   "set": "khm",

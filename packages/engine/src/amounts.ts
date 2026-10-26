@@ -333,6 +333,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.toGraveyardThisTurn ?? 0;
     case "sum":
       return c.of.reduce((n, x) => n + evalCount(s, x, ctx), 0);
+    case "greater":
+      return Math.max(evalCount(s, c.of[0], ctx), evalCount(s, c.of[1], ctx));
     case "difference":
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
     case "absDifference":
@@ -435,6 +437,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const f = c.controlling;
         return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && objectMatches(s, f, s.objects[id]!, ctx.controller, false))).length;
       }
+      if (c.lifeLessThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.life < (s.players[ctx.controller]?.life ?? 0)).length;
       if (c.handMoreThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length > (s.players[ctx.controller]?.hand.length ?? 0)).length;
       if (c.handAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length <= c.handAtMost!).length;
       // Smuggler's Share: players still in the game, by what they did this turn.
@@ -497,6 +500,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         return 0;
       }
       if (c.kind === "manaValue") {
+        // It left the battlefield on its last move (Ruinous Intrusion's "the permanent exiled this way"): as it last
+        // existed there, a copy's copied mana cost (CR 608.2h, 707.2).
+        const lk = o.zone !== "battlefield" && o.zone !== "stack" ? s.lastKnown?.[o.id] : undefined;
+        const was = lk && lk.zc === (o.zoneChanges ?? 0) - 1 && lk.copyKey ? s.cards[lk.copyKey] : undefined;
+        if (was) return manaValue(parseManaCost(was.manaCost));
         // On the stack, X is the value chosen for it (CR 202.3e).
         const cost = parseManaCost(defOf(s, o).manaCost);
         const item = o.zone === "stack" ? (s.stack.find((x) => x.objectId === o.id) ?? (s.resolving?.item.objectId === o.id ? s.resolving.item : undefined)) : undefined;
@@ -768,7 +776,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
     case "plusOnesPutThisTurn":
@@ -785,6 +793,8 @@ function describeCount(c: Count): string {
       return "#permanents put into a graveyard this turn";
     case "sum":
       return c.of.map(describeCount).join(" + ");
+    case "greater":
+      return `the greater of ${describeCount(c.of[0])} and ${describeCount(c.of[1])}`;
     case "difference":
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
     case "absDifference":

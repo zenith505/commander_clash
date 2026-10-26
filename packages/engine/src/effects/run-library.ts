@@ -86,7 +86,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "exileTop":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const ids = p.library.slice(0, amountNow(s, e.n, { ...ctx, eachOne: pid }));
+        const ids = p.library.slice(0, Math.max(0, amountNow(s, e.n, { ...ctx, eachOne: pid })));
         for (const id of ids) {
           moveObject(s, id, "exile");
           const o = obj(s, id);
@@ -1197,7 +1197,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
-          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : "on the bottom of your library";
+          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
         }
@@ -1222,7 +1222,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       };
       if (sc.castingTarget !== undefined && e.castFree) return;
       // Resuming after the owner ordered the rest for the bottom: the cards taken have already moved.
-      if (sc.moved) return toBottom(s, pid, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false) ?? castExiled();
+      if (sc.moved) return toBottom(s, from, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false) ?? castExiled();
       // An Aura put onto the battlefield: its controller chooses what it enchants as it enters (CR 303.4f), or it stays
       // with the rest (303.4g).
       const hosts = e.into === "battlefield" ? chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src) : new Map<ObjectId, AuraHost>();
@@ -1270,7 +1270,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
               log(s, `${defOf(s, o).name} is attacking ${attack.label}.`);
             }
             if (o.zone === "battlefield") r.created!.push(id); // "it" in what follows
-          } else p.library = [id, ...p.library.filter((x) => x !== id)];
+          } else player(s, from).library = [id, ...player(s, from).library.filter((x) => x !== id)];
         }
       });
       if (e.rest === "shuffle") {
@@ -1288,7 +1288,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         for (const id of rest) moveObject(s, id, "hand");
       } else {
         sc.moved = true;
-        return toBottom(s, pid, rest, src, !!e.random) ?? castExiled();
+        // Another player's library (Lonis, Cryptozoologist): the rest go to the bottom of theirs.
+        return toBottom(s, from, rest, src, !!e.random) ?? castExiled();
       }
       return castExiled();
     }

@@ -154,6 +154,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // Yes Man, Personal Securitron: "When ~ leaves the battlefield, its owner creates ...": whose ~ is (CR 108.3), whoever
   // controlled it.
   if ((x === "its owner" || x === "~'s owner") && (ctx.selfIt || ctx.selfCard) && !ctx.subjectIt && !ctx.targets.length) return { ref: "selfOwner" };
+  // Pendant of Prosperity: "{2}, {T}: ... This artifact's owner draws a card": in an ability of a permanent, whose that
+  // permanent is (CR 108.3), not the ability's controller.
+  if (x === "~'s owner" && ctx.activated && !ctx.spell) return { ref: "selfOwner" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   // "Whenever ~ deals combat damage to an opponent, it deals that much damage to each other opponent" (Hydra Omnivore).
@@ -454,6 +457,8 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "cardsInLibrary":
     case "cardsInGraveyard":
     case "life":
+    // Betor, Ancestor's Voice: "mana value less than or equal to the amount of life you lost this turn".
+    case "lifeLostThisTurn":
       return mine(c.who);
     case "greatestPower":
       return mine(c.whose);
@@ -478,6 +483,10 @@ export function boundAtTargeting(a: AmountExpr): boolean {
 
 /** "Creature that player controls" in a trigger about a player: the phrase without it, and whether it was there. */
 function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
+  // Auron, Venerated Guardian: "target creature defending player controls with power less than ~'s power": the same
+  // as "target creature with power less than ~'s power" that player controls.
+  const mid = / (that player|defending player) controls( with (?:power|toughness|mana value) [^,]+)$/i.exec(phrase);
+  if (mid && (/^that/i.test(mid[1]!) ? ctx.eventPlayer : ctx.defending)) return [`${phrase.slice(0, mid.index)}${mid[2]}`, true];
   const m = / that player controls$/i.exec(phrase);
   if (m && ctx.eventPlayer) return [phrase.slice(0, m.index), true];
   // "Target nonland permanent card from that player's graveyard" (Tinybones, the Pickpocket): a card that player owns.
@@ -891,6 +900,12 @@ export function parseTargetPhrase(
   if (dealtYou) {
     extra.dealtCombatDamageToYou = true;
     p = p.slice(0, dealtYou.index);
+  }
+  // Spear of Heliod: "target creature that dealt damage to you this turn".
+  const dealtYouAny = / that dealt damage to you this turn$/.exec(p);
+  if (dealtYouAny) {
+    extra.dealtDamageToYou = true;
+    p = p.slice(0, dealtYouAny.index);
   }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);

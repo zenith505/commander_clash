@@ -43,7 +43,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "Remove five quest counters from ~ and sacrifice it" (Quest for the Holy Relic): two costs, paid in any order (CR 601.2h).
   const line = (word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw).replace(/(^|, )(Remove [^,:]+? counters? from ~) and sacrifice it:/, "$1$2, Sacrifice ~:").replace(/(^|, )(Remove [^,:]+? counters? from ~) and exile it:/, "$1$2, Exile ~:");
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Return ~ to its owner's hand|Discard ~|Discard your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from an? (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard X cards|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) untapped [^,:]+? you control|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from an? (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard X cards|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) untapped [^,:]+? you control|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
   // "Waterbend {N}" (CR 701.67a) is paying {N}, part of which tapped artifacts and creatures can pay.
   const water = /^Waterbend \{(\d+|X)\}(?=[,:])/.exec(line);
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(water ? line.slice("Waterbend ".length) : line);
@@ -198,6 +198,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : undefined;
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
   let costLess: ActivatedAbility["costLess"];
+  let costLessIf: ActivatedAbility["costLessIf"];
   // "Activate only if this card is in your graveyard" (Loathsome Troll): it works only from there (CR 113.6j).
   let inYard = false;
   // "Any player may activate this ability" (CR 602.2): its controller is whoever activates it (CR 113.8), "you" in it
@@ -222,6 +223,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       if (!c) return "fail";
       costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
       effectText = effectText.slice(0, less.index);
+      found = true;
+    }
+    // Hylda's Crown of Winter: "This ability costs {1} less to activate during your turn."
+    const lessTurn = / This ability costs \{(\d+)\} less to activate during your turn\.$/.exec(effectText);
+    if (lessTurn && !costLess && !costLessIf) {
+      costLessIf = { n: Number(lessTurn[1]), cond: { kind: "yourTurn" } };
+      effectText = effectText.slice(0, lessTurn.index);
       found = true;
     }
     // "Spend only mana of the chosen color to activate this ability." (Throne of Eldraine): the color chosen as it entered.
@@ -316,7 +324,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // 602.2b, 601.2h).
   const bounceOwn = costs.split(", ").includes("Return ~ to its owner's hand");
   if (bounceOwn && (fromYard || fromHand || exileOwn || /Sacrifice ~/.test(costs))) return "fail";
-  if (untapSelf && (fromYard || fromHand || exileFromHand || putFromHand)) return "fail";
+  // Timestream Navigator: "{2}{U}{U}, {T}, Put ~ on the bottom of its owner's library: ...": the same, into the library.
+  const bottomOwn = costs.split(", ").includes("Put ~ on the bottom of its owner's library");
+  if (bottomOwn && (fromYard || fromHand || exileOwn || bounceOwn || /Sacrifice ~/.test(costs))) return "fail";
+  if (untapSelf && (fromYard || fromHand || exileFromHand || putFromHand || bottomOwn)) return "fail";
   const manaCost = symbols
     .filter((x) => x !== "T" && x !== "Q")
     .map((x) => `{${x}}`)
@@ -336,7 +347,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // libraries isn't compiled.
   // A cost that mills moves a card from a library: it uses the stack (CR 605.1a; Millikin rulings).
   const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || keyword || halfLife || untapSelf))) return "fail";
+  if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || bottomOwn || keyword || halfLife || untapSelf))) return "fail";
   if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X") && !energyX && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
@@ -362,6 +373,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf || (inYard && !/Exile ~ from your graveyard/.test(costs)) ? {} : { exileSelf: true }) } : {}),
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(bounceOwn ? { returnSelf: true as const } : {}),
+    ...(bottomOwn ? { returnSelf: true as const, toLibraryBottom: true as const } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(exileFromHand ? { zone: "hand" as const, exileSelf: true } : {}),
     ...(putFromHand ? { zone: "hand" as const } : {}),
@@ -372,6 +384,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(maxPerTurn ? { maxPerTurn } : {}),
     ...(xMin ? { xMin } : {}),
     ...(costLess ? { costLess } : {}),
+    ...(costLessIf ? { costLessIf } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(/Pay life equal to the number of colors in your commanders' color identity/.test(costs) ? { lifeCostIdentity: true as const } : {}),

@@ -73,6 +73,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
     return a && b && typeof a === "object" && typeof b === "object" && "count" in a && "count" in b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
   }
+  // Prophet of the Scarab: "the number of Zombies you control or the number of Zombie cards in your graveyard, whichever
+  // is greater".
+  if ((m = /^(the number of .+?) or (the number of .+), whichever is greater$/i.exec(p))) {
+    const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
+    return a && b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "greater", of: [a.count, b.count] } } : null;
+  }
   if ((m = new RegExp(`^${NUM} minus (.+)$`, "i").exec(p))) {
     const c = parseCount(m[2]!, ctx);
     return c && { count: c.count, times: -(c.times ?? 1), plus: num(m[1]!) - (c.plus ?? 0) };
@@ -246,6 +252,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Consuming Tide: "for each opponent who has more cards in their hand than you", counted as it resolves.
   if (each && /^opponent who has more cards in (?:their )?hand than you$/i.test(p)) return count({ kind: "players", opponents: true, handMoreThanYou: true });
+  // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.
+  if (each && /^opponent who has less life than you$/i.test(p)) return count({ kind: "players", opponents: true, lifeLessThanYou: true });
   // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.
   if (each && (m = /^opponent who has (one|two|three|zero|no) or fewer cards in hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtMost: m[1] === "no" ? 0 : num(m[1]!) });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).

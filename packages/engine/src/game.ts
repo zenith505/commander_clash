@@ -1522,6 +1522,7 @@ function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = [])
     for (const r of rules) {
       // "Of the chosen type": the one chosen as the source entered.
       const filter = bindChosen(r.filter, src.chosen);
+      if (r.while && !staticConditionNow(s, r.while, src.id, you)) continue;
       if (!filter.chosen && objectMatches(s, filter, o, you, false)) {
         // Giada: "for each Angel you already control", the entering one aside, Giada included (rulings).
         // Arwen: its toughness as the creature enters (rulings), none if 0 or less.
@@ -6445,8 +6446,9 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
   const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
-  if (!ab.equip && !ab.costLess && !powerUp && ab.keyword !== "Ninjutsu") return cost;
+  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && ab.keyword !== "Ninjutsu") return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
+  if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
   const aim = per && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
@@ -6664,7 +6666,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
-  if (ab.returnSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "hand");
+  if (ab.returnSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, ab.toLibraryBottom ? "library" : "hand"); // "library": to the bottom
   const stackId = `s${s.nextId++}`;
   const item: StackItem = {
     id: stackId,

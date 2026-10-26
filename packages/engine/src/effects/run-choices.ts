@@ -665,7 +665,9 @@ function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetS
 /** "If it was a creature card" (SpellCondition "targetCardWas"): the target card, wherever it went, by its printed characteristics. */
 function targetCardWas(s: GameState, ctx: ResolveCtx, index: number, filter: TargetSpec): boolean {
   const t = ctx.targets[index];
-  const card = t?.kind === "object" ? s.objects[t.id] : undefined;
+  // Glorious Gale: "If it was a legendary spell": the target spell, on the stack or the card it became once countered.
+  const spellId = t?.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? ctx.spellObjects?.[index]) : undefined;
+  const card = t?.kind === "object" ? s.objects[t.id] : spellId ? s.objects[spellId] : undefined;
   return !!ctx.legal[index] && !!card && printedMatches(bindChosen(filter, ctx.chosen), defOf(s, card));
 }
 

@@ -931,7 +931,16 @@ export function compile(d: CardDef): CompiledCard {
       else (out.othersEnterAs ??= []).push({ filter: g.filter, mods, text: line });
       continue;
     }
-    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control| for each mana from (?:a Treasure|an artifact source) spent to cast it)?\\.$`).exec(line);
+    // Vampire Socialite: "As long as an opponent lost life this turn, each other Vampire you control enters with an
+    // additional +1/+1 counter on it": only while that's so, as each one would enter.
+    const socialite = /^As long as (an opponent lost life this turn), (each other .+)$/.exec(line);
+    const socialiteIf = socialite ? parseStaticCondition(socialite[1]!, { affects: { kind: "self" }, mods: [], text: line }) : undefined;
+    const othersLine = socialite ? `E${socialite[2]!.slice(1)}` : line;
+    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control| for each mana from (?:a Treasure|an artifact source) spent to cast it)?\\.$`).exec(othersLine);
+    if (socialite && (!othersExtra || !socialiteIf)) {
+      out.unsupported.push(raw);
+      continue;
+    }
     if (othersExtra) {
       // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
       const that = /^creature you control that's an? ([A-Z]\w+) or an? ([A-Z]\w+)$/.exec(othersExtra[2]!);
@@ -947,7 +956,7 @@ export function compile(d: CardDef): CompiledCard {
         const spentFrom = othersExtra[5] && / for each mana from /.test(othersExtra[5]) ? (/Treasure/.test(othersExtra[5]) ? "treasure" : "artifact") : undefined;
         const per = othersExtra[5] && !spentFrom ? / for each ([A-Z][a-z]+) you already control$/.exec(othersExtra[5])![1]! : undefined;
         if (per && !CREATURE_TYPES.has(per)) out.unsupported.push(raw);
-        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), text: line });
+        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), ...(socialiteIf ? { while: socialiteIf } : {}), text: line });
       }
       continue;
     }
@@ -3022,7 +3031,10 @@ export function compile(d: CardDef): CompiledCard {
       // Norin the Wary: "When a player casts a spell or a creature attacks, ...": a cast and an attack are never one event.
       /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line) ??
       // Lady Octopus: "Whenever you draw your first or second card each turn": each card is drawn one at a time (CR 121.2).
-      /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line);
+      /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line) ??
+      // Astrologian's Planisphere: "Whenever you cast a noncreature spell and whenever you draw your third card each turn":
+      // a cast and a draw are never one event.
+      /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast ~ and whenever/.test(line)
@@ -3048,6 +3060,8 @@ export function compile(d: CardDef): CompiledCard {
             : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ ${twice[2]}, ${effect}`]
             : /^When a player casts a spell or a creature attacks, /.test(line)
+              ? [`Whenever ${twice[1]}, ${effect}`, `Whenever ${twice[2]}, ${effect}`]
+            : /^Whenever you cast an? [^,]+? spell and whenever you draw /.test(line)
               ? [`Whenever ${twice[1]}, ${effect}`, `Whenever ${twice[2]}, ${effect}`]
             : /^Whenever you draw your first or second card each turn, /.test(line)
               ? [`Whenever you draw your first card each turn, ${effect}`, `Whenever you draw your second card each turn, ${effect}`]
@@ -3097,6 +3111,8 @@ export function compile(d: CardDef): CompiledCard {
     const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
+    // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
+    else if (!spellLines.length && !ascendSpell && d.keywords.includes("Cascade")) out.spell = { targets: [], effects: [], text: "" };
     else out.unsupported.push(...spellLines);
   }
   if (unpreventableX !== undefined) {

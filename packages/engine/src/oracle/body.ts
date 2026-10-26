@@ -155,6 +155,9 @@ function thenSubject(first: string, next: string): string {
   // Bogardan): lowercase after the trigger.
   const who = /^(Target player|Target opponent|That player|that player|Each player|Each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
+  // Pendant of Prosperity: "~'s owner draws a card, then that player may put a land card from their hand onto the
+  // battlefield": the same owner.
+  if (/^~'s owner draws /.test(first) && /^that player may put /.test(next)) return `~'s owner ${next.slice("that player ".length)}`;
   // Oblation: "The owner of target nonland permanent shuffles it into their library, then draws two cards": that owner.
   if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^draws /.test(next)) return `Its owner ${next}`;
   // Rolling Hamsphere: "create three 1/1 red Hamster creature tokens, then it deals X damage to any target": the tokens
@@ -762,6 +765,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     text = text.trim().slice(0, roundEach.index);
     ctx.halfRound = roundEach[1] as "up" | "down";
   }
+  // Wash Out: "Return all permanents of the color of your choice to their owners' hands": the color is chosen as it
+  // resolves (CR 608.2d), the same as "Choose a color. Return all permanents of the chosen color ...".
+  text = text.replace(/^(Return|Destroy|Exile) all ([a-z]+) of the color of your choice\b/, "Choose a color. $1 all $2 of the chosen color");
+  // Smallpox: "Each player loses 1 life, discards a card, sacrifices a creature of their choice, then sacrifices a land of
+  // their choice": one instruction after another, each done by every player at once (rulings), as with ", then".
+  text = text.replace(/^(Each (?:player|opponent) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
@@ -845,6 +854,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Primal Amulet: "..., you may remove those counters and transform it."
   // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.
   text = text.replace(/(^|\. | and )([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \3 counters on it, (you may )?remove (?:all of them|those counters)( and |(?=, transform ~, and ))/, (_, lead: string, put: string, kind: string, n: string, may: string | undefined, and: string) => `${lead}${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~${and}`);
+  // Prize Pig: "put that many ribbon counters on ~. Then if there are three or more ribbon counters on ~, remove those
+  // counters and untap it": all of them, whether or not it's tapped (rulings).
+  text = text.replace(/^([Pp]ut (?:that many|X) ([a-z]+) counters on ~\.) Then if there are ([a-z]+) or more \2 counters on ~, remove those counters and untap it\.$/, "$1 If there are $3 or more $2 counters on ~, remove all $2 counters from ~ and untap ~.");
   // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
   // ability": the same check of ~'s counters as it resolves.
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
@@ -901,7 +913,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Kaya, Geist Hunter: "Exile all cards from all graveyards" is exiling all graveyards.
   text = text.replace(/\b([Ee])xile all cards from all graveyards\b/g, "$1xile all graveyards");
   // Sorin of House Markov: "exile ~, then return ~ to the battlefield transformed under ~'s owner's control" ("him").
-  text = text.replace(/\bexile ~, then return ~ to the battlefield transformed under ~'s owner's control\b/g, "exile ~, then return it to the battlefield transformed under its owner's control");
+  // Nicol Bolas, the Ravager: "{4}{U}{B}{R}: Exile ~, then return ~ ...", the same at the start of an ability.
+  text = text.replace(/\b([Ee])xile ~, then return ~ to the battlefield transformed under ~'s owner's control\b/g, "$1xile ~, then return it to the battlefield transformed under its owner's control");
   text = text.replace(/If you win the flip, you may exile ~\. If you do, return ~ to the battlefield transformed under (?:its|~'s) owner's control\./, "If you win the flip, you may exile ~, then return it to the battlefield transformed under its owner's control.");
   // Deadbridge Chant: "choose a card at random in your graveyard. If it's a creature card, put it onto the battlefield.
   // Otherwise, put it into your hand."
@@ -3828,6 +3841,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences.splice(si + 1, 2, `You may put ${sacPut[1]} with mana value X or less from among them onto the battlefield`);
       continue;
     }
+    // Lonis, Cryptozoologist: "Target opponent reveals the top X cards of their library. You may put a nonland permanent
+    // card with mana value X or less from among them onto the battlefield under your control. That player puts the rest
+    // on the bottom of their library in a random order.": you take from their library (Effect dig's `library`).
+    const theirLook: RegExpExecArray | null = !dig ? new RegExp(`^Target opponent reveals the top ${NUMX} cards of their library$`).exec(s) : null;
+    if (theirLook) {
+      const put = /^(You may put an? .+? from among them onto the battlefield) under your control$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      if (!put || !/^That player puts the rest on the bottom of their library in a random order\.?$/.test(sentences[si + 2] ?? "")) return null;
+      const index = addTarget(ctx, { kind: "player", opponent: true, text: "target opponent" });
+      ctx.lastPlayerTarget = index;
+      dig = { type: "dig", n: amt(theirLook[1]!), reveal: true, library: { ref: "target", index } };
+      sentences.splice(si + 1, 2, put[1]!, "Put the rest on the bottom in a random order");
+      continue;
+    }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
     if (look && !dig && (!look[3] || look[2] === "X")) {
       const def = look[3] ? parseCount(look[3], ctx) : undefined;
@@ -4166,6 +4192,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
       continue;
     }
+    // Glorious Gale: "Counter target creature spell. If it was a legendary spell, the Ring tempts you": that spell's card,
+    // countered or not, by its printed characteristics.
+    const wasSpell = /^If it was a legendary spell, (.+)$/.exec(s);
+    if (wasSpell) {
+      const prev = effects[effects.length - 1];
+      const i = prev?.type === "counterSpell" && !prev.bounce && !prev.exileSpell ? prev.index : -1;
+      if (i < 0 || ctx.targets[i]?.kind !== "spell" || ctx.targets[i]!.many || ctx.targets[i]!.optional) return null;
+      const inner = parseOne(capital(wasSpell[1]!), ctx);
+      if (!inner || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter: { kind: "card", supertypes: ["Legendary"], text: "legendary card" } }, effects: inner });
+      continue;
+    }
     // Agatha's Soul Cauldron: "Exile target card from a graveyard. When a creature card is exiled this way, put a +1/+1
     // counter on target creature you control": a reflexive trigger (CR 603.12) if the card was a creature card.
     const whenCard = /^When an? ((?:[a-z]+ )?[a-z]+) card is exiled this way, (.+)$/.exec(s);
@@ -4330,13 +4368,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // power of the creature exiled this way": that target's power as it last existed (CR 608.2h), if it was exiled. A
     // commander exiled this way is still in exile as this resolves (it can go to the command zone only as a state-based
     // action afterwards, CR 903.9a).
-    const powerExiled = /^(.+), where X is the power of the creature exiled this way$/.exec(s);
+    // Ruinous Intrusion: "Exile target artifact or enchantment. Put X +1/+1 counters on target creature you control, where
+    // X is the mana value of the permanent exiled this way": the same, with its mana value.
+    const powerExiled = /^(.+), where X is the (power of the creature|mana value of the permanent) exiled this way$/.exec(s);
     if (powerExiled) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "exile" || prev.what.ref !== "target" || ctx.targets[prev.what.index]?.types?.join() !== "Creature") return null;
+      const mv = powerExiled[2] === "mana value of the permanent";
+      if (prev?.type !== "exile" || prev.what.ref !== "target" || prev.what.n || prev.until || (mv ? ctx.targets[prev.what.index]?.kind !== "object" || ctx.targets[prev.what.index]!.many : ctx.targets[prev.what.index]?.types?.join() !== "Creature")) return null;
       const parsed = parseOne(powerExiled[1]!, ctx);
       // X stands for that power (amounts.ts reads a target that just left as it last existed).
-      const power = { count: { kind: "power", of: { ref: "target", index: prev.what.index } } };
+      const power = { count: { kind: mv ? "manaValue" : "power", of: { ref: "target", index: prev.what.index } } };
       let xs = 0;
       const subst = (v: unknown): unknown => {
         if (Array.isArray(v)) return v.map(subst);

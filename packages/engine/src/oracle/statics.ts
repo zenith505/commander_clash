@@ -148,6 +148,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
+  // Zurgo, Thunder's Decree: "During your end step, Warrior tokens you control have ..." (the end step only, not cleanup,
+  // CR 513).
+  else if ((m = /^During your end step, (.+)$/.exec(text))) [cond, statement] = ["it's your end step", m[1]];
   // Razorkin Needlehead: "~ has first strike during your turn".
   else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
@@ -567,7 +570,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
-  if ((m = /^you've cast an? ((?!other\b|another\b)[a-z]+) spell this turn$/.exec(text))) {
+  // Hall of Oracles: "if you've cast an instant or sorcery spell this turn": either kind.
+  if ((m = /^you've cast an? ((?!other\b|another\b)[a-z]+(?: or [a-z]+)?) spell this turn$/.exec(text))) {
     const filter = parseSearchFilter(`${m[1]!} card`);
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
@@ -656,12 +660,15 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
   // under your control this turn" (Mad Dog: neither happened), "unless it came under your control this turn" (Erg Raiders).
   if (/^~ didn't attack this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn", not: true };
+  // Wakka, Devoted Guardian: "if a counter was put on ~ this turn", any kind, as it entered too (CR 122.6).
+  if (/^a counter was put on ~ this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "countersPutThisTurn" };
   if (/^~ didn't attack or come under your control this turn$/.test(text))
     return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisTurn", not: true }, { kind: "self", is: "controlledThisTurn", not: true }] };
   if (/^(?:~|it) came under your control this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "controlledThisTurn" };
   if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
   // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
   if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };
+  if (text === "it's your end step") return { kind: "phase", phase: "end", yours: true };
   if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
@@ -669,6 +676,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
+  if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
@@ -768,6 +776,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const c = parseStaticCondition(`you control another ${m[1]}`, st);
     return c?.kind === "control" && c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
   }
+  // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
+  if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");

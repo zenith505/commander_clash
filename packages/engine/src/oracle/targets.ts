@@ -122,6 +122,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (chose && ctx.chooseWords?.includes(chose[1]!)) return { ref: "choseWord", option: chose[1]! };
   const lost = /^each opponent who lost (?:(\d+) or more )?life this turn$/.exec(x);
   if (lost) return { ref: "opponentsLostLife", n: lost[1] ? Number(lost[1]) : 1 };
+  if (/^each opponent (?:with|who has) no cards in hand$/.test(x)) return { ref: "opponentsEmptyHanded" };
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
   if (controlling) {
@@ -213,6 +214,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // "Its owner loses life equal to its mana value" (Brainstealer Dragon): whose the entering permanent is.
   if (x === "its owner" && ctx.lastObjectTarget === undefined && ctx.subjectIt && !ctx.targets.length) return { ref: "subjectOwner" };
   if (x === "each player other than its controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many) return { ref: "otherThanTargetController", index: ctx.lastObjectTarget };
+  if (x === "each of its controller's opponents" && ctx.subjectIt && ctx.lastObjectTarget === undefined) return { ref: "subjectControllerOpponents" };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -347,7 +349,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   }
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).
-  const of = /^(.+?) (target player|target opponent|that player) controls\b(.*)$/i.exec(x);
+  // Silumgar, the Drifting Death: "creatures defending player controls get -1/-1 until end of turn" (CR 506.2).
+  const of = /^(.+?) (target player|target opponent|that player|defending player) controls\b(.*)$/i.exec(x);
   const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) ? parseGroup(`${of[1]}${of[3]}`, true) : null;
   if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller) {
     const who = of[2]!.toLowerCase();
@@ -356,7 +359,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
       const index = addTarget(ctx, { kind: "player", opponent: who === "target opponent", text: who });
       ctx.lastPlayerTarget = index;
       whose = { ref: "target", index };
-    } else whose = parsePlayer("that player", ctx);
+    } else whose = parsePlayer(who === "defending player" ? who : "that player", ctx);
     if (!whose || (whose.ref === "target" && whose.n)) return null;
     return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose };
   }

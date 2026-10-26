@@ -1992,6 +1992,8 @@ export interface Resolving {
   returnedNontoken?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
   digTook?: boolean;
+  /** The cards its last search found (SpellCondition searchFound). */
+  searchFound?: ObjectId[];
   /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */
   couldntPick?: PlayerId[];
   /** The Army its amass instruction chose (CR 701.47c), for "the amassed Army". */

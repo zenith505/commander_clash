@@ -723,7 +723,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "phase": {
       const combat = ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
-      const now = cond.phase === "combat" ? combat : s.step === "main1" || s.step === "main2";
+      const now = cond.phase === "combat" ? combat : cond.phase === "end" ? s.step === "end" : s.step === "main1" || s.step === "main2";
       return now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1);
     }
     case "prowl": {
@@ -759,7 +759,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return fits(s.players[you]?.life ?? 0);
     }
     case "discardedThisTurn":
-      return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0);
+      return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you));
     case "opponentLostLife":
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
@@ -960,6 +960,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
+      if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");

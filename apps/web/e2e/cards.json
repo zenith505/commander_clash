@@ -2190,6 +2190,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6b1d178f-9713-4dcf-920b-ddf2c94cc427",
+  "name": "Brood Sliver",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Sliver",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sliver"
+  ],
+  "oracleText": "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver creature token.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lgn",
+  "releasedAt": "2003-02-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7ac5d98-805e-4212-be94-333a0c0c44a7",
   "name": "Brudiclad, Telchor Engineer",
   "manaCost": "{4}{U}{R}",
@@ -10579,6 +10609,36 @@
   ]
  },
  {
+  "oracleId": "06e0459f-d691-4470-884a-27c09b6612d2",
+  "name": "Muscle Sliver",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Sliver",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sliver"
+  ],
+  "oracleText": "All Sliver creatures get +1/+1.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d07d3be3-f69d-4484-8467-cffd43871788",
   "name": "Myr Retriever",
   "manaCost": "{2}",
@@ -14735,6 +14795,40 @@
   "commanderLegal": "legal",
   "set": "ddj",
   "releasedAt": "2012-09-07",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bd7867f4-4f58-49c2-9c24-a124dfdb506d",
+  "name": "Street Wraith",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Wraith",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wraith"
+  ],
+  "oracleText": "Swampwalk (This creature can't be blocked as long as defending player controls a Swamp.)\nCycling—Pay 2 life. (Pay 2 life, Discard this card: Draw a card.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Landwalk",
+   "Swampwalk",
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsr",
+  "releasedAt": "2021-03-19",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

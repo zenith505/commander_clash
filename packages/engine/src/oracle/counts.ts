@@ -320,6 +320,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
   // Rug of Smothering: "for each spell they've cast this turn", the player the trigger is about.
   if (ctx?.eventPlayer && /^spells? (?:they've|that player has) cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", eventPlayer: true });
+  // Magebane Lizard: "the number of noncreature spells they've cast this turn", that one included (it's cast by now).
+  if (ctx?.eventPlayer && (m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells (?:they've|that player has) cast this turn$/i.exec(p))) {
+    const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
+    return filter ? count({ kind: "spellsCastThisTurn", filter, eventPlayer: true }) : null;
+  }
   // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
   if ((m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells you've cast this turn$/i.exec(p))) {
     const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
@@ -365,6 +370,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The amount of mana spent to cast that spell" (Mana Sculpt): the targeted spell's, as it last existed on the stack.
   if ((m = /^(?:the )?amount of mana spent to cast that spell$/.exec(p))) {
     const of = whoseObject("that spell's", ctx);
+    // Manaform Hellkite: in "whenever you cast" the spell cast, the mana actually spent on it (rulings: 0 if none was).
+    if (of?.ref === "castSpell") return count({ kind: "eventAmount" });
     return of?.ref === "target" ? count({ kind: "manaSpentOn", of }) : null;
   }
   // "For each counter on ~" (Twitching Doll): every kind.

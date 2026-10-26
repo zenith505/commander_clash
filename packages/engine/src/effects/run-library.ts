@@ -916,6 +916,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if ((searchers.length === 1 || e.dest.zone === "libraryTop") && !yardOnly && !e.noShuffle) shuffleLibrary(s, lib);
         if (e.noShuffle && !yardOnly) r.searchedHere = true;
       }
+      r.searchFound = moves.map((m) => m.id);
       // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
       if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
       // Sword of Hearth and Home: the card exiled before enters with the found card, under your control (rulings: at the

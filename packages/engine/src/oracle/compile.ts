@@ -1010,6 +1010,8 @@ export function compile(d: CardDef): CompiledCard {
       // "• Mardu — If a creature attacking causes a triggered ability ... triggers an additional time" (Windcrag Siege).
       const again = out.entersAnchor!.includes(anchored[1]!) ? triggersAgainLine(anchored[2]!) : null;
       if (again) (out.triggersAgain ??= []).push({ ...again, anchor: anchored[1]! });
+      // Glacierwood Siege: "• Sultai — You may play lands from your graveyard." (the permission of Crucible of Worlds).
+      else if (out.entersAnchor!.includes(anchored[1]!) && anchored[2] === "You may play lands from your graveyard." && !out.landsFromGraveyardIf) out.landsFromGraveyardIf = { kind: "anchor", word: anchored[1]! };
       else if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
       continue;
     }
@@ -2976,7 +2978,7 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cast ~ and whenever ~ (attacks), (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).

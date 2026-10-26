@@ -533,6 +533,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander))
             : e.cond.kind === "digTook"
             ? !!s.resolving!.digTook
+            : e.cond.kind === "searchFound"
+            ? !!s.resolving!.searchFound?.some((id) => printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, obj(s, id))))
             : e.cond.kind === "bouncedThisWay"
             ? !!s.resolving!.bouncedThisWay?.some((b) => b.subtypes.includes((e.cond as { subtype: string }).subtype) && b.id !== ctx.sourceId)
             : e.cond.kind === "excessDealt"

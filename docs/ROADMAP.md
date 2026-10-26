@@ -1,7 +1,7 @@
 # Roadmap
 
-24,306 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,197 of
+24,356 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,226 of
 9,979 (82%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -81,11 +81,20 @@ line blocks.
    enters), Doors of Durin (reveal the top card, then trample or hexproof until your next turn by what you control),
    Goldberry, River-Daughter ("a counter of each kind not on ~", "one or more counters"), Sauron's Ransom (an opponent
    makes a face-down pile and a face-up pile, which the UI would have to hide), Tromokratis ("can't be blocked unless
-   all creatures defending player controls block it", CR 509.1c). Next most played: Zurgo, Thunder's Decree, Sinister
-   Gnarlbark (blight), Rakdos, the Muscle, Storm of Souls, Gale, Waterdeep Prodigy, Aurora Phoenix, Damping Sphere,
-   Wakka, Devoted Guardian, Glacierwood Siege, Captain Howler, Sea Scourge; Hallowed Moonlight (Containment Priest's
-   replacement for one turn) and Infernal Offering are near. `npm run popular` now reads every ranked card (31,917),
-   so it doesn't run dry at rank 5,000.
+   all creatures defending player controls block it", CR 509.1c). Out after round 163: Gale, Waterdeep Prodigy (cast
+   a card from your graveyard as its trigger resolves, with an exile replacement for that spell), Damping Sphere (a
+   land's mana replaced by {C} when it makes two or more, which has to come after other mana replacements like Mana
+   Reflection, CR 616.1), Captain Howler, Sea Scourge (+2/+0 for each card discarded in one batch, then a trigger
+   for "that creature" this turn), Angel of Jubilation (no paying life or sacrificing creatures for any cost),
+   Olivia, Crimson Bride (the returned creature gains a leaves condition on legendary Vampires), Relentless Dead
+   ("you may pay {X}" on a dies trigger, then a target with mana value X), Cache Grab ("if you control a Squirrel or
+   returned a Squirrel card this way"), Rot Hulk (up to X targets, X the number of opponents), Crown of Gondor (an
+   equip cost that's lower while you're the monarch), Calix, Destiny's Hand ("until target enchantment you control
+   leaves the battlefield"), Xenagos, the Reveler (any number of creature and land cards from among seven onto the
+   battlefield), Great Unclean One (a token for each opponent with less life than you). Next most played: Agility
+   Bobblehead, Timeline Culler, Evercoat Ursine, Arwen, Mortal Queen, Shelob, Child of Ungoliant, Gollum, Obsessed
+   Stalker, Sword of Hours, Krark's Thumb, Professor Hojo, Verdant Command, Infesting Radroach, Reverse the Polarity.
+   `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
    Smaller gaps from round 162: bots discard their hand to Perplex only when it's one card or none; Rhet-Tomb Mystic's
    and Jo Grant's granted cycling are cycling abilities of the cards (CR 702.29a), but the hand-grant reads only
    "ninjutsu" and "cycling" so far; Instill Energy's "can attack as though it had haste" covers attacking only, not {T}

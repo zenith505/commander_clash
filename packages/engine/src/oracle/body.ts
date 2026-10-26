@@ -307,6 +307,8 @@ const checkableMay = (e: Effect): boolean =>
   // sacrifice a Zombie. If you do, ..." (Wilhelt): only with one to sacrifice.
   // "You may choose a token you control. If you do, ..." (Brudiclad): only with one to choose.
   (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice" || e.action === "choose") && e.n === 1 && !e.unless) ||
+  // "You may blight 1. If you do, ..." (Scuzzback Scrounger): only with a creature to put the counters on (CR 701.68b).
+  (e.type === "pick" && e.who.ref === "you" && e.action === "counters" && e.counter?.kind === "-1/-1" && e.n === 1 && !e.unless) ||
   // "You may sacrifice three other nonland permanents. If you do, ..." (Scavenger's Talent): only with that many to
   // sacrifice; all of them is doing it.
   (e.type === "pick" && e.who.ref === "you" && e.action === "sacrifice" && typeof e.n === "number" && e.n > 1 && !e.unless && !e.anyNumber) ||
@@ -762,7 +764,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^[Cc]hoose (up to one )?target ([a-z]+) spell or ([a-z]+) spell\. Its owner puts it on their choice of the top or bottom of their library\./, "The owner of $1target $2 or $3 spell puts it on their choice of the top or bottom of their library.");
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
-  text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
+  // Archangel Elspeth: "It becomes an Angel in addition to its other types and gains flying." Two changes, both with no
+  // duration (rulings).
+  text = text.replace(/\bIt becomes (an? [A-Z][a-z]+) in addition to its other types and gains ([a-z]+)\./g, "It becomes $1 in addition to its other types. It gains $2.");
+  // Tend the Pests: '... with "When this token dies, you gain 1 life," where X is ...': the comma belongs before "where".
+  text = text.replace(/,"( where X is )/g, '",$1');
+  // Samwise the Stouthearted: "choose up to one target permanent card in your graveyard that was put there from the
+  // battlefield this turn. Return it to your hand. Then the Ring tempts you." The same, then the Ring.
+  text = text.replace(/^[Cc]hoose ((?:up to one )?target [^.]+? in your graveyard(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)\. Return it to your hand\.(?=$| Then )/, "Return $1 to your hand.");
   // Brought Back: "Choose up to two target permanent cards in your graveyard that were put there from the battlefield this
   // turn. Return them to the battlefield tapped." is one instruction; they return at the same time.
   text = text.replace(/^[Cc]hoose (up to (?:one|two|three) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
@@ -2436,6 +2445,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!who) return null;
       effects.push({ type: "impulse", n: tgtExile[2] === "card" ? 1 : amt(tgtExile[3]!), until: /next turn/.test(tgtPlay[1]!) ? "nextTurn" : "thisTurn", who, ...(any ? { anyType: true as const } : {}) });
       si += any ? 2 : 1;
+      continue;
+    }
+    // Rakdos, the Muscle: "exile cards equal to its mana value from the top of target player's library. Until your next
+    // end step, you may play those cards, and mana of any type can be spent to cast those spells." The sacrificed
+    // creature's mana value as it last existed (rulings); the permission yours, with the normal timing (rulings).
+    const tgtEqual = /^[Ee]xile cards equal to (.+?) from the top of (target player|target opponent)'s library$/.exec(s);
+    const tgtEqualPlay = tgtEqual && /^Until your next end step, you may play those cards(, and mana of any type can be spent to cast those spells)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (tgtEqual && tgtEqualPlay) {
+      const n = parseCount(tgtEqual[1]!, ctx);
+      const who = n && parsePlayer(tgtEqual[2]!, ctx);
+      if (!n || !who) return null;
+      effects.push({ type: "impulse", n, until: "yourNextEndStep", who, ...(tgtEqualPlay[1] ? { anyType: true as const } : {}) });
+      si++;
       continue;
     }
     // Nashi, Moon Sage's Scion: "Exile the top card of each player's library. Until end of turn, you may play one of those
@@ -5075,7 +5097,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
       // "If your life total is greater than your starting life total, draw a card. Otherwise, you gain 2 life." (Cosmos Elixir).
       // "If you control a Demon, each opponent loses 2 life and you gain 2 life. Otherwise, you lose 2 life." (Unholy Annex).
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad");
+      // Gravelighter: "draw a card if a creature died this turn. Otherwise, each player sacrifices a creature of their
+      // choice": whether a creature died, not whether a card was drawn (rulings).
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied");
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -5335,6 +5359,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.alsoMods = mods;
       continue;
     }
+    // Oriq Loremage: "Search your library for a card, put it into your graveyard, then shuffle. If it's an instant or
+    // sorcery card, put a +1/+1 counter on ~." The card found, wherever it went.
+    const foundIs = /^If it's an? ([a-z]+(?: or [a-z]+)? card), (.+)$/.exec(s);
+    const foundSearch = effects[effects.length - 1];
+    if (foundIs && foundSearch?.type === "search" && foundSearch.n === 1 && !foundSearch.others && !foundSearch.who && !foundSearch.library) {
+      const filter = parseSearchFilter(foundIs[1]!);
+      const before = ctx.targets.length;
+      const then = filter && parseOne(capital(foundIs[2]!), ctx);
+      if (!filter || !then || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "searchFound", filter }, effects: then });
+      continue;
+    }
     const isAlso = /^(?:That creature is|It's|It is|Each of them is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
@@ -5342,6 +5378,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Ghost Vacuum: "Each of them is a 1/1 Spirit ...": the cards it put onto the battlefield.
       if (prev?.type === "moveLinked" && /^Each of them/.test(s)) {
         if (prev.dest !== "battlefield" || !mods || prev.alsoMods) return null;
+        prev.alsoMods = mods;
+        continue;
+      }
+      // Storm of Souls: "Return all creature cards from your graveyard to the battlefield. Each of them is a 1/1 Spirit
+      // with flying in addition to its other types": the permanents they became.
+      if (prev?.type === "returnAllFromGraveyard" && /^Each of them/.test(s)) {
+        if (prev.toHand || !mods || prev.alsoMods) return null;
         prev.alsoMods = mods;
         continue;
       }
@@ -5507,7 +5550,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "choose", choice: "opponent", ...(/ most life /.test(ifDid[2]!) ? { mostLife: "opponents" as const } : {}) }, ...then] });
         continue;
       }
-      const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
+      // "If you do, scry 2, then draw a card" (Lord Skitter's Butcher): an "if" keeps its place among its instructions, so
+      // one that waits on a player may come before another.
+      const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : attempt(ctx, () => parseOne(capital(ifDid[2]!), ctx)) ?? (ifDid[1] === "do" ? attempt(ctx, () => parseThen(capital(ifDid[2]!), ctx, true)) : null);
       if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       // Its own "where X is ..." (CR 107.3c).
       const ok = !!inner && defineX();
@@ -6660,7 +6705,8 @@ function insteadOfAffected(fx: Effect[], previous: Effect[]): Effect[] | null {
  * "Draw a card, then discard a card" after a condition ("If you control a blue creature, ..."): the instructions in order,
  * all under it. Only one of them may wait on a choice, the last, so resuming it doesn't repeat the others.
  */
-function parseThen(s: string, ctx: Ctx): Effect[] | null {
+/** `inIf`: inside an "if", which keeps its place among its instructions, so one that waits on a player may come first. */
+function parseThen(s: string, ctx: Ctx, inIf = false): Effect[] | null {
   // "Then shuffle" ends a search; "then shuffle your graveyard into your library" (The Mending of Dominaria) is its own.
   const parts = s.split(/, then (?!shuffle(?! your graveyard into your library$))/);
   if (parts.length < 2) return null;
@@ -6670,7 +6716,7 @@ function parseThen(s: string, ctx: Ctx): Effect[] | null {
     if (!fx) return null;
     out.push(...fx);
   }
-  return out.slice(0, -1).some((e) => pauses(e)) ? null : out;
+  return !inIf && out.slice(0, -1).some((e) => pauses(e)) ? null : out;
 }
 
 /**
@@ -7138,7 +7184,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
   // "You create a 2/2 green Wolf creature token and that player mills ten cards" (Sword of Body and Mind): "that player"
   // after a part about you.
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$|blight \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {
@@ -7173,7 +7219,7 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
     return first && second ? [...first, ...second] : null;
   }
   // "Any number of target players each mill a card and lose 1 life" (Tinybones Joins Up): all of them both times.
-  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^any number of target (players|opponents) each$/i.test(subject) ? "Each of those players" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
+  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^any number of target (players|opponents) each$/i.test(subject) ? "Each of those players" : /^(you|each player|each opponent|that player|each of its controller's opponents)$/i.test(subject) ? subject : null;
   if (!again) return null;
   // "Target player draws cards equal to half the number of cards in their library and loses half their life" (Peer into
   // the Abyss): either part may be "... equal to ...".

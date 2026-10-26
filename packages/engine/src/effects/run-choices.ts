@@ -19,6 +19,7 @@ import { cardNameOptions } from "../names";
 import { voteWins } from "./run-votes";
 import { defMv } from "../faces";
 import { putCounters } from "../counters";
+import { CREATURE_TYPES } from "../keywords";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -48,6 +49,20 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const n = Number(sc.payX);
         loseLife(s, ctx.controller, n);
         log(s, `${player(s, ctx.controller).name} pays ${n} life for ${src}.`);
+        sc.may = true;
+      }
+      // "You may pay any amount of {E}" (Galvanic Discharge): the amount first, at most the energy they have; paying 0 is
+      // paying (rulings). Paid at once (CR 107.14).
+      if (e.payX?.energy && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          const most = Math.max(0, player(s, ctx.controller).energy ?? 0);
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payEnergy", options: ["0"], numberRange: { min: 0, max: most }, prompt: `${e.text.replace(/~/g, src)}: how much energy?` };
+          return "paused";
+        }
+        const n = Number(sc.payX);
+        const p = player(s, ctx.controller);
+        p.energy = (p.energy ?? 0) - n;
+        log(s, `${p.name} pays ${n} energy for ${src}.`);
         sc.may = true;
       }
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
@@ -556,7 +571,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "castFromHandAndAnotherNamed"
             ? ((o) => !s.resolving!.item.copy && o?.castFrom === "hand" && (player(s, ctx.controller).castNames?.[defOf(s, o).name] ?? 0) >= 2)(s.objects[s.resolving!.item.objectId ?? ""])
             : e.cond.kind === "castFromGraveyard"
-            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.castFrom === (e.cond.hand ? "hand" : e.cond.exile ? "exile" : "graveyard")
+            ? !s.resolving!.item.copy && ((from) => (e.cond.kind === "castFromGraveyard" && e.cond.notHand ? !!from && from !== "hand" : from === (e.cond.kind === "castFromGraveyard" && e.cond.hand ? "hand" : e.cond.kind === "castFromGraveyard" && e.cond.exile ? "exile" : "graveyard")))(s.objects[s.resolving!.item.objectId ?? ""]?.castFrom)
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"
@@ -599,7 +614,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 return !!o && printedMatches(f, defOf(s, o));
               })(e.cond.filter)
             : e.cond.kind === "subjectIs"
-            ? ((f) => objects(s, { ref: "subject" }, ctx).some((o) => objectMatches(s, f, o, ctx.controller, false)))(e.cond.filter)
+            ? ((f) => {
+                // Gone from the battlefield: a creature type as it last existed (CR 608.2h), when that's all it asks.
+                const o = objects(s, { ref: "subject" }, ctx)[0];
+                const typeOnly = Object.entries(f).every(([k, v]) => ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k) && (!Array.isArray(v) || k === "subtypes" || !v.length));
+                if (o?.zone !== "battlefield" && ctx.lki?.subtypes && typeOnly && f.subtypes?.length) return f.subtypes.some((t) => ctx.lki!.subtypes!.includes(t) || (!!ctx.lki!.allCreatureTypes && CREATURE_TYPES.has(t)));
+                return objects(s, { ref: "subject" }, ctx).some((x) => objectMatches(s, f, x, ctx.controller, false));
+              })(e.cond.filter)
             : e.cond.kind === "targetCardWas"
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"

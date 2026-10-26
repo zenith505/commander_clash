@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type Effect } from "../abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type Effect, type TargetSpec } from "../abilities";
 import { NUM, num, X, sacrificeSelf, counterKind, singular } from "./words";
 import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
@@ -98,7 +98,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       extra.push({ kind: "sacrifice", filter: { ...both, text: `${c[1]} and a ${c[2]}` }, n: 2, oneOfEach: [a, b] });
     } else if ((c = /^Sacrifice another (\w+) or an? (\w+)$/.exec(part))) {
       // "Sacrifice another creature or an artifact" (Street Urchin): this permanent too if it's an artifact (rulings).
-      const filter = pickFilter(`${c[1]} or ${c[2]}`);
+      // "Sacrifice another creature or a Treasure" (Skullport Merchant): a card type or a subtype, either one.
+      const parts = [pickFilter(c[1]!), pickFilter(c[2]!)];
+      const filter = pickFilter(`${c[1]} or ${c[2]}`) ?? (parts.every((x) => x?.kind === "object") ? { kind: "object" as const, types: [], notTypes: [], notColors: [], anyOf: parts as TargetSpec[], text: `${c[1]} or ${c[2]}` } : null);
       const selfIf = pickFilter(c[2]!);
       if (!filter || !selfIf) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or ${/^[aeiou]/i.test(c[2]!) ? "an" : "a"} ${c[2]}` }, n: 1, other: true, selfIf });

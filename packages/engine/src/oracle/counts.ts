@@ -40,6 +40,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
   }
+  // "Each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way."
+  // (Voracious Fell Beast): the permanents this ability's sacrifice took.
+  if (ctx && ((each && /^creature sacrificed this way$/.test(p)) || /^the number of creatures sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
@@ -264,6 +267,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
+  if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
+  // Reaper's Scythe: "for each player who lost life this turn", you too.
+  if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
@@ -341,6 +347,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was
+  // (rulings).
+  if (/^spells? you've cast this turn from anywhere other than your hand$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });
   // Rug of Smothering: "for each spell they've cast this turn", the player the trigger is about.
   if (ctx?.eventPlayer && /^spells? (?:they've|that player has) cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", eventPlayer: true });
   // Magebane Lizard: "the number of noncreature spells they've cast this turn", that one included (it's cast by now).
@@ -373,6 +382,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // Breathe Your Last: "Destroy target creature or planeswalker. You gain 1 life for each of its colors."
+  if (/^of its colors$/i.test(p) && ctx?.lastObjectTarget !== undefined) {
+    const of = whoseObject("its", ctx);
+    return of && count({ kind: "colorsOf", of });
+  }
   // "Your Ring-bearer's power" (One Ring to Rule Them All): 0 without one (CR 701.54a, 107.1b).
   if ((m = /^your Ring-bearer's (power|toughness)$/.exec(p))) return count({ kind: m[1] as "power" | "toughness", of: { ref: "ringBearer" } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
@@ -438,6 +452,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
   if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
     return count({ kind: "attachedToSelf", subtypes: /and/.test(m[1]!) ? ["Aura", "Equipment"] : [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // Lunar Insight: "for each different mana value among nonland permanents you control".
+  if (each && (m = /^different mana value among (.+?) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, differentManaValues: true } } : null;
+  }
   // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
   if ((m = /^differently named (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx, each);
@@ -553,7 +572,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (x === "the amassed army's") return ctx?.amassed ? { ref: "amassed" } : null;
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   // "That spell's mana value": the targeted spell (Imp's Mischief).
-  if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
+  // With a target that isn't a spell, in a cast trigger, the spell cast (Dancing from Dark to Dawn), below.
+  if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined && !(x === "that spell's" && ctx.castSpell && ctx.targets[ctx.lastObjectTarget]?.kind !== "spell")) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   // "Return target card from your graveyard to your hand. You gain life equal to that card's mana value": the card
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).

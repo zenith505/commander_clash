@@ -310,6 +310,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const { other: _, ...rest } = to;
     return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ...rest, otherThan: a.index }, ...(m[3] ? { also: [{ ref: m[3] === "each opponent" ? "eachOpponent" : "eachPlayer" }] } : {}), by: { target: a.index } }];
   }
+  // "Target creature you control deals X damage to any other target and X damage to itself, where X is its power"
+  // (Self-Destruct): both at once, from that creature, X as this resolves; with the other target illegal, it's still dealt
+  // to itself; with that creature illegal, none (rulings).
+  if ((m = /^(Target creature you control) deals damage equal to its power to (any other target) and to itself$/.exec(s))) {
+    const a = parseObject(m[1]!.toLowerCase(), ctx);
+    if (a?.ref !== "target" || a.n) return null;
+    const to = parseDamageRecipient(m[2]!, ctx);
+    return to?.ref === "anyTarget" ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, also: [{ ref: "target", index: a.index }], by: { target: a.index } }] : null;
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).

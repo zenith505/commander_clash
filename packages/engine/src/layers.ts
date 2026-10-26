@@ -545,6 +545,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return src.zone === "exile" && !src.faceDown && src.owner === you && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
     case "selfCommandOrBattlefield":
       return src.zone === "command" || src.zone === "battlefield";
+    case "selfInCommand":
+      return src.zone === "command";
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
       return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src));
     case "graveyardAtLeast": // threshold
@@ -594,6 +596,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "yourTurn":
       return (s.activePlayer === you) !== !!cond.not;
+    case "extraTurn":
+      return !!s.extraTurn;
     case "eventPlayersTurn":
       return eventPlayer !== undefined && (s.activePlayer === eventPlayer) !== !!cond.not;
     case "anyOf":
@@ -739,6 +743,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "castAnother": // checked before the spell counts itself (CR 601.2f, 601.2i)
       return (s.castThisTurn ?? []).some((c) => c.player === you);
     case "creatureDied":
+      if (cond.notNamedSelf) return (s.diedNamesThisTurn ?? []).some((n) => !n || !sameName(n, defOf(s, src).name));
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
     case "meldPartner": {
       // "If you both own and control ~ and a creature named Bruna, the Fading Light" (CR 701.42): ~ as it is now.
@@ -925,7 +930,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "sourcesDealtDamage":
       return (s.turnLog?.damageSources?.[you]?.length ?? 0) >= cond.n;
     case "castCount":
-      return (s.castThisTurn ?? []).filter((c) => c.player === you && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n;
+      return (s.castThisTurn ?? []).filter((c) => c.player === you && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n !== !!cond.not;
     case "colorsAmong": {
       const colors = new Set<Color>();
       for (const c of chars.values()) if (c.controller === you) for (const k of c.colors) colors.add(k);

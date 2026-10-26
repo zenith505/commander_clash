@@ -898,6 +898,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
   // Dawn of a New Age: "Then if ~ has no hope counters on it, sacrifice it and you gain 4 life": ~, as it resolves.
   text = text.replace(/\b[Tt]hen if ~ has no ([a-z]+) counters on it, sacrifice it\b/, "If there are no $1 counters on ~, sacrifice ~");
+  // Archfiend of the Dross: "Remove an oil counter from ~. Then if it has no oil counters on it, you lose the game": ~,
+  // checked after the removal. Thing in the Ice: "..., transform it" too.
+  text = text.replace(/(\b[Rr]emove an? ([a-z]+) counter from ~\.) Then if it has no \2 counters on it, (you lose the game|transform it)\./, (_, rm: string, kind: string, then: string) => `${rm} If there are no ${kind} counters on ~, ${then.replace(/ it$/, " ~")}.`);
   // Amalia Benavides Aguirre: "~ explores. Then destroy all other creatures if its power is exactly 20": ~ is the only
   // object named, checked once as the ability resolves, after the explore (rulings).
   text = text.replace(/^(~ explores\. Then [^.~]+ if )its (power|toughness)\b/, "$1~'s $2");
@@ -1243,6 +1246,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )You add ((?:\{[WUBRGC]\})+)(?= and |\.)/, "$1Add $2");
   // "~ deals 2 damage to each other player" (Syphon Soul): with no teams, every other player is an opponent (CR 102.3).
   text = text.replace(/\b(deals \w+ damage to) each other player\b/g, "$1 each opponent");
+  // "~ deals X damage to that player, where X is the number of untapped lands they control" (Citadel of Pain): "they"
+  // is that player.
+  text = text.replace(/\b(damage to that player, where X is the number of [a-z ]+?) they control\./, "$1 that player controls.");
+  // Self-Destruct: "Target creature you control deals X damage to any other target and X damage to itself, where X is its
+  // power": one X, its power as this resolves (rulings).
+  text = text.replace(/^Target creature you control deals X damage to any other target and X damage to itself, where X is its power\.$/, "Target creature you control deals damage equal to its power to any other target and to itself.");
+  // Necrogen Rotpriest: "that player gets an additional poison counter": one more, from this trigger (CR 122.1).
+  text = text.replace(/\bthat player gets an additional poison counter\b/g, "that player gets a poison counter");
   // "~ deals 3 damage to each of your opponents" (Aurelia, the Law Above) is "each opponent".
   text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
@@ -1286,6 +1297,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // (Paladin Class): both until end of turn.
   text = text.replace(/(^|\. )[Uu]ntil end of turn, (target [a-z ]*?creature) gets ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gains ([a-z ]+)\./, (_, a, t, pt, per, kw) => `${a}${t.charAt(0).toUpperCase()}${t.slice(1)} gets ${pt} until end of turn for each ${per}. It gains ${kw} until end of turn.`);
   text = text.replace(/(^|\. )Until end of turn, creatures you control get ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gain ([a-z]+)\./, "$1Creatures you control get $2 until end of turn for each $3. Creatures you control gain $4 until end of turn.");
+  // Haldir, Lórien Lieutenant: "Until end of turn, other Elves you control gain vigilance and get +1/+1 for each +1/+1
+  // counter on ~": the same.
+  text = text.replace(/(^|\. )Until end of turn, (other [A-Z][a-z]+ you control) gain ([a-z]+) and get ([+-]\d+\/[+-]\d+) for each ([^.]+?)\./, (_, a: string, g: string, kw: string, pt: string, per: string) => `${a}${capital(g)} gain ${kw} until end of turn. ${capital(g)} get ${pt} until end of turn for each ${per}.`);
   // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
@@ -3467,7 +3481,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Look at the top three cards of target player's library, then put them back in any order." The player
     // looking orders them (CR 401.4 lets nobody else see them). "You may shuffle." after it is a choice to shuffle.
-    const order = new RegExp(`^(You may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
+    const order = new RegExp(`^([Yy]ou may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
     if (order && /^[Pp]ut them back in any order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const who = parsePlayer(order[3] === "your" ? "you" : order[3]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
@@ -3717,6 +3731,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseSentence(capital(subjectIs[2]!), ctx);
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectIs[1]!], text: subjectIs[1]! } }, effects: inner });
+      continue;
+    }
+    // Taborax, Hope's Demise: "Whenever another nontoken creature you control dies, put a +1/+1 counter on ~. If that
+    // creature was a Cleric, you may draw a card. If you do, you lose 1 life.": the creature as it last existed (CR
+    // 608.2h); both sentences under the condition.
+    const subjectWas = (ctx.subjectIt || ctx.subject) && effects.length ? /^If that creature was an? ([A-Z][a-z]+), (you may [^.]+)$/.exec(s) : null;
+    const wasDo = subjectWas && /^If you do, ([^.]+)\.?$/.exec(sentences[si + 1] ?? "");
+    if (subjectWas && CREATURE_TYPES.has(subjectWas[1]!) && (wasDo || !/^(?:Otherwise|If)\b/.test(sentences[si + 1] ?? ""))) {
+      const sub = parseBody(`${capital(subjectWas[2]!)}.${wasDo ? ` If you do, ${wasDo[1]}.` : ""}`, {});
+      if (!sub || sub.targets.length || /~|\bit\b|\bthat creature\b/.test(`${subjectWas[2]} ${wasDo?.[1] ?? ""}`)) return null;
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectWas[1]!], text: subjectWas[1]! } }, effects: sub.effects });
+      if (wasDo) si++;
       continue;
     }
     // Ajani's Chosen: "Whenever an enchantment you control enters, create a 2/2 white Cat creature token. If that enchantment
@@ -4192,6 +4218,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Galvanic Discharge, Harnessed Lightning, Die Young: "Choose target creature. You get {E}{E}{E}, then you may pay any
+    // amount of {E}. ~ deals that much damage to that creature" ("The creature gets -1/-1 until end of turn for each {E}
+    // paid this way"): X energy, chosen as it resolves, at most what you have; paying 0 is paying (rulings, CR 107.14).
+    // ", then" has split the sentence already.
+    const anyEnergy = ctx.spell && /^[Yy]ou may pay any amount of \{E\}$/.test(s);
+    const energyUse = anyEnergy && si + 2 === sentences.length ? (sentences[si + 1] ?? "").replace(/\.$/, "") : "";
+    const energyX = energyUse.replace(/^~ deals that much damage to that (permanent|creature)$/, "~ deals X damage to that $1").replace(/^The creature gets -1\/-1 until end of turn for each \{E\} paid this way$/, "That creature gets -X/-X until end of turn");
+    if (anyEnergy && energyX !== energyUse && ctx.targets.length === 1) {
+      const before = ctx.targets.length;
+      const inner = parseOne(energyX, ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true }, text: `pay any amount of {E}. ${energyUse}` });
+      si++;
+      continue;
+    }
     // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
     const payLifeX = /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
     if (payLifeX) {
@@ -4377,6 +4418,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
+    // Mastermind Plum: "Exile up to one target card from a graveyard. If an artifact card was exiled this way, create a
+    // Treasure token": the target card, if it was chosen and still legal as this resolves (so exiled).
+    const ifCardExiled = /^If an? ((?:[a-z]+ )?[a-z]+) card was exiled this way, (.+)$/.exec(s);
+    if (ifCardExiled) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${ifCardExiled[1]!} card`);
+      if (!t || t.kind !== "card" || t.many || prev?.type !== "exile" || prev.what.ref !== "target" || prev.what.index !== i || prev.what.n || !filter) return null;
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(ifCardExiled[2]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
+      continue;
+    }
     // "Choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of
     // experience counters you have, return it to the battlefield. Otherwise, put it into your hand." (Meren of Clan Nel
     // Toth): compared as it resolves; with it lower, it can't go to the hand instead (rulings).
@@ -4415,6 +4471,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!amount || ctx.targets.length !== i + 1) return null;
       const filter: TargetSpec = { kind: t.kind, bound: { key, at: "most", amount }, text: `${atMost[2]} less than or equal to ${atMost[3]}` };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+      continue;
+    }
+    // Dreamdew Entrancer: "Tap up to one target creature and put three stun counters on it. If you control that creature,
+    // draw two cards.": the target as it is now, still legal (none chosen: false).
+    const ifYours = /^If you control (?:that creature|that permanent), (.+)$/.exec(s);
+    if (ifYours) {
+      const i = ctx.lastObjectTarget;
+      const t = i !== undefined ? ctx.targets[i] : undefined;
+      const prev = effects[effects.length - 1];
+      if (i === undefined || t?.kind !== "object" || t.many || t.controller || !prev || !mentionsTarget(prev, i)) return null;
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(ifYours[1]!), ctx);
+      if (!fx || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "you control" } }, effects: fx });
       continue;
     }
     // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can
@@ -4468,6 +4538,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const each = moves.map((e, i) => (e.type === "bounce" || e.type === "putInLibrary") && e.what.ref === "target" && e.what.index === i && !e.what.n);
       if (last?.type !== "exileSpell" || !moves.length || each.includes(false) || ctx.targets.length !== moves.length || ctx.targets.some((x) => x.kind !== "card" || x.owner !== "you")) return null;
       effects.splice(0, effects.length, { type: "if", cond: howCast.cond, effects: [...moves.map((_, i): Effect => ({ type: "bounce", what: { ref: "target", index: i } })), { type: "exileSpell" }], otherwise: effects.slice() });
+      continue;
+    }
+    // See the Truth: "Look at the top three cards of your library. Put one of those cards into your hand and the rest on the
+    // bottom ... If ~ was cast from anywhere other than your hand, put each of those cards into your hand instead."
+    const seeDig = effects[effects.length - 1];
+    if (howCast && !howCast.not && howCast.text === "put each of those cards into your hand instead" && seeDig?.type === "dig" && seeDig.into === "hand" && !seeDig.filter && !seeDig.upTo && typeof seeDig.n === "number" && effects.length - 1 === prevStart) {
+      effects[effects.length - 1] = { type: "if", cond: howCast.cond, effects: [{ ...seeDig, count: seeDig.n }], otherwise: [seeDig] };
       continue;
     }
     // "Return target creature card from your graveyard to the battlefield. If {G} was spent to cast ~, that creature enters
@@ -6747,6 +6824,8 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
   { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast from your hand", cond: { kind: "castFromGraveyard", hand: true }, spellOnly: true, noTargets: true },
+  // See the Truth: a copy wasn't cast at all (CR 707.10), so it isn't the same as "if ~ wasn't cast from your hand".
+  { re: "~ was cast from anywhere other than your hand", cond: { kind: "castFromGraveyard", notHand: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Its targets are chosen whenever it's cast; they're only not acted on (Return to Dust rulings).
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, ungated: true },

@@ -73,7 +73,7 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
   const v0 = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
-  const n = a.signed ? v : Math.max(0, a.half ? halve(v, a.half) : v);
+  const n = a.signed ? v : Math.max(0, a.half ? (a.third ? (a.half === "up" ? Math.ceil(v / 3) : Math.floor(v / 3)) : halve(v, a.half)) : v);
   return a.negate ? -n : n;
 }
 
@@ -179,10 +179,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
+        else if (c.differentManaValues) names.add(String(o.faceDown ? 0 : defMv(defOf(s, o))));
         else if (!c.differentNames) n++;
         else if (ch.name && !o.faceDown) names.add(ch.name);
       }
-      return c.differentNames ? names.size : n;
+      return c.differentNames || c.differentManaValues ? names.size : n;
     }
     case "mostSharingCreatureType": {
       // White Lotus Tile: for each creature type, how many creatures you control have it; a changeling has every one
@@ -267,6 +268,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "returnedToYourHand":
+      return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "exiledTopManaValue":
@@ -379,6 +382,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
+    case "colorsOf": {
+      const o = refObjects(s, c.of, ctx)[0];
+      if (!o) return 0;
+      if (o.zone === "battlefield") return characteristics(s, o).colors.length;
+      // It left the battlefield on its last move (destroyed by an earlier part of this effect): as it last existed there.
+      const lk = s.lastKnown?.[o.id];
+      return lk && lk.zc === (o.zoneChanges ?? 0) - 1 ? (lk.source?.colors.length ?? 0) : characteristics(s, o).colors.length;
+    }
     case "castSpellColors": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
@@ -614,7 +625,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
-      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
     }
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
@@ -682,7 +693,7 @@ export function describeAmount(a: Amount): string {
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
-  const v1 = a.half ? `half ${v0}, rounded ${a.half}` : v0;
+  const v1 = a.half ? `${a.third ? "a third of" : "half"} ${v0}, rounded ${a.half}` : v0;
   const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
   return a.negate ? `-(${v})` : v;
 }
@@ -692,7 +703,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}`;
     case "cardsInHand":
       return "#cards in hand";
     case "timesAffectedAttacked":
@@ -715,6 +726,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "returnedToYourHand":
+      return "#cards returned to your hand";
     case "milledManaValue":
       return "the total mana value of the milled cards";
     case "exiledTopMatching":
@@ -840,7 +853,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn`;
+      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":
@@ -859,6 +872,8 @@ function describeCount(c: Count): string {
       return "colors of mana spent";
     case "castSpellColors":
       return "that spell's colors";
+    case "colorsOf":
+      return "its colors";
     case "castSpellCommanderCasts":
       return "times it's been cast from the command zone";
     case "manaSpent":

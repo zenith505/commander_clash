@@ -140,6 +140,6 @@ export const lethalDamage = (s: GameState, o: GameObject) => Math.max(0, toughne
 export function estimate(a: Amount, x = 0): number {
   if (typeof a === "number") return a;
   const v = (a.count.kind === "x" ? x : 2) * (a.times ?? 1) + (a.plus ?? 0);
-  const n = Math.max(0, a.half ? halve(v, a.half) : v);
+  const n = Math.max(0, a.half ? (a.third ? Math.ceil(v / 3) : halve(v, a.half)) : v);
   return a.negate ? -n : n;
 }

@@ -389,6 +389,14 @@ function conditionalAbility(d: CardDef, text: string, out: CompiledCard, cond: S
   const inner = compile({ ...d, oracleText: text });
   const base = compile({ ...d, oracleText: "" });
   if (inner.unsupported.length) return false;
+  // Racers' Scoreboard: "Max speed — Spells you cast cost {1} less to cast": one cost change, only while it holds.
+  const [mod, ...mods] = inner.costMods ?? [];
+  if (mod && !mods.length && !base.costMods && !mod.if) {
+    const { costMods: _, ...plain } = inner;
+    if (JSON.stringify(plain) !== JSON.stringify(base)) return false;
+    (out.costMods ??= []).push({ ...mod, if: cond });
+    return true;
+  }
   const lists = ["triggers", "activated", "mana", "statics"] as const;
   const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k)).sort(([a], [b]) => a.localeCompare(b)));
   if (rest(inner) !== rest(base) || lists.some((k) => base[k].length)) return false;
@@ -525,6 +533,14 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // Poisonous N given to other creatures ("All Sliver creatures have poisonous 1", Virulent Sliver; "Enchanted creature
+    // has poisonous 3"): "Whenever this creature deals combat damage to a player, that player gets N poison counters"
+    // (CR 702.70a), one ability for each instance (702.70b).
+    const poisonous = /^(All [A-Z][a-z]+ creatures have|Enchanted creature has) poisonous (\d+)\.$/.exec(line);
+    if (poisonous) {
+      const n = Number(poisonous[2]);
+      line = `${poisonous[1]} "Whenever this creature deals combat damage to a player, that player gets ${n === 1 ? "a poison counter" : `${n} poison counters`}."`;
+    }
     // "~ can't be copied." (See Double): copy effects make no copy of this spell (CR 707.10).
     if (isSpell && line === "~ can't be copied.") {
       uncopyableSpell = true;
@@ -964,12 +980,23 @@ export function compile(d: CardDef): CompiledCard {
     // in the plural. "This creature enters with an additional +1/+1 counter on it": a replacement effect on itself
     // entering (CR 614.1c), which applies as it would exist on the battlefield (CR 614.12, rulings on Master Chef).
     // Kalain, Reclusive Painter: "... for each mana from a Treasure spent to cast them" (see perSpentFrom).
-    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them)?\\.$`).exec(line);
+    // Gev, Scaled Scorch: "... for each opponent who lost life this turn": counted as each one would enter.
+    // Curator Beastie: "Colorless creatures you control enter with two additional +1/+1 counters on them": without
+    // "other", only where this permanent couldn't be one of them (as for "each other ..." above).
+    const pluralAll = new RegExp(`^(?!Other )([A-Z][a-z]+ creatures you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them\\.$`).exec(line);
+    const othersPlural = pluralAll ? ([pluralAll[0], pluralAll[1], pluralAll[2], pluralAll[3], undefined, undefined] as unknown as RegExpExecArray) : new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them| for each (opponent who lost life this turn))?\\.$`).exec(line);
     if (othersPlural) {
-      const g = parseGroup(`each ${othersPlural[1]!.replace(/s you control$/, " you control")}`);
-      const spentFrom = othersPlural[4] ? (/Treasure/.test(othersPlural[4]) ? "treasure" : "artifact") : undefined;
-      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
-      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), text: line });
+      const g = parseGroup(`each ${(pluralAll ? othersPlural[1]!.toLowerCase() : othersPlural[1]!).replace(/s you control$/, " you control")}`);
+      const f = g?.filter.kind === "object" ? g.filter : undefined;
+      const selfMatches = !f || f.colorCount === "colorless" ? !d.colors.length : !f.colors?.length || f.colors.some((c) => d.colors.includes(c as never));
+      if (pluralAll && (!f || f.types?.length !== 1 || f.types[0] !== "Creature" || f.subtypes?.length || (f.colorCount !== "colorless" && !f.colors?.length) || (f.colorCount !== undefined && f.colorCount !== "colorless") || (d.types.includes("Creature") && selfMatches))) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      const spentFrom = othersPlural[4] && !othersPlural[5] ? (/Treasure/.test(othersPlural[4]) ? "treasure" : "artifact") : undefined;
+      const per = othersPlural[5] ? parseCount(othersPlural[5], null, true) : undefined;
+      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || per === null) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), ...(per ? { per } : {}), text: line });
       continue;
     }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
@@ -2560,6 +2587,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantSearchOwn = true;
       continue;
     }
+    if (line === "Your opponents can't search libraries.") {
+      out.opponentsCantSearch = true;
+      continue;
+    }
     if (line === "You control your opponents while they're searching their libraries.") {
       out.controlsOpponentSearches = true;
       continue;
@@ -2699,7 +2730,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.
-    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped(?: and)?)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
       // "~ enters tapped with three stun counters on it." "... if you attacked this turn" (raid), "... if a creature

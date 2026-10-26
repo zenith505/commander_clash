@@ -779,10 +779,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "Each player may search": a player who declines doesn't search, or shuffle (rulings on Veteran Explorer).
       // Ashiok, Dream Render: a player its controller can't make search their own library doesn't; "you may search ... If
       // you do, shuffle", "then shuffle" after a "may": they can't choose to, so no shuffle either (rulings).
-      const barred = (pid: PlayerId) => pid === ctx.controller && libOf(pid) === player(s, pid) && searchBarred(s, pid);
+      // Stranglehold: a player it bars searches no library at all.
+      const barred = (pid: PlayerId) => (pid === ctx.controller && libOf(pid) === player(s, pid) && searchBarred(s, pid)) || cantSearch(s, pid);
       while (e.may && queue.length && sc.may !== true) {
         if (sc.may === false || barred(queue[0]!)) {
-          if (sc.may !== false) log(s, `${player(s, queue[0]!).name} can't search their library.`);
+          if (sc.may !== false) log(s, `${player(s, queue[0]!).name} can't search ${libOf(queue[0]!) === player(s, queue[0]!) ? "their" : "that"} library.`);
           queue.shift();
           sc.may = undefined;
           continue;
@@ -793,7 +794,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // Without a "may": no search (nothing found), but the library is still shuffled if the effect says to (rulings).
       while (!e.orGraveyard && queue.length && barred(queue[0]!)) {
-        log(s, `${player(s, queue[0]!).name} can't search their library.`);
+        log(s, `${player(s, queue[0]!).name} can't search ${libOf(queue[0]!) === player(s, queue[0]!) ? "their" : "that"} library.`);
         searchedBy.push({ pid: queue.shift()!, found: [] });
       }
       if (queue.length) {
@@ -1452,6 +1453,14 @@ export function searchBarred(s: GameState, pid: PlayerId): boolean {
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && !!abilitiesOf(s, o).opponentsCantSearchOwn;
+  });
+}
+
+/** Stranglehold: an opponent's permanent keeps this player from searching any library. */
+export function cantSearch(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && !!abilitiesOf(s, o).opponentsCantSearch;
   });
 }
 

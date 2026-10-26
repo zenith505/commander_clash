@@ -55,6 +55,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+    } else if ((m = /^You may reveal (an? [A-Z][a-z]+ card), (an? [A-Z][a-z]+ card), and\/or (an? [A-Z][a-z]+ card) from among them and put them into your hand$/.exec(s))) {
+      // "You may reveal an Angel card, a Demon card, and/or a Dragon card from among them and put them into your hand"
+      // (Kaalia, Zenith Seeker): up to one of each, as Kiora's two above.
+      const specs = [m[1]!, m[2]!, m[3]!].map((w) => parseSearchFilter(w.replace(/^an? /, "")));
+      if (specs.some((f) => !f)) return null;
+      const anyOf = specs as NonNullable<(typeof specs)[number]>[];
+      Object.assign(dig, { count: 3, upTo: true, filter: { kind: "card", anyOf, text: `${m[1]}, ${m[2]}, and/or ${m[3]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
     } else if (/^For each card type, you may put a card of that type from among (?:them|the revealed cards) into your hand$/.test(s)) {
       // Atraxa, Grand Unifier: up to one card for each card type (CR 205.2a), a card with more than one type taken as any
       // one of them (rulings), as Kiora's "and/or" (oneOfEach).
@@ -65,6 +72,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 99, upTo: true, filter, into: "hand" }, restOf(m[2]!));
+    } else if (dig.reveal && (m = new RegExp(`^Put (an? .+? card) from among them into your hand(?: and the rest ${REST})?$`).exec(s))) {
+      // "Reveal the top six cards ... Put an Assassin, Pirate, or Vehicle card from among them into your hand and the rest
+      // on the bottom" (Adéwalé, Breaker of Chains): one that fits must be taken, if there's one (the cards are revealed).
+      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+      if (!filter || / of the chosen /.test(m[1]!)) return null;
+      Object.assign(dig, { count: 1, upTo: false, required: true, filter, into: "hand" });
+      if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if ((m = /^You may reveal any number of ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));

@@ -4586,6 +4586,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Barrin's Unmaking: "Return target permanent to its owner's hand if that permanent shares a color with the most common
+    // color among all permanents or a color tied for most common": as it resolves.
+    const mostCommon = /^(.+) if that (permanent|creature) shares a color with the most common color among all permanents or a color tied for most common$/.exec(s);
+    if (mostCommon) {
+      const fx = parseOne(mostCommon[1]!, ctx);
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (!fx || i !== curTargets || t?.kind !== "object" || t.optional || t.many || !fx.every((e) => mentionsTarget(e, i))) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", mostCommonColor: true, text: "shares a color with the most common color" } }, effects: fx });
+      continue;
+    }
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
       // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only

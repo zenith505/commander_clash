@@ -177,6 +177,8 @@ export interface Characteristics {
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
+  /** "Can't attack if defending player controls ..." (Mogg Jailer): what the defending player mustn't control. */
+  attackIfNot?: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -209,6 +211,10 @@ export interface Characteristics {
   attackAsThoughHaste: boolean;
   /** "Can attack players who attacked you during their last turn as though it didn't have defender" (Weathered Sentinels). */
   attackDespiteDefenderVs: boolean;
+  /** "Can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy). */
+  blocksLandwalkers: boolean;
+  /** "Can block creatures with shadow as though it had shadow" (Heartwood Dryad). */
+  blocksShadow: boolean;
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
   extraBlocks: number;
   blockAny: boolean;
@@ -301,6 +307,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackDespiteDefender: false,
     attackAsThoughHaste: false,
     attackDespiteDefenderVs: false,
+    blocksLandwalkers: false,
+    blocksShadow: false,
     extraBlocks: 0,
     blockAny: false,
   };
@@ -321,6 +329,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   ...(c.untargetable ? { untargetable: [...c.untargetable] } : {}),
   cantBlockCreatures: [...c.cantBlockCreatures],
   attackUnless: [...c.attackUnless],
+  ...(c.attackIfNot ? { attackIfNot: [...c.attackIfNot] } : {}),
   goadedBy: [...c.goadedBy],
   mustAttack: [...c.mustAttack],
 });
@@ -390,7 +399,7 @@ function gather(s: GameState): Inst[] {
   const out: Inst[] = [];
   let order = 0;
   for (const e of s.effects) {
-    const base = { timestamp: e.timestamp, sourceId: e.sourceId, sourceName: e.sourceName, untilEndOfTurn: e.duration === "endOfTurn", controller: e.controller };
+    const base = { timestamp: e.timestamp, sourceId: e.sourceId, sourceName: e.sourceName, untilEndOfTurn: e.duration === "endOfTurn" || e.duration === "endOfCombat", controller: e.controller };
     // "For as long as it has a vow counter on it": only those that still do.
     const fixed = e.group ? [] : e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected;
     const held = e.notGranted ? fixed.filter((id) => e.notGranted![id]) : [];
@@ -697,6 +706,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Breena: that opponent against each of your other opponents still in the game (rulings: the attacking player may be one).
       return eventPlayer !== undefined && !s.players[eventPlayer]!.lost && s.turnOrder.some((p) => p !== you && p !== eventPlayer && !s.players[p]!.lost && s.players[p]!.life < s.players[eventPlayer]!.life);
     case "eventPlayerMost":
+    case "youMost":
     case "opponentMore": {
       const measure = (p: PlayerId) => {
         if (cond.what === "life") return s.players[p]!.life;
@@ -709,6 +719,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         if (eventPlayer === undefined || s.players[eventPlayer]!.lost) return false;
         const theirs = measure(eventPlayer);
         return s.turnOrder.every((p) => p === eventPlayer || s.players[p]!.lost || measure(p) < theirs);
+      }
+      if (cond.kind === "youMost") {
+        const mine = measure(you);
+        return !s.players[you]!.lost && s.turnOrder.every((p) => p === you || s.players[p]!.lost || measure(p) < mine);
       }
       const mine = measure(you);
       if (cond.subjectController) {
@@ -911,6 +925,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const c = chars.get(sourceId);
       return !!c && objectMatches(s, cond.filter, src, you, false, undefined, c, (x) => chars.get(x.id));
     }
+    case "mostCommonColor":
+      return mostCommonColors(s, (id) => chars.get(id)).includes(cond.color);
     case "attachedIs": {
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);
@@ -966,6 +982,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "self": {
       if (cond.not) return !conditionMet(s, { kind: "self", is: cond.is }, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
       if (cond.is === "attacking") return src.attacking !== undefined;
+      if (cond.is === "blocking") return !!src.blocking?.length;
+      if (cond.is === "attackingOrBlocking") return src.attacking !== undefined || !!src.blocking?.length;
+      // Blocked: it stays blocked once blockers are declared for it, even if they all leave combat (CR 509.1h).
+      if (cond.is === "blocked") return src.attacking !== undefined && src.blockedBy !== undefined;
+      if (cond.is === "hasBlockers") return src.attacking !== undefined && !!src.blockedBy?.length;
+      // Rampaging Cyclops: blockers removed from combat no longer count (rulings).
+      if (cond.is === "twoOrMoreBlockers") return src.attacking !== undefined && (src.blockedBy?.length ?? 0) >= 2;
       // CR 506.5: "attacking alone" means it's attacking and no other creature is.
       if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
@@ -1355,6 +1378,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackUnless":
       c.attackUnless.push(m.defenderControls);
       return;
+    case "cantAttackIf":
+      (c.attackIfNot ??= []).push(m.defenderControls);
+      return;
     case "cantBeBlockedByLesserPower":
       if (m.than === "source") {
         if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
@@ -1390,6 +1416,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "attackDespiteDefender":
       if (m.vsAttackedYou) c.attackDespiteDefenderVs = true;
       else c.attackDespiteDefender = true;
+      return;
+    case "blockAsThough":
+      if (m.walk) c.blocksLandwalkers = true;
+      if (m.shadow) c.blocksShadow = true;
       return;
     case "assignsToughness":
       if (m.ifGreater) c.assignsToughnessIfGreater = true;
@@ -1771,4 +1801,15 @@ function commandersIdentity(s: GameState, pid: PlayerId | undefined): string[] |
   if (pid === undefined) return undefined;
   const cmds = Object.values(s.objects).filter((o) => o.isCommander && o.owner === pid);
   return cmds.length ? [...new Set(cmds.flatMap((o) => s.cards[o.cardId]?.colorIdentity ?? []))] : undefined;
+}
+
+/**
+ * The most common colors among all permanents, those tied included: each permanent counts once for each of its colors
+ * (Ruham Djinn, Heroic Defiance, Barrin's Unmaking). None while no permanent has a color.
+ */
+export function mostCommonColors(s: GameState, view: (id: ObjectId) => Characteristics | undefined = (id) => characteristics(s, s.objects[id]!)): Color[] {
+  const n: Partial<Record<Color, number>> = {};
+  for (const id of s.battlefield) for (const c of view(id)?.colors ?? []) n[c] = (n[c] ?? 0) + 1;
+  const most = Math.max(0, ...Object.values(n));
+  return most ? (Object.keys(n) as Color[]).filter((c) => n[c] === most) : [];
 }

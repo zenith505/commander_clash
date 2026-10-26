@@ -1222,7 +1222,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "subject" || to.ref === "allCreatures" || to.ref === "each" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

@@ -14,6 +14,7 @@ import { controllerOf, staticConditionNow } from "../layers";
  */
 export function doesNothingNow(s: GameState, sourceId: ObjectId, body: AbilityBody): boolean {
   const o = s.objects[sourceId];
+  if (body.inert) return true;
   if (!o || body.modal || body.targets.length || !body.effects.length) return false;
   return body.effects.every(
     (e) =>

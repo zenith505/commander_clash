@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, isLandwalk, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -23,6 +23,7 @@ import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
+import { draftLine } from "./draft";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -533,6 +534,18 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // Conspiracy's draft-matters lines (CR 905.2) in a game no draft came before (oracle/draft.ts).
+    const drafted = draftLine(line);
+    if (drafted === null) continue;
+    if (typeof drafted === "string") line = drafted;
+    else if (drafted) {
+      // An ability that does nothing: its cost or trigger event as the card says, with no effect.
+      const ab = drafted.kind === "activated" ? parseActivated(`${drafted.cost}: Draw a card.`) : parseTrigger(`${drafted.when}, draw a card.`);
+      if (!ab || ab === "fail") out.unsupported.push(raw);
+      else if (drafted.kind === "activated") out.activated.push(bindThisAbility({ ...(ab as ActivatedAbility), body: { targets: [], effects: [], text: line, inert: true } }, line));
+      else out.triggers.push(bindThisAbility({ ...(ab as TriggeredAbility), body: { targets: [], effects: [], text: line, inert: true } }, line));
+      continue;
+    }
     // Adaptive Training Post: "Whenever you cast ..., if ~ has fewer than three charge counters on it, put a charge counter
     // on it": "it" is ~ both times, not the spell.
     line = line.replace(/^(Whenever you cast [^,]+, if ~ has [^,]+ counters on it, put an? [^ ,]+ counter on) it\.$/, "$1 ~.");
@@ -2577,6 +2590,12 @@ export function compile(d: CardDef): CompiledCard {
     // Lavinia, Azorius Renegade: X as chosen (rulings), the lands that player controls as they cast it (CR 601.3).
     if (line === "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls.") {
       out.opponentsNoncreatureMvAboveLands = true;
+      continue;
+    }
+    // Undertow, Staff of the Ages (CompiledCard.walkBlockable).
+    const walkable = /^Creatures with (\w+walk|landwalk abilities) can be blocked as though they didn't have (\w+walk|those abilities)\.$/.exec(line);
+    if (walkable && (walkable[1] === walkable[2] || (walkable[1] === "landwalk abilities" && walkable[2] === "those abilities")) && (walkable[1] === "landwalk abilities" || isLandwalk(capital(walkable[1]!)))) {
+      (out.walkBlockable ??= []).push(walkable[1] === "landwalk abilities" ? "*" : capital(walkable[1]!));
       continue;
     }
     if (line === "Your opponents can't block with creatures with even mana values.") {

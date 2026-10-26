@@ -723,7 +723,10 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
   // "Dragon creatures get +1/+1 until end of turn" (Bladewing the Risen): every creature of those types, whoever controls it.
   const typed = /^(?:[A-Z][a-z]+ )+creatures$/.test(p) && p.split(" ").slice(0, -1).every((w) => CREATURE_TYPES.has(w));
-  if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed) return null;
+  // "White creatures get +2/+0 until end of turn" (Valorous Charge), "green creatures get -1/-1" (Rank and File): every
+  // creature of that color, whoever controls it.
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green) creatures$/i.test(p);
+  if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
@@ -793,6 +796,13 @@ export function parseTargetPhrase(
     target?: true;
   } = {},
 ): TargetSpec | null {
+  // Regicide: "creature that's one or more of the colors chosen as you drafted cards named ~": no colors were chosen
+  // without a draft, so nothing fits (TargetSpec.drafted, oracle/draft.ts).
+  const drafted = /^(.+?) that's one or more of the colors chosen as you drafted cards named ~$/.exec(phrase);
+  if (drafted) {
+    const head = parseTargetPhrase(drafted[1]!, opts);
+    return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
@@ -915,6 +925,13 @@ export function parseTargetPhrase(
   if (blocked) {
     extra.blockedBySource = true;
     p = p.slice(0, blocked.index);
+  }
+  // "Target creature blocking ~" (Master of Arms), "... blocking or blocked by ~" (Cromat), "it" being ~. Only a target:
+  // it's checked as targets are (lesserPowerOk), not in a group.
+  const blocking = opts.target ? / blocking( or blocked by)? (?:it|~)$/.exec(p) : null;
+  if (blocking) {
+    extra.blockingSource = blocking[1] ? "either" : "blocking";
+    p = p.slice(0, blocking.index);
   }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);

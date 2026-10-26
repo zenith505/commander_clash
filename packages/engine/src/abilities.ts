@@ -475,6 +475,17 @@ export interface TargetSpec {
    */
   bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /**
+   * Chosen or noted as you drafted cards (Conspiracy, CR 905.2b): "a card with a name you noted for cards named ~",
+   * "one or more of the colors chosen as you drafted cards named Regicide". No draft comes before a game here, so
+   * nothing was noted and nothing fits (rulings).
+   */
+  drafted?: true;
+  /**
+   * "Shares a color with the most common color among all permanents or a color tied for most common" (Barrin's Unmaking),
+   * or (false) doesn't (Heroic Defiance): see mostCommonColors.
+   */
+  mostCommonColor?: boolean;
+  /**
    * "With mana value less than or equal to the number of cards in its controller's graveyard" (Drown in the Loch): each
    * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
    */
@@ -512,6 +523,11 @@ export interface TargetSpec {
   saddledSource?: true;
   /** "Target creature it's blocking" (Tinder Wall): one the source is blocking, or was as it last existed (CR 608.2h). */
   blockedBySource?: true;
+  /**
+   * "Target creature blocking ~" (Master of Arms): one blocking the source; "either" adds "or blocked by ~" (Cromat). With
+   * the source sacrificed to pay the cost (Urborg Panther), as it last existed (CR 608.2h).
+   */
+  blockingSource?: "blocking" | "either";
   /**
    * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
@@ -1244,6 +1260,8 @@ export type Modification =
   | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
+  /** "Can't attack if defending player controls an untapped creature with power 2 or less" (Mogg Jailer, CR 508.1c). */
+  | { kind: "cantAttackIf"; defenderControls: TargetSpec }
   /**
    * "Creatures with power less than ~'s power can't block it" (CR 509.1b). `than: "source"`: less than the power of the
    * permanent with this ability, not the attacker's ("... can't block creatures you control", Champion of Lambholt).
@@ -1282,6 +1300,11 @@ export type Modification =
   | { kind: "assignsToughness"; ifGreater?: true }
   /** "Can attack as though it didn't have defender" (CR 702.3b). */
   | { kind: "attackDespiteDefender"; /** Only players who attacked you during their last turn (Weathered Sentinels). */ vsAttackedYou?: true }
+  /**
+   * "Can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy), "can block
+   * creatures with shadow as though it had shadow" (Heartwood Dryad): evasion it ignores as it blocks (CR 509.1b).
+   */
+  | { kind: "blockAsThough"; walk?: true; shadow?: true }
   /** "Enchanted creature can attack as though it had haste" (Instill Energy): it may attack while summoning sick (CR 302.6); its {T} abilities still can't be activated. */
   | { kind: "attackAsThoughHaste" }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
@@ -1402,7 +1425,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1428,6 +1451,8 @@ export type StaticCondition =
   | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand"; subjectController?: true; /** "That player" is the active player, an opponent (Keeper of the Accord). */ activePlayer?: true; /** "If defending player controls more lands than you" (Aerial Surveyor): the trigger's event player. */ eventPlayer?: true }
   /** "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's event player. */
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
+  /** "As long as you have more cards in hand than each opponent" (Okina Nightwatch): strictly more than each opponent still in the game. */
+  | { kind: "youMost"; what: "lands" | "creatures" | "life" | "hand" }
   /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
   /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
@@ -1562,6 +1587,8 @@ export type StaticCondition =
   | { kind: "life"; min?: number; max?: number; opponent?: true; /** "If each player has 10 or less life" (Cryptolith Fragment): every player still in the game. */ everyone?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
+  /** "As long as white is the most common color among all permanents or is tied for most common" (Ruham Djinn): see mostCommonColors. */
+  | { kind: "mostCommonColor"; color: Color }
   /** "As long as it's blocking or blocked by a Goblin or Orc" (Sting): the permanent this is attached to blocks one or is blocked by one. */
   | { kind: "attachedInCombatWith"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
@@ -2464,7 +2491,7 @@ export type Effect =
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -2885,7 +2912,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -3507,6 +3534,8 @@ export interface AbilityBody {
   text: string;
   /** "This ability still resolves if its target becomes illegal" (Gilded Drake): it isn't removed by CR 608.2b. */
   resolvesAnyway?: true;
+  /** Does nothing at all: a draft-matters ability with nothing noted in a draft (oracle/draft.ts), like Volatile Chimera's. */
+  inert?: true;
   /** "This ability can't be copied" (Gogo, Master of Mimicry), "~ can't be copied" (See Double): an effect that would copy it makes no copy. */
   uncopyable?: true;
   /**
@@ -5035,6 +5064,12 @@ export interface CompiledCard {
   opponentsNoncreatureMvAboveLands?: true;
   /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */
   opponentsCantBlockEven?: true;
+  /**
+   * "Creatures with islandwalk can be blocked as though they didn't have islandwalk" (Undertow), "creatures with landwalk
+   * abilities can be blocked as though they didn't have those abilities" (Staff of the Ages, "*"): any creature may block
+   * them as though they hadn't (CR 509.1b; rulings: it doesn't take the ability away).
+   */
+  walkBlockable?: string[];
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
   /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */

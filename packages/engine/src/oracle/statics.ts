@@ -87,6 +87,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const types = [m[2]!, ...(m[3] ? [m[3]] : [])];
     return { ...st, text: line, condition: { kind: "attachedInCombatWith", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: types, text: types.join(" or ") } } };
   }
+  // Heroic Defiance: "Enchanted creature gets +3/+3 unless it shares a color with the most common color among all
+  // permanents or a color tied for most common".
+  if ((m = /^(Enchanted creature gets [+-]\d+\/[+-]\d+) unless it shares a color with the most common color among all permanents or a color tied for most common$/.exec(text))) {
+    const st = parseStatic(`${m[1]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", mostCommonColor: false, text: "creature that doesn't share a color with the most common color" } } };
+  }
   // "As long as equipped creature is a Human, it gets an additional +1/+1": a second bonus, only for a Human.
   if ((m = /^As long as (enchanted|equipped) creature is an? ([A-Z][a-z]+), it (gets|has) (.+)$/.exec(text)) && CREATURE_TYPES.has(m[2]!)) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);
@@ -520,6 +527,8 @@ export function parseUntargetable(t: string): Untargetable | null {
 
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
+  // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
+  if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
@@ -706,6 +715,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // more than every other player still in the game (CR 800.4a), you included.
   if ((m = /^that player (?:controls more (lands|creatures)|has more (life|cards in hand)) than each other player$/.exec(text)))
     return { kind: "eventPlayerMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  // Okina Nightwatch: "you have more cards in hand than each opponent", strictly more than each opponent in the game.
+  if ((m = /^you (?:control more (lands|creatures)|have more (life|cards in hand)) than each opponent$/.exec(text)))
+    return { kind: "youMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
@@ -814,8 +826,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).
   if ((m = /^~ (is|isn't) prepared$/.exec(text))) return { kind: "self", is: "prepared", ...(m[1] === "isn't" ? { not: true as const } : {}) };
   // "It" is the source only when the ability is about the source itself.
-  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
-  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
+  if (/^at least one creature is blocking ~$/.test(text)) return { kind: "self", is: "hasBlockers" };
+  if (/^two or more creatures are blocking (?:~|it)$/.test(text)) return { kind: "self", is: "twoOrMoreBlockers" };
+  // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
+  const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
@@ -1124,7 +1139,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?)(?:,? and|, (?:has|have) (.+?),? and) (can block .+)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const grants = m[4] ? parseGrants(m[4]) : [];
-    const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
+    // "... and can block creatures with landwalk abilities as though they didn't have those abilities" (Street Savvy).
+    const asThough = /^can block creatures with .+ as though /.test(m[5]!) ? parseStaticMods(m[5]!)?.[0] : undefined;
+    const more = / this turn$/.test(m[5]!) ? null : (asThough ?? parseExtraBlocks(m[5]!));
     return first && grants && more ? [...first, ...grants, more] : null;
   }
   // Assault Suit: "gets +2/+2, has haste, can't attack you or planeswalkers you control, and can't be sacrificed".
@@ -1197,6 +1214,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
+  // Mogg Jailer, Orgg: "can't attack if defending player controls an untapped creature with power 2 or less", whether or
+  // not that creature could block (rulings).
+  if ((m = /^can't attack if defending player controls (an? .+)$/.exec(rest))) {
+    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackIf", defenderControls: { ...filter, text: m[1]! } }] : null;
+  }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
   if (/^can't be attacked$/.test(rest)) return [{ kind: "cantBeAttacked" }];
   // The Aetherspark: "can't be attacked and has "Whenever equipped creature ...""
@@ -1213,6 +1236,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = /^can't block creatures with power (\d+) or (greater|less)$/.exec(rest))) {
     const filter = parseTargetPhrase(`creature with power ${m[1]} or ${m[2]}`);
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
+  }
+  // "Can't block black creatures" (Gibbering Hyenas), "can't block artifact creatures", "can't block creatures with flying",
+  // "can't block white creatures with power 2 or greater" (Orcish Veteran): attackers it can't block (CR 509.1b).
+  if ((m = /^can't block ((?:[a-z]+ )*creatures(?: with .+)?)$/.exec(rest)) && !/\b(?:this turn|each combat|you control|your opponents control|alone)\b/.test(m[1]!)) {
+    const [head, ...more] = m[1]!.split(/ (?=with )/);
+    const filter = parseTargetPhrase([head!.split(" ").map(singular).join(" "), ...more].join(" "));
+    return filter?.kind === "object" && !filter.controller && (filter.types?.includes("Creature") || filter.allTypes?.includes("Creature")) ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
   // "Creatures with flying can't attack you or planeswalkers you control" (Sandwurm Convergence, CR 508.1c): "you" is the
@@ -1267,7 +1297,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".
-    const [head, ...rest] = m[1]!.split(/ (?=with )/);
+    // "Black and/or red creatures" (Sacred Knight): those that are either color, or both.
+    const [head, ...rest] = m[1]!.replace(/^(white|blue|black|red|green) and\/or (white|blue|black|red|green) /, "$1 or $2 ").split(/ (?=with )/);
     const phrase = [head!.split(" ").map(singular).join(" "), ...rest].join(" ");
     const filter = parseTargetPhrase(phrase);
     return filter && filter.kind === "object" ? [{ kind: "cantBeBlockedBy", filter: { ...filter, text: m[1]! } }] : null;
@@ -1296,10 +1327,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];
   if (/^can attack as though (?:it|they) didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender" }];
   if (/^can attack as though (?:it|they) had haste$/.test(rest)) return [{ kind: "attackAsThoughHaste" }];
+  if (/^can block creatures with landwalk abilities as though they didn't have those abilities$/.test(rest)) return [{ kind: "blockAsThough", walk: true }];
+  if (/^can block creatures with shadow as though (?:it|they) had shadow$/.test(rest)) return [{ kind: "blockAsThough", shadow: true }];
   if (/^can attack players who attacked you during their last turn as though it didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender", vsAttackedYou: true }];
   // "Gets +0/+2 and assigns combat damage equal to its toughness ..." (Gauntlets of Light), "assigns ... and can attack
   // as though it didn't have defender" (Arcades).
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|assigns? combat damage .+?) and (assigns? combat damage .+|can attack as though .+)$`).exec(rest))) {
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|assigns? combat damage .+?) and (assigns? combat damage .+|can attack as though .+|can block creatures with .+)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;

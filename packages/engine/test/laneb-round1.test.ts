@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { blockProblem, botActions, compileCard, doesNothingNow, isFullySupported, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { attackProblem, blockProblem, invalidateCharacteristics as invalidateAll, removeFromCombat, botActions, compileCard, doesNothingNow, isFullySupported, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -505,5 +505,183 @@ describe("Color groups, blocking restrictions by color, hybrid cumulative upkeep
     expect(compileCard(jadeStatue).activated[0]!.body.effects[0]).toMatchObject({ duration: "endOfCombat" });
     expect(s.objects[j]!.zone).toBe("battlefield");
     expect(planActivate(s, ap, j, 0)).toBeNull(); // only during combat
+  });
+});
+
+const megatherium = card("Megatherium", "Creature — Beast", "{2}{G}", {cmc: 3,power: "4",toughness: "4",keywords: ["Trample"],oracleText: "Trample\nWhen this creature enters, sacrifice it unless you pay {1} for each card in your hand."});
+const fettergeist = card("Fettergeist", "Creature — Spirit", "{2}{U}", {cmc: 3,power: "3",toughness: "4",keywords: ["Flying"],oracleText: "Flying\nAt the beginning of your upkeep, sacrifice this creature unless you pay {1} for each other creature you control."});
+const sphere = card("Phantasmal Sphere", "Creature — Illusion", "{1}{U}", {cmc: 2,power: "0",toughness: "1",keywords: ["Flying"],oracleText: "Flying\nAt the beginning of your upkeep, put a +1/+1 counter on this creature, then sacrifice this creature unless you pay {1} for each +1/+1 counter on it.\nWhen this creature leaves the battlefield, target opponent creates an X/X blue Orb creature token with flying, where X is the number of +1/+1 counters on this creature."});
+const raider = card("Saprazzan Raider", "Creature — Merfolk", "{2}{U}", {cmc: 3,power: "1",toughness: "2",oracleText: "When this creature becomes blocked, return it to its owner's hand."});
+const okina = card("Okina Nightwatch", "Creature — Human Monk", "{4}{G}", {cmc: 5,power: "4",toughness: "3",oracleText: "As long as you have more cards in hand than each opponent, this creature gets +3/+3."});
+const cyclops = card("Rampaging Cyclops", "Creature — Cyclops", "{3}{R}", {cmc: 4,power: "4",toughness: "4",oracleText: "This creature gets -2/-0 as long as two or more creatures are blocking it."});
+const masterOfArms = card("Master of Arms", "Creature — Human Soldier", "{2}{W}", {cmc: 3,power: "2",toughness: "2",keywords: ["First strike"],oracleText: "First strike\n{1}{W}: Tap target creature blocking this creature."});
+const cromat = card("Cromat", "Legendary Creature — Illusion", "{W}{U}{B}{R}{G}", {cmc: 5,power: "5",toughness: "5",keywords: ["Regenerate"],oracleText: "{W}{B}: Destroy target creature blocking or blocked by Cromat.\n{U}{R}: Cromat gains flying until end of turn.\n{B}{G}: Regenerate Cromat.\n{R}{W}: Cromat gets +1/+1 until end of turn.\n{G}{U}: Put Cromat on top of its owner's library."});
+const jailer = card("Mogg Jailer", "Creature — Goblin", "{1}{R}", {cmc: 2,power: "2",toughness: "2",oracleText: "This creature can't attack if defending player controls an untapped creature with power 2 or less."});
+const orgg = card("Orgg", "Creature — Orgg", "{3}{R}{R}", {cmc: 5,power: "6",toughness: "6",keywords: ["Trample"],oracleText: "Trample\nThis creature can't attack if defending player controls an untapped creature with power 3 or greater.\nThis creature can't block creatures with power 3 or greater."});
+const javelineer = card("Goblin Javelineer", "Creature — Goblin Warrior", "{R}", {cmc: 1,power: "1",toughness: "1",keywords: ["Haste"],oracleText: "Haste\nWhenever this creature becomes blocked, it deals 1 damage to target creature blocking it."});
+
+const toMay = (s: GameState) => {
+  for (let i = 0; i < 30 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  expect(s.pending?.kind).toBe("chooseMay");
+  return s;
+};
+/** The bot's answer: it pays to keep a permanent while the price is reasonable. */
+const botAnswer = (s: GameState, pid: PlayerId) => {
+  for (const a of botActions(s, pid)) s = act(s, a);
+  return s;
+};
+const payOf = (s: GameState) => (s.pending?.kind === "chooseMay" ? s.pending.pay?.mana : undefined);
+const bearOf = (n = 2) => card("Bear", "Creature — Bear", "{1}{G}", { power: String(n), toughness: "2" });
+
+describe("Pay {1} for each ... to keep ~, becomes blocked, hand size, creatures blocking ~, can't attack if", () => {
+  it("are fully supported", () => supported(megatherium, fettergeist, sphere, raider, okina, cyclops, masterOfArms, cromat, jailer, orgg, javelineer));
+
+  it("Megatherium: {1} for each card in your hand as the trigger resolves (CR 608.2h); not paying sacrifices it", () => {
+    let { s, ap, ids } = setup([megatherium]);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = toMay(s);
+    expect(payOf(s)).toBe(`{${s.players[ap]!.hand.length}}`);
+    expect(s.players[ap]!.hand.length).toBeGreaterThan(0);
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    s = resolveAll(s);
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+    // Paid, it stays.
+    let { s: t, ap: ap2, ids: ids2 } = setup([megatherium]);
+    t = toMay(run(t, planCast(t, ap2, ids2[0]!)));
+    t = resolveAll(botAnswer(t, ap2));
+    expect(zone(t, ids2[0]!)).toBe("battlefield");
+  });
+
+  it("Megatherium with no cards in hand: {0}, paid by doing nothing", () => {
+    let { s, ap, ids } = setup([megatherium]);
+    for (const id of s.players[ap]!.hand.filter((x) => x !== ids[0])) {
+      s.players[ap]!.hand.splice(s.players[ap]!.hand.indexOf(id), 1);
+      s.players[ap]!.library.push(id);
+      s.objects[id]!.zone = "library";
+    }
+    s = toMay(run(s, planCast(s, ap, ids[0]!)));
+    expect(payOf(s)).toBe("{0}");
+    s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("Fettergeist: {1} for each other creature you control; Phantasmal Sphere: a counter, then {1} for each counter on it", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const f = putOnBattlefield(s, ap, fettergeist);
+    putOnBattlefield(s, ap, bearOf());
+    putOnBattlefield(s, ap, bearOf());
+    putOnBattlefield(s, opp, bearOf());
+    const sp = putOnBattlefield(s, ap, sphere);
+    s.objects[sp]!.counters["+1/+1"] = 1;
+    s = toMay(passUntil(passUntil(s, "end", ap), "upkeep", ap));
+    const asked = [s.pending?.kind === "chooseMay" ? s.pending.source : "", payOf(s)];
+    s = toMay(botAnswer(s, ap));
+    asked.push(s.pending?.kind === "chooseMay" ? s.pending.source : "", payOf(s));
+    // Fettergeist counts the Bears and the Sphere: three; the Sphere has two counters by then.
+    expect(asked.sort()).toEqual(["Fettergeist", "Phantasmal Sphere", "{2}", "{3}"].sort());
+    s = resolveAll(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(zone(s, f) === "battlefield").not.toBe(zone(s, sp) === "battlefield");
+  });
+
+  it("Saprazzan Raider returns to its owner's hand when it becomes blocked", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const r = putOnBattlefield(s, ap, raider);
+    const blocker = putOnBattlefield(s, opp, bearOf());
+    s = toBlocks(s, ap, [{ attacker: r, defender: opp }]);
+    s = resolveAll(act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: r }] }));
+    expect(zone(s, r)).toBe("hand");
+  });
+
+  it("Okina Nightwatch gets +3/+3 only with strictly more cards in hand than each opponent", () => {
+    const { s, ap } = setup([]);
+    const o = putOnBattlefield(s, ap, okina);
+    const most = Math.max(...s.turnOrder.filter((p) => p !== ap).map((p) => s.players[p]!.hand.length));
+    while (s.players[ap]!.hand.length > most) s.players[ap]!.hand.pop();
+    while (s.players[ap]!.hand.length < most) s.players[ap]!.hand.push(s.players[ap]!.library.pop()!);
+    invalidateAll(s);
+    expect(pt(s, o)).toBe("4/3");
+    s.players[ap]!.hand.push(s.players[ap]!.library.pop()!);
+    invalidateAll(s);
+    expect(pt(s, o)).toBe("7/6");
+  });
+
+  it("Rampaging Cyclops gets -2/-0 while two or more creatures are blocking it, not once one is removed (rulings)", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const c = putOnBattlefield(s, ap, cyclops);
+    const b1 = putOnBattlefield(s, opp, bearOf());
+    const b2 = putOnBattlefield(s, opp, bearOf());
+    s = toBlocks(s, ap, [{ attacker: c, defender: opp }]);
+    expect(pt(s, c)).toBe("4/4");
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: b1, attacker: c }, { blocker: b2, attacker: c }] });
+    expect(pt(s, c)).toBe("2/4");
+    removeFromCombat(s, s.objects[b2]!);
+    invalidateAll(s);
+    expect(pt(s, c)).toBe("4/4");
+  });
+
+  it("Master of Arms taps a creature blocking it, not one blocking another attacker", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const m = putOnBattlefield(s, ap, masterOfArms);
+    const other = putOnBattlefield(s, ap, bearOf());
+    const b1 = putOnBattlefield(s, opp, bearOf());
+    const b2 = putOnBattlefield(s, opp, bearOf());
+    s = toBlocks(s, ap, [{ attacker: m, defender: opp }, { attacker: other, defender: opp }]);
+    expect(planActivate(s, ap, m, 0, [tgt(b1)])).toBeNull();
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: b1, attacker: m }, { blocker: b2, attacker: other }] });
+    expect(planActivate(s, ap, m, 0, [tgt(b2)])).toBeNull();
+    s = resolveAll(run(s, planActivate(s, ap, m, 0, [tgt(b1)])));
+    expect(s.objects[b1]!.tapped).toBe(true);
+    // Still blocking (rulings).
+    expect(s.objects[m]!.blockedBy).toEqual([b1]);
+  });
+
+  it("Cromat destroys a creature it blocks", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const att = putOnBattlefield(s, opp, bearOf());
+    const other = putOnBattlefield(s, opp, bearOf());
+    const c = putOnBattlefield(s, ap, cromat);
+    s = toBlocks(s, opp, [{ attacker: att, defender: ap }, { attacker: other, defender: ap }]);
+    s = act(s, { type: "declareBlockers", player: ap, blocks: [{ blocker: c, attacker: att }] });
+    while (waitingOn(s) !== ap) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(planActivate(s, ap, c, 0, [tgt(other)])).toBeNull();
+    s = resolveAll(run(s, planActivate(s, ap, c, 0, [tgt(att)])));
+    expect(zone(s, att)).toBe("graveyard");
+  });
+
+  it("Goblin Javelineer deals 1 damage to a creature blocking it", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const j = putOnBattlefield(s, ap, javelineer);
+    const blocker = putOnBattlefield(s, opp, card("Wall", "Creature — Wall", "{1}", { power: "0", toughness: "4" }));
+    s = toBlocks(s, ap, [{ attacker: j, defender: opp }]);
+    const idle = putOnBattlefield(s, opp, bearOf());
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: j }] });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(idle)] })).toThrow();
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(blocker)] }));
+    expect(s.objects[blocker]!.damage).toBe(1);
+  });
+
+  it("Mogg Jailer can't attack a player with an untapped creature with power 2 or less; Orgg one with power 3 or greater", () => {
+    const { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const third = next(s, opp);
+    const j = putOnBattlefield(s, ap, jailer);
+    const o = putOnBattlefield(s, ap, orgg);
+    const small = putOnBattlefield(s, opp, bearOf(2));
+    putOnBattlefield(s, third, bearOf(3));
+    expect(attackProblem(s, s.objects[j]!, opp)).not.toBeNull();
+    expect(attackProblem(s, s.objects[j]!, third)).toBeNull();
+    expect(attackProblem(s, s.objects[o]!, third)).not.toBeNull();
+    expect(attackProblem(s, s.objects[o]!, opp)).toBeNull();
+    // Tapped, it doesn't count.
+    s.objects[small]!.tapped = true;
+    invalidateAll(s);
+    expect(attackProblem(s, s.objects[j]!, opp)).toBeNull();
   });
 });

@@ -474,6 +474,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Uro: "When ~ enters, sacrifice it unless it escaped" (CR 702.138b): whether it escaped can't change.
   if (/^[Ss]acrifice (?:~|it) unless (?:it|~) escaped$/.test(s) && ctx.selfIt && ctx.lastObjectTarget === undefined)
     return [{ type: "if", cond: { kind: "state", cond: { kind: "self", is: "escaped" } }, effects: [], otherwise: [sacrificeSelf] }];
+  // Megatherium, Extravagant Spirit, Fettergeist, Phantasmal Sphere: "sacrifice ~ unless you pay {1} for each card in your hand", the
+  // number counted as it resolves (CR 608.2h).
+  if ((m = /^(?:[Tt]hen )?[Ss]acrifice (~|it) unless you pay (\{\d+\}) for each (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    // Phantasmal Sphere: "for each +1/+1 counter on it", on ~.
+    const n = parseCount(m[3]!.replace(/ on it$/, " on ~"), ctx, true);
+    if (!n) return null;
+    return [{ type: "may", effects: [], pay: { mana: m[2]! }, payTimes: n, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} for each ${m[3]} to keep ~` }];
+  }
   // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const pay = parsePayCost(m[2]!);

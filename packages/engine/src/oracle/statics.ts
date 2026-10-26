@@ -708,6 +708,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // more than every other player still in the game (CR 800.4a), you included.
   if ((m = /^that player (?:controls more (lands|creatures)|has more (life|cards in hand)) than each other player$/.exec(text)))
     return { kind: "eventPlayerMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  // Okina Nightwatch: "you have more cards in hand than each opponent", strictly more than each opponent in the game.
+  if ((m = /^you (?:control more (lands|creatures)|have more (life|cards in hand)) than each opponent$/.exec(text)))
+    return { kind: "youMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
@@ -815,6 +818,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^~ (is|isn't) prepared$/.exec(text))) return { kind: "self", is: "prepared", ...(m[1] === "isn't" ? { not: true as const } : {}) };
   // "It" is the source only when the ability is about the source itself.
   if (/^at least one creature is blocking ~$/.test(text)) return { kind: "self", is: "hasBlockers" };
+  if (/^two or more creatures are blocking (?:~|it)$/.test(text)) return { kind: "self", is: "twoOrMoreBlockers" };
   // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
   const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
@@ -1200,6 +1204,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = /^can't attack unless defending player controls (an? .+)$/.exec(rest))) {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
+  }
+  // Mogg Jailer, Orgg: "can't attack if defending player controls an untapped creature with power 2 or less", whether or
+  // not that creature could block (rulings).
+  if ((m = /^can't attack if defending player controls (an? .+)$/.exec(rest))) {
+    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackIf", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
   if (/^can't be attacked$/.test(rest)) return [{ kind: "cantBeAttacked" }];

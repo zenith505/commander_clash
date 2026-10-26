@@ -177,6 +177,8 @@ export interface Characteristics {
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
+  /** "Can't attack if defending player controls ..." (Mogg Jailer): what the defending player mustn't control. */
+  attackIfNot?: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -327,6 +329,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   ...(c.untargetable ? { untargetable: [...c.untargetable] } : {}),
   cantBlockCreatures: [...c.cantBlockCreatures],
   attackUnless: [...c.attackUnless],
+  ...(c.attackIfNot ? { attackIfNot: [...c.attackIfNot] } : {}),
   goadedBy: [...c.goadedBy],
   mustAttack: [...c.mustAttack],
 });
@@ -703,6 +706,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Breena: that opponent against each of your other opponents still in the game (rulings: the attacking player may be one).
       return eventPlayer !== undefined && !s.players[eventPlayer]!.lost && s.turnOrder.some((p) => p !== you && p !== eventPlayer && !s.players[p]!.lost && s.players[p]!.life < s.players[eventPlayer]!.life);
     case "eventPlayerMost":
+    case "youMost":
     case "opponentMore": {
       const measure = (p: PlayerId) => {
         if (cond.what === "life") return s.players[p]!.life;
@@ -715,6 +719,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         if (eventPlayer === undefined || s.players[eventPlayer]!.lost) return false;
         const theirs = measure(eventPlayer);
         return s.turnOrder.every((p) => p === eventPlayer || s.players[p]!.lost || measure(p) < theirs);
+      }
+      if (cond.kind === "youMost") {
+        const mine = measure(you);
+        return !s.players[you]!.lost && s.turnOrder.every((p) => p === you || s.players[p]!.lost || measure(p) < mine);
       }
       const mine = measure(you);
       if (cond.subjectController) {
@@ -967,6 +975,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Blocked: it stays blocked once blockers are declared for it, even if they all leave combat (CR 509.1h).
       if (cond.is === "blocked") return src.attacking !== undefined && src.blockedBy !== undefined;
       if (cond.is === "hasBlockers") return src.attacking !== undefined && !!src.blockedBy?.length;
+      // Rampaging Cyclops: blockers removed from combat no longer count (rulings).
+      if (cond.is === "twoOrMoreBlockers") return src.attacking !== undefined && (src.blockedBy?.length ?? 0) >= 2;
       // CR 506.5: "attacking alone" means it's attacking and no other creature is.
       if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
@@ -1355,6 +1365,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantAttackUnless":
       c.attackUnless.push(m.defenderControls);
+      return;
+    case "cantAttackIf":
+      (c.attackIfNot ??= []).push(m.defenderControls);
       return;
     case "cantBeBlockedByLesserPower":
       if (m.than === "source") {

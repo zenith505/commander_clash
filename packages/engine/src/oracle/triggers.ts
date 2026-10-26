@@ -64,7 +64,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever a land (?:you control enters|enters the battlefield under your control), (.+)$/, "landYouControlEnters"],
   // Blocking (CR 509.3). The "a creature" forms are matched first, by parseBlockTrigger.
   [/^Whenever ~ blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked"],
-  [/^Whenever ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
+  [/^When(?:ever)? ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
   [/^Whenever ~ attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked"],
   // "Whenever ~ attacks a player and isn't blocked" (Master of Cruelties): not a planeswalker or battle (rulings); "that
   // player" is the defending player. See TriggeredAbility.attacksPlayer.

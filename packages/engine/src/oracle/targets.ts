@@ -924,6 +924,13 @@ export function parseTargetPhrase(
     extra.blockedBySource = true;
     p = p.slice(0, blocked.index);
   }
+  // "Target creature blocking ~" (Master of Arms), "... blocking or blocked by ~" (Cromat), "it" being ~. Only a target:
+  // it's checked as targets are (lesserPowerOk), not in a group.
+  const blocking = opts.target ? / blocking( or blocked by)? (?:it|~)$/.exec(p) : null;
+  if (blocking) {
+    extra.blockingSource = blocking[1] ? "either" : "blocking";
+    p = p.slice(0, blocking.index);
+  }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);
   if (entered) {

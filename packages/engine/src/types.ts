@@ -1958,6 +1958,8 @@ export interface Resolving {
   revealedFromHand?: number;
   /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
   parley?: { land: number; nonland: number };
+  /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
+  revealedUntilMv?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
   /** "The damage dealt this way": all of it, so far in this resolution. */

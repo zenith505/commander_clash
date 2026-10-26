@@ -508,14 +508,19 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
   // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
   // "Whenever you cast your first spell during each opponent's turn" (Wavebreak Hippocamp): the first you cast in that turn.
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
+  // Nev, the Practical Dean: "your first spell with {X} in its mana cost each turn": the first of those (TargetSpec.xInCost),
+  // and "X" in what it does is the X that spell was cast with (CR 107.3a).
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
-    const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
+    const kind = parsed && { ...parsed, ...(nth[4] ? { xInCost: true as const } : {}), text: `${nth[3] ? `${nth[3]} spell` : "spell"}${nth[4] ?? ""}` };
     if (kind?.kind !== "spell") return "fail";
-    if ((nth[4] === "during their turn" && nth[1] === "you") || (nth[4] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
-    const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}), ...(nth[4] === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
+    if ((nth[5] === "during their turn" && nth[1] === "you") || (nth[5] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
+    const spellX = !!nth[4] && /\bX\b/.test(nth[6]!) && !/\bwhere X is\b/.test(nth[6]!);
+    const body0 = parseBody(nth[6]!, { castSpell: true, eventPlayer: true, ...(spellX ? { ownX: true } : {}) });
+    const body = body0 && spellX ? { ...replaceX(body0, { count: { kind: "castSpellX" } }), text: body0.text } : body0;
+    const nth4 = nth[5];
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
   // Alania, Divergent Storm: "Whenever you cast a spell, if it's the first instant spell, the first sorcery spell, or the
   // first Otter spell other than ~ you've cast this turn, ...": one trigger if it's the first of any of those kinds (an
@@ -639,8 +644,12 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     // Read as the subject, whatever it is now (rulings: as it last existed, if it left).
     text = text.replaceAll(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`, "that creature");
   }
-  let body = parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}) });
+  // "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean, Zaxara):
+  // the X that spell was cast with (CR 107.3a), not one of this ability's own.
+  const spellX = !!xM && !thatMuch && !short && /\bX\b/.test(text) && !/\bwhere X is\b/.test(text);
+  let body = parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}), ...(spellX ? { ownX: true } : {}) });
   if (!body) return "fail";
+  if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
   return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
@@ -2736,6 +2745,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
       // Body Launderer: "When ~ dies, return another target non-Rogue creature card with equal or lesser power from your
       // graveyard": ~'s power as it last existed (rulings), fixed as the target is chosen (TargetSpec.bound).
+      // Unquenchable Fury, Zodiac Dragon: "When ~ is put into your graveyard from the battlefield, (you may) return it to your
+      // hand": the card, which only triggers this from its owner's graveyard (ownGraveyard below).
+      if (event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line)) text = text.replace(/^((?:you may )?)return it to your hand\.$/, "$1return ~ to its owner's hand.");
       const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
       if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });

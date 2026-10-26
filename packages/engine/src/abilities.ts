@@ -96,6 +96,8 @@ export interface AmountExpr {
 export type Count =
   /** The X chosen while casting or activating it (CR 107.3a), or the spell's X for its permanent's ETB (CR 107.3m). */
   | { kind: "x" }
+  /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
+  | { kind: "castSpellX" }
   /** "Where X is the greatest power among creatures you controlled as you cast this spell" (Lifestream's Blessing): counted once, as it's cast (StackItem.asCast). */
   | { kind: "asCast"; of: Count }
   /**
@@ -1445,6 +1447,8 @@ export type StaticCondition =
   | { kind: "subjectAttackingYou" }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
   | { kind: "anyOf"; conds: StaticCondition[] }
+  /** "~ can't attack or block unless a player has no cards in hand" (Lupine Prototype): while `cond` is false. */
+  | { kind: "not"; cond: StaticCondition }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
   | { kind: "coven" }
   /**
@@ -2980,7 +2984,7 @@ export type Effect =
    * permanent a card put onto the battlefield became (Back for More); `target`, that target, and with `attached` only if
    * the token just created was attached to it (Curse of the Werefox). With no such object, it doesn't trigger (rulings).
    */
-  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "When you reveal a creature card this way, ..., where X is the mana value of that card" (Yuna's Whistle): only if the revealUntil before found a card (ResolvingState.revealedUntilMv), its X that card's mana value. */ xRevealedMv?: true; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */

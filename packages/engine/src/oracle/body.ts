@@ -4006,13 +4006,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
     // Hidden Blade: "Attach it to target creature you control. If that creature is an Assassin, it gains deathtouch ...".
-    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
+    // Karametra's Blessing: "If it's an enchanted creature or enchantment creature, ..." (TargetSpec.anyOf).
+    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+|enchanted creature or enchantment creature), (.+)$/.exec(s);
     if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (CREATURE_TYPES.has(ifIts[2]!) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       const prev = effects[effects.length - 1];
       const typed = parseTargetPhrase(ifIts[2]!);
-      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text", ...(/^[A-Z]/.test(ifIts[2]!) ? ["subtypes"] : [])].includes(k));
+      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text", ...(/^[A-Z]/.test(ifIts[2]!) ? ["subtypes"] : []), ...(/ or /.test(ifIts[2]!) ? ["anyOf"] : [])].includes(k));
       const types = typed?.kind === "object" ? [...(typed.types ?? []), ...(typed.allTypes ?? [])] : [];
       // Anything else is left to the readings below (Carbonize's "If it's a creature, it can't be regenerated ...").
       // "Up to one target ... loses all abilities until your next turn. If it's a creature, it also has base power and
@@ -4619,9 +4620,31 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
+    // Kabira Evangel: "you may choose a color. If you do, Allies you control gain protection from the chosen color until end
+    // of turn": both or neither, the color chosen as it resolves (CR 608.2d).
+    if (/^[Yy]ou may choose a color$/.test(s) && /^If you do, /.test(sentences[si + 1] ?? "")) {
+      const inner = parseOne(capital(sentences[si + 1]!.replace(/^If you do, /, "").replace(/\.$/, "")), ctx);
+      if (!inner || !/\bthe chosen color\b/.test(sentences[si + 1]!) || inner.some((x) => pauses(x))) return null;
+      effects.push({ type: "may", effects: [{ type: "choose", choice: "color" }, ...inner], text: "choose a color" });
+      si++;
+      continue;
+    }
+    // Yuna's Whistle: "Reveal cards ... until you reveal a creature card. Put that card into your hand ... When you reveal a
+    // creature card this way, put X +1/+1 counters on target creature you control, where X is the mana value of that
+    // card": a reflexive trigger (CR 603.12) only if one was found, its X that card's mana value.
+    const whenRevealed = /^When you reveal an? ([a-z]+ card) this way, (.+), where X is the mana value of that card$/.exec(s);
+    if (whenRevealed) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "revealUntil" || prev.n || prev.who || prev.filter.text !== whenRevealed[1] || si + 1 !== sentences.length || /\b(?:that|those|it)\b/.test(whenRevealed[2]!)) return null;
+      const reflexive = reflexiveBody(whenRevealed[2]!, ctx, false, false, true);
+      if (!reflexive) return null;
+      effects.push({ type: "reflexive", body: reflexive, xRevealedMv: true });
+      continue;
+    }
     // Mastermind Plum: "Exile up to one target card from a graveyard. If an artifact card was exiled this way, create a
     // Treasure token": the target card, if it was chosen and still legal as this resolves (so exiled).
-    const ifCardExiled = /^If an? ((?:[a-z]+ )?[a-z]+) card was exiled this way, (.+)$/.exec(s);
+    // Feral Appetite: "If a creature card is exiled this way, ..." too.
+    const ifCardExiled = /^If an? ((?:[a-z]+ )?[a-z]+) card (?:was|is) exiled this way, (.+)$/.exec(s);
     if (ifCardExiled) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
@@ -6159,6 +6182,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // card this turn." The permission is about the card chosen, so it depends on the discard too.
       const choosePlay = ifDid[1] === "do" && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top (${NUM}) cards of your library, then choose one of them$`).exec(ifDid[2]!) : null;
       if (choosePlay) si++;
+      // Redcap Gutter-Dweller: "If you do, put a +1/+1 counter on ~ and exile the top card of your library. You may play that
+      // card this turn." The exile and the permission both depend on it.
+      const andPlay = ifDid[1] === "do" && !choosePlay && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? /^(.+) and exile the top card of your library$/.exec(ifDid[2]!) : null;
+      if (andPlay) {
+        const first = parseOne(capital(andPlay[1]!), ctx);
+        if (!first || first.some((x) => pauses(x))) return null;
+        si++;
+        effects.push({ type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: [...first, { type: "impulse", n: 1, until: "thisTurn" }] });
+        if (sacIt) delete ctx.sacrificedIt;
+        if (!defineX()) return null;
+        continue;
+      }
       // The Master, Gallifrey's End: "If you do, choose an opponent with the most life among your opponents. That player
       // faces a villainous choice — ...": the choice and what that player does both depend on it.
       const chooseThat = ifDid[1] === "do" && !choosePlay && /^choose an opponent(?: with the most life among your opponents)?$/.test(ifDid[2]!) && /^That player /.test(sentences[si + 1] ?? "") && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined;
@@ -7313,6 +7348,15 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     return previous.length === 1 && prev?.type === "keepRest" ? { effects: [{ ...prev, youChoose: true }], instead } : null;
   }
+  // "Return target creature card from your graveyard to your hand. If this spell was kicked, instead put that card onto
+  // the battlefield tapped" (Zuko's Conviction): the same target card, onto the battlefield.
+  const putThat = instead ? /^Put that card onto the battlefield( tapped)?$/.exec(t) : null;
+  if (putThat) {
+    const prev = previous[0];
+    const spec = prev?.type === "bounce" && prev.what.ref === "target" ? ctx.targets[prev.what.index] : undefined;
+    if (previous.length !== 1 || prev?.type !== "bounce" || spec?.kind !== "card" || spec.many || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+    return { effects: [{ type: "putOntoBattlefield", what: prev.what, ...(putThat[1] ? { tapped: true } : {}) }], instead };
+  }
   t = t.replace(/^It deals /, "~ deals ");
   const before = ctx.targets.length;
   // "If you cast this spell during your main phase, instead scry 3, then draw three cards" (Precognitive Perception).
@@ -7446,6 +7490,20 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   }
   const fx = attempt(ctx, () => parsePutChoice(s, ctx)) ?? attempt(ctx, () => parseUnlessEntered(s, ctx)) ?? attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx)) ?? attempt(ctx, () => parseAndYouMay(s, ctx));
   if (fx) noteLast(ctx, fx);
+  // "Then you return up to two creature cards from your graveyard to your hand" (Unseal the Necropolis), "then you return
+  // a land card ..." (Witherbloom Command): after another player's instruction, "you" only says who does it.
+  const you = fx ? null : /^(Then )?[Yy]ou return (.+)$/.exec(s);
+  if (you) return parseOne(you[1] ? `Then return ${you[2]}` : `Return ${you[2]}`, ctx);
+  // Gandalf, Goblins' Bane: "~ gets +1/+1 until end of turn and deals 1 damage to each opponent": both, in order.
+  const getsDeals = fx ? null : /^(~ gets [^,]+? until end of turn) and (deals .+)$/.exec(s);
+  if (getsDeals) {
+    const first = parseOne(getsDeals[1]!, ctx);
+    const second = first && parseOne(`~ ${getsDeals[2]}`, ctx);
+    return first && second ? [...first, ...second] : null;
+  }
+  // "You may put a land card from your graveyard onto the battlefield tapped" (Wreck and Rebuild): the same as returning it.
+  const put = fx ? null : /^(You may p|P)ut (an? [a-z]+ card) from your graveyard onto the battlefield( tapped)?$/.exec(s);
+  if (put) return parseOne(`${put[1] === "P" ? "R" : "You may r"}eturn ${put[2]} from your graveyard to the battlefield${put[3] ?? ""}`, ctx);
   return fx;
 }
 
@@ -7624,7 +7682,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
-    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed)) return false;
+    if (o.type === "reflexive" && (o.xExcess || o.xSacrificed || o.xRevealedMv)) return false;
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;

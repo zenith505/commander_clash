@@ -398,6 +398,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const lk = s.lastKnown?.[o.id];
       return lk && lk.zc === (o.zoneChanges ?? 0) - 1 ? (lk.source?.colors.length ?? 0) : characteristics(s, o).colors.length;
     }
+    case "castSpellX": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      return item?.x ?? 0;
+    }
     case "castSpellColors": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
@@ -896,6 +900,8 @@ function describeCount(c: Count): string {
       return "mana spent";
     case "colorsSpent":
       return "colors of mana spent";
+    case "castSpellX":
+      return "that spell's X";
     case "castSpellColors":
       return "that spell's colors";
     case "colorsOf":

@@ -180,6 +180,12 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
+    // Afterlife N is one too (CR 702.135a), each instance on its own (702.135b): "Enchanted creature gets +1/+1 and has
+    // afterlife 1" (Indebted Spirit). The creature had it as it last existed, with the Aura still attached (CR 603.10a).
+    if (/^afterlife \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Afterlife ${/\d+/.exec(w)![0]}` });
+      continue;
+    }
     // Read ahead (CR 702.155a): how a Saga enters and which chapters trigger the turn it entered; one granted by another
     // permanent applies as it enters (CR 614.12; see finishEntering) and that turn.
     if (/^read ahead$/i.test(w)) {

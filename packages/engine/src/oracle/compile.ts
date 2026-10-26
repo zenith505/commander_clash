@@ -360,9 +360,12 @@ export function normalizeSelf(d: CardDef): string {
   t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
   // A card named for two characters ("Aang and La, Ocean's Fury", "Bebop & Rocksteady") takes plural verbs: "Whenever
   // Aang and La attack", "Whenever ~ enter or attack". It's still one object (CR 201.5), read as "~ attacks".
-  if (/ (?:and|&) /.test(comma)) {
+  // A plural name ("The Sackville-Bagginses", "The Notary Hobbits") too.
+  if (/ (?:and|&) /.test(comma) || /^The [^,]+[a-z]s$/.test(d.name)) {
     const third = (v: string) => (v === "die" ? "dies" : `${v}s`);
-    t = t.replace(/~ (attack|enter|deal|block|die)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
+    t = t.replace(/~ (attack|enter|deal|block|die|get)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
+    // The Notary Hobbits: "When ~ enter, if they're not a token, create two tokens that are copies of them": ~ itself.
+    t = t.replace(/(When ~ enters, if )they're( not a token, create [^.]+ copies of )them\b/g, "$1it's$2it");
   }
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
@@ -2889,7 +2892,11 @@ export function compile(d: CardDef): CompiledCard {
     // activated (CR 602.2b, 601.2f).
     const equipLessIf = !equipLessPer ? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate if ([^.]+)\.$/.exec(line) : null;
     const lessCond = equipLessIf ? parseStaticCondition(equipLessIf[3]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
-    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer ?? (lessCond ? equipLessIf : null);
+    // Plate Armor: "Equip {3}. This ability costs {1} less to activate for each other Equipment you control": counted as it's
+    // activated (CR 602.2b, 601.2f), the source left out.
+    const equipLessEach = !equipLessPer && !equipLessIf ? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each ([^.]+)\.$/.exec(line) : null;
+    const lessEach = equipLessEach ? parseCount(equipLessEach[3]!, null, true) : null;
+    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer ?? (lessCond ? equipLessIf : null) ?? (lessEach ? equipLessEach : null);
     if (equip && d.subtypes.includes("Equipment")) {
       // CR 702.6a: "[Cost]: Attach this permanent to target creature you control. Activate only as a sorcery."
       out.activated.push({
@@ -2902,6 +2909,7 @@ export function compile(d: CardDef): CompiledCard {
         equip: true,
         ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
         ...(lessCond ? { costLessIf: { n: Number(equipLessIf![2]), cond: lessCond } } : {}),
+        ...(lessEach ? { costLess: { ...lessEach, times: (lessEach.times ?? 1) * Number(equipLessEach![2]) } } : {}),
       });
       continue;
     }
@@ -3168,7 +3176,9 @@ export function compile(d: CardDef): CompiledCard {
     // and the other Knights; the same effect for each, read as two (CR 611.3). Yuna, Hope of Spira: "~ and enchantment
     // creatures you control have trample, lifelink, and ward {2}": ~ once, even as an enchantment creature (one ward,
     // CR 702.21b), and the others.
-    const selfAndOthers = /^(During your turn, )?~ and (?:other )?([A-Z][a-z]+|[a-z]+ creatures) you control (have|get) (.+)$/.exec(line);
+    // Sylvan Advocate: "As long as you control six or more lands, ~ and land creatures you control get +2/+2": the same, under
+    // the condition.
+    const selfAndOthers = /^(During your turn, |As long as [^,]+, )?~ and (?:other )?([A-Z][a-z]+|[a-z]+ creatures) you control (have|get) (.+)$/.exec(line);
     const selfOthers = selfAndOthers && [`~ ${selfAndOthers[3] === "have" ? "has" : "gets"} ${selfAndOthers[4]}`, `${selfAndOthers[1] ? "other" : "Other"} ${selfAndOthers[2]} you control ${selfAndOthers[3]} ${selfAndOthers[4]}`].map((t) => (selfAndOthers[1] ? parseConditionalStatic(`${selfAndOthers[1]}${t}`) : parseStatic(t)));
     if (selfOthers?.every((p) => p)) {
       for (const p of selfOthers) out.statics.push({ ...p!, text: line });

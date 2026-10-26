@@ -803,6 +803,15 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // "Enchanted creature or enchantment creature" (Karametra's Blessing, Nyx Herald, Feast of Dreams): a creature that's
+  // enchanted or is an enchantment, either one (TargetSpec.anyOf).
+  const enchOr = /^(target )?enchanted creature or enchantment creature((?: you control)?)$/.exec(phrase.trim());
+  if (enchOr) {
+    const rest = parseTargetPhrase(`${enchOr[1] ?? ""}creature${enchOr[2]}`, opts);
+    if (rest?.kind !== "object" || rest.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", status: "enchanted", text: "enchanted creature" }, { kind: "object", types: ["Enchantment"], text: "enchantment creature" }];
+    return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "enchanted creature or enchantment creature") };
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);

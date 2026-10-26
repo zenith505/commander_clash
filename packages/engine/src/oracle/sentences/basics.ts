@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular, COUNTER } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -251,6 +251,35 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[3]!, ctx);
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
+  }
+  // Rhystic Syphon: "Unless target player pays {3}, that player loses 5 life and you gain 5 life": that player decides as
+  // it resolves (CR 608.2d); the rest happens only if they don't pay.
+  if ((m = /^Unless (target player|target opponent) (pays (?:\{[^}]+\})+), that player (loses \d+ life) and (you gain \d+ life)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const lose = parseSentence(capital(`${m[1]} ${m[3]}`), ctx);
+    const gain = lose && parseSentence(capital(m[4]!), ctx);
+    const fx = lose && gain ? [...lose, ...gain] : null;
+    const options = parsePunisherOptions(m[2]!, ctx);
+    const who = { ref: "target" as const, index: before };
+    if (!fx || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who, options, effects: fx.map((e) => (e.type === "loseLife" && e.who.ref === "target" ? { ...e, who: { ref: "punished" as const } } : e)) }];
+  }
+  // Vectis Dominator: "Tap target creature unless its controller pays 2 life": that player decides as it resolves.
+  if ((m = /^(Tap target creature) unless its controller (pays \d+ life)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(m[1]!, ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (!fx || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx }];
+  }
+  // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
+  // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).
+  if ((m = /^(.+?) unless any player (pays (?:\{[^}]+\})+)$/.exec(s)) && /\bgets? an additional [+-]\d+\/[+-]\d+ until end of turn$/.test(m[1]!)) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(m[1]!.replace(/\bgets? an additional\b/, (w) => w.replace(" an additional", "")), ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (!fx || !options || ctx.targets.length !== before) return null;
+    return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: fx, mode: "ifNone", thenText: m[1]!.replace(/^They\b/, "they").replace(/^That creature\b/, "that creature") }];
   }
   // Waterbending Lesson: "Then discard a card unless you waterbend {2}." You choose as it resolves whether to pay {2},
   // tapping artifacts and creatures you control for its generic mana (CR 701.67a, rulings), or to discard.
@@ -582,6 +611,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
   }
+  // Junk Golem: "sacrifice ~ unless you remove a +1/+1 counter from it": removing one keeps it; with none, or choosing not
+  // to, it's sacrificed.
+  if ((m = new RegExp(`^[Ss]acrifice (~|it) unless you remove an? (${COUNTER}) counter from (?:it|~)$`).exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const counter = counterKind(m[2]!);
+    return [{ type: "may", effects: [{ type: "removeCounters", what: { ref: "self" }, counter, n: 1 }], otherwise: [sacrificeSelf], keep: true, text: `Remove a ${m[2]} counter from ~ to keep it` }];
+  }
   // Command Bridge: "sacrifice it unless you tap an untapped permanent you control". Tapping one keeps it; with none
   // untapped, or choosing not to, it's sacrificed.
   // Public Thoroughfare: "an untapped artifact or land you control", either one.
@@ -793,10 +828,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Prevent all combat damage that would be dealt to and dealt by that creature this turn" (Maze of Ith), "Prevent all
   // damage target creature would deal this turn": a prevention effect on that creature until the turn ends (CR 615.1).
+  // Redeem: "Prevent all damage that would be dealt this turn to up to two target creatures": the same as "... to up to
+  // two target creatures this turn".
+  s = s.replace(/^(Prevent all (?:combat )?damage that would be dealt) this turn to (up to (?:one|two|three) target creatures?)$/i, "$1 to $2 this turn");
   const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
   if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
-    const what = p && /^(~|it|that creature|target .+)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    const what = p && /^(~|it|that creature|target .+|up to (?:one|two|three) target creatures?)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
   }
   // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent

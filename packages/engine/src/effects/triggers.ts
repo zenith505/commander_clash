@@ -152,7 +152,7 @@ export type TriggerSourceEvent =
   /** `player` created a token (CR 111.2), `id` (it may have left already: "whenever you create a token" still triggers). */
   | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
-  | { type: "playerDealtDamage"; player: PlayerId; amount: number }
+  | { type: "playerDealtDamage"; player: PlayerId; amount: number; combat?: boolean }
   /** Damage that would have been dealt to `player` was prevented, `amount` of it, all at the same time (Selfless Squire). */
   | { type: "damagePreventedToPlayer"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
@@ -1008,7 +1008,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      // Swarmborn Giant: "When you're dealt combat damage" (CR 510.2: all of it at once).
+      add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "youAreDealtCombatDamage" && you === ev.player && !!ev.combat) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
       // Sower of Discord: damage to one of the two chosen players; "that player" is the other one, who loses that much.
       const pair = o.chosen?.players;
       const other = pair?.length === 2 && pair.includes(ev.player) ? pair.find((p) => p !== ev.player) : undefined;

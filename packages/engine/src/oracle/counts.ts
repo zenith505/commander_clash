@@ -34,6 +34,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.subtypes?.length !== 2) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, subtypes: types, text: p.replace(/^the number of /, "") } } };
   }
+  // Timberpack Wolf: "for each other creature you control named ~", Cleric of the Forward Order: "for each creature you
+  // control named ~": the same count.
+  if (each && (m = /^((?:other )?)creature you control named ~$/.exec(p))) return parseCount(`the number of ${m[1]}creatures you control named ~`, ctx);
   // Hare Apparent: "the number of other creatures you control named ~": with the source's name (CR 201.5), as it is now.
   if ((m = /^(the number of (?:other )?creatures you control) named ~$/.exec(p))) {
     const c = parseCount(m[1]!, ctx);

@@ -334,7 +334,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!cards.length) return;
         const kind = e.filter?.text ?? "card";
         const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : "to exile";
+        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : "to exile";
         s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional ? 0 : 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
@@ -344,6 +344,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const tops = discardToTop(s, pid, ids, src, ctx);
         if (tops === "paused") return "paused";
         discardCards(s, pid, ids, "", false, false, ctx.controller, undefined, tops);
+      } else if (e.action === "shuffleIn") {
+        for (const id of ids) {
+          log(s, `${p.name} shuffles ${defOf(s, obj(s, id)).name} into their library.`);
+          moveObject(s, id, "library");
+        }
+        if (ids.length) shuffleLibrary(s, p);
       } else if (e.action === "libraryThird")
         for (const id of ids) {
           log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their library third from the top.`);
@@ -531,23 +537,33 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "handToTop": {
-      // Brainstorm: with fewer cards in hand, all of them (rulings); the player picks the cards and their order.
-      const p = player(s, ctx.controller);
+      // Brainstorm: with fewer cards in hand, all of them (rulings); the player picks the cards and their order. Another
+      // player ("target opponent puts a card from their hand on top of their library") or each player in turn order
+      // (CR 101.4) picks from their own hand; each one's cards move once they've chosen.
       const sc = (s.resolving!.scratch ??= {});
-      let ids = sc.chosen?.[p.id];
-      if (!ids) {
-        const n = Math.min(amountNow(s, e.n, ctx), p.hand.length);
-        if (!n) return;
-        if (p.hand.length > 1) {
-          s.pending = { kind: "handToTop", player: p.id, count: n, source: src, ...(e.bottom ? { bottom: true as const } : {}) };
-          return "paused";
+      const done = (sc.handTopDone ??= {});
+      for (const pid of e.who ? apnap(s, players(s, e.who, ctx)) : [ctx.controller]) {
+        if (done[pid]) continue;
+        const p = player(s, pid);
+        let ids = sc.chosen?.[p.id];
+        if (!ids) {
+          const n = Math.min(amountNow(s, e.n, ctx), p.hand.length);
+          if (!n) {
+            done[pid] = true;
+            continue;
+          }
+          if (p.hand.length > 1) {
+            s.pending = { kind: "handToTop", player: p.id, count: n, source: src, ...(e.bottom ? { bottom: true as const } : {}) };
+            return "paused";
+          }
+          ids = [...p.hand];
         }
-        ids = [...p.hand];
+        const cards = ids.filter((id) => p.hand.includes(id));
+        // On the bottom the first pick goes lowest; on top it ends on top.
+        for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
+        log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
+        done[pid] = true;
       }
-      const cards = ids.filter((id) => p.hand.includes(id));
-      // On the bottom the first pick goes lowest; on top it ends on top.
-      for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
-      log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
       return;
     }
     case "scrollRack": {
@@ -1210,7 +1226,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
+          const to = e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
@@ -1258,12 +1274,14 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.playFree ? " and may cast it this turn without paying its mana cost" : e.play ? " and may play it this turn" : ""}.`);
+      else if (found.length && e.into === "graveyard") log(s, `${p.name} puts ${names(found)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
       r.digTook = found.length > 0;
       enterTogether(s, () => {
         for (const id of found) {
           if (e.into === "hand") moveObject(s, id, "hand");
+          else if (e.into === "graveyard") moveObject(s, id, "graveyard");
           else if (e.into === "exile") {
             // Face up (CR 406.3); "you may play the exiled card this turn" is that object's only (CR 400.7).
             moveObject(s, id, "exile");

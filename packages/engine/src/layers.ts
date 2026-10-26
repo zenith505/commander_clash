@@ -188,6 +188,8 @@ export interface Characteristics {
   cantBeBlockedByLesserPowerThan: ObjectId[];
   /** The Ring-bearer's (CR 701.54c). */
   cantBeBlockedByGreaterPower: boolean;
+  /** Spitfire Handler: it can't block an attacker with greater power than its own (CR 509.1b). */
+  cantBlockGreaterPower: boolean;
   cantAttackAlone: boolean;
   onlyAttacksAlone: boolean;
   cantBlockAlone: boolean;
@@ -296,6 +298,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeBlockedByLesserPower: false,
     cantBeBlockedByLesserPowerThan: [],
     cantBeBlockedByGreaterPower: false,
+    cantBlockGreaterPower: false,
     cantAttackAlone: false,
     onlyAttacksAlone: false,
     cantBlockAlone: false,
@@ -1424,6 +1427,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     }
     case "cantBeBlockedByGreaterPower":
+    case "cantBlockGreaterPower":
     case "cantAttackAlone":
     case "onlyAttacksAlone":
     case "cantBlockAlone":

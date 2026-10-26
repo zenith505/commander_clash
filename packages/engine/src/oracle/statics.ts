@@ -814,8 +814,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const c = parseStaticCondition(`you control another ${m[1]}`, st);
     return c?.kind === "control" && c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
   }
-  // Dire Tactics: "If you don't control a Human, ...": none at all.
-  if ((m = /^you don't control an? ([A-Z][a-z]+)$/.exec(text))) {
+  // Dire Tactics: "If you don't control a Human, ...", Pest Rescuer: "if you don't control a Pest creature token": none.
+  if ((m = /^you don't control an? (.+)$/.exec(text))) {
     const c = parseStaticCondition(`you control a ${m[1]}`, st);
     return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0 } : null;
   }

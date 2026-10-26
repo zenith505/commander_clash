@@ -207,6 +207,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   const plain = plainFilter(p);
   if (plain) return plain;
+  // "An instant, sorcery, or Dragon card" (Dragonologist): a card of any one of those card types or that creature type.
+  const mixed = /^((?:[A-Za-z]+, )+[A-Za-z]+),? or ([A-Za-z]+) card$/.exec(p);
+  if (mixed && /[A-Z]/.test(p)) {
+    const subs = [...mixed[1]!.split(", "), mixed[2]!].map((w) => plainFilter(`${w} card`));
+    if (subs.some((x) => !x)) return null;
+    return { kind: "card", anyOf: subs as TargetSpec[], text: p };
+  }
   // "An artifact creature card or Vehicle card" (Szarekh), "a Hero or enchantment card" (Rick Jones): either one.
   // "An artifact or Dragon card" (Magda, Brazen Outlaw).
   // "A Bird or basic land card" (Sazh Katzroy).

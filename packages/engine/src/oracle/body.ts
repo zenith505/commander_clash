@@ -1064,6 +1064,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       ],
       text,
     };
+  // Incremental Blight: "Put a -1/-1 counter on target creature, two -1/-1 counters on another target creature, and three
+  // -1/-1 counters on a third target creature." Three different target creatures (CR 115.3), each getting its own number.
+  if (/^Put a -1\/-1 counter on target creature, two -1\/-1 counters on another target creature, and three -1\/-1 counters on a third target creature\.$/.test(text.trim())) {
+    const creature = (i: number): TargetSpec => ({ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature", ...(i ? { distinctFrom: [...Array(i).keys()] } : {}) });
+    return {
+      targets: [creature(0), creature(1), creature(2)],
+      effects: [1, 2, 3].map((n, i) => ({ type: "counters" as const, what: { ref: "target" as const, index: i }, counter: "-1/-1" as const, n })),
+      text,
+    };
+  }
   // Telling Time: "Look at the top three cards of your library. Put one of those cards into your hand, one on top of your
   // library, and one on the bottom of your library." In that order, with fewer cards too (rulings): the other two stay
   // on top for the second pick, which leaves one on top and puts the other on the bottom.

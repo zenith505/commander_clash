@@ -349,9 +349,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return filter ? count({ kind: "spellsCastThisTurn", filter, eventPlayer: true }) : null;
   }
   // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
-  if ((m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells you've cast this turn$/i.exec(p))) {
-    const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
-    return filter ? count({ kind: "spellsCastThisTurn", filter }) : null;
+  // "For each other instant and sorcery spell you've cast this turn" (Lock and Load, a spell): not its own cast.
+  if ((m = /^(other )?((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells? you've cast this turn$/i.exec(p)) && (!m[1] || (each && ctx?.spell))) {
+    const filter = parseSearchFilter(`${m[2]!.replace(/ and /, " or ")} card`);
+    return filter ? count({ kind: "spellsCastThisTurn", filter, ...(m[1] ? { other: true as const } : {}) }) : null;
   }
   if ((m = /^the total mana value of (other )?spells you've cast this turn$/i.exec(p))) return count({ kind: "manaValueCastThisTurn", ...(m[1] ? { other: true as const } : {}) });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.

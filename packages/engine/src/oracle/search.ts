@@ -201,6 +201,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     const head = parseSearchFilter(manaAb[1]!);
     return head ? { ...head, manaAbility: true, text: p } : null;
   }
+  // "Spells with flash or flying" (Errant and Giada, as cards): a card with either keyword.
+  const twoKw = /^(.*?card) with ([a-z]+) or ([a-z]+)$/.exec(p);
+  if (twoKw) {
+    const subs = [twoKw[2]!, twoKw[3]!].map((k) => parseSearchFilter(`${twoKw[1]} with ${k}`));
+    if (subs.some((x) => !x?.keywords?.length)) return null;
+    return { kind: "card", anyOf: subs as TargetSpec[], text: p };
+  }
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
   // "An instant card or a card with flash" (Waterlogged Teachings). "A basic Plains card or a creature card with mana value

@@ -138,6 +138,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^player who chose ([a-z]+)$/.exec(p)) && ctx?.chooseWords?.includes(m[1]!)) return { count: { kind: "choseWord", option: m[1]! } };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
+  // After "Remove all +1/+1 counters from ~" paid as a cost (StackItem.countersRemoved): "for each +1/+1 counter removed
+  // this way" (Vish Kal), "the number of charge counters removed this way" (Geometric Nexus), "for each five counters
+  // removed this way" (Sage of Hours: each whole group of five).
+  if (ctx?.activated && each && (m = /^(?:(five) counters|(?:(?:[+-]1\/[+-]1|[a-z]+) )?counter) removed this way$/i.exec(p))) return { count: { kind: "countersRemovedThisWay" }, ...(m[1] ? { per: 5 } : {}) };
+  if (ctx?.activated && !each && /^the number of (?:(?:[+-]1\/[+-]1|[a-z]+) )?counters removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
   // Profane Transfusion: "where X is the difference between those players' life totals", after they exchanged them.
   if (!each && ctx?.exchanged && /^the difference between those players' life totals$/i.test(p)) return { count: { kind: "exchangedLifeDifference" } };
   // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the

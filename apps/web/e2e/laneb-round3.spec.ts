@@ -21,7 +21,7 @@ test("Cruel Fate: put one of the opponent's top five into their graveyard, then 
   const s0 = scene({ board: [...LANDS], hand: ["Cruel Fate"] }, [{ library: TOP }]);
   const s = passToPrompt(run(s0, planCast(s0, 0, one(s0, "Cruel Fate"), [{ kind: "player", id: 1 }])));
   expect(s.pending).toMatchObject({ kind: "searchLibrary", player: 0, min: 1, max: 1 });
-  const [bolt, ring, stone, spell, ritual] = TOP.map((n) => idsOf(s, n, "library", 1)[0]!);
+  const [bolt, ring, stone, spell, ritual] = TOP.map((n) => idsOf(s, n, "library", 1)[0]!) as [string, string, string, string, string];
   const name = s.players[1]!.name;
   await open(page, s);
   await expect(modal(page)).toContainText(`Cruel Fate: put a card into ${name}'s graveyard`);
@@ -61,7 +61,7 @@ test("Stunted Growth on yourself: click three cards from your hand to put on top
   const s0 = scene({ board: [...LANDS], hand: ["Stunted Growth", "Lightning Bolt", "Sol Ring", "Mind Stone", "Counterspell"] });
   const s = passToPrompt(run(s0, planCast(s0, 0, one(s0, "Stunted Growth"), [{ kind: "player", id: 0 }])));
   expect(s.pending).toMatchObject({ kind: "handToTop", player: 0, count: 3 });
-  const [bolt, ring, stone] = ["Lightning Bolt", "Sol Ring", "Mind Stone"].map((n) => one(s, n));
+  const [bolt, ring, stone] = ["Lightning Bolt", "Sol Ring", "Mind Stone"].map((n) => one(s, n)) as [string, string, string];
   await open(page, s);
   await expect(controls(page)).toContainText("Stunted Growth: click 3 cards to put on top of your library (first pick ends on top).");
   const put = controls(page).getByRole("button", { name: "Put on top" });

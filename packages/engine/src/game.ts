@@ -3033,8 +3033,9 @@ function beginStep(s: GameState, step: Step): void {
   }
   switch (step) {
     case "untap": {
-      // "Players skip their untap steps" (Stasis) replaces the whole step (CR 614.10): no phasing, no untapping.
-      if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).skipUntapSteps)) {
+      // "Players skip their untap steps" (Stasis) replaces the whole step (CR 614.10): no phasing, no untapping. So does
+      // "Take an extra turn after this one. Skip the untap step of that turn." (Savor the Moment).
+      if (s.extraTurn?.skipUntap || s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).skipUntapSteps)) {
         log(s, `${player(s, ap).name} skips their untap step.`);
         return advanceStep(s);
       }
@@ -3890,6 +3891,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
 function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
+  if (rc.n <= 0) return;
   const left = (o.counters[rc.counter] ?? 0) - rc.n;
   o.counters[rc.counter] = left;
   invalidateCharacteristics(s);
@@ -6512,7 +6514,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = ab.mana ? 0 : activationTax(s, o) + opponentsTargetTax(s, pid, targets);
+  const more = ab.mana ? 0 : activationTax(s, o, pid) + opponentsTargetTax(s, pid, targets);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -6589,11 +6591,13 @@ function opponentsTargetTax(s: GameState, pid: PlayerId, targets?: TargetChoice[
 }
 
 /** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */
-function activationTax(s: GameState, o: GameObject): number {
+function activationTax(s: GameState, o: GameObject, pid: PlayerId): number {
   let n = 0;
   for (const id of s.battlefield) {
     const src = obj(s, id);
     for (const tax of abilitiesOf(s, src).activationTaxes ?? []) {
+      const owner = controllerOf(s, src);
+      if ((tax.opponents && (owner === pid || !opponents(s, owner).includes(pid))) || (tax.yourTurn && s.activePlayer !== owner)) continue;
       if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter) continue;
       n += tax.n;
     }
@@ -6686,7 +6690,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     p.energy = (p.energy ?? 0) - x;
     log(s, `${p.name} pays ${x} energy.`);
   }
-  if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
+  const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : undefined;
+  if (ab.removeCounters) removeCountersCost(s, o, countersRemoved !== undefined ? { counter: ab.removeCounters.counter, n: countersRemoved } : ab.removeCounters);
+  if (countersRemoved !== undefined) log(s, `${p.name} removes ${countersRemoved} ${ab.removeCounters!.counter} counter${countersRemoved === 1 ? "" : "s"} from ${d.name}.`);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).
   if (ab.putCounters) {
     const put = putCounters(s, o, ab.putCounters.counter, ab.putCounters.n);
@@ -6758,6 +6764,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(costDiscarded.length ? { costDiscarded } : {}),
+    ...(countersRemoved !== undefined ? { countersRemoved } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),

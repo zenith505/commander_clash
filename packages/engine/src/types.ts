@@ -870,6 +870,8 @@ export interface StackItem {
   costCardNames?: string[];
   /** The cards a discard cost discarded (keys into `cards`): "if the discarded card wasn't a land card" (Grab the Prize). */
   costDiscarded?: string[];
+  /** "Remove all +1/+1 counters from ~" paid as a cost: how many were removed (Sage of Hours, "counters removed this way"). */
+  countersRemoved?: number;
   /** The cards an "Exile a card from your hand" cost exiled, as the objects they became there: "the exiled card" (Jhoira of the Ghitu). */
   costExiled?: { id: ObjectId; zc: number }[];
   /**
@@ -949,6 +951,8 @@ export interface ExtraTurn {
   player: PlayerId;
   /** "At the beginning of that turn's end step, you lose the game": the spell's controller and card. */
   loseAtEnd?: { controller: PlayerId; sourceCardId: string; subject: { id: ObjectId; zc: number } };
+  /** "Skip the untap step of that turn" (Savor the Moment, CR 614.10). */
+  skipUntap?: true;
 }
 
 /** A triggered ability waiting to be put on the stack. CR 603.3 */

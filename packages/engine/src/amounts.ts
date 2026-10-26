@@ -71,7 +71,7 @@ export const isFixed = (a: Amount): a is number => typeof a === "number";
 /** The value of `a` right now. */
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
-  const v0 = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
+  const v0 = Math.floor(evalCount(s, a.count, ctx) / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
   const n = a.signed ? v : Math.max(0, a.half ? (a.third ? (a.half === "up" ? Math.ceil(v / 3) : Math.floor(v / 3)) : halve(v, a.half)) : v);
   return a.negate ? -n : n;
@@ -526,6 +526,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (!o) {
         // Gone: as it last existed on the battlefield (CR 608.2h).
         // A trigger's subject that died ("whenever another creature dies, ... its power") too.
+        // "Return it to its owner's hand. If you do, create ... equal to its toughness" (Riders of the Mark, rulings): this
+        // ability moved it, so as it last existed on the battlefield.
+        const left = c.of.ref === "self" && !ctx.lki && ctx.sourceId !== undefined && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
+        if (left && left.zc === ctx.sourceZc && c.kind !== "manaValue") return Math.max(0, left[c.kind]);
         if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
         // The amassed Army that has left: as it last existed (CR 608.2h).
         const a = c.of.ref === "amassed" ? (s.resolving?.amassed ?? s.resolving?.item.amassed) : undefined;
@@ -708,7 +712,7 @@ export function partySize(s: GameState, pid: PlayerId, view: (o: GameObject) => 
 /** For display: "X", "the number of creatures you control", "2". */
 export function describeAmount(a: Amount): string {
   if (typeof a === "number") return String(a);
-  const base = describeCount(a.count);
+  const base = a.per ? `${describeCount(a.count)} / ${a.per}, rounded down` : describeCount(a.count);
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;

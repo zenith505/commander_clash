@@ -1038,6 +1038,13 @@ export function parseTargetPhrase(
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
   }
+  // "Creatures you control with three or more +1/+1 counters on them" (Runadi, Behemoth Caller).
+  const counters = !counter && / with (two|three|four|five) or more ([+-]1\/[+-]1|[a-z]+) counters on (?:it|them)/.exec(p);
+  if (counters) {
+    extra.counter = counterKind(counters[2]!);
+    extra.counterMin = ["two", "three", "four", "five"].indexOf(counters[1]!) + 2;
+    p = (p.slice(0, counters.index) + p.slice(counters.index + counters[0].length)).trim();
+  }
   // "Each creature you control with a mana ability" (Raggadragga): an activated or triggered one (CR 605.1).
   const manaAb = / with a mana ability$/.exec(p);
   if (manaAb) {
@@ -1077,6 +1084,14 @@ export function parseTargetPhrase(
     p = p.slice(0, gy.index);
     linkedExile = !gy[1];
     owner = gy[1] === "your" ? "you" : gy[1] === "a" || !gy[1] ? undefined : "opponent";
+    // Thor, God of Thunder: "target Equipment, instant, or sorcery card from your graveyard": a card of any one of them.
+    const listed = phrase.trim().replace(/^target /i, "").replace(/ (?:from|in) (?:your|a|an opponent's) graveyard$/, "");
+    const list = /^([A-Z][a-z]+), ([a-z]+), or ([a-z]+) card$/.exec(listed);
+    if (list && (opts.target || /^target /i.test(phrase.trim())) && !Object.keys(extra).length) {
+      const anyOf = [list[1], list[2], list[3]].map((w) => parseTargetPhrase(`${w} card from your graveyard`));
+      if (anyOf.some((f) => f?.kind !== "card")) return null;
+      return { kind: "card", anyOf: anyOf.map((f) => ({ ...f!, owner: undefined })), ...(owner ? { owner } : {}), text };
+    }
     // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
     if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".

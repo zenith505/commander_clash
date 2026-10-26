@@ -1890,6 +1890,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
+  // Suki, Courageous Rescuer: "Whenever another permanent you control leaves the battlefield during your turn, ...": only
+  // while you're the active player.
+  const leavesYours = /^(Whenever (?:another|an?) [^,]+? leaves the battlefield) during your turn, (.+)$/.exec(line);
+  if (leavesYours) {
+    const t = parseTrigger(`${leavesYours[1]}, ${leavesYours[2]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
+  }
   // Narci, Fable Singer; Tom Bombadil: "whenever the final chapter ability of a Saga you control resolves": the chapter
   // ability with the greatest chapter number its Saga has (rulings), once it has finished resolving and left the stack
   // (rulings); "that Saga's mana value" is the event's amount.

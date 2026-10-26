@@ -389,6 +389,14 @@ function conditionalAbility(d: CardDef, text: string, out: CompiledCard, cond: S
   const inner = compile({ ...d, oracleText: text });
   const base = compile({ ...d, oracleText: "" });
   if (inner.unsupported.length) return false;
+  // Racers' Scoreboard: "Max speed — Spells you cast cost {1} less to cast": one cost change, only while it holds.
+  const [mod, ...mods] = inner.costMods ?? [];
+  if (mod && !mods.length && !base.costMods && !mod.if) {
+    const { costMods: _, ...plain } = inner;
+    if (JSON.stringify(plain) !== JSON.stringify(base)) return false;
+    (out.costMods ??= []).push({ ...mod, if: cond });
+    return true;
+  }
   const lists = ["triggers", "activated", "mana", "statics"] as const;
   const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k)).sort(([a], [b]) => a.localeCompare(b)));
   if (rest(inner) !== rest(base) || lists.some((k) => base[k].length)) return false;
@@ -972,12 +980,14 @@ export function compile(d: CardDef): CompiledCard {
     // in the plural. "This creature enters with an additional +1/+1 counter on it": a replacement effect on itself
     // entering (CR 614.1c), which applies as it would exist on the battlefield (CR 614.12, rulings on Master Chef).
     // Kalain, Reclusive Painter: "... for each mana from a Treasure spent to cast them" (see perSpentFrom).
-    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them)?\\.$`).exec(line);
+    // Gev, Scaled Scorch: "... for each opponent who lost life this turn": counted as each one would enter.
+    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them| for each (opponent who lost life this turn))?\\.$`).exec(line);
     if (othersPlural) {
       const g = parseGroup(`each ${othersPlural[1]!.replace(/s you control$/, " you control")}`);
-      const spentFrom = othersPlural[4] ? (/Treasure/.test(othersPlural[4]) ? "treasure" : "artifact") : undefined;
-      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
-      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), text: line });
+      const spentFrom = othersPlural[4] && !othersPlural[5] ? (/Treasure/.test(othersPlural[4]) ? "treasure" : "artifact") : undefined;
+      const per = othersPlural[5] ? parseCount(othersPlural[5], null, true) : undefined;
+      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || per === null) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), ...(per ? { per } : {}), text: line });
       continue;
     }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);

@@ -262,7 +262,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // Kopala, Warden of Waves: "Spells your opponents cast that target a Merfolk you control cost {2} more to cast",
   // "Abilities your opponents activate that target a Merfolk you control cost {2} more to activate": once per spell or
   // ability however many it targets (rulings); activated abilities only, not triggered ones (CR 602.2b applies 601.2f).
-  if ((m = /^(Spells your opponents cast|Abilities your opponents activate) that target an? ([A-Za-z]+) you control cost \{(\d+)\} more to (cast|activate)$/.exec(text)) && (m[1]!.startsWith("Spells") === (m[4] === "cast"))) {
+  if ((m = /^(Spells your opponents cast|Abilities your opponents activate) that target an? ([A-Za-z]+(?: or [a-z]+)?) you control cost \{(\d+)\} more to (cast|activate)$/.exec(text)) && (m[1]!.startsWith("Spells") === (m[4] === "cast"))) {
     const filter = parseTargetPhrase(m[2]!);
     return filter?.kind === "object" && !filter.controller ? { opponentsTargetTax: { n: Number(m[3]), filter: { ...filter, text: m[2]! }, ...(m[4] === "activate" ? { abilities: true as const } : {}) } } : "fail";
   }

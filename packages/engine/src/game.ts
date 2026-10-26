@@ -1529,7 +1529,7 @@ function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = [])
         // Master Biomancer: its power, likewise.
         // Kalain, Coin of Mastery: the mana from Treasures or artifact sources spent to cast it, kept as the spell became
         // this permanent (none for one not cast, or a token copy of a spell, CR 707.10).
-        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : r.perSpentFrom ? (o.spent?.from?.[r.perSpentFrom] ?? 0) : 1;
+        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : r.perSpentFrom ? (o.spent?.from?.[r.perSpentFrom] ?? 0) : r.per !== undefined ? evalAmount(s, r.per, { controller: you, sourceId: src.id }) : 1;
         if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
         if (r.asSubtype && !subtypes.includes(r.asSubtype)) subtypes.push(r.asSubtype);
       }
@@ -7359,6 +7359,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // "You may pay any amount of life": that much, paid next (CR 119.4).
     (r.scratch ??= {}).payX = choice;
     log(s, `${p.name} chooses to pay ${choice} life for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "payEnergy") {
+    // "You may pay any amount of {E}": that much, paid next (CR 107.14).
+    (r.scratch ??= {}).payX = choice;
+    log(s, `${p.name} chooses to pay ${choice} energy for ${pend.source}.`);
     continueResolution(s);
     return;
   }

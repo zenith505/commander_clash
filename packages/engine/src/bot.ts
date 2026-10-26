@@ -750,6 +750,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const n = Math.max(0, Math.min(pend.numberRange?.max ?? 0, p.life - 15, p.library.length - 2, 5 - p.hand.length));
       return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
+    // "You may pay any amount of {E}" (Galvanic Discharge, Die Young): enough to kill the target if it's another
+    // player's creature or planeswalker (all of it if that's not enough), nothing for one of ours.
+    if (pend.kind === "chooseOption" && pend.what === "payEnergy") {
+      const most = pend.numberRange?.max ?? 0;
+      const t = s.resolving?.item.targets?.find((x) => x.kind === "object");
+      const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+      const theirs = !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;
+      const need = !theirs ? 0 : objIsType(s, o!, "Creature") ? Math.max(0, toughness(s, o!) - (o!.damage ?? 0)) : (o!.counters.loyalty ?? 0);
+      return [{ type: "chooseOption", player: pid, choice: String(Math.min(most, need)) }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "drawUpTo") {
       const left = player(s, pid).library.length;
       return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => Number(o) < left) ?? "0" }];

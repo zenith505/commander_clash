@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
-import { potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -146,6 +146,14 @@ describe("See the Truth", () => {
   });
 });
 
+/** Everyone passes (no blocks) until a trigger asks for its targets. */
+const untilTargets = (s: GameState) => {
+  for (let i = 0; i < 40 && s.pending?.kind !== "chooseTargets"; i++) {
+    const pid = waitingOn(s)!;
+    s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : act(s, { type: "passPriority", player: pid });
+  }
+  return s;
+};
 /** `attackers` attack `defender`; no blocks; everyone passes until the end of combat (triggers resolve on the way). */
 const hit = (s: GameState, ap: PlayerId, attackers: string[], defender: PlayerId) => passUntil(attack(s, ap, attackers.map((attacker) => ({ attacker, defender }))), "endCombat", ap);
 
@@ -309,5 +317,213 @@ describe("Needle Drop", () => {
     s = resolveAll(run(s, planCast(s, ap, ids[0]!, [{ kind: "player", id: opp }])));
     expect(lifeOf(s, opp)).toBe(life - 1);
     expect(handOf(s, ap).length).toBe(hand);
+  });
+});
+
+const scoreboard = card("Racers' Scoreboard", "Artifact", "{4}", { cmc: 4, oracleText: "Start your engines! (If you have no speed, it starts at 1. It increases once on each of your turns when an opponent loses life. Max speed is 4.)\nWhen this artifact enters, draw two cards, then discard a card.\nMax speed — Spells you cast cost {1} less to cast.", keywords: ["Max speed", "Start your engines!"] });
+
+describe("Racers' Scoreboard", () => {
+  it("is fully supported", () => supported(scoreboard));
+  it("spells you cast cost {1} less only at max speed", () => {
+    const { s, ap, ids } = setup([bear()]);
+    putOnBattlefield(s, ap, scoreboard);
+    s.players[ap]!.speed = 3;
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(1);
+    s.players[ap]!.speed = 4;
+    invalidateCharacteristics(s);
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(0);
+  });
+});
+
+const maze = card("Lost in the Maze", "Enchantment", "{X}{U}{U}", { cmc: 2, oracleText: "Flash\nWhen this enchantment enters, tap X target creatures. Put a stun counter on each of those creatures you don't control. (If a permanent with a stun counter would become untapped, remove one from it instead.)\nTapped creatures you control have hexproof.", keywords: ["Flash"] });
+
+describe("Lost in the Maze", () => {
+  it("is fully supported", () => supported(maze));
+  it("taps X target creatures; a stun counter only on those you don't control", () => {
+    let { s, ap, ids, opp } = setup([maze]);
+    const mine = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    s = run(s, planCast(s, ap, ids[0]!, undefined, undefined, undefined, 2));
+    s = resolveAll(s);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(mine), tgt(theirs)] }));
+    expect(s.objects[mine]!.tapped).toBe(true);
+    expect(s.objects[theirs]!.tapped).toBe(true);
+    expect(s.objects[mine]!.counters.stun ?? 0).toBe(0);
+    expect(s.objects[theirs]!.counters.stun).toBe(1);
+  });
+});
+
+const skullsnatcher = card("Skullsnatcher", "Creature — Rat Ninja", "{1}{B}", { cmc: 2, power: "2", toughness: "1", oracleText: "Ninjutsu {B} ({B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever this creature deals combat damage to a player, exile up to two target cards from that player's graveyard.", keywords: ["Ninjutsu"] });
+
+describe("Skullsnatcher", () => {
+  it("is fully supported", () => supported(skullsnatcher));
+  it("exiles up to two cards from the graveyard of the player it hit, not another's", () => {
+    let { s, ap, opp } = setup([]);
+    const sn = putOnBattlefield(s, ap, skullsnatcher);
+    const a = into(s, opp, bear(), "graveyard");
+    const b = into(s, opp, bear(), "graveyard");
+    const other = into(s, next(s, opp), bear(), "graveyard");
+    s = attack(s, ap, [{ attacker: sn, defender: opp }]);
+    s = untilTargets(s);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(other), { kind: "none" }] })).toThrow();
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(a), tgt(b)] }));
+    expect(zone(s, a)).toBe("exile");
+    expect(zone(s, b)).toBe("exile");
+    expect(zone(s, other)).toBe("graveyard");
+  });
+});
+
+const gev = card("Gev, Scaled Scorch", "Legendary Creature — Lizard Mercenary", "{B}{R}", { cmc: 2, power: "3", toughness: "2", oracleText: "Ward—Pay 2 life.\nOther creatures you control enter with an additional +1/+1 counter on them for each opponent who lost life this turn.\nWhenever you cast a Lizard spell, Gev deals 1 damage to target opponent.", keywords: ["Ward"] });
+
+describe("Gev, Scaled Scorch", () => {
+  it("is fully supported", () => supported(gev));
+  it("other creatures enter with a +1/+1 counter for each opponent who lost life this turn", () => {
+    let { s, ap, ids, opp } = setup([bear(), bear()]);
+    putOnBattlefield(s, ap, gev);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.counters["+1/+1"] ?? 0).toBe(0);
+    for (const p of [opp, next(s, opp)]) loseLife(s, p, 1);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.objects[ids[1]!]!.counters["+1/+1"]).toBe(2);
+  });
+});
+
+const kasmina = card("Kasmina, Enigmatic Mentor", "Legendary Planeswalker — Kasmina", "{3}{U}", { cmc: 4, loyalty: "5", oracleText: "Spells your opponents cast that target a creature or planeswalker you control cost {2} more to cast.\n−2: Create a 2/2 blue Wizard creature token. Draw a card, then discard a card." });
+
+describe("Kasmina, Enigmatic Mentor", () => {
+  it("is fully supported", () => supported(kasmina));
+  it("opponents' spells that target a creature or planeswalker of yours cost {2} more", () => {
+    const { s, ap, ids, opp } = setup([card("Shock", "Instant", "{R}", { cmc: 1, oracleText: "Shock deals 2 damage to any target." })]);
+    putOnBattlefield(s, opp, kasmina);
+    const theirs = putOnBattlefield(s, opp, bear());
+    const mine = putOnBattlefield(s, ap, bear());
+    const o = s.objects[ids[0]!]!;
+    expect(spellCost(s, ap, o, 0, [], { targets: [tgt(theirs)] }).extra).toBe(2);
+    expect(spellCost(s, ap, o, 0, [], { targets: [tgt(mine)] }).extra).toBe(0);
+    expect(spellCost(s, ap, o, 0, [], { targets: [{ kind: "player", id: opp }] }).extra).toBe(0);
+  });
+});
+
+const plum = card("Mastermind Plum", "Legendary Creature — Human Wizard", "{2}{B}", { cmc: 3, power: "2", toughness: "2", oracleText: "Whenever Mastermind Plum attacks, exile up to one target card from a graveyard. If an artifact card was exiled this way, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nWhenever you cast a spell, if mana from a Treasure was spent to cast it, you draw a card and you lose 1 life.", keywords: ["Treasure"] });
+
+describe("Mastermind Plum", () => {
+  it("is fully supported", () => supported(plum));
+  const plumAttack = (exiled: CardDef | null) => {
+    let { s, ap, opp } = setup([]);
+    const p = putOnBattlefield(s, ap, plum);
+    const c = exiled ? into(s, opp, exiled, "graveyard") : undefined;
+    s = untilTargets(attack(s, ap, [{ attacker: p, defender: opp }]));
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [c ? tgt(c) : { kind: "none" }] }));
+    if (c) expect(zone(s, c)).toBe("exile");
+    return s.battlefield.filter((id) => s.objects[id]!.controller === ap && named(s, id) === "Treasure Token").length;
+  };
+  it("an artifact card exiled: a Treasure", () => expect(plumAttack(purse)).toBe(1));
+  it("another card exiled: none", () => expect(plumAttack(bear())).toBe(0));
+  it("no card chosen: none", () => expect(plumAttack(null)).toBe(0));
+});
+
+const haldir = card("Haldir, Lórien Lieutenant", "Legendary Creature — Elf Soldier", "{X}{G}", { cmc: 1, power: "0", toughness: "0", oracleText: "Haldir enters with X +1/+1 counters on it.\nVigilance\n{5}{G}: Until end of turn, other Elves you control gain vigilance and get +1/+1 for each +1/+1 counter on Haldir.", keywords: ["Vigilance"] });
+
+describe("Haldir, Lórien Lieutenant", () => {
+  it("is fully supported", () => supported(haldir));
+  it("other Elves you control gain vigilance and +1/+1 for each +1/+1 counter on Haldir", () => {
+    let { s, ap } = setup([]);
+    const h = putOnBattlefield(s, ap, haldir);
+    s.objects[h]!.counters["+1/+1"] = 3;
+    const elf = putOnBattlefield(s, ap, card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1" }));
+    const notElf = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    s = resolveAll(run(s, planActivate(s, ap, h, 0)));
+    expect(pt(s, elf)).toBe("4/4");
+    expect(kw(s, elf, "Vigilance")).toBe(true);
+    expect(pt(s, notElf)).toBe("2/2");
+    expect(pt(s, h)).toBe("3/3");
+  });
+});
+
+const suki = card("Suki, Courageous Rescuer", "Legendary Creature — Human Warrior Ally", "{1}{W}{W}", { cmc: 3, power: "2", toughness: "4", oracleText: "Other creatures you control get +1/+0.\nWhenever another permanent you control leaves the battlefield during your turn, create a 1/1 white Ally creature token. This ability triggers only once each turn." });
+
+describe("Suki, Courageous Rescuer", () => {
+  it("is fully supported", () => supported(suki));
+  const allies = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid).length;
+  it("once each turn, during your turn only", () => {
+    let { s, ap, ids } = setup([card("Two Bolts", "Sorcery", "{R}", { oracleText: "Destroy two target creatures." })]);
+    putOnBattlefield(s, ap, suki);
+    const a = putOnBattlefield(s, ap, bear());
+    const b = putOnBattlefield(s, ap, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(a), tgt(b)])));
+    expect(zone(s, a)).toBe("graveyard");
+    expect(allies(s, ap)).toBe(1);
+    // An opponent's turn: nothing.
+    s = passUntil(s, "main1", next(s, ap));
+    const c = putOnBattlefield(s, ap, bear());
+    moveObject(s, c, "graveyard");
+    s = resolveAll(s);
+    expect(allies(s, ap)).toBe(1);
+  });
+});
+
+const galvanic = card("Galvanic Discharge", "Instant", "{R}", { cmc: 1, oracleText: "Choose target creature or planeswalker. You get {E}{E}{E} (three energy counters), then you may pay any amount of {E}. Galvanic Discharge deals that much damage to that permanent." });
+const harnessed = card("Harnessed Lightning", "Instant", "{1}{R}", { cmc: 2, oracleText: "Choose target creature. You get {E}{E}{E} (three energy counters), then you may pay any amount of {E}. Harnessed Lightning deals that much damage to that creature." });
+const dieYoung = card("Die Young", "Sorcery", "{1}{B}", { cmc: 2, oracleText: "Choose target creature. You get {E}{E} (two energy counters), then you may pay any amount of {E}. The creature gets -1/-1 until end of turn for each {E} paid this way." });
+
+describe("Galvanic Discharge, Harnessed Lightning and Die Young (pay any amount of energy)", () => {
+  it("are fully supported", () => supported(galvanic, harnessed, dieYoung));
+  it("Galvanic Discharge: get three energy, pay any amount, that much damage", () => {
+    let { s, ap, ids, opp } = setup([galvanic]);
+    s.players[ap]!.energy = 2;
+    const big = putOnBattlefield(s, opp, card("Big", "Creature — Beast", "{4}", { power: "5", toughness: "5" }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(big)])));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payEnergy", numberRange: { min: 0, max: 5 } });
+    expect(() => act(s, { type: "chooseOption", player: ap, choice: "6" })).toThrow();
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "4" }));
+    expect(s.objects[big]!.damage).toBe(4);
+    expect(s.players[ap]!.energy).toBe(1);
+  });
+  it("paying 0: no damage, the energy is kept", () => {
+    let { s, ap, ids, opp } = setup([harnessed]);
+    const b = putOnBattlefield(s, opp, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "0" }));
+    expect(s.objects[b]!.damage).toBe(0);
+    expect(s.players[ap]!.energy).toBe(3);
+  });
+  it("Die Young: -1/-1 for each energy paid", () => {
+    let { s, ap, ids, opp } = setup([dieYoung]);
+    const big = putOnBattlefield(s, opp, card("Big", "Creature — Beast", "{4}", { power: "5", toughness: "5" }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(big)])));
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "2" }));
+    expect(pt(s, big)).toBe("3/3");
+    expect(s.players[ap]!.energy ?? 0).toBe(0);
+  });
+  it("a bot pays enough to kill an opponent's creature", () => {
+    let { s, ap, ids, opp } = setup([galvanic]);
+    const b = putOnBattlefield(s, opp, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+    s = resolveAll(run(s, botActions(s, ap)));
+    expect(zone(s, b)).toBe("graveyard");
+    expect(s.players[ap]!.energy).toBe(1);
+  });
+  it("an illegal target: nothing, not even the energy", () => {
+    let { s, ap, ids, opp } = setup([galvanic]);
+    const b = putOnBattlefield(s, opp, bear());
+    s = run(s, planCast(s, ap, ids[0]!, [tgt(b)]));
+    moveObject(s, b, "graveyard");
+    s = resolveAll(s);
+    expect(s.pending).toBeNull();
+    expect(s.players[ap]!.energy ?? 0).toBe(0);
+  });
+});
+
+describe("Cloudpost", () => {
+  it("adds {C} for each Locus on the battlefield", () => {
+    let { s, ap, opp } = setup([]);
+    const cp = putOnBattlefield(s, ap, cloudpost);
+    putOnBattlefield(s, opp, glimmerpost);
+    const before = s.players[ap]!.manaPool.C ?? 0;
+    s = run(s, planActivate(s, ap, cp, 0));
+    expect(s.players[ap]!.manaPool.C).toBe(before + 2);
   });
 });

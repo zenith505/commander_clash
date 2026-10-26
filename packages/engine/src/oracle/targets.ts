@@ -295,6 +295,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Goad each creature that had a double strike counter put on it this way" (Spectacular Showdown).
   const hadPut = /^each creature that had an? (\+1\/\+1|double strike) counter put on it this way$/i.exec(x);
   if (hadPut) return { ref: "countersPutThisWay", kind: hadPut[1]!.toLowerCase() };
+  // Lost in the Maze: "Tap X target creatures. Put a stun counter on each of those creatures you don't control."
+  if (/^each of those creatures you don't control$/i.test(x) && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, notYours: true };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
@@ -561,10 +563,11 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const yard = both ? parseTargetPhrase(`${singularPhrase(both[1]!)} from a graveyard`) : undefined;
   if (both && (perm?.kind !== "object" || yard?.kind !== "card" || perm.controller || yard.owner || theirs)) return null;
   const parsed = perm && yard ? { ...perm, orCard: yard, text: `${perm.text} or ${yard.text.replace(/^target /, "")}` } : differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx), target: true });
-  if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
+  // Skullsnatcher: "up to two target cards from that player's graveyard": cards that player owns (as for one target).
+  if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind === "card" ? !!parsed.owner : parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
-  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
+  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: parsed.kind === "card" ? parsed.text.replace(/ from a graveyard$/, " from that player's graveyard") : `${parsed.text} that player controls` } : parsed;
   // One group with a total to each ability: the targets that have it are that group.
   if (total && ctx.targets.some((t) => t.total)) return null;
   if (equalToughness && (total || ctx.targets.some((t) => t.equalToughness))) return null;

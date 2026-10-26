@@ -50,6 +50,20 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `${player(s, ctx.controller).name} pays ${n} life for ${src}.`);
         sc.may = true;
       }
+      // "You may pay any amount of {E}" (Galvanic Discharge): the amount first, at most the energy they have; paying 0 is
+      // paying (rulings). Paid at once (CR 107.14).
+      if (e.payX?.energy && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          const most = Math.max(0, player(s, ctx.controller).energy ?? 0);
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payEnergy", options: ["0"], numberRange: { min: 0, max: most }, prompt: `${e.text.replace(/~/g, src)}: how much energy?` };
+          return "paused";
+        }
+        const n = Number(sc.payX);
+        const p = player(s, ctx.controller);
+        p.energy = (p.energy ?? 0) - n;
+        log(s, `${p.name} pays ${n} energy for ${src}.`);
+        sc.may = true;
+      }
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
       if (e.payX && e.pay?.mana && sc.may === undefined) {
         if (sc.payX === undefined) {

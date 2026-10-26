@@ -1286,6 +1286,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // (Paladin Class): both until end of turn.
   text = text.replace(/(^|\. )[Uu]ntil end of turn, (target [a-z ]*?creature) gets ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gains ([a-z ]+)\./, (_, a, t, pt, per, kw) => `${a}${t.charAt(0).toUpperCase()}${t.slice(1)} gets ${pt} until end of turn for each ${per}. It gains ${kw} until end of turn.`);
   text = text.replace(/(^|\. )Until end of turn, creatures you control get ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gain ([a-z]+)\./, "$1Creatures you control get $2 until end of turn for each $3. Creatures you control gain $4 until end of turn.");
+  // Haldir, Lórien Lieutenant: "Until end of turn, other Elves you control gain vigilance and get +1/+1 for each +1/+1
+  // counter on ~": the same.
+  text = text.replace(/(^|\. )Until end of turn, (other [A-Z][a-z]+ you control) gain ([a-z]+) and get ([+-]\d+\/[+-]\d+) for each ([^.]+?)\./, (_, a: string, g: string, kw: string, pt: string, per: string) => `${a}${capital(g)} gain ${kw} until end of turn. ${capital(g)} get ${pt} until end of turn for each ${per}.`);
   // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
@@ -4192,6 +4195,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Galvanic Discharge, Harnessed Lightning, Die Young: "Choose target creature. You get {E}{E}{E}, then you may pay any
+    // amount of {E}. ~ deals that much damage to that creature" ("The creature gets -1/-1 until end of turn for each {E}
+    // paid this way"): X energy, chosen as it resolves, at most what you have; paying 0 is paying (rulings, CR 107.14).
+    // ", then" has split the sentence already.
+    const anyEnergy = ctx.spell && /^[Yy]ou may pay any amount of \{E\}$/.test(s);
+    const energyUse = anyEnergy && si + 2 === sentences.length ? (sentences[si + 1] ?? "").replace(/\.$/, "") : "";
+    const energyX = energyUse.replace(/^~ deals that much damage to that (permanent|creature)$/, "~ deals X damage to that $1").replace(/^The creature gets -1\/-1 until end of turn for each \{E\} paid this way$/, "That creature gets -X/-X until end of turn");
+    if (anyEnergy && energyX !== energyUse && ctx.targets.length === 1) {
+      const before = ctx.targets.length;
+      const inner = parseOne(energyX, ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true }, text: `pay any amount of {E}. ${energyUse}` });
+      si++;
+      continue;
+    }
     // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
     const payLifeX = /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
     if (payLifeX) {
@@ -4375,6 +4393,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const reflexive = reflexiveBody(whenCard[2]!, ctx);
       if (!reflexive) return null;
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
+    // Mastermind Plum: "Exile up to one target card from a graveyard. If an artifact card was exiled this way, create a
+    // Treasure token": the target card, if it was chosen and still legal as this resolves (so exiled).
+    const ifCardExiled = /^If an? ((?:[a-z]+ )?[a-z]+) card was exiled this way, (.+)$/.exec(s);
+    if (ifCardExiled) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${ifCardExiled[1]!} card`);
+      if (!t || t.kind !== "card" || t.many || prev?.type !== "exile" || prev.what.ref !== "target" || prev.what.index !== i || prev.what.n || !filter) return null;
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(ifCardExiled[2]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
       continue;
     }
     // "Choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of

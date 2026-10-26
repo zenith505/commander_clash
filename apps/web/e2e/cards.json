@@ -4558,6 +4558,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "42d86827-6459-42fc-86b6-6eb055604c36",
+  "name": "Edge of Autumn",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "If you control four or fewer lands, search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\nCycling—Sacrifice a land. (Sacrifice a land, Discard this card: Draw a card.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5674f6ae-ed5d-441e-a534-b5dd415165fd",
   "name": "Eerie Ultimatum",
   "manaCost": "{W}{W}{B}{B}{B}{G}{G}",
@@ -6008,6 +6036,32 @@
   "set": "m11",
   "releasedAt": "2010-07-16",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ef0f06f1-3991-4897-bf62-d4cab7ec79a0",
+  "name": "Galvanic Discharge",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target creature or planeswalker. You get {E}{E}{E} (three energy counters), then you may pay any amount of {E}. Galvanic Discharge deals that much damage to that permanent.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

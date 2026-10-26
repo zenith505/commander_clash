@@ -805,6 +805,8 @@ export type ObjRef =
       sameName?: { filter: TargetSpec; of?: true };
       /** "~ and that creature each get +2/+0" (Gogo, Mysterious Mime): the source too, while it's still that permanent. */
       andSelf?: true;
+      /** "Each of those creatures you don't control" (Lost in the Maze): only the targets another player controls as it resolves. */
+      notYours?: true;
       /**
        * "Exile target creature card from a graveyard. Create a token that's a copy of it" (The Scarab God): the targeted
        * card wherever this spell or ability has put it since (CR 400.7), copied as that card (rulings).
@@ -2861,7 +2863,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -4832,7 +4834,7 @@ export interface CompiledCard {
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
   /** "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types" (Displaced Dinosaurs): other permanents like this enter with these changes, for as long as they're on the battlefield (CR 614.1c, 614.12). */
   othersEnterAs?: { filter: TargetSpec; mods: Modification[]; text: string }[];
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** n for each mana from a Treasure (Kalain, Reclusive Painter) or an artifact source (Coin of Mastery) spent to cast the entering creature (CR 106.3; none if it wasn't cast). */ perSpentFrom?: "treasure" | "artifact"; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; /** "As long as an opponent lost life this turn, ..." (Vampire Socialite): only while this holds, as the creature would enter. */ while?: StaticCondition; text: string }[];
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** n for each mana from a Treasure (Kalain, Reclusive Painter) or an artifact source (Coin of Mastery) spent to cast the entering creature (CR 106.3; none if it wasn't cast). */ perSpentFrom?: "treasure" | "artifact"; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; /** "As long as an opponent lost life this turn, ..." (Vampire Socialite): only while this holds, as the creature would enter. */ while?: StaticCondition; /** "For each opponent who lost life this turn" (Gev, Scaled Scorch): n times this, counted as the creature would enter. */ per?: Amount; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; /** Counted as it enters: "for each instant and sorcery spell you've cast this turn" (Ral, Leyline Prodigy). */ n: Amount }[];
   entersTappedUnless?: EntersCondition;

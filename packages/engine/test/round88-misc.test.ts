@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { characteristics, isFullySupported, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { characteristics, compileCard, isFullySupported, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 function settle(s: GameState) {
   for (let i = 0; i < 60 && (s.stack.length || s.resolving || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
@@ -34,7 +34,9 @@ const sol = card("Sol Ring", "Artifact", "{1}", { oracleText: "{T}: Add {C}{C}."
 describe("round 88: cards the new lines made playable", () => {
   it("compile, and the 'it' of a later instruction isn't the spell", () => {
     for (const d of [cacophony, font, kenrith, route, greathearted]) expect(isFullySupported(d), d.name).toBe(true);
-    for (const d of [skywise, berserker]) expect(isFullySupported(d), d.name).toBe(false);
+    expect(isFullySupported(skywise)).toBe(false);
+    // Since round 164: after "put two +1/+1 counters on this creature", "It" is that creature, never the spell.
+    expect(compileCard(berserker).triggers[0]!.body.effects[1]).toMatchObject({ type: "continuous", what: { ref: "self" } });
   });
 
   it("Cacophony Unleashed becomes a legendary 6/6 Nightmare God creature and is still an enchantment (CR 205.1b)", () => {

@@ -813,11 +813,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const o = e.moveTo && (!to || to.id === o0?.id) ? undefined : o0;
       const sc = (s.resolving!.scratch ??= {});
       const picked = (sc.countersPicked ??= {});
-      const n = !o ? 0 : e.moveTo ? Object.values(o.counters).reduce((a, b) => a + Math.max(0, b), 0) : amountNow(s, e.n, ctx);
+      const n = !o ? 0 : e.moveTo ? Object.entries(o.counters).reduce((a, [k, b]) => a + (!e.kinds || e.kinds.includes(k) ? Math.max(0, b) : 0), 0) : amountNow(s, e.n, ctx);
       const left = (k: string) => (o!.counters[k] ?? 0) - (picked[k] ?? 0);
       const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
       while (o && count() < n && !sc.countersDone) {
-        const kinds = Object.keys(o.counters).filter((k) => left(k) > 0 && !countersStay(s, o, k));
+        const kinds = Object.keys(o.counters).filter((k) => left(k) > 0 && !countersStay(s, o, k) && (!e.kinds || e.kinds.includes(k)));
         if (!kinds.length) break;
         if (sc.counterKind !== undefined) {
           if (sc.counterKind === "done") sc.countersDone = true;

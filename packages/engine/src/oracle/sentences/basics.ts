@@ -495,6 +495,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
     return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
   }
+  // The Tabernacle at Pendrell Vale's granted "At the beginning of your upkeep, destroy this creature unless you pay {1}":
+  // pay to keep it, or it's destroyed (and can be regenerated).
+  if ((m = /^[Dd]estroy ~ unless you pay (\{\d+\})$/.exec(s))) return [{ type: "may", effects: [], pay: { mana: m[1]! }, otherwise: [{ type: "destroy", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~` }];
   // Volatile Stormdrake: "sacrifice that creature unless you pay an amount of {E} equal to its mana value", the creature
   // it targeted (now yours): its mana value as this resolves.
   if ((m = /^[Ss]acrifice (that creature) unless you pay an amount of \{E\} equal to its mana value$/.exec(s)) && ctx.lastObjectTarget !== undefined) {
@@ -581,7 +584,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Command Bridge: "sacrifice it unless you tap an untapped permanent you control". Tapping one keeps it; with none
   // untapped, or choosing not to, it's sacrificed.
-  if ((m = /^[Ss]acrifice (~|it) unless you tap an untapped ([a-z]+) you control$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+  // Public Thoroughfare: "an untapped artifact or land you control", either one.
+  if ((m = /^[Ss]acrifice (~|it) unless you tap an untapped ([a-z]+(?: or [a-z]+)?) you control$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const filter = pickFilter(m[2]!);
     if (filter?.kind !== "object") return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, tapped: false, text: `untapped ${filter.text}` }, n: 1, action: "tap" }], otherwise: [sacrificeSelf], keep: true, text: `Tap an untapped ${m[2]} you control to keep ~` }];
@@ -816,6 +820,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "~ deals 2 damage to any target and 1 damage to any other target" (Arc Trail): both at once.
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+?) and ${NUMX} damage to (.+)$`, "i").exec(s))) {
+    // Fear, Fire, Foes!: "... to target creature and 1 damage to each other creature with the same controller": that
+    // creature's controller's other creatures (its last known controller if it's gone, CR 608.2h).
+    if (m[4] === "each other creature with the same controller") {
+      const a = parseDamageRecipient(m[2]!, ctx);
+      if (a?.ref !== "target" || a.n || ctx.targets[a.index]?.kind !== "object") return null;
+      const b: ObjRef = { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creature with the same controller" }, of: { ref: "targetController", index: a.index }, otherThan: a.index };
+      return [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b }];
+    }
     const a = parseDamageRecipient(m[2]!, ctx);
     const b = a && parseDamageRecipient(m[4]!, ctx);
     return a && b ? [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b }] : null;

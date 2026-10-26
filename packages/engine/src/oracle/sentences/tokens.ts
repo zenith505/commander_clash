@@ -51,12 +51,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Cc]reate (.+)$/.exec(s))) {
     // Triplicate Titan: "a ... token with flying, a ... token with vigilance, and a ... token with trample".
     // Farmer Cotton: "X 1/1 white Halfling creature tokens and X Food tokens": a predefined token after one.
+    // Fae Offering: "a Clue token, a Food token, and a Treasure token".
     // Reckoner Bankbuster: "a Treasure token and a 1/1 colorless Pilot creature token with "..."": only split before the
     // quoted ability, the last token's.
     const q = m[1]!.indexOf('"');
-    const parts = (q < 0 ? m[1]! : m[1]!.slice(0, q)).split(/,? and (?=(?:an?|one|two|three|four|five|X) (?:\d+\/\d+ |[A-Z][a-z]+ tokens?$))|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
+    const parts = (q < 0 ? m[1]! : m[1]!.slice(0, q)).split(/,? and (?=(?:an?|one|two|three|four|five|X) (?:\d+\/\d+ |[A-Z][a-z]+ tokens?$))|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )|, (?=an? [A-Z][a-z]+ token,)/);
     if (q >= 0) parts[parts.length - 1] += m[1]!.slice(q);
-    if (parts.length >= 2 && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
+    // Not "your choice of a Clue token, a Food token, or a Treasure token" (The Third Doctor): one of them.
+    if (parts.length >= 2 && !/^your choice of /.test(m[1]!) && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
       const fx = parts.map((x) => parseSentence(`Create ${x}`, ctx));
       if (fx.some((x) => x?.length !== 1 || x[0]!.type !== "createToken" || x[0]!.attacking || x[0]!.attackingEach || x[0]!.attachTo)) return null;
       return [{ type: "together", effects: fx.map((x) => x![0]!) }];
@@ -247,6 +249,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const times = { twice: 2, "three times": 3, "four times": 4, "five times": 5 }[m[2]!]!;
     return Array.from({ length: times }, () => ({ type: "createToken" as const, who: { ref: "you" as const }, n: 1, token: INCUBATOR, counters: { counter: "+1/+1" as const, n: Number(m![1]) } }));
   }
+  // "Incubate 3 X times" (Progenitor Exarch): X incubates, one after another.
+  if ((m = /^[Ii]ncubate (\d+) X times$/.exec(s))) return [{ type: "repeat", n: X, effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token: INCUBATOR, counters: { counter: "+1/+1", n: Number(m[1]) } }] }];
   // Incubate N (CR 701.53a): an Incubator token that enters with N +1/+1 counters on it. "Its controller incubates X".
   if ((m = new RegExp(`^(?:(.+?) )?[Ii]ncubates? ${NUMX}$`).exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

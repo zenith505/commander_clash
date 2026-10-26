@@ -33,6 +33,8 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if ((m = /^a player has (\d+) or less life$/.exec(text))) return { kind: "playerLifeAtMost", n: Number(m[1]) };
   if ((m = new RegExp(`^you have ${NUM} or more opponents$`).exec(text))) return { kind: "opponents", min: num(m[1]!) };
   if (/^it's your first, second, or third turn of the game$/.test(text)) return { kind: "ownTurnAtMost", n: 3 };
+  // Horned Loch-Whale: "enters tapped unless it's your turn".
+  if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   return null;
 }
 
@@ -140,6 +142,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if ((m = /^As long as (enchanted|equipped) permanent is a creature, it (gets .+|has .+)$/.exec(text))) {
     const mods = parseStaticMods(m[2]!);
     return mods ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } } : null;
+  }
+  // The Kaldheim Runes: "As long as enchanted permanent is an Equipment, it has "Equipped creature has flying."" (Rune of
+  // Flight): while it's an Equipment, it has that static ability, which then applies to the creature it's attached to.
+  if ((m = /^As long as enchanted permanent is an Equipment, it (has ".+")$/.exec(text))) {
+    const mods = parseStaticMods(m[1]!);
+    return mods?.length && mods.every((x) => x.kind === "addAbility") ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment" } } } : null;
   }
   // Luxior, Giada's Gift: "Equipped permanent isn't a planeswalker and is a creature in addition to its other types": one
   // type-changing effect (layer 4, CR 613.1d); losing the planeswalker type, it loses its planeswalker subtypes (CR
@@ -550,6 +558,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
+  // Vampire Nocturnus: "the top card of your library is black"; Mul Daya Channelers: "... is a creature card".
+  if ((m = /^the top card of your library is (white|blue|black|red|green)$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: `${m[1]} card` } };
+  if ((m = /^the top card of your library is an? (artifact|creature|enchantment|instant|land|planeswalker|sorcery) card$/.exec(text))) return { kind: "topCardIs", filter: { kind: "object", types: [capital(m[1]!)], text: `${m[1]} card` } };
+  // Tainted Indulgence: "there are five or more mana values among cards in your graveyard".
+  if ((m = new RegExp(`^there are ${NUM} or more mana values among cards in your graveyard$`).exec(text))) return { kind: "amount", amount: { count: { kind: "graveyardManaValues", who: { ref: "you" } } }, min: num(m[1]!) };
   // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
   // enchantment, land and planeswalker (CR 110.4a).
   if ((m = new RegExp(`^there are ${NUM} or more permanent types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!), permanent: true };
@@ -649,6 +662,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
   // Nightpack Ambusher: "if you didn't cast a spell this turn".
   if (/^you didn't cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true };
+  // Fae Offering: "if you've cast both a creature spell and a noncreature spell this turn": one of each.
+  if ((m = /^you've cast both an? ([a-z]+) spell and an? ([a-z]+) spell this turn$/.exec(text))) {
+    const a = parseSearchFilter(`${m[1]!} card`);
+    const b = parseSearchFilter(`${m[2]!} card`);
+    return a && b ? { kind: "allOf", conds: [{ kind: "castCount", n: 1, filter: a }, { kind: "castCount", n: 1, filter: b }] } : null;
+  }
   // Hall of Oracles: "if you've cast an instant or sorcery spell this turn": either kind.
   if ((m = /^you've cast an? ((?!other\b|another\b)[a-z]+(?: or [a-z]+)?) spell this turn$/.exec(text))) {
     const filter = parseSearchFilter(`${m[1]!} card`);
@@ -1817,7 +1836,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (each) {
     // Coat of Arms: "for each other creature on the battlefield that shares at least one creature type with it", "it"
     // each creature it affects, counted for that one.
-    const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
+    // Alpha Status: "Enchanted creature gets +2/+2 for each other creature on the battlefield that shares a creature type
+    // with it": the same, "it" the enchanted creature.
+    const coat = (/^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter") || (/^other creature on the battlefield that shares a creature type with it$/.test(each[4]!) && affects.kind === "attached");
     // Stoneforge Masterwork: "Equipped creature gets +1/+1 for each other creature you control that shares a creature type
     // with it": "it" is the equipped creature, each creature counted once however many types it shares (rulings).
     const masterwork = /^other creature you control that shares a creature type with it$/.test(each[4]!) && affects.kind === "attached";

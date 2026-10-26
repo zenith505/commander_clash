@@ -1653,6 +1653,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = tr.targeted;
         if (!w) return true;
         if (w.spell && item!.kind !== "spell") return false;
+        if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
         const mine = (p: PlayerId) => (w.by === "you" ? p === watcher : w.by === "opponent" ? p !== watcher : true);
         if (!mine(by)) return false;
         return !w.first || !before.some(mine);

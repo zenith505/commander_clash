@@ -478,6 +478,14 @@ export function compile(d: CardDef): CompiledCard {
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")
+      // Kothophed, Soul Hoarder: "a permanent owned by another player": every other player is an opponent (CR 102.3).
+      .replace(/^Whenever a permanent owned by another player is put into a graveyard from the battlefield, /m, "Whenever a permanent an opponent owns is put into a graveyard from the battlefield, ")
+      // Death Tyrant: "Whenever an attacking creature you control or a blocking creature an opponent controls dies, ...":
+      // two trigger events (CR 603.1) no one creature can meet both of, the same as an ability for each.
+      .replace(/^((?:[A-Z][^\n—]* — )?)Whenever (an attacking creature you control) or (a blocking creature an opponent controls) dies, ([^\n]+)$/m, "$1Whenever $2 dies, $4\n$1Whenever $3 dies, $4")
+      // Questing Druid: "Whenever you cast a spell that's white, blue, black, or red": a spell that's any of those colors,
+      // as "a white, blue, black, or red spell" says (CR 105.2).
+      .replace(/^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )*(?:white|blue|black|red|green),? or (?:white|blue|black|red|green)), /m, "Whenever you cast a $1 spell, ")
       .split("\n")
       .map((l) => {
         const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
@@ -3196,8 +3204,8 @@ export function compile(d: CardDef): CompiledCard {
     // creatures you control have trample, lifelink, and ward {2}": ~ once, even as an enchantment creature (one ward,
     // CR 702.21b), and the others.
     // Sylvan Advocate: "As long as you control six or more lands, ~ and land creatures you control get +2/+2": the same, under
-    // the condition.
-    const selfAndOthers = /^(During your turn, |As long as [^,]+, )?~ and (?:other )?([A-Z][a-z]+|[a-z]+ creatures) you control (have|get) (.+)$/.exec(line);
+    // the condition. Vampire Nocturnus: "~ and other Vampire creatures you control get +2/+1 and have flying".
+    const selfAndOthers = /^(During your turn, |As long as [^,]+, )?~ and (?:other )?([A-Z][a-z]+(?: creatures)?|[a-z]+ creatures) you control (have|get) (.+)$/.exec(line);
     const selfOthers = selfAndOthers && [`~ ${selfAndOthers[3] === "have" ? "has" : "gets"} ${selfAndOthers[4]}`, `${selfAndOthers[1] ? "other" : "Other"} ${selfAndOthers[2]} you control ${selfAndOthers[3]} ${selfAndOthers[4]}`].map((t) => (selfAndOthers[1] ? parseConditionalStatic(`${selfAndOthers[1]}${t}`) : parseStatic(t)));
     if (selfOthers?.every((p) => p)) {
       for (const p of selfOthers) out.statics.push({ ...p!, text: line });

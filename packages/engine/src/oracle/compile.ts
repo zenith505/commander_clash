@@ -1432,6 +1432,11 @@ export function compile(d: CardDef): CompiledCard {
       out.landsFromGraveyard = true;
       continue;
     }
+    // Krark's Thumb: "If you would flip a coin, instead flip two coins and ignore one." (CR 705.3, a replacement effect).
+    if (line === "If you would flip a coin, instead flip two coins and ignore one.") {
+      out.flipTwo = true;
+      continue;
+    }
     // Titania, Nature's Force: "You may play Forests from your graveyard." Land cards with that basic land type (CR 305.6).
     const typedYard = /^You may play (Plains|Islands|Swamps|Mountains|Forests) from your graveyard\.$/.exec(line);
     if (typedYard) {
@@ -3006,7 +3011,9 @@ export function compile(d: CardDef): CompiledCard {
       // turn, or casts their second spell each turn, you draw a card": three triggers (rulings: each can trigger).
       /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line) ??
       // Norin the Wary: "When a player casts a spell or a creature attacks, ...": a cast and an attack are never one event.
-      /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line);
+      /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line) ??
+      // Lady Octopus: "Whenever you draw your first or second card each turn": each card is drawn one at a time (CR 121.2).
+      /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast ~ and whenever/.test(line)
@@ -3033,6 +3040,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ ${twice[2]}, ${effect}`]
             : /^When a player casts a spell or a creature attacks, /.test(line)
               ? [`Whenever ${twice[1]}, ${effect}`, `Whenever ${twice[2]}, ${effect}`]
+            : /^Whenever you draw your first or second card each turn, /.test(line)
+              ? [`Whenever you draw your first card each turn, ${effect}`, `Whenever you draw your second card each turn, ${effect}`]
             : twice.length === 5
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)

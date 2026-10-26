@@ -51,7 +51,8 @@ export const INCUBATOR: TokenSpec = {
 
 export function parseToken(power: number, toughness: number, desc: string, withText?: string): TokenSpec | null {
   // desc: "white Soldier", "green and white Elf Warrior", "colorless Thopter artifact"
-  const words = desc.split(/\s+/);
+  // "red, green, and white Sand Warrior" (Sand Scout): three colors or more, with commas.
+  const words = desc.replace(/^((?:[a-z]+, )+)and /, (_, list: string) => `${list.replace(/, /g, " and ")}`).split(/\s+/);
   const colors: Color[] = [];
   const subtypes: string[] = [];
   const types = ["Creature"];

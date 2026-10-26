@@ -4155,8 +4155,9 @@ export function castProblem(
     // Paying an alternative cost that has no X, X is 0 (CR 107.3b); the Shoals' "a red card with mana value X" has one.
     const paid = altCost(d, choices.alt, s, pid, o)!;
     if (x && parseManaCost(d.manaCost).hasX && !parseManaCost(paid.mana).hasX && !paid.costs?.some((c) => xCost(c) || (c.kind === "exileFromHand" && c.mvX))) return "X is 0 unless the cost you pay has X";
-    if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
+    if ((choices.alt === "warp" || choices.alt === "grantedWarp") && o.zone !== "hand" && !(via?.alt === "warp" && choices.alt === "warp")) return "warp works only from your hand"; // CR 702.185a
   }
+  if (via?.alt && choices?.alt !== via.alt) return `${d.name} can be cast from your graveyard only for its ${via.alt} cost`;
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
@@ -6675,6 +6676,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     modes: ab.body.modal ? modes : undefined,
     ...(lki ? { lki } : {}),
     ...(abCost.hasX || ab.loyaltyX || abilityCostsHaveX(ab) ? { x: x ?? 0 } : {}),
+    // A loyalty ability (CR 606.3): "target loyalty ability of a planeswalker" (Verdant Command).
+    ...(ab.loyalty !== undefined || ab.loyaltyX ? { loyalty: true as const } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(costDiscarded.length ? { costDiscarded } : {}),

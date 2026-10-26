@@ -438,11 +438,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", who, youChoose: true, filter, ...(m[3] ? { tapped: true as const } : {}) }];
   }
   // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): the same,
-  // under your control; "from any graveyard" (The Deck of Many Things) the same.
-  if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from (?:a|any) graveyard onto the battlefield under your control$/.exec(s))) {
+  // under your control; "from any graveyard" (The Deck of Many Things) the same; "... onto the battlefield tapped under your
+  // control" (Soul of Windgrace).
+  if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from (?:a|any) graveyard onto the battlefield( tapped)? under your control$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     if (!filter) return null;
-    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", anyGraveyard: true, filter }];
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", anyGraveyard: true, filter, ...(m[2] ? { tapped: true as const } : {}) }];
   }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise into your hand$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrHand" }];
@@ -770,6 +771,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Malcolm: "Draw a card, then discard a card. ... you may cast the discarded card without paying its mana cost": as this
   // resolves (CR 608.2g), from the graveyard it went to; a land card can't be cast (CR 305.9).
   if (/^[Yy]ou may cast the discarded card without paying its mana cost$/.test(s)) return ctx.discardedOne ? [{ type: "castTargetFree", what: { ref: "discarded" } }] : null;
+  // Evercoat Ursine: "you may play one of them without paying its mana cost", the cards its two hideaways exiled: one
+  // of them, chosen as this resolves (rulings).
+  if (/^[Yy]ou may play one of the cards exiled with ~ without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "playLinked", one: true }];
   if ((m = /^You may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {
     if (!m[1]) return [{ type: "playLinked" }];
     const cond = parseStaticCondition(m[1], { affects: { kind: "self" }, mods: [], text: "" });

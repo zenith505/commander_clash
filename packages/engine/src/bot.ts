@@ -234,6 +234,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
     // Sepulchral Primordial: each opponent's creature card comes back under our control.
     if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
+    // Krark's Thumb: keep the won flip.
+    if (pend.kind === "chooseMay" && pend.thumb) return [{ type: "chooseMay", player: pid, yes: true }];
     // Rona, Tolarian Obliterator: a land exiled from a hand at random, ours to put onto the battlefield.
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
     // Dina's Guidance: the creature card found goes into the hand, not the graveyard (bots don't plan reanimation).
@@ -2255,7 +2257,7 @@ function payTribute(s: GameState, id: ObjectId): boolean {
 function graveyardCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   for (const g of graveyardWays(s, obj(s, id), pid)) {
     // A split card's half (an aftermath half): cast as that face.
-    const plan = asFace(s, obj(s, id), g.face, () => castPlan(s, pid, id, false, g.kind));
+    const plan = asFace(s, obj(s, id), g.face, () => castPlan(s, pid, id, false, g.kind, g.alt));
     if (plan) return g.face === undefined ? plan : plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face: g.face } : a));
   }
   return null;

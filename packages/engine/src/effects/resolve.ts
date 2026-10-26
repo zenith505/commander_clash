@@ -553,6 +553,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "opponentsEmptyHanded":
       return opponents(s, ctx.controller).filter((p) => !player(s, p).hand.length);
+    case "opponentsCombatDamagedByName": {
+      // The name the ability says, its source's (CR 201.4); it doesn't matter who controlled those creatures (rulings).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const name = me ? defOf(s, me).name : undefined;
+      return opponents(s, ctx.controller).filter((p) => !!name && !!player(s, p).combatDamagedByNames?.includes(name));
+    }
     case "choseWord":
       return apnap(s, Object.entries(s.resolving?.chose ?? {}).filter(([, w]) => w === ref.option).map(([k]) => Number(k) as PlayerId)).filter((p) => !player(s, p).lost);
     case "choseThisWay":

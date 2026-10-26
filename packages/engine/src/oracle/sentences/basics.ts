@@ -34,6 +34,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (m[2]) n = typeof n === "number" ? 2 * n : { ...n, times: 2 * (n.times ?? 1) };
     return [{ type: "getRad", who, n }];
   }
+  // Klothys, God of Destiny: "you gain 2 life and ~ deals 2 damage to each opponent": two instructions, in order.
+  if ((m = /^(You gain \d+ life) and (~ deals \d+ damage to each opponent)$/.exec(s))) {
+    const first = parseSentence(m[1]!, ctx);
+    const second = first && parseSentence(m[2]!, ctx);
+    return first && second ? [...first, ...second] : null;
+  }
   // "Each creature gets twice -X/-X until end of turn" (Nuclear Fallout): -X/-X with X doubled.
   if ((m = /^(.+? gets?) twice ([+-]X\/[+-]X .+)$/.exec(s))) {
     const fx = parseSentence(`${m[1]} ${m[2]}`, ctx);

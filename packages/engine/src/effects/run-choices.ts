@@ -546,7 +546,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "returnedYoursAtLeast"
             ? (s.resolving!.returnedNontoken ?? []).filter((c) => c === ctx.controller).length >= (e.cond as { n: number }).n
             : e.cond.kind === "rollIn"
-            ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
+            ? e.cond.aboveEvent
+              ? ((r) => r !== undefined && (r > (ctx.event?.amount ?? 0) || r >= ((e.cond as { min?: number }).min ?? Infinity)))(s.resolving!.rolled?.result)
+              : rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "castInMain"

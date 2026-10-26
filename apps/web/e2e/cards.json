@@ -1993,6 +1993,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f32d19d6-8ac1-4744-b2c2-5c9d4cd0da70",
+  "name": "Bottle of Suleiman",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}, Sacrifice this artifact: Flip a coin. If you win the flip, create a 5/5 colorless Djinn artifact creature token with flying. If you lose the flip, this artifact deals 5 damage to you.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b9ac4856-5cdb-479f-b0f5-7fa0b232a5ff",
   "name": "Bottomless Pool // Locker Room",
   "manaCost": "{U} // {4}{U}",
@@ -5026,6 +5048,40 @@
   "set": "dsk",
   "releasedAt": "2024-09-27",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "65c32889-3d70-449f-af76-05385c78c5a9",
+  "name": "Evercoat Ursine",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental Bear",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Bear"
+  ],
+  "oracleText": "Trample\nHideaway 3, hideaway 3 (When this creature enters, look at the top three cards of your library, exile one face down, then put the rest on the bottom in a random order. Then do it again.)\nWhenever this creature deals combat damage to a player, if there are cards exiled with it, you may play one of them without paying its mana cost.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample",
+   "Hideaway"
+  ],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8848,6 +8904,30 @@
   "set": "sld",
   "releasedAt": "2022-06-13",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a97c8482-775c-4f11-9872-25b4f9bfcb1a",
+  "name": "Krark's Thumb",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would flip a coin, instead flip two coins and ignore one.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -15790,6 +15870,40 @@
   "commanderLegal": "legal",
   "set": "avr",
   "releasedAt": "2012-05-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3c307122-bc18-41f1-87d5-ae6b3ca9b8b9",
+  "name": "Timeline Culler",
+  "manaCost": "{B}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Drix Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Drix",
+   "Warlock"
+  ],
+  "oracleText": "Haste\nYou may cast this card from your graveyard using its warp ability.\nWarp—{B}, Pay 2 life. (You may cast this card from your hand or graveyard for its warp cost. If you do, exile this creature at the beginning of the next end step, then you may cast it from exile on a later turn.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Haste",
+   "Warp"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

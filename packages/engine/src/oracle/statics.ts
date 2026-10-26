@@ -181,6 +181,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
+  // Idol of False Gods: "it's a 0/0 creature in addition to its other types and it has annihilator 2".
+  const itsA = /^it's (an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types)(?: and it (has .+))?$/.exec(statement);
+  if (itsA) statement = `~ is ${itsA[1]}${itsA[2] ? ` and ${itsA[2]}` : ""}`;
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
   const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
@@ -531,7 +534,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^the amount of mana spent to cast that spell is greater than ~'s power$/.test(text)) return { kind: "increment", powerOnly: true };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   // "If there are cards exiled with ~" (Valakut Exploration): the cards this object's linked exile took (CR 607.2a).
-  if (/^(?:there are cards|a card is) exiled with ~$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
+  if (/^(?:there are cards|a card is) exiled with (?:~|it)$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
   // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's.
   if (/^it(?: isn't that player's|'s not their| isn't their) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
@@ -575,6 +578,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const filter = parseSearchFilter(`${m[1]!} card`);
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
+  // Stella Lee, Wild Card: "if you've cast three or more spells this turn": of any kind.
+  if ((m = new RegExp(`^you've cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "castCount", n: num(m[1]!), filter: { kind: "card", text: "spell" } };
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
     const filter = parseSearchFilter(`${m[2]!.replace(/ and\/or /g, " or ").replace(/ and /g, " or ")} card`);
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
@@ -1522,7 +1527,14 @@ function parseStaticLine(line: string): StaticAbility | null {
   // solved): types (layer 4), abilities (6) and base power and toughness (7b), CR 613.1.
   const isA = /^~ is (an? \d+\/\d+ .+ in addition to its other types)$/.exec(text);
   if (isA) {
-    const mods = parseIsA(isA[1]!, false);
+    const mods = parseIsA(isA[1]!, false) ?? parseStaticMods(`is ${isA[1]}`);
+    return mods ? { affects: { kind: "self" }, mods, text: line } : null;
+  }
+  // Idol of False Gods: "it's a 0/0 creature in addition to its other types and it has annihilator 2" (the statement of
+  // an "as long as"): the card type in layer 4, the ability in 6, the base power and toughness in 7b (CR 613.1).
+  const isAnd = /^~ is (an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types and has .+)$/.exec(text);
+  if (isAnd) {
+    const mods = parseStaticMods(`is ${isAnd[1]}`);
     return mods ? { affects: { kind: "self" }, mods, text: line } : null;
   }
   const cda = parseDefinedPT(text);

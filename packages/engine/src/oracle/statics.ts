@@ -1414,6 +1414,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
   if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  // On Serra's Wings: "Enchanted creature is legendary, gets +1/+1, and has flying, ...": the legendary supertype added
+  // in the type-changing layer (CR 205.4a, 613.1d), with the rest of the line's bonuses.
+  const legendaryAura = /^Enchanted creature is legendary, (gets [^,]+), and (has .+)$/.exec(text);
+  if (legendaryAura) {
+    const rest = parseStaticLine(`Enchanted creature ${legendaryAura[1]} and ${legendaryAura[2]}.`);
+    return rest && rest.affects.kind === "attached" && !rest.condition ? { ...rest, mods: [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Legendary"] }, ...rest.mods], text: line } : null;
+  }
   // Unable to Scream: "As long as enchanted creature is face down, it can't be turned face up." Only a face-down
   // permanent can be turned face up (CR 702.37e, 701.40b), so it's the same as having it always.
   if (text === "As long as enchanted creature is face down, it can't be turned face up") return { affects: { kind: "attached" }, mods: [{ kind: "cantTurnFaceUp" }], text: line };

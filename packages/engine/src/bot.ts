@@ -33,6 +33,7 @@ import {
   blockProblem,
   blockRequirementProblem,
   cantBlockNow,
+  cantBeBlockedNow,
   provokerOf,
   tapCostCandidates,
   craftCandidates,
@@ -5248,7 +5249,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   }
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
     if (blocks.some((b) => b.attacker === at.id)) continue;
-    if (blockersNeeded(s, at) > 1 || characteristics(s, at).cantBeBlocked) continue;
+    if (blockersNeeded(s, at) > 1 || cantBeBlockedNow(s, at)) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
     const good = canBlock.find((b) => toughness(s, b) > hit(at, b) && !(objHasKeyword(s, at, "Deathtouch") && hit(at, b) > 0));
     const trade = canBlock.find((b) => hit(b, at) >= toughness(s, at));
@@ -5262,7 +5263,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // as it survives all of them together.
   const hurt = (b: GameObject) => blocks.filter((x) => x.blocker === b.id).reduce((n, x) => n + (objHasKeyword(s, obj(s, x.attacker), "Deathtouch") ? Infinity : hit(obj(s, x.attacker), b)), 0);
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
-    if (blocks.some((b) => b.attacker === at.id) || blockersNeeded(s, at) > 1 || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
+    if (blocks.some((b) => b.attacker === at.id) || blockersNeeded(s, at) > 1 || objHasKeyword(s, at, "Deathtouch") || cantBeBlockedNow(s, at)) continue;
     const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + hit(at, b));
     if (extra) blocks.push({ blocker: extra.id, attacker: at.id });
   }

@@ -404,6 +404,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
+  // Get Out: "Return one or two target creatures and/or enchantments you own to your hand": targets you own (CR 108.3),
+  // to their owner's hand, yours.
+  if ((m = /^Return ((?:one or two |up to (?:one|two|three) )?target (?!.*\bspells?\b).+?) you own to your hand$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`Return ${m[1]} to their owners' hands`, ctx);
+    const added = ctx.targets.slice(before);
+    if (!fx || !added.length || added.some((t) => t.kind !== "object" || t.owner || t.controller)) {
+      ctx.targets.length = before;
+      return null;
+    }
+    for (let i = before; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, owner: "you" } as typeof ctx.targets[number];
+    return fx;
+  }
   if (!/^Return target (?:[a-z]+ )*spell(?: you don't control| an opponent controls| or [^,]+)? to/i.test(s) && (m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?|~|it|that card|that creature|those creatures|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands|their owner's hand)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;

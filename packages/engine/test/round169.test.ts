@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
-import { abilityProblem, botActions, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -633,4 +633,224 @@ const cowabunga = card("Cowabunga!", "Sorcery", "{G}", { cmc: 1, oracleText: "Lo
 const incidental = [nobleStand, scolding, cinderWall, stoicEph, zephyr, pantherPounce, butterbur, errandRider, glimmerSeeker, diabolist, wick, ajani, cowabunga];
 describe("Other cards this round", () => {
   it("are fully supported", () => supported(...incidental));
+});
+
+const serraWings = card("On Serra's Wings", "Legendary Enchantment — Aura", "{3}{W}", { cmc: 4, oracleText: "Enchant creature\nEnchanted creature is legendary, gets +1/+1, and has flying, vigilance, and lifelink.", keywords: ["Enchant"] });
+const cruel = card("Cruel Ultimatum", "Sorcery", "{U}{U}{B}{B}{B}{R}{R}", { cmc: 7, oracleText: "Target opponent sacrifices a creature of their choice, discards three cards, then loses 5 life. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." });
+const getOut = card("Get Out", "Instant", "{U}{U}", { cmc: 2, oracleText: "Choose one —\n• Counter target creature or enchantment spell.\n• Return one or two target creatures and/or enchantments you own to your hand." });
+const aberrant = card("Aberrant Return", "Sorcery", "{4}{B}{B}", { cmc: 6, oracleText: "Put one, two, or three target creature cards from graveyards onto the battlefield under your control. Each of them enters with an additional -1/-1 counter on it." });
+const kratos = card("Kratos, God of War", "Legendary Creature — God Warrior", "{R}{R}{R}", { cmc: 3, power: "2", toughness: "3", oracleText: "Double strike\nAll creatures have haste.\nAt the beginning of each player's end step, Kratos deals damage to that player equal to the number of creatures that player controls that didn't attack this turn.", keywords: ["Double strike"] });
+const byrke = card("Byrke, Long Ear of the Law", "Legendary Creature — Rabbit Soldier", "{4}{G}{W}", { cmc: 6, power: "4", toughness: "4", oracleText: "Vigilance\nWhen Byrke enters, put a +1/+1 counter on each of up to two target creatures.\nWhenever a creature you control with a +1/+1 counter on it attacks, double the number of +1/+1 counters on it.", keywords: ["Vigilance","Double"] });
+const venser = card("Venser, the Sojourner", "Legendary Planeswalker — Venser", "{3}{W}{U}", { cmc: 5, loyalty: "3", oracleText: "+2: Exile target permanent you own. Return it to the battlefield under your control at the beginning of the next end step.\n−1: Creatures can't be blocked this turn.\n−8: You get an emblem with \"Whenever you cast a spell, exile target permanent.\"" });
+const hiddenBlade = card("Hidden Blade", "Artifact — Equipment", "{2}", { cmc: 2, oracleText: "Flash\nWhen this Equipment enters, attach it to target creature you control. If that creature is an Assassin, it gains deathtouch until end of turn.\nEquipped creature gets +1/+0 and has first strike.\nEquip {2}", keywords: ["Equip","Flash"] });
+const scaleguard = card("Elite Scaleguard", "Creature — Human Soldier", "{4}{W}", { cmc: 5, power: "2", toughness: "3", oracleText: "When this creature enters, bolster 2. (Choose a creature with the least toughness among creatures you control and put two +1/+1 counters on it.)\nWhenever a creature you control with a +1/+1 counter on it attacks, tap target creature defending player controls.", keywords: ["Bolster"] });
+const rageForger = card("Rage Forger", "Creature — Elemental Shaman", "{2}{R}", { cmc: 3, power: "2", toughness: "2", oracleText: "When this creature enters, put a +1/+1 counter on each other Shaman creature you control.\nWhenever a creature you control with a +1/+1 counter on it attacks, you may have that creature deal 1 damage to target player or planeswalker." });
+const savingGrasp = card("Saving Grasp", "Instant", "{U}", { cmc: 1, oracleText: "Return target creature you own to your hand.\nFlashback {W} (You may cast this card from your graveyard for its flashback cost. Then exile it.)", keywords: ["Flashback"] });
+const inkcaster = card("Tenured Inkcaster", "Creature — Vampire Warlock", "{4}{B}", { cmc: 5, power: "2", toughness: "2", oracleText: "When this creature enters, put a +1/+1 counter on target creature.\nWhenever a creature you control with a +1/+1 counter on it attacks, each opponent loses 1 life and you gain 1 life." });
+const forsaken = card("Forsaken Wastes", "World Enchantment", "{2}{B}", { cmc: 3, oracleText: "Players can't gain life.\nAt the beginning of each player's upkeep, that player loses 1 life.\nWhenever this enchantment becomes the target of a spell, that spell's controller loses 5 life." });
+const undercity = card("Undercity Plague", "Sorcery", "{4}{B}{B}", { cmc: 6, oracleText: "Target player loses 1 life, discards a card, then sacrifices a permanent of their choice.\nCipher (Then you may exile this spell card encoded on a creature you control. Whenever that creature deals combat damage to a player, its controller may cast a copy of the encoded card without paying its mana cost.)", keywords: ["Cipher"] });
+const bonecrusher = card("Bonecrusher Giant", "Creature — Giant", "{2}{R}", { cmc: 3, power: "4", toughness: "3", oracleText: "Whenever this creature becomes the target of a spell, this creature deals 2 damage to that spell's controller." });
+const assassin = (name = "Assassin") => bear({ name, typeLine: "Creature — Human Assassin", subtypes: ["Human", "Assassin"] });
+/** Players pass until `pid`'s end step, answering the end step triggers. */
+const toEnd = (s: GameState, pid: PlayerId) => settle(passUntil(s, "end", pid), pid);
+
+describe("On Serra's Wings", () => {
+  it("is fully supported", () => supported(serraWings));
+  it("makes the enchanted creature legendary, +1/+1, with flying, vigilance and lifelink", () => {
+    const { s, ap } = setup([]);
+    const b = putOnBattlefield(s, ap, bear());
+    const aura = putOnBattlefield(s, ap, serraWings);
+    s.objects[aura]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[b]!).supertypes).toContain("Legendary");
+    expect(pt(s, b)).toBe("3/3");
+    for (const k of ["Flying", "Vigilance", "Lifelink"]) expect(kw(s, b, k)).toBe(true);
+  });
+});
+
+describe("Cruel Ultimatum", () => {
+  it("is fully supported", () => supported(cruel));
+  it("the opponent sacrifices, discards three and loses 5; you return a creature card, draw three and gain 5", () => {
+    let { s, ap, ids, opp } = setup([cruel]);
+    putOnBattlefield(s, ap, swamp);
+    const theirs = putOnBattlefield(s, opp, bear());
+    const dead = into(s, ap, bear({ name: "Dead Bear" }), "graveyard");
+    const life = [s.players[ap]!.life, s.players[opp]!.life];
+    const hands = [handOf(s, ap).length, handOf(s, opp).length];
+    s = settle(run(s, planCast(s, ap, ids[0]!, [{ kind: "player", id: opp }])), ap);
+    for (let i = 0; i < 5 && s.pending; i++) s = settle(run(s, botActions(s, s.pending.player)), ap);
+    expect(zone(s, theirs)).toBe("graveyard");
+    expect(handOf(s, opp).length).toBe(hands[1]! - 3);
+    expect(s.players[opp]!.life).toBe(life[1]! - 5);
+    expect(zone(s, dead)).toBe("hand");
+    expect(handOf(s, ap).length).toBe(hands[0]! - 1 + 1 + 3);
+    expect(s.players[ap]!.life).toBe(life[0]! + 5);
+  });
+});
+
+describe("Bonecrusher Giant", () => {
+  it("is fully supported", () => supported(bonecrusher));
+  it("deals 2 damage to the controller of a spell that targets it", () => {
+    let { s, ap, ids } = setup([shock]);
+    const g = putOnBattlefield(s, ap, bonecrusher);
+    const life = s.players[ap]!.life;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(g)])));
+    expect(s.players[ap]!.life).toBe(life - 2);
+    expect(s.objects[g]!.damage).toBe(2);
+  });
+});
+
+describe("Forsaken Wastes", () => {
+  it("is fully supported", () => supported(forsaken));
+  it("the controller of a spell that targets it loses 5 life", () => {
+    let { s, ap, ids } = setup([card("Disenchant", "Instant", "{1}{W}", { cmc: 2, oracleText: "Destroy target artifact or enchantment." })]);
+    const w = putOnBattlefield(s, ap, forsaken);
+    const life = s.players[ap]!.life;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(w)])));
+    expect(s.players[ap]!.life).toBe(life - 5);
+    expect(zone(s, w)).toBe("graveyard");
+  });
+});
+
+describe("Get Out", () => {
+  it("is fully supported", () => supported(getOut));
+  it("returns one or two target creatures and/or enchantments you own, even ones another player controls", () => {
+    let { s, ap, ids, opp } = setup([getOut]);
+    const mine = putOnBattlefield(s, ap, bear());
+    const stolen = putOnBattlefield(s, ap, bear({ name: "Stolen Bear" }));
+    s.objects[stolen]!.controller = opp;
+    const theirs = putOnBattlefield(s, opp, bear({ name: "Their Bear" }));
+    invalidateCharacteristics(s);
+    expect(planCast(s, ap, ids[0]!, [tgt(theirs)], [1])).toBeNull();
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(mine), tgt(stolen)], [1])));
+    expect(zone(s, mine)).toBe("hand");
+    expect(zone(s, stolen)).toBe("hand");
+    expect(handOf(s, ap)).toContain(stolen);
+  });
+});
+
+describe("Aberrant Return", () => {
+  it("is fully supported", () => supported(aberrant));
+  it("puts up to three creature cards from graveyards onto the battlefield under your control, each with a -1/-1 counter", () => {
+    let { s, ap, ids, opp } = setup([aberrant]);
+    const a = into(s, ap, bear({ name: "A", power: "3", toughness: "3" }), "graveyard");
+    const b = into(s, opp, bear({ name: "B", power: "3", toughness: "3" }), "graveyard");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(a), tgt(b), { kind: "none" }])));
+    for (const id of [a, b]) {
+      expect(zone(s, id)).toBe("battlefield");
+      expect(s.objects[id]!.controller).toBe(ap);
+      expect(pt(s, id)).toBe("2/2");
+    }
+  });
+});
+
+describe("Kratos, God of War", () => {
+  it("is fully supported", () => supported(kratos));
+  it("deals damage to each player at their end step for each creature they control that didn't attack", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, kratos);
+    const attacker = putOnBattlefield(s, ap, bear());
+    putOnBattlefield(s, ap, bear({ name: "Stay Home" }));
+    const life = s.players[ap]!.life;
+    s = attack(s, ap, [{ attacker, defender: opp }]);
+    s = toEnd(s, ap);
+    // Kratos and the bear that stayed home.
+    expect(s.players[ap]!.life).toBe(life - 2);
+  });
+});
+
+describe("Byrke, Long Ear of the Law", () => {
+  it("is fully supported", () => supported(byrke));
+  it("doubles the +1/+1 counters on an attacking creature you control that has one", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, byrke);
+    const a = putOnBattlefield(s, ap, bear());
+    const plain = putOnBattlefield(s, ap, bear({ name: "Plain Bear" }));
+    s.objects[a]!.counters["+1/+1"] = 2;
+    s = settle(attack(s, ap, [{ attacker: a, defender: opp }, { attacker: plain, defender: opp }]), ap);
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(4);
+    expect(s.objects[plain]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+});
+
+describe("Tenured Inkcaster", () => {
+  it("is fully supported", () => supported(inkcaster, scaleguard, rageForger));
+  it("drains each opponent for 1 when a creature you control with a +1/+1 counter attacks", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, inkcaster);
+    const a = putOnBattlefield(s, ap, bear());
+    s.objects[a]!.counters["+1/+1"] = 1;
+    const life = Object.fromEntries(s.turnOrder.map((p) => [p, s.players[p]!.life]));
+    s = settle(attack(s, ap, [{ attacker: a, defender: opp }]), ap);
+    for (const p of s.turnOrder) expect(s.players[p]!.life).toBe(p === ap ? life[p]! + 1 : life[p]! - 1);
+  });
+});
+
+describe("Venser, the Sojourner", () => {
+  it("is fully supported", () => supported(venser));
+  it("−1: creatures can't be blocked this turn, also ones that arrive later", () => {
+    let { s, ap, opp } = setup([]);
+    const v = putOnBattlefield(s, ap, venser);
+    s.objects[v]!.counters.loyalty = 3;
+    const blocker = putOnBattlefield(s, opp, bear());
+    s = resolveAll(run(s, planActivate(s, ap, v, 1)));
+    const later = putOnBattlefield(s, ap, bear({ name: "Later" }));
+    s.objects[later]!.attacking = opp;
+    expect(blockProblem(s, s.objects[blocker]!, s.objects[later]!)).toMatch(/can't be blocked/);
+    s = passUntil(s, "upkeep", next(s, ap));
+    expect(blockProblem(s, s.objects[blocker]!, s.objects[later]!)).toBeNull();
+  });
+});
+
+describe("Hidden Blade", () => {
+  it("is fully supported", () => supported(hiddenBlade));
+  it("attaches to target creature you control, which gains deathtouch if it's an Assassin", () => {
+    for (const isAssassin of [true, false]) {
+      let { s, ap, ids } = setup([hiddenBlade]);
+      const c = putOnBattlefield(s, ap, isAssassin ? assassin() : bear());
+      s = run(s, planCast(s, ap, ids[0]!));
+      for (let i = 0; i < 8 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(c)] }));
+      expect(s.objects[ids[0]!]!.attachedTo).toBe(c);
+      expect(kw(s, c, "First strike")).toBe(true);
+      expect(kw(s, c, "Deathtouch")).toBe(isAssassin);
+    }
+  });
+});
+
+describe("More cards this round", () => {
+  it("are fully supported", () => supported(savingGrasp, undercity));
+});
+
+const goatnap = card("Goatnap", "Sorcery", "{2}{R}", { cmc: 3, oracleText: "Gain control of target creature until end of turn. Untap that creature. It gains haste until end of turn. If that creature is a Goat, it also gets +3/+0 until end of turn." });
+const justiciar = card("Holy Justiciar", "Creature — Human Cleric", "{3}{W}", { cmc: 4, power: "2", toughness: "1", oracleText: "{2}{W}, {T}: Tap target creature. If that creature is a Zombie, exile it." });
+const leonin = card("Ingenious Leonin", "Creature — Cat Soldier", "{4}{W}", { cmc: 5, power: "4", toughness: "4", oracleText: "{3}{W}: Put a +1/+1 counter on another target attacking creature you control. If that creature is a Cat, it gains first strike until end of turn. (It deals combat damage before creatures without first strike.)" });
+const kaseto = card("Kaseto, Orochi Archmage", "Legendary Creature — Snake Wizard", "{1}{G}{U}", { cmc: 3, power: "2", toughness: "2", oracleText: "{G}{U}: Target creature can't be blocked this turn. If that creature is a Snake, it gets +2/+2 until end of turn." });
+const littleBear = card("Little Bear", "Creature — Bear", "{2}{G}", { cmc: 3, power: "3", toughness: "2", oracleText: "Flash\nWhen this creature enters, untap another target creature you control. If that creature is a Bear, put a +1/+1 counter on it.", keywords: ["Flash"] });
+const yipYip = card("Yip Yip!", "Instant — Lesson", "{W}", { cmc: 1, oracleText: "Target creature you control gets +2/+2 until end of turn. If that creature is an Ally, it also gains flying until end of turn." });
+
+describe("If that creature is a ... (Goatnap, Little Bear and others)", () => {
+  it("are fully supported", () => supported(goatnap, justiciar, leonin, kaseto, littleBear, yipYip));
+  it("Little Bear: untaps another creature, and puts a +1/+1 counter on it if it's a Bear", () => {
+    for (const isBear of [true, false]) {
+      let { s, ap, ids } = setup([littleBear]);
+      const c = putOnBattlefield(s, ap, isBear ? bear() : human());
+      s.objects[c]!.tapped = true;
+      s = run(s, planCast(s, ap, ids[0]!));
+      for (let i = 0; i < 8 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(c)] }));
+      expect(s.objects[c]!.tapped).toBe(false);
+      expect(s.objects[c]!.counters["+1/+1"] ?? 0).toBe(isBear ? 1 : 0);
+    }
+  });
+  it("Goatnap: a Goat also gets +3/+0", () => {
+    for (const isGoat of [true, false]) {
+      let { s, ap, ids, opp } = setup([goatnap]);
+      const c = putOnBattlefield(s, opp, isGoat ? bear({ name: "Goat", typeLine: "Creature — Goat", subtypes: ["Goat"] }) : bear());
+      s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(c)])));
+      expect(controllerOf(s, s.objects[c]!)).toBe(ap);
+      expect(pt(s, c)).toBe(isGoat ? "5/2" : "2/2");
+      expect(kw(s, c, "Haste")).toBe(true);
+    }
+  });
 });

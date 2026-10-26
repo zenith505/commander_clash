@@ -770,7 +770,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^(Return|Destroy|Exile) all ([a-z]+) of the color of your choice\b/, "Choose a color. $1 all $2 of the chosen color");
   // Smallpox: "Each player loses 1 life, discards a card, sacrifices a creature of their choice, then sacrifices a land of
   // their choice": one instruction after another, each done by every player at once (rulings), as with ", then".
-  text = text.replace(/^(Each (?:player|opponent) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
+  // Aberrant Return: "Put one, two, or three target creature cards from graveyards onto the battlefield under your
+  // control. Each of them enters with an additional -1/-1 counter on it." It enters with it (CR 614.1c), as with "...
+  // under your control with an additional -1/-1 counter on it".
+  text = text.replace(/^((?:Put|Return) [^.]*target [^.]+ from [^.]*graveyards? (?:to|onto) the battlefield under your control)\. (?:Each of them|It) enters with an additional ([+-]1\/[+-]1) counter on it\./, "$1 with an additional $2 counter on it.");
+  // Cruel Ultimatum: "Target opponent sacrifices a creature of their choice, discards three cards, then loses 5 life. You
+  // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
+  text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
+  text = text.replace(/^((?:Each (?:player|opponent)|Target (?:player|opponent)) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
@@ -3784,7 +3791,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "If it's a Vampire, put a +1/+1 counter on it" (Sorin, Imperious Bloodlord): a creature type, as it is as this resolves.
-    const ifIts =/^If it's (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
+    // Hidden Blade: "Attach it to target creature you control. If that creature is an Assassin, it gains deathtouch ...".
+    const ifIts =/^If (?:it's|that creature is) (not )?an? ([a-z]+(?: [a-z]+)?|[A-Z][a-z]+), (.+)$/.exec(s);
     if (ifIts && (/^[a-z]/.test(ifIts[2]!) || (CREATURE_TYPES.has(ifIts[2]!) && !ifIts[1]))) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
@@ -3796,7 +3804,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Up to one target ... loses all abilities until your next turn. If it's a creature, it also has base power and
       // toughness 2/2 until your next turn" (Azure Beastbinder): with no target chosen, the condition is false.
       const then = ifIts[3]!.replace(/^it also /, "it ");
-      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && ["untap", "tap", "counters", "continuous"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
+      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && ["untap", "tap", "counters", "continuous", "attach"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
         const fx = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
         if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
         const filter: TargetSpec = ifIts[1] ? { kind: "object", types: [], notTypes: types, notColors: [], text: `not ${ifIts[2]}` } : { ...typed, text: ifIts[2]! };

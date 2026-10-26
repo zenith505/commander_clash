@@ -445,13 +445,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
   // "Nontoken creatures you control that entered this turn" (Tromell, Seymour's Butler): ones that entered this turn.
-  // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
+  // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents; "... that
+  // didn't attack this turn" (Kratos, God of War).
   // "Damage to defending player equal to the number of artifacts they control" (Generous Plunderer): the defending player's.
   if (ctx?.defending) p = p.replace(/ (?:they control|defending player controls)$/, " that player controls");
   // "Target player draws X cards and loses X life, where X is the number of creatures they control of the chosen type"
   // (Pact of the Serpent): the player targeted.
   else if (ctx?.lastPlayerTarget !== undefined && !ctx.eventPlayer) p = p.replace(/ they control( of the chosen type)?$/, " that player controls$1");
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
     const theirs = /^(target|that|those) /.test(who);

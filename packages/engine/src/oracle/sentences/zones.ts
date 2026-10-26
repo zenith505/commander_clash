@@ -695,9 +695,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (toThat && !(i === 1 && before?.kind === "card" && before.owner === "you" && before.types?.length === 1 && before.types[0] === "Creature" && !before.many && !before.optional)) return null;
     // "Target Saga card" (Rydia, Summoner of Mist): an enchantment subtype (CR 205.3h), and a Saga isn't an Aura.
     const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || (attach && st === "Aura"));
-    if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || what.n))) return null;
+    if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
     if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
+    // Aberrant Return: one, two, or three target cards, each "with an additional -1/-1 counter on it".
     // "With two additional +1/+1 counters on it" (The Darkness Crystal): it enters with them (CR 614.1c).
     const n = m[5] ? ({ "two additional": 2, "three additional": 3 } as Record<string, number>)[m[5].toLowerCase()] ?? 1 : 0;
     // "Tapped and attacking" (Alesha, Yore-Tiller Nephilim): attacking what its controller chooses (CR 508.4, rulings).
@@ -941,6 +942,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // Venser, the Sojourner: "Creatures can't be blocked this turn": all creatures, also ones that arrive later (rulings).
+  if (/^Creatures can't be blocked this turn$/.test(s)) return [{ type: "cantBeBlockedRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
   // "Until your next turn, those permanents can't attack or block and their activated abilities can't be activated" (Mythos
   // of Vadrok): what detain does, in words (CR 701.35a); mana abilities too (CR 605.1a).
   if ((m = /^Until your next turn, (.+?) can't attack or block and (?:its|their) activated abilities can't be activated$/.exec(s))) {

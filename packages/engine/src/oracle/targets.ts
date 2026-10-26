@@ -927,6 +927,13 @@ export function parseTargetPhrase(
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
   }
+  // Kratos, God of War: "creatures that player controls that didn't attack this turn": not declared as attackers this
+  // turn (CR 508.1a); one put onto the battlefield attacking never attacked (CR 508.4).
+  const didnt = !/, except for creatures that couldn't attack$/.test(p) && / that didn't attack this turn$/.exec(p);
+  if (didnt) {
+    extra.combat = "didntAttackThisTurn";
+    p = p.slice(0, didnt.index);
+  }
   // "Destroy all untapped creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
   // the Witch): the ones that could have been declared as attackers but weren't (rulings).
   const couldnt = / that didn't attack this turn, except for creatures that couldn't attack$/.exec(p);

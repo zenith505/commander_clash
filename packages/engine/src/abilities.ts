@@ -477,6 +477,11 @@ export interface TargetSpec {
    */
   drafted?: true;
   /**
+   * "Shares a color with the most common color among all permanents or a color tied for most common" (Barrin's Unmaking),
+   * or (false) doesn't (Heroic Defiance): see mostCommonColors.
+   */
+  mostCommonColor?: boolean;
+  /**
    * "With mana value less than or equal to the number of cards in its controller's graveyard" (Drown in the Loch): each
    * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
    */
@@ -1563,6 +1568,8 @@ export type StaticCondition =
   | { kind: "life"; min?: number; max?: number; opponent?: true; /** "If each player has 10 or less life" (Cryptolith Fragment): every player still in the game. */ everyone?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
+  /** "As long as white is the most common color among all permanents or is tied for most common" (Ruham Djinn): see mostCommonColors. */
+  | { kind: "mostCommonColor"; color: Color }
   /** "As long as it's blocking or blocked by a Goblin or Orc" (Sting): the permanent this is attached to blocks one or is blocked by one. */
   | { kind: "attachedInCombatWith"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */

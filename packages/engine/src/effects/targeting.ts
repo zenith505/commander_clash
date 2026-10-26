@@ -4,7 +4,7 @@ import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
-import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
+import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
@@ -52,6 +52,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
   if (spec.notColors?.some((col) => c.colors.includes(col))) return false;
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
+  if (spec.mostCommonColor !== undefined) {
+    const most = mostCommonColors(s, view ? (id) => view(s.objects[id]!) : undefined);
+    if (c.colors.some((col) => most.includes(col)) !== spec.mostCommonColor) return false;
+  }
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
   if (spec.owner === "you" && o.owner !== controller) return false;
@@ -293,7 +297,7 @@ function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<Target
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
-  if (spec.bound || spec.drafted) return false; // not worked out yet (see objectMatches); nothing noted in a draft
+  if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;

@@ -360,3 +360,61 @@ describe("Landwalk: snow forestwalk, and blocking as though creatures didn't hav
     expect(blockProblem(s, s.objects[hd]!, s.objects[sw]!)).not.toBeNull(); // swampwalk
   });
 });
+
+const ruham = card("Ruham Djinn", "Creature — Djinn", "{5}{W}", {cmc: 6,power: "5",toughness: "5",keywords: ["First strike"],oracleText: "First strike\nThis creature gets -2/-2 as long as white is the most common color among all permanents or is tied for most common."});
+const zanam = card("Zanam Djinn", "Creature — Djinn", "{5}{U}", {cmc: 6,power: "5",toughness: "6",keywords: ["Flying"],oracleText: "Flying\nThis creature gets -2/-2 as long as blue is the most common color among all permanents or is tied for most common."});
+const defiance = card("Heroic Defiance", "Enchantment — Aura", "{1}{W}", {cmc: 2,keywords: ["Enchant"],oracleText: "Enchant creature\nEnchanted creature gets +3/+3 unless it shares a color with the most common color among all permanents or a color tied for most common."});
+const unmaking = card("Barrin's Unmaking", "Instant", "{1}{U}", {cmc: 2,oracleText: "Return target permanent to its owner's hand if that permanent shares a color with the most common color among all permanents or a color tied for most common."});
+const colored = (name: string, cost: string) => card(name, "Creature — Bear", cost, { power: "2", toughness: "2" });
+
+describe("The most common color among all permanents, or tied for it", () => {
+  it("are fully supported", () => supported(ruham, zanam, defiance, unmaking));
+
+  it("Ruham Djinn gets -2/-2 while white is the most common color or tied; a multicolored permanent counts for each color", () => {
+    const { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const r = putOnBattlefield(s, ap, ruham);
+    // Only white so far: Ruham itself.
+    expect(pt(s, r)).toBe("3/3");
+    putOnBattlefield(s, opp, colored("Red Bear", "{1}{R}"));
+    expect(pt(s, r)).toBe("3/3"); // tied
+    const gr = putOnBattlefield(s, opp, colored("Gruul Bear", "{R}{G}"));
+    expect(pt(s, r)).toBe("5/5"); // red 2, white 1
+    putOnBattlefield(s, ap, colored("Orzhov Bear", "{W}{B}"));
+    expect(pt(s, r)).toBe("3/3"); // red 2, white 2
+    s.battlefield.splice(s.battlefield.indexOf(gr), 1);
+    expect(pt(s, r)).toBe("3/3");
+  });
+
+  it("Zanam Djinn looks at blue, among every player's permanents", () => {
+    const { s, ap } = setup([]);
+    const z = putOnBattlefield(s, ap, zanam);
+    expect(pt(s, z)).toBe("3/4");
+    putOnBattlefield(s, next(s, ap), colored("Green Bear", "{1}{G}"));
+    putOnBattlefield(s, next(s, ap), colored("Green Bear", "{1}{G}"));
+    expect(pt(s, z)).toBe("5/6");
+  });
+
+  it("Heroic Defiance: +3/+3 unless the creature shares a color with a most common color", () => {
+    const { s, ap } = setup([]);
+    const g = putOnBattlefield(s, ap, colored("Green Bear", "{1}{G}"));
+    const d = putOnBattlefield(s, ap, defiance);
+    s.objects[d]!.attachedTo = g;
+    // White (the Aura) and green are tied.
+    expect(pt(s, g)).toBe("2/2");
+    putOnBattlefield(s, ap, colored("White Bear", "{1}{W}"));
+    expect(pt(s, g)).toBe("5/5");
+  });
+
+  it("Barrin's Unmaking returns the target only if it shares a color with a most common color", () => {
+    let { s, ap, ids } = setup([unmaking, unmaking]);
+    const opp = next(s, ap);
+    const g = putOnBattlefield(s, opp, colored("Green Bear", "{1}{G}"));
+    const r = putOnBattlefield(s, opp, colored("Red Bear", "{1}{R}"));
+    putOnBattlefield(s, opp, colored("Red Bear", "{1}{R}"));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(g)])));
+    expect(zone(s, g)).toBe("battlefield");
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(r)])));
+    expect(zone(s, r)).toBe("hand");
+  });
+});

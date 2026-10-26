@@ -905,6 +905,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const c = chars.get(sourceId);
       return !!c && objectMatches(s, cond.filter, src, you, false, undefined, c, (x) => chars.get(x.id));
     }
+    case "mostCommonColor":
+      return mostCommonColors(s, (id) => chars.get(id)).includes(cond.color);
     case "attachedIs": {
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);
@@ -1774,4 +1776,15 @@ function commandersIdentity(s: GameState, pid: PlayerId | undefined): string[] |
   if (pid === undefined) return undefined;
   const cmds = Object.values(s.objects).filter((o) => o.isCommander && o.owner === pid);
   return cmds.length ? [...new Set(cmds.flatMap((o) => s.cards[o.cardId]?.colorIdentity ?? []))] : undefined;
+}
+
+/**
+ * The most common colors among all permanents, those tied included: each permanent counts once for each of its colors
+ * (Ruham Djinn, Heroic Defiance, Barrin's Unmaking). None while no permanent has a color.
+ */
+export function mostCommonColors(s: GameState, view: (id: ObjectId) => Characteristics | undefined = (id) => characteristics(s, s.objects[id]!)): Color[] {
+  const n: Partial<Record<Color, number>> = {};
+  for (const id of s.battlefield) for (const c of view(id)?.colors ?? []) n[c] = (n[c] ?? 0) + 1;
+  const most = Math.max(0, ...Object.values(n));
+  return most ? (Object.keys(n) as Color[]).filter((c) => n[c] === most) : [];
 }

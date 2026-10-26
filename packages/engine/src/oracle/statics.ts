@@ -86,6 +86,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const types = [m[2]!, ...(m[3] ? [m[3]] : [])];
     return { ...st, text: line, condition: { kind: "attachedInCombatWith", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: types, text: types.join(" or ") } } };
   }
+  // Heroic Defiance: "Enchanted creature gets +3/+3 unless it shares a color with the most common color among all
+  // permanents or a color tied for most common".
+  if ((m = /^(Enchanted creature gets [+-]\d+\/[+-]\d+) unless it shares a color with the most common color among all permanents or a color tied for most common$/.exec(text))) {
+    const st = parseStatic(`${m[1]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", mostCommonColor: false, text: "creature that doesn't share a color with the most common color" } } };
+  }
   // "As long as equipped creature is a Human, it gets an additional +1/+1": a second bonus, only for a Human.
   if ((m = /^As long as (enchanted|equipped) creature is an? ([A-Z][a-z]+), it (gets|has) (.+)$/.exec(text)) && CREATURE_TYPES.has(m[2]!)) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);
@@ -519,6 +526,8 @@ export function parseUntargetable(t: string): Untargetable | null {
 
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
+  // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
+  if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {

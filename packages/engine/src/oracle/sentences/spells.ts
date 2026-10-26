@@ -57,6 +57,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "End the turn." (CR 724.1): Sundial of the Infinite, Time Stop.
   if (/^End the turn$/i.test(s)) return [{ type: "endTurn" }];
+  // Obeka, Brute Chronologist: "The player whose turn it is may end the turn" (CR 724.1): that player decides as it
+  // resolves, whoever controls the ability.
+  if (/^The player whose turn it is may end the turn$/.test(s)) return [{ type: "eachMay", who: { ref: "activePlayer" }, effects: [{ type: "endTurn" }], text: "end the turn" }];
+  // Soothsaying: "Shuffle your library."
+  if (/^Shuffle your library$/.test(s)) return [{ type: "shuffle", who: { ref: "you" } }];
   // Controlling another player (CR 723): "You control target player during that player's next turn" (Mindslaver),
   // "you gain control of target opponent during that player's next turn" (Emrakul), "... during their next turn".
   if ((m = /^You (?:gain control of|control) (target player|target opponent) during (?:that player's|their) next turn$/i.exec(s))) {

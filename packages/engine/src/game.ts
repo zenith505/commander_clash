@@ -3024,6 +3024,11 @@ function beginStep(s: GameState, step: Step): void {
   }
   switch (step) {
     case "untap": {
+      // "Players skip their untap steps" (Stasis) replaces the whole step (CR 614.10): no phasing, no untapping.
+      if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).skipUntapSteps)) {
+        log(s, `${player(s, ap).name} skips their untap step.`);
+        return advanceStep(s);
+      }
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       dayNightUntapCheck(s); // CR 502.2
       // "You may choose not to untap ~": the active player decides which permanents will untap (CR 502.3).
@@ -4936,6 +4941,8 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
     // Quick Sliver: any player, whoever controls it.
     if (abilitiesOf(s, o).flashForAll?.some((spec) => printedMatches(spec, d))) return true;
     if (controllerOf(s, o) !== pid) return false;
+    // Final-Word Phantom: any spell, during an opponent's end step.
+    if (abilitiesOf(s, o).flashInOpponentsEndStep && s.step === "end" && s.activePlayer !== pid) return true;
     // Radagast: the first creature spell you cast this turn, those cast before it was on the battlefield counted (rulings).
     const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, s.cards[c.card]!));
     return !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d)) || !!abilitiesOf(s, o).flashForFirst?.some(first);

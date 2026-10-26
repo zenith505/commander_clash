@@ -937,6 +937,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(Search your library for an? [^.,]+? card [^.,]+)\. Put that card onto the battlefield, then shuffle\./g, "$1, put that card onto the battlefield, then shuffle.");
   // Kaya, Geist Hunter: "Exile all cards from all graveyards" is exiling all graveyards.
   text = text.replace(/\b([Ee])xile all cards from all graveyards\b/g, "$1xile all graveyards");
+  // Geth, Lord of the Vault: "Put target ... card ... from an opponent's graveyard onto the battlefield ... Then that player
+  // mills X cards": that player is the card's owner.
+  text = text.replace(/^(Put target [^.]+ card[^.]* from an opponent's graveyard onto the battlefield[^.]*)\. Then that player mills/, "$1. Its owner mills");
   // Sorin of House Markov: "exile ~, then return ~ to the battlefield transformed under ~'s owner's control" ("him").
   // Nicol Bolas, the Ravager: "{4}{U}{B}{R}: Exile ~, then return ~ ...", the same at the start of an ability.
   text = text.replace(/\b([Ee])xile ~, then return ~ to the battlefield transformed under ~'s owner's control\b/g, "$1xile ~, then return it to the battlefield transformed under its owner's control");
@@ -1327,6 +1330,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // control other than ~" (Dawnstrike Vanguard) is "each other creature you control".
   text = text.replace(/\b([Tt])arget (creature|permanent) you control other than ~/g, (_, t: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${w} you control`);
   text = text.replace(/\beach (creature|permanent) you control other than ~/g, "each other $1 you control");
+  // "Exile target nonland permanent other than ~" (Admonition Angel), "target creature other than ~ gets -1/-1" (Weed-Pruner
+  // Poplar): "another target ...", other than the source, when no target comes before it in the sentence.
+  // "Return up to one target nonland permanent other than ~" (Council of Echoes): "up to one other target ...".
+  text = text.replace(/(^|[.:] |, )([^.]*?)\b(?:([Tt])arget|(up to one) target) ((?:non[a-z]+ )?(?:creature|permanent)) other than ~/g, (all, lead: string, before: string, t: string | undefined, upTo: string | undefined, w: string) => (/\btargets?\b/.test(before) ? all : upTo ? `${lead}${before}up to one other target ${w}` : `${lead}${before}${t === "T" ? "A" : "a"}nother target ${w}`));
   // "Each player secretly votes for truth or consequences, then those votes are revealed" is one instruction (a vote whose
   // votes nobody sees until all are made), not two.
   text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
@@ -3548,6 +3555,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si = r.next - 1;
       continue;
     }
+    // Sorin the Mirthless: "Look at the top card of your library. You may reveal that card and put it into your hand. If you
+    // do, you lose life equal to its mana value." Not revealing it leaves it on top (rulings).
+    if (lookTop?.[1] === "your" && /^You may reveal (?:that card|it) and put it into your hand$/.test(sentences[si + 1] ?? "") && /^If you do, you lose life equal to its mana value$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "revealTop", look: true }, { type: "may", effects: [{ type: "revealRevealed" }, { type: "revealTopToHand", life: { who: { ref: "you" } } }], text: "reveal the card and put it into your hand, losing life equal to its mana value" });
+      si += 2;
+      continue;
+    }
     // Kinship: "you may look at the top card of your library. If it shares a creature type with ~, you may reveal it. If
     // you do, [effect]." Looking is only information, so it's always done; revealing is up to the controller even when
     // the card shares a type (rulings on Mudbutton Clanger), and the card stays on top.
@@ -5157,6 +5171,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "destroyedThisWay", ...(yours ? { you: true as const } : {}) }, effects: inner });
+      continue;
+    }
+    // Shredder's Technique: "Destroy target creature or enchantment. If an enchantment was destroyed this way, you lose 2
+    // life": destroyed even if a replacement effect put it elsewhere, an enchantment as it last existed (CR 608.2h).
+    const ifTypeDestroyed = /^If an? (artifact|creature|enchantment|land|planeswalker) was destroyed this way, (.+)$/.exec(s);
+    if (ifTypeDestroyed) {
+      const prev = effects[effects.length - 1];
+      const type = capital(ifTypeDestroyed[1]!);
+      if (prev?.type !== "destroy" || prev.what.ref !== "target" || !ctx.targets[prev.what.index]?.types?.includes(type) || /\b(?:its?|that)\b/.test(ifTypeDestroyed[2]!)) return null;
+      const inner = parseOne(capital(ifTypeDestroyed[2]!), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay", cardType: type }, effects: inner });
       continue;
     }
     // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
@@ -7702,8 +7728,9 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
   // "You create a 2/2 green Wolf creature token and that player mills ten cards" (Sword of Body and Mind): "that player"
-  // after a part about you.
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$|blight \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
+  // after a part about you. "Draw a card and ~ can't be blocked this turn" (Vampire Gourmand), "... and ~ gets +2/+0 until
+  // end of turn" (Reckless Detective).
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|manifest|after this phase|they gain|scry \d+$|surveil \d+$|blight \d+$)\b|~ (?=can't be blocked this turn$|gets [+-]\d+\/[+-]\d+ until end of turn$)|get (?:\{E\}|\w+ \{E\}|an amount of \{E\})|that player (?=mills|draws|discards|loses|gains)(?<=^you [^,]+ and that player ))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

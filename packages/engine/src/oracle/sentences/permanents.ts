@@ -260,6 +260,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
+  // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
+  // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
+  // doesn't return (rulings).
+  if ((m = /^When (another target creature|target creature) dies this turn, return that card to the battlefield under your control$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield under your control", thisTurn: true }] : null;
+  }
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
   if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);

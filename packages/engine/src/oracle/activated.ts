@@ -304,7 +304,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (untapSelf && (tap || symbols.filter((x) => x === "Q").length > 1 || inYard)) return "fail";
   // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
-  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
+  // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
+  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to target creature)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).

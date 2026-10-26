@@ -2893,7 +2893,15 @@ function revealedMay(s: GameState, card: string): boolean | undefined {
   const r = s.resolving;
   if (r?.revealed?.id !== card) return undefined;
   const may = allEffects(r.body.effects).find((e) => e.type === "may" && e.effects.some((x) => "what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed"));
-  if (may?.type !== "may") return undefined;
+  if (may?.type !== "may") {
+    // Sorin the Mirthless: the card, for life equal to its mana value, when that leaves plenty.
+    const toHand = allEffects(r.body.effects).find((e) => e.type === "may" && e.effects.some((x) => x.type === "revealTopToHand"));
+    if (toHand) {
+      const n = defMv(defOf(s, obj(s, card)));
+      return n <= 4 && player(s, r.item.controller).life - n >= 10;
+    }
+    return undefined;
+  }
   return may.effects.some((x) => x.type === "bounce" || x.type === "putOntoBattlefield") ? true : undefined;
 }
 
@@ -2990,6 +2998,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // The Second Doctor: "each player may draw a card. Each opponent who does can't attack you ... during their next turn":
   // the card, unless that player is the only opponent left to attack.
   if (r && e?.type === "eachMay" && e.each && after?.type === "attackBanNextTurn" && pid !== r.item.controller) return opponents(s, pid).length > 1;
+  // Obeka, Brute Chronologist: "the player whose turn it is may end the turn": bots don't end their own turn early.
+  if (r && e?.type === "eachMay" && e.effects.some((x) => x.type === "endTurn")) return false;
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).
@@ -3657,7 +3667,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const discardX = discardXCount(s, pid, id, ab);
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
-      if (ab.body.effects.some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite: bots don't end their turn early
+      if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;

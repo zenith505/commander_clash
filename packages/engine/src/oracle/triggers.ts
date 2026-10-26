@@ -911,7 +911,12 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever a creature you control with deathtouch deals combat damage to a player" (Fynn, the Fangbearer): the
   // keyword as it deals the damage.
-  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+) (deals combat damage to .+)$/.exec(line);
+  // "Whenever a creature you control with a counter on it deals combat damage to a player" (Ray Fillet): any kind.
+  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+|with a counter on it) (deals combat damage to .+)$/.exec(line);
+  // Samut, Vizier of Naktamun: "..., if that creature entered this turn, draw a card": an intervening if (CR 603.4) that
+  // stays true once it is, so it's the same as a creature that entered this turn dealing the damage.
+  const enteredIf = /^(Whenever (?:another|an?) .+? you control deals combat damage to a player), if that creature entered this turn, (.+)$/.exec(line);
+  if (enteredIf) line = `${enteredIf[1]}, ${enteredIf[2]}`;
   // "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix, Guided by Fate): this
   // creature, enchanted or not, or another that matches; each one that deals the damage triggers it once.
   const orSelf = /^Whenever ~ or (an? .+? you control deals combat damage to .+)$/.exec(line);
@@ -932,9 +937,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { subjectIt: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
+  if (enteredIf && (orSelf || filter.enteredThisTurn)) return "fail";
   return {
     event: "creatureYouControlDealsCombatDamageToPlayer",
-    dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
+    dealer: { filter: { ...filter, controller: "you", ...(enteredIf ? { enteredThisTurn: true as const } : {}), text: `${m[2]} you control${enteredIf ? " that entered this turn" : ""}` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
     body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
     ...(m[3] === "a player or battle" ? { orBattle: true as const } : {}),
@@ -2051,7 +2057,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
@@ -2059,8 +2065,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // A milled-cards batch (Infesting Radroach) is watched from graveyards too (see the batch event in effects/triggers.ts).
     if ((!YARD_EVENTS.includes(t.event) && !(t.event === "batch" && t.batch?.milled && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
-    const attach = / attached to that creature$/.test(yard[2]!);
-    if (attach && !(t.event === "permanentEnters" && t.enters?.filter.types?.includes("Creature")) && t.event !== "anotherCreatureYouControlEnters") return "fail";
+    // Sword of the Meek: "..., then attach it to that creature": it returns even if it can't be attached (rulings).
+    const attach = / attached to that creature$|, then attach it to that creature$/.test(yard[2]!);
+    // "When a Ninja you control enters" (Smoke Shroud): a creature type means a creature.
+    const creature = (f: TargetSpec | undefined) => !!f && (!!f.types?.includes("Creature") || (!f.types?.length && !!f.subtypes?.length && f.subtypes.every((x) => CREATURE_TYPES.has(x))));
+    if (attach && !(t.event === "permanentEnters" && creature(t.enters?.filter)) && t.event !== "anotherCreatureYouControlEnters") return "fail";
     const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
     return body ? { ...t, body, zone: "graveyard" } : "fail";
   }

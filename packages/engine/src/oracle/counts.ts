@@ -225,6 +225,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "life", who });
   }
+  // Malignus: "the highest life total among your opponents" (those still in the game).
+  if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });

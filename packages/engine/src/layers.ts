@@ -196,6 +196,8 @@ export interface Characteristics {
   cantTurnFaceUp: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
+  /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
+  cantAttackPlayersOnly: PlayerId[];
   mustBeBlocked: boolean;
   allMustBlock: boolean;
   mustBlock: boolean;
@@ -290,6 +292,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSacrificed: false,
     cantTurnFaceUp: false,
     cantAttackPlayers: [],
+    cantAttackPlayersOnly: [],
     mustBeBlocked: false,
     allMustBlock: false,
     mustBlock: false,
@@ -1350,7 +1353,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackYou": {
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       const you = controllerOfInst(e, chars);
-      if (!c.cantAttackPlayers.includes(you)) c.cantAttackPlayers.push(you);
+      const list = m.playerOnly ? c.cantAttackPlayersOnly : c.cantAttackPlayers;
+      if (!list.includes(you)) list.push(you);
       return;
     }
     case "cantBeBlockedByGreaterPower":

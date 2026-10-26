@@ -139,7 +139,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
       const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
-      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
+      const made = e.by === "created" ? objects(s, { ref: "created" }, ctx) : [];
+      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable || (e.unpreventableX !== undefined && (ctx.x ?? 0) >= e.unpreventableX) ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).

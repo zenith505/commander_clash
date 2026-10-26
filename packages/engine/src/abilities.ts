@@ -197,7 +197,8 @@ export type Count =
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
   | { kind: "colorsOf"; of: ObjRef }
-  | { kind: "life"; who: PlayerRef }
+  /** `highest`: "the highest life total among your opponents" (Malignus): the greatest of theirs, not the sum. */
+  | { kind: "life"; who: PlayerRef; highest?: true }
   /** "The difference" between your starting life total and your life total when it is less (Shadow of Mortality); 0 otherwise. */
   | { kind: "lifeBelowStart" }
   /** "The number of experience counters you have" (CR 122.1). */
@@ -1248,7 +1249,7 @@ export type Modification =
   /** "Can't attack a player it has already attacked this turn" (Port Razer): attacking a planeswalker still can (rulings). */
   | { kind: "cantAttackSamePlayer" }
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
-  | { kind: "cantAttackYou"; /** "That combat" (Illusionist's Gambit): only in the added combat phase with this key. */ combatKey?: number }
+  | { kind: "cantAttackYou"; /** "That combat" (Illusionist's Gambit): only in the added combat phase with this key. */ combatKey?: number; /** Blazing Archon's "can't attack you": the player only, not their planeswalkers or battles (CR 508.1c). */ playerOnly?: true }
   /**
    * "Can't attack those players or planeswalkers they control this combat" (Chaos Dragon): the players, worked out as the
    * effect starts ("highestRoll": the opponents who had the highest result of the last "each player rolls", ties
@@ -1688,7 +1689,8 @@ export type Effect =
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
       /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
       /** `castSpell`: "that spell deals ..." in a cast trigger (Sorcerer Class): the spell, as it last existed if it has left the stack (rulings, CR 608.2h). */
-      by?: "subject" | "attached" | "castSpell" | { target: number };
+      /** `created`: "That creature deals ..." after putting a card onto the battlefield (Too Greedily, Too Deep): the one permanent this resolution put there, if it's still there. */
+      by?: "subject" | "attached" | "castSpell" | "created" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }

@@ -323,6 +323,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
+  // Sword of the Meek: "Return ~ from your graveyard to the battlefield, then attach it to that creature": it returns,
+  // then the Equipment is attached if it can be (CR 701.3b); it stays unattached otherwise (rulings).
+  if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield and then attach it to that creature$/.test(s))
+    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }, { type: "attach", what: { ref: "subject" }, source: { ref: "created" }, equipmentOnly: true }];
   // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
   // battlefield" (Corpse Dance), "put the top creature card of defending player's graveyard onto the battlefield under
   // your control" (Bone Dancer), "Put the top card of your graveyard on the bottom of your library" (Soldevi Digger),

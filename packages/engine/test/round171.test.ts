@@ -1,8 +1,8 @@
 // Round 171: the most played cards, in popularity order, after round 170 (from Haakon, Stromgald Scourge, rank 7,022, on).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
-import { moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { act, bear, card, forest, island, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
+import { attackProblem, moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -316,5 +316,221 @@ describe("Paladin Danse, Steel Maverick", () => {
     s = resolveAll(run(s, planActivate(s, ap, p, 0)));
     expect(zone(s, p)).toBe("exile");
     expect([kw(s, human, "Indestructible"), kw(s, golem, "Indestructible"), kw(s, b, "Indestructible")]).toEqual([true, true, false]);
+  });
+});
+const thundermaw = card("Thundermaw Hellkite", "Creature — Dragon", "{3}{R}{R}", {cmc: 5,power: "5",toughness: "5",keywords: ["Flying","Haste"],oracleText: "Flying\nHaste (This creature can attack and {T} as soon as it comes under your control.)\nWhen this creature enters, it deals 1 damage to each creature with flying your opponents control. Tap those creatures."});
+const fadingHope = card("Fading Hope", "Instant", "{U}", {cmc: 1,keywords: ["Scry"],oracleText: "Return target creature to its owner's hand. If its mana value was 3 or less, scry 1. (Look at the top card of your library. You may put that card on the bottom.)"});
+const brackish = card("Brackish Blunder", "Instant", "{1}{U}", {cmc: 2,keywords: ["Explore"],oracleText: "Return target creature to its owner's hand. If it was tapped, create a Map token. (It's an artifact with \"{1}, {T}, Sacrifice this token: Target creature you control explores. Activate only as a sorcery.\")"});
+const desculpting = card("Desculpting Blast", "Instant", "{1}{U}", {cmc: 2,oracleText: "Return target nonland permanent to its owner's hand. If it was attacking, create a 1/1 colorless Drone artifact creature token with flying and \"This token can block only creatures with flying.\""});
+const samut = card("Samut, Vizier of Naktamun", "Legendary Creature — Human Warrior Cleric", "{1}{R}{G}", {cmc: 3,power: "2",toughness: "3",keywords: ["Vigilance","First strike","Haste"],oracleText: "First strike, vigilance, haste\nWhenever a creature you control deals combat damage to a player, if that creature entered this turn, draw a card."});
+const rayFillet = card("Ray Fillet, Wave Warrior", "Legendary Creature — Fish Mutant", "{2}{U}", {cmc: 3,power: "0",toughness: "2",keywords: ["Flying","Evolve"],oracleText: "Flying\nEvolve (Whenever a creature you control enters, if that creature has greater power or toughness than this creature, put a +1/+1 counter on this creature.)\nWhenever a creature you control with a counter on it deals combat damage to a player, draw a card."});
+const raphael = card("Raphael, the Muscle", "Legendary Creature — Mutant Ninja Turtle", "{4}{R}", {cmc: 5,power: "4",toughness: "4",keywords: ["Partner","Double"],oracleText: "Double all damage that creatures you control with counters on them would deal.\nWhen Raphael enters, create a Mutagen token.\nPartner—Character select (You can have two commanders if both have this ability.)"});
+const archon = card("Blazing Archon", "Creature — Archon", "{6}{W}{W}{W}", {cmc: 9,power: "5",toughness: "6",keywords: ["Flying"],oracleText: "Flying\nCreatures can't attack you."});
+const malignus = card("Malignus", "Creature — Elemental Spirit", "{3}{R}{R}", {cmc: 5,power: "*",toughness: "*",oracleText: "Malignus's power and toughness are each equal to half the highest life total among your opponents, rounded up.\nDamage that would be dealt by this creature can't be prevented."});
+const greedily = card("Too Greedily, Too Deep", "Sorcery", "{5}{B}{R}", {cmc: 7,oracleText: "Put target creature card from a graveyard onto the battlefield under your control. That creature deals damage equal to its power to each other creature."});
+const keyrune = card("Dimir Keyrune", "Artifact", "{3}", {cmc: 3,oracleText: "{T}: Add {U} or {B}.\n{U}{B}: This artifact becomes a 2/2 blue and black Horror artifact creature until end of turn and can't be blocked this turn."});
+const meek = card("Sword of the Meek", "Artifact — Equipment", "{2}", {cmc: 2,keywords: ["Equip"],oracleText: "Equipped creature gets +1/+2.\nEquip {2}\nWhenever a 1/1 creature you control enters, you may return this card from your graveyard to the battlefield, then attach it to that creature."});
+const shroud = card("Smoke Shroud", "Enchantment — Aura", "{1}{U}", {cmc: 2,keywords: ["Enchant"],oracleText: "Enchant creature\nEnchanted creature gets +1/+1 and has flying.\nWhen a Ninja you control enters, you may return this card from your graveyard to the battlefield attached to that creature."});
+const hit = (s: GameState, ap: PlayerId, attackers: string[], defender: PlayerId) => passUntil(attack(s, ap, attackers.map((attacker) => ({ attacker, defender }))), "endCombat", ap);
+
+describe("Round 171, second cards", () => {
+  it("are fully supported", () => supported(thundermaw, fadingHope, brackish, desculpting, samut, rayFillet, raphael, archon, malignus, greedily, keyrune, meek, shroud));
+});
+
+describe("Thundermaw Hellkite", () => {
+  it("1 damage to each creature with flying your opponents control, and taps them", () => {
+    let { s, ap, ids } = setup([thundermaw]);
+    const opp = next(s, ap);
+    const bird = putOnBattlefield(s, opp, card("Big Bird", "Creature — Bird", "{3}{W}", { power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying" }));
+    const walker = putOnBattlefield(s, opp, bear());
+    const mine0 = putOnBattlefield(s, ap, card("My Bird", "Creature — Bird", "{3}{W}", { power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying" }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[bird]!.damage).toBe(1);
+    expect(s.objects[bird]!.tapped).toBe(true);
+    expect([s.objects[walker]!.damage, s.objects[walker]!.tapped]).toEqual([0, false]);
+    expect([s.objects[mine0]!.damage, s.objects[mine0]!.tapped]).toEqual([0, false]);
+  });
+});
+
+describe("Fading Hope and the other bounce-then-if spells", () => {
+  it("Fading Hope: scry 1 if its mana value was 3 or less", () => {
+    let { s, ap, ids } = setup([fadingHope]);
+    const b = putOnBattlefield(s, next(s, ap), bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+    expect(zone(s, b)).toBe("hand");
+    expect(s.pending?.kind).toBe("arrangeTop");
+  });
+  it("Fading Hope: no scry for a bigger creature", () => {
+    let { s, ap, ids } = setup([fadingHope]);
+    const big = putOnBattlefield(s, next(s, ap), card("Big", "Creature — Beast", "{3}{G}{G}", { cmc: 5, power: "5", toughness: "5" }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(big)])));
+    expect(zone(s, big)).toBe("hand");
+    expect(s.pending).toBeFalsy();
+  });
+  it("Brackish Blunder: a Map token only if it was tapped", () => {
+    let { s, ap, ids } = setup([brackish, brackish]);
+    const opp = next(s, ap);
+    const t = putOnBattlefield(s, opp, bear());
+    s.objects[t]!.tapped = true;
+    const u = putOnBattlefield(s, opp, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(t)])));
+    expect(mine(s, ap, "Map Token").length).toBe(1);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(u)])));
+    expect(zone(s, u)).toBe("hand");
+    expect(mine(s, ap, "Map Token").length).toBe(1);
+  });
+  it("Desculpting Blast: a Drone only if it was attacking", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const blast = into(s, opp, desculpting, "hand");
+    for (const l of [island, island]) putOnBattlefield(s, opp, l);
+    const b = putOnBattlefield(s, ap, bear());
+    s = attack(s, ap, [{ attacker: b, defender: opp }]);
+    s = priorityTo(s, opp);
+    s = resolveAll(run(s, planCast(s, opp, blast, [tgt(b)])));
+    expect(zone(s, b)).toBe("hand");
+    expect(mine(s, opp, "Drone Token").length).toBe(1);
+  });
+});
+
+describe("Samut, Vizier of Naktamun", () => {
+  it("draws for a creature that entered this turn dealing combat damage to a player, not for an older one", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    putOnBattlefield(s, ap, samut);
+    const old = putOnBattlefield(s, ap, bear());
+    const fresh = putOnBattlefield(s, ap, card("Hasty Bear", "Creature — Bear", "{1}{R}", { power: "2", toughness: "2", keywords: ["Haste"], oracleText: "Haste" }));
+    s.objects[fresh]!.controlledSinceTurn = s.turn;
+    s.objects[fresh]!.enteredTurn = s.turn;
+    invalidateCharacteristics(s);
+    const hand = handOf(s, ap).length;
+    s = hit(s, ap, [old, fresh], opp);
+    expect(handOf(s, ap).length).toBe(hand + 1);
+  });
+});
+
+describe("Ray Fillet, Wave Warrior", () => {
+  it("draws for each creature with a counter on it that deals combat damage to a player", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    putOnBattlefield(s, ap, rayFillet);
+    const a = putOnBattlefield(s, ap, bear());
+    s.objects[a]!.counters.charge = 1;
+    const b = putOnBattlefield(s, ap, bear());
+    const c = putOnBattlefield(s, ap, bear());
+    s.objects[c]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s);
+    const hand = handOf(s, ap).length;
+    s = hit(s, ap, [a, b, c], opp);
+    expect(handOf(s, ap).length).toBe(hand + 2);
+  });
+});
+
+describe("Raphael, the Muscle", () => {
+  it("doubles the damage creatures you control with counters on them would deal", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    putOnBattlefield(s, ap, raphael);
+    const a = putOnBattlefield(s, ap, bear());
+    s.objects[a]!.counters.shield = 0;
+    s.objects[a]!.counters.charge = 1;
+    const b = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    const life = lifeOf(s, opp);
+    s = hit(s, ap, [a, b], opp);
+    expect(lifeOf(s, opp)).toBe(life - 4 - 2);
+  });
+});
+
+describe("Blazing Archon", () => {
+  it("creatures can't attack you, but can attack your planeswalkers", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    putOnBattlefield(s, opp, archon);
+    const pw = putOnBattlefield(s, opp, card("Test Walker", "Legendary Planeswalker — Test", "{3}", { loyalty: "3" }));
+    s.objects[pw]!.counters.loyalty = 3;
+    const b = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    expect(attackProblem(s, s.objects[b]!, opp)).not.toBeNull();
+    expect(attackProblem(s, s.objects[b]!, opp, true, pw)).toBeNull();
+    expect(attackProblem(s, s.objects[b]!, next(s, opp))).toBeNull();
+  });
+});
+
+describe("Malignus", () => {
+  it("is half the highest life total among your opponents, rounded up", () => {
+    const { s, ap } = setup([]);
+    const m = putOnBattlefield(s, ap, malignus);
+    const opps = s.turnOrder.filter((p) => p !== ap);
+    s.players[opps[0]!]!.life = 13;
+    s.players[opps[1]!]!.life = 25;
+    s.players[opps[2]!]!.life = 7;
+    s.players[ap]!.life = 99;
+    invalidateCharacteristics(s);
+    expect(pt(s, m)).toBe("13/13");
+  });
+});
+
+describe("Too Greedily, Too Deep", () => {
+  it("returns a creature card from a graveyard under your control; it deals damage equal to its power to each other creature", () => {
+    let { s, ap, ids } = setup([greedily]);
+    const opp = next(s, ap);
+    const giant = into(s, opp, card("Hill Giant", "Creature — Giant", "{3}{R}", { cmc: 4, power: "3", toughness: "3" }), "graveyard");
+    const b = putOnBattlefield(s, ap, bear());
+    const big = putOnBattlefield(s, opp, card("Wall", "Creature — Wall", "{3}", { power: "0", toughness: "5" }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(giant)])));
+    const [g] = mine(s, ap, "Hill Giant");
+    expect(g).toBeDefined();
+    expect(s.objects[g!]!.damage).toBe(0);
+    expect(zone(s, b)).toBe("graveyard");
+    expect(s.objects[big]!.damage).toBe(3);
+  });
+});
+
+describe("Dimir Keyrune", () => {
+  it("becomes a 2/2 blue and black Horror artifact creature that can't be blocked this turn", () => {
+    let { s, ap } = setup([]);
+    const k = putOnBattlefield(s, ap, keyrune);
+    s = resolveAll(run(s, planActivate(s, ap, k, 0)));
+    const c = characteristics(s, s.objects[k]!);
+    expect(c.types).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+    expect(c.subtypes).toEqual(["Horror"]);
+    expect(c.colors.sort()).toEqual(["B", "U"]);
+    expect(pt(s, k)).toBe("2/2");
+    const opp = next(s, ap);
+    const blocker = putOnBattlefield(s, opp, bear());
+    s = attack(s, ap, [{ attacker: k, defender: opp }]);
+    expect(blockProblem(s, s.objects[blocker]!, s.objects[k]!)).not.toBeNull();
+  });
+});
+
+describe("Sword of the Meek", () => {
+  it("a 1/1 creature you control enters: return it from your graveyard and attach it", () => {
+    let { s, ap } = setup([]);
+    const sword = into(s, ap, meek, "graveyard");
+    const elf = into(s, ap, card("Llanowar Elves", "Creature — Elf Druid", "{G}", { cmc: 1, power: "1", toughness: "1" }), "hand");
+    s = resolveAll(run(s, planCast(s, ap, elf)));
+    expect(zone(s, sword)).toBe("battlefield");
+    expect(s.objects[sword]!.attachedTo).toBe(elf);
+    expect(pt(s, elf)).toBe("2/3");
+  });
+  it("not for a 2/2", () => {
+    let { s, ap } = setup([]);
+    const sword = into(s, ap, meek, "graveyard");
+    const b = into(s, ap, bear(), "hand");
+    s = resolveAll(run(s, planCast(s, ap, b)));
+    expect(zone(s, sword)).toBe("graveyard");
+  });
+});
+
+describe("Smoke Shroud", () => {
+  it("a Ninja you control enters: return it from your graveyard attached to that Ninja", () => {
+    let { s, ap } = setup([]);
+    const aura = into(s, ap, shroud, "graveyard");
+    const ninja = into(s, ap, card("Ninja", "Creature — Human Ninja", "{1}{U}", { cmc: 2, power: "1", toughness: "1" }), "hand");
+    s = resolveAll(run(s, planCast(s, ap, ninja)));
+    expect(zone(s, aura)).toBe("battlefield");
+    expect(s.objects[aura]!.attachedTo).toBe(ninja);
+    expect(kw(s, ninja, "Flying")).toBe(true);
   });
 });

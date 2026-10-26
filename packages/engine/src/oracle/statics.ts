@@ -1204,6 +1204,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // "Creatures with flying can't attack you or planeswalkers you control" (Sandwurm Convergence, CR 508.1c): "you" is the
   // source's controller.
   if (/^can't attack you or planeswalkers you control$/.test(rest)) return [{ kind: "cantAttackYou" }];
+  // Blazing Archon: "Creatures can't attack you": you, but not your planeswalkers (CR 508.1c).
+  if (/^can't attack you$/.test(rest)) return [{ kind: "cantAttackYou", playerOnly: true }];
   if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
   if (/^can't attack its owner or planeswalkers its owner controls$/.test(rest)) return [{ kind: "cantAttackOwner", planeswalkers: true }];
   // Xantcha: "attacks each combat if able and can't attack its owner or planeswalkers its owner controls".

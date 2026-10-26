@@ -920,6 +920,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Vexing Radgull: "that player gets two rad counters if they don't have any rad counters. Otherwise, proliferate."
   text = text.replace(/(^|\. )[Tt]hat player gets (\w+) rad counters if they don't have any rad counters\. Otherwise,/, (_, lead: string, n: string) => `${lead}If that player has no rad counters, that player gets ${n} rad counters. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Sword of the Meek: "return ~ from your graveyard to the battlefield, then attach it to that creature": one sentence
+  // (sentences/zones.ts), not split at ", then".
+  text = text.replace(/\b([Rr]eturn ~ from your graveyard to the battlefield), then (attach it to that creature)\./, "$1 and then $2.");
+  // Dimir Keyrune: "~ becomes a 2/2 blue and black Horror artifact creature until end of turn and can't be blocked this
+  // turn": two instructions about the same permanent.
+  text = text.replace(/^(~ becomes an? [^.]+? until end of turn) and can't be blocked this turn\./, "$1. ~ can't be blocked this turn.");
   // Ral, Leyline Prodigy: "Draw a card if you control a blue permanent other than ~": another blue permanent.
   text = text.replace(/\bif you control an? ((?:white|blue|black|red|green) (?:permanent|creature)) other than ~\./g, "if you control another $1.");
   // Ral, Monsoon Mage: "If you win the flip, you may exile ~. If you do, return ~ to the battlefield transformed under ~'s
@@ -3813,6 +3819,33 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "continuous", what, mods: [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }], duration: "game" });
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], notSubtypes: ["Vehicle"], text: "not a Vehicle" };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: [{ type: "continuous", what, mods: [{ kind: "setPT", power: Number(notVehicle[1]), toughness: Number(notVehicle[2]) }], duration: "game" }] });
+      si++;
+      continue;
+    }
+    // Too Greedily, Too Deep: "Put target creature card from a graveyard onto the battlefield under your control. That
+    // creature deals damage equal to its power to each other creature." The permanent it became (CR 400.7), if it's
+    // still there, with its power as it resolves.
+    if (/^That creature deals damage equal to its power to each other creature\.?$/.test(sentences[si + 1] ?? "") && /^Put target creature card from (?:a|your) graveyard onto the battlefield(?: under your control)?$/.test(s)) {
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || fx[0]!.type !== "putOntoBattlefield") return null;
+      effects.push(...fx, { type: "damage", amount: { count: { kind: "power", of: { ref: "created" } } }, to: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "each other creature" }, notCreated: true }, by: "created" });
+      si++;
+      continue;
+    }
+    // "Return target creature to its owner's hand. If its mana value was 3 or less, scry 1." (Fading Hope, Perilous
+    // Voyage, Serum Snare), "... If it was tapped, ..." (Brackish Blunder), "If it was attacking, ..." (Desculpting
+    // Blast): the permanent as it last existed on the battlefield (rulings, CR 608.2h), so it's checked just before it
+    // moves, and the rest happens after.
+    const bounceWas = /^[Rr]eturn target [^.]+ to its owner's hand$/.test(s) ? /^If (?:its mana value was (\d+) or less|that permanent had mana value (\d+) or less|it was (tapped|attacking)), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (bounceWas && !/\b(?:it|its|that permanent|that creature)\b/.test(bounceWas[4]!.replace(/"[^"]*"/g, ""))) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "bounce" || ctx.targets[before]!.kind !== "object") return null;
+      const mv = bounceWas[1] ?? bounceWas[2];
+      const filter: TargetSpec = mv ? { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(mv) }, text: `mana value ${mv} or less` } : bounceWas[3] === "tapped" ? { kind: "object", types: [], notTypes: [], notColors: [], tapped: true, text: "tapped" } : { kind: "object", types: [], notTypes: [], notColors: [], combat: "attacking", text: "attacking" };
+      const then = parseOne(capital(bounceWas[4]!), ctx);
+      if (!then || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
       si++;
       continue;
     }
@@ -7261,6 +7294,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
     // "Double the power of each other creature you control until end of turn. Those creatures gain vigilance" (Rhonas).
     if (last?.type === "doublePT" && last.what.ref === "each") ctx.lastGroup = last.what;
+    // Thundermaw Hellkite: "deals 1 damage to each creature with flying your opponents control. Tap those creatures": the
+    // same group, whether or not the damage was prevented or redirected (rulings); nothing leaves mid-resolution.
+    if (last?.type === "damage" && "ref" in last.to && last.to.ref === "each" && last.to.filter.kind === "object" && !last.to.filter.anyOf) ctx.lastGroup = last.to;
     // "Draw a card for each creature you control with a +1/+1 counter on it. Those creatures gain indestructible until end
     // of turn" (Inspiring Call): the ones counted, as it resolves (CR 611.2c).
     if (last?.type === "draw" && typeof last.n === "object" && "count" in last.n && last.n.count.kind === "permanents" && last.n.count.filter.kind === "object") ctx.lastGroup = { ref: "each", filter: last.n.count.filter };

@@ -217,6 +217,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // with suspend, it's suspended again (Arc Blade). If it doesn't resolve, it isn't exiled.
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
   if (/^Exile ~$/i.test(s) && ctx.spell) return [{ type: "exileSpell" }];
+  // Esper Origins: "exile it, then put it onto the battlefield transformed under its owner's control with a finality
+  // counter on it": the spell's card, back face up (CR 712.14a), as a new object (CR 400.7).
+  if (/^[Ee]xile (?:it|~), then put it onto the battlefield transformed under its owner's control with a finality counter on it$/.test(s) && ctx.spell) return [{ type: "exileSpell", thenTransformed: { counter: "finality" } }];
   // Elixir of Immortality: "Shuffle ~ and your graveyard into their owner's library": the permanent into its owner's
   // library if it's still on the battlefield, your graveyard into yours (rulings).
   if (/^Shuffle ~ and your graveyard into their owner's library$/.test(s) && !ctx.spell)
@@ -271,7 +274,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what?.ref === "each" ? [{ type: "shuffleIntoLibrary", what }] : null;
   }
   // "The owner of target nonland permanent shuffles it into their library."
-  if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
+  // Ice Magic: "Target creature's owner shuffles it into their library": the same.
+  if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s) ?? /^([Tt]arget [a-z ]+?)'s owner shuffles it into their library$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
   }

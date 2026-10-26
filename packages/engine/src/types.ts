@@ -824,6 +824,8 @@ export interface StackItem {
   stateIndex?: number;
   /** A Saga's chapter ability: while it's on the stack, the Saga isn't sacrificed (CR 714.4). */
   chapter?: true;
+  /** A Saga's final chapter ability (its greatest chapter number): the Saga's mana value, for "whenever the final chapter ability of a Saga you control resolves" (Narci). */
+  finalChapter?: number;
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
@@ -989,6 +991,8 @@ export interface PendingTrigger {
   body?: AbilityBody;
   /** A Saga's chapter ability (CR 714.4). */
   chapter?: true;
+  /** Its final chapter ability: the Saga's mana value (StackItem.finalChapter). */
+  finalChapter?: number;
   /** Its intervening "if" (CR 603.4), checked again as it resolves. */
   ifCond?: StaticCondition;
 }
@@ -1333,6 +1337,8 @@ export interface TurnLog {
   sacrificed?: { player: PlayerId; types: string[]; subtypes: string[]; /** It was a token (Evendo Brushrazer's "a nontoken permanent"). */ token?: true }[];
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
+  /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
+  plusOnes?: { by: PlayerId; controller: PlayerId; creature: boolean; id: ObjectId; zc: number; n: number }[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
@@ -1854,6 +1860,8 @@ export interface TriggerEventInfo {
   castAlt?: "surge" | "spectacle" | "prowl";
   /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h). */
   spent?: SpentMana;
+  /** A permanent's enters trigger, or a "when you cast this spell" one: how much mana was spent to cast that spell (CR 601.2h). */
+  manaSpent?: number;
 }
 
 export interface Resolving {
@@ -1920,6 +1928,8 @@ export interface Resolving {
   revealed?: { id: ObjectId; zc: number };
   /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */
   exiledTop?: { id: ObjectId; zc: number };
+  /** The card a chooseFromGraveyard with a `chooser` moved, for "that card's mana value" (O-Kagachi Made Manifest). */
+  chosenFromYard?: { id: ObjectId; zc: number };
   /** The cards "exile the top two cards of your library. You may play them" exiled (Bonehoard Dracosaur). */
   impulsed?: ObjectId[];
   /** The cards its "hold" flicker exiled, for the search after it to put onto the battlefield with what it finds. */

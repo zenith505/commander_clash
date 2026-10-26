@@ -15524,6 +15524,96 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4d23b22b-31a5-4eec-b894-2dd5a7138c5a",
+  "name": "The Kami War // O-Kagachi Made Manifest",
+  "manaCost": "{1}{W}{U}{B}{R}{G}",
+  "cmc": 6,
+  "typeLine": "Enchantment — Saga // Enchantment Creature — Dragon Spirit",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI — Exile target nonland permanent an opponent controls.\nII — Return up to one other target nonland permanent to its owner's hand. Then each opponent discards a card.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.",
+  "colors": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Transform",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "The Kami War",
+    "manaCost": "{1}{W}{U}{B}{R}{G}",
+    "typeLine": "Enchantment — Saga",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Saga"
+    ],
+    "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI — Exile target nonland permanent an opponent controls.\nII — Return up to one other target nonland permanent to its owner's hand. Then each opponent discards a card.\nIII — Exile this Saga, then return it to the battlefield transformed under your control.",
+    "colors": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839"
+   },
+   {
+    "name": "O-Kagachi Made Manifest",
+    "manaCost": "",
+    "typeLine": "Enchantment Creature — Dragon Spirit",
+    "supertypes": [],
+    "types": [
+     "Enchantment",
+     "Creature"
+    ],
+    "subtypes": [
+     "Dragon",
+     "Spirit"
+    ],
+    "oracleText": "O-Kagachi Made Manifest is all colors.\nFlying, trample\nWhenever this creature attacks, defending player chooses a nonland card in your graveyard. Return that card to your hand. This creature gets +X/+0 until end of turn, where X is the mana value of that card.",
+    "power": "6",
+    "toughness": "6",
+    "colors": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/3/6/36052532-5028-43a8-9fc4-56221ec867fd.jpg?1783923839"
+   }
+  ]
+ },
+ {
   "oracleId": "b981af39-4ee6-4fbc-9a89-618dcad9dfbf",
   "name": "The Necrobloom",
   "manaCost": "{1}{W}{B}{G}",

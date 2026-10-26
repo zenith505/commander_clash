@@ -5261,6 +5261,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
     if (abilitiesOf(s, o).opponentsCantCastDuringCombat && controllerOf(s, o) !== pid && inCombatPhase(s))
       return `${characteristics(s, o).name}: opponents can't cast spells during combat`;
+    // Angelic Arbiter: an opponent who declared an attacking creature this turn (rulings).
+    if (abilitiesOf(s, o).opponentsWhoAttackedCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && player(s, pid).attackedTurn === s.turn)
+      return `${characteristics(s, o).name}: opponents who attacked with a creature this turn can't cast spells`;
     // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
     const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
@@ -7878,8 +7881,16 @@ function bridged(s: GameState, o: GameObject): boolean {
   return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).attackPowerCapHand && power(s, o) > player(s, controllerOf(s, obj(s, id))).hand.length);
 }
 
+/** Angelic Arbiter: `pid` cast a spell this turn and an opponent of theirs controls an Arbiter, so they can't attack (rulings). */
+export function arbiterStopsAttacks(s: GameState, pid: PlayerId): string | null {
+  if (!(s.castThisTurn ?? []).some((c) => c.player === pid)) return null;
+  const o = s.battlefield.map((id) => obj(s, id)).find((x) => abilitiesOf(s, x).opponentsWhoCastCantAttack && controllerOf(s, x) !== pid);
+  return o ? `${characteristics(s, o).name}: opponents who cast a spell this turn can't attack with creatures` : null;
+}
+
 export function potentialAttackers(s: GameState, pid: PlayerId) {
   const opps = opponents(s, pid);
+  if (arbiterStopsAttacks(s, pid)) return [];
   return creaturesOf(s, pid).filter(
     (o) =>
       !o.tapped &&

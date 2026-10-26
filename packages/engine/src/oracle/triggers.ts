@@ -1859,6 +1859,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
+  // Narci, Fable Singer; Tom Bombadil: "whenever the final chapter ability of a Saga you control resolves": the chapter
+  // ability with the greatest chapter number its Saga has (rulings), once it has finished resolving and left the stack
+  // (rulings); "that Saga's mana value" is the event's amount.
+  const finalChapter = /^Whenever the final chapter ability of a Saga you control resolves, (.+?)(, where X is that Saga's mana value)?\.$/.exec(line);
+  if (finalChapter) {
+    if (/\bthat Saga\b/.test(finalChapter[1]!) || /\bX\b/.test(finalChapter[1]!) !== !!finalChapter[2]) return "fail";
+    const body0 = parseBody(`${capital(finalChapter[1]!)}.`);
+    if (!body0) return "fail";
+    const body = finalChapter[2] ? { ...replaceX(body0, { count: { kind: "eventAmount" } }), text: line.replace(/^[^,]+, /, "") } : body0;
+    return { event: "youFinalChapterResolves", body };
+  }
   // "You may draw a card. Do this only once each turn." (CR 603.2h): it triggers only if its controller hasn't done it
   // this turn; choosing to do it is what counts (rulings on Ancient Cornucopia), so a "no" lets it trigger again.
   const doOnce = /^(.+?) Do this only once each turn\.?$/.exec(line);
@@ -2544,9 +2555,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ dies, if it's not a token, ..." (Vaultborn Tyrant): an intervening if (CR 603.4) on the creature as it last
       // existed (CR 603.10a).
       let ifNotToken = false;
-      const notToken = /^if it's not a token, (.+)$/i.exec(body0);
+      const notToken = /^if it(?:'s not| isn't) a token, (.+)$/i.exec(body0);
       if (notToken) {
-        if (event !== "selfDies") return "fail" as const;
+        // "When ~ enters, if it's not a token" (Life of the Party): a token is one for as long as it exists.
+        if (event !== "selfDies" && event !== "selfEnters") return "fail" as const;
         ifNotToken = true;
         body0 = notToken[1]!;
       }
@@ -2610,7 +2622,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && fewer) {
         // The one return of the card itself, maybe delayed to the next end step.

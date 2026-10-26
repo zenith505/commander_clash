@@ -122,6 +122,17 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.counter === ANY_COUNTER) return Object.values(o?.counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0);
       return o?.counters[c.counter] ?? 0;
     }
+    case "affectedKeywordCount": {
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      if (!o) return 0;
+      const has = characteristics(s, o).keywords.map((k) => k.toLowerCase());
+      return c.keywords.filter((k) => {
+        const w = k.toLowerCase();
+        if (w === "partner") return has.includes("partner") || has.includes("partner with");
+        // "Protection from ...", "hexproof from ...": variants of one keyword (CR 702.11d, 702.16).
+        return has.some((h) => h === w || ((w === "protection" || w === "hexproof") && h.startsWith(`${w} from`)));
+      }).length;
+    }
     case "affectedControllerPoison": {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o ? (s.players[controllerOf(s, o)]?.poison ?? 0) : 0;
@@ -254,6 +265,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "exiledTopManaValue":
       return (s.resolving?.exiledTopCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
+    case "exiledTopMatching": {
+      // A chosen color with none chosen: no card matches.
+      const f = bindChosen(c.filter, ctx.chosen);
+      return f.chosen ? 0 : (s.resolving?.exiledTopCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && printedMatches(f, defOf(s, s.objects[id]!))).length;
+    }
     case "revealedFromHand":
     case "bottomedFromHand":
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
@@ -301,6 +317,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
     case "diedThisTurn":
       return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
+    case "plusOnesPutThisTurn":
+      return (s.turnLog?.plusOnes ?? [])
+        .filter((p) => (!c.byYou || p.by === ctx.controller) && (!c.onYours || p.controller === ctx.controller) && (!c.creature || p.creature) && (!c.self || (p.id === ctx.sourceId && p.zc === (ctx.sourceZc ?? s.objects[p.id]?.zoneChanges ?? 0))))
+        .reduce((a, p) => a + p.n, 0);
     case "tokensCreatedThisTurn":
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
     case "enteredThisTurn":
@@ -659,6 +679,8 @@ function describeCount(c: Count): string {
       return "#cards in hand";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
+    case "affectedKeywordCount":
+      return `#of ${c.keywords.join(", ")} it has`;
     case "affectedCounters":
       return `#${c.counter} counters on it`;
     case "affectedManaValue":
@@ -677,6 +699,8 @@ function describeCount(c: Count): string {
       return "#sacrificed";
     case "milledManaValue":
       return "the total mana value of the milled cards";
+    case "exiledTopMatching":
+      return `#${c.filter.text}s exiled`;
     case "exiledTopManaValue":
       return "the total mana value of the exiled cards";
     case "revealedFromHand":
@@ -747,6 +771,8 @@ function describeCount(c: Count): string {
       return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}`;
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}creatures that died this turn`;
+    case "plusOnesPutThisTurn":
+      return `#+1/+1 counters ${c.byYou ? "you've " : ""}put on ${c.self ? "~" : `${c.onYours ? "your " : ""}${c.creature ? "creatures" : "permanents"}`} this turn`;
     case "tokensCreatedThisTurn":
       return `#${c.subtype ? `${c.subtype} ` : ""}tokens you created this turn`;
     case "enteredThisTurn":

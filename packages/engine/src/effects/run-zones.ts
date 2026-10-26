@@ -1371,6 +1371,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (moved?.zone !== "exile") return;
       if (e.type === "exileSpell") {
         log(s, `${name} is exiled.`);
+        // Esper Origins: then onto the battlefield with its back face up, under its owner's control (CR 712.14a).
+        if (e.thenTransformed) return returnFromExile(s, [moved], (c) => c.owner, src, e.thenTransformed.counter, false, true);
         return;
       }
       moved.counters.time = e.n;
@@ -2222,8 +2224,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             : e.upTo && count >= 99
             ? `any number of ${kind.replace(/\bcard\b/, "cards")}`
             : `${e.upTo ? "up to " : ""}${count} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
-        // Realmbreaker: you choose from their graveyard.
-        s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : p.id, source: src, what: e.youChoose ? `${what} in ${p.name}'s graveyard` : what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+        // Realmbreaker: you choose from their graveyard. O-Kagachi Made Manifest: another player chooses from yours, for you.
+        const chooser = e.chooser ? players(s, e.chooser, ctx).find((pid) => !player(s, pid).lost) : undefined;
+        if (e.chooser && chooser === undefined) return;
+        s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
@@ -2256,6 +2260,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
+      if (e.chooser && found.length === 1) s.resolving!.chosenFromYard = { id: found[0]!, zc: obj(s, found[0]!).zoneChanges ?? 0 };
       if (e.milled) s.resolving!.did = found.length > 0;
       return;
     }

@@ -119,7 +119,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     } else if ((c = new RegExp(`^Tap (another|X|${NUM}) untapped (.+) you control$`).exec(part))) {
       // "Tap another untapped creature you control" (Tyvar, the Pummeler): not the source. "Tap X untapped Knights you
       // control" (Aryel): X is announced as it's activated, and is how many (CR 107.3a, 602.2b).
-      const filter = pickFilter(c[c.length - 1]!);
+      const filter = pickFilter(c[c.length - 1]!.replace(/^([a-z]+)s and\/or ([a-z]+)s$/, "$1 or $2")); // "artifacts and/or creatures" (Warden of the Inner Sky): either
       if (!filter) return "fail";
       extra.push({ kind: "tap", filter: { ...filter, text: `untapped ${c[1] === "another" ? "other " : ""}${filter.text} you control` }, n: c[1] === "another" ? 1 : c[1] === "X" ? 0 : num(c[1]!), ...(/\{T\}/.test(costs) || c[1] === "another" ? { other: true } : {}), ...(c[1] === "X" ? { x: true as const } : {}) });
     } else if ((c = new RegExp(`^Untap ${NUM} tapped (.+) you control$`).exec(part))) {

@@ -1108,10 +1108,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // "For each poison counter its controller has" (Phyresis Outbreak): each controller's creatures get their own amount,
       // counted once now (rulings), as effects with one timestamp.
       const perController = JSON.stringify(e.mods).includes('"affectedControllerPoison"');
-      const groups = perController ? [...new Set(affected.map((id) => controllerOf(s, obj(s, id))))].map((pid) => affected.filter((id) => controllerOf(s, obj(s, id)) === pid)) : [affected];
+      // Akroma, Vision of Ixidor: each creature's own bonus, by the keywords it has now (rulings).
+      const perAffected = JSON.stringify(e.mods).includes('"affectedKeywordCount"');
+      const groups = perAffected ? affected.map((id) => [id]) : perController ? [...new Set(affected.map((id) => controllerOf(s, obj(s, id))))].map((pid) => affected.filter((id) => controllerOf(s, obj(s, id)) === pid)) : [affected];
       const timestamp = s.nextTimestamp++; // CR 613.7b
       for (const group of groups) {
-        const groupMods = perController ? fixMods(s, e.mods, ctx, group[0]) : mods;
+        const groupMods = perController || perAffected ? fixMods(s, e.mods, ctx, group[0]) : mods;
         s.effects.push({
           id: `e${s.nextId++}`,
           timestamp,

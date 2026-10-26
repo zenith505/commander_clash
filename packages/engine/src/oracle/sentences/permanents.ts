@@ -967,6 +967,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const affects = parseAffected(m[1] === "each creature" ? "Each creature" : "Creatures your opponents control");
     return affects ? [{ type: "groupRules", affects, text: m[1]!, mods: [{ kind: "goad", notGoaded: true }], duration: "yourNextTurn" }] : null;
   }
+  // Akroma, Vision of Ixidor: "until end of turn, each other creature you control gets +1/+1 if it has flying, +1/+1 if
+  // it has first strike, and so on for double strike, ...": +1/+1 for each of those keywords it has as this resolves
+  // (rulings).
+  if ((m = /^[Uu]ntil end of turn, each other creature you control gets \+1\/\+1 if it has flying, \+1\/\+1 if it has first strike, and so on for ((?:[a-z ]+, )+and [a-z]+)$/.exec(s)) && !ctx.spell) {
+    const rest = m[1]!.replace(/, and /, ", ").split(", ");
+    const keywords = ["flying", "first strike", ...rest].map((k) => canonicalKeyword(k) ?? (k === "protection" || k === "partner" ? capital(k) : undefined));
+    if (keywords.some((k) => !k)) return null;
+    const n = { count: { kind: "affectedKeywordCount" as const, keywords: keywords as string[] } };
+    return [{ type: "continuous", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "other creature you control" }, other: true }, mods: [{ kind: "modifyPT", power: n, toughness: n }], duration: "endOfTurn" }];
+  }
+  // "The tokens are goaded for the rest of the game" (Life of the Party, Balefang, Rendmaw): goaded by you (CR 701.15),
+  // with no end; still goaded after you leave the game (rulings, CR 800.4a ends only control effects).
+  if ((m = /^The (tokens are|token is) goaded for the rest of the game$/.exec(s)) && (ctx.lastCreatedAny || ctx.lastCreated)) return [{ type: "continuous", what: { ref: "created" }, mods: [{ kind: "goad" }], duration: "game" }];
   // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
   // "Goad all creatures you don't control" (Disrupt Decorum), "goad all suspected creatures" (Nelly Borca): the creatures
   // there as it resolves (CR 611.2c; Disrupt Decorum's ruling: creatures entering later aren't goaded).

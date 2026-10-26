@@ -2564,6 +2564,15 @@ export function compile(d: CardDef): CompiledCard {
       out.compleated = true;
       continue;
     }
+    // Angelic Arbiter: what the opponent did earlier in the turn counts, even before it was there (rulings).
+    if (line === "Each opponent who cast a spell this turn can't attack with creatures.") {
+      out.opponentsWhoCastCantAttack = true;
+      continue;
+    }
+    if (line === "Each opponent who attacked with a creature this turn can't cast spells.") {
+      out.opponentsWhoAttackedCantCast = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during combat.") {
       out.opponentsCantCastDuringCombat = true;
       continue;

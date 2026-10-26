@@ -226,7 +226,12 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
       (o.counterTimestamps ??= {})[kind] = s.nextTimestamp++;
       invalidateCharacteristics(s);
     }
-    fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m, by: putterNow ?? controllerOf(s, o) });
+    const by = putterNow ?? controllerOf(s, o);
+    if (kind === "+1/+1" && o.zone === "battlefield") {
+      ((s.turnLog ??= {}).plusOnes ??= []).push({ by, controller: controllerOf(s, o), creature: characteristics(s, o).types.includes("Creature"), id: o.id, zc: o.zoneChanges ?? 0, n: m });
+      invalidateCharacteristics(s); // "as long as you've put one or more +1/+1 counters on a creature this turn"
+    }
+    fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m, by });
   }
   return m;
 }

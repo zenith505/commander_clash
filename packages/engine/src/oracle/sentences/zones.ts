@@ -38,6 +38,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Nicol Bolas, the Arisen: "Exile all but the bottom card of target player's library": the top cards, as many as there
+  // are less one.
+  if ((m = /^Exile all but the bottom card of (target player|target opponent)'s library$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "exileTop", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, plus: -1 } }] : null;
+  }
   // Everything Comes to Dust: "Exile all creatures except those that share a creature type with a creature that convoked
   // ~, all artifacts, and all enchantments": an artifact or enchantment creature goes too, as an artifact or enchantment.
   if (s === "Exile all creatures except those that share a creature type with a creature that convoked ~, all artifacts, and all enchantments" && ctx.spell)
@@ -557,6 +563,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const put: Effect = { type: "putFromHand", who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true, ...(m[2] === "any number of" ? { any: true } : {}) };
     ctx.eachChose = true;
     return [put];
+  }
+  // Pendant of Prosperity: "~'s owner may put a land card from their hand onto the battlefield": that player chooses.
+  if ((m = /^~'s owner may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+    const who = parsePlayer("~'s owner", ctx);
+    const filter = parseSearchFilter(m[2]!);
+    if (!who || filter === null) return null;
+    return [{ type: "putFromHand", who, ...(filter ? { filter } : {}), ...(m[3] ? { tapped: true } : {}), may: true }];
   }
   // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
   // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).

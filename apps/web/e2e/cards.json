@@ -9597,6 +9597,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0ee06ed0-717a-4bfa-b634-d00e013c1f16",
+  "name": "Lonis, Cryptozoologist",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Snake Elf Scout",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake",
+   "Elf",
+   "Scout"
+  ],
+  "oracleText": "Whenever another nontoken creature you control enters, investigate.\n{T}, Sacrifice X Clues: Target opponent reveals the top X cards of their library. You may put a nonland permanent card with mana value X or less from among them onto the battlefield under your control. That player puts the rest on the bottom of their library in a random order.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Investigate"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2f9263d7-916f-4535-95d2-888ab73cf339",
   "name": "Luxior, Giada's Gift",
   "manaCost": "{1}",

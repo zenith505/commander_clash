@@ -697,7 +697,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const a = as[0];
       // "Deals damage equal to its power to each of two other target creatures": each one still a legal target, a
       // planeswalker too where it could be targeted (Bite Down). Only fighting needs both to be creatures (CR 701.14b).
-      const bs = e.type === "bite" ? objects(s, e.b, ctx).filter((b) => ["Creature", "Planeswalker", "Battle"].some((t) => objIsType(s, b, t))) : objects(s, e.b, ctx).slice(0, 1).filter((b) => objIsType(s, b, "Creature"));
+      const bs = e.type === "bite" && e.self ? as : e.type === "bite" ? objects(s, e.b, ctx).filter((b) => ["Creature", "Planeswalker", "Battle"].some((t) => objIsType(s, b, t))) : objects(s, e.b, ctx).slice(0, 1).filter((b) => objIsType(s, b, "Creature"));
       if (!a || !bs.length) {
         log(s, `${src}: no damage is dealt.`);
         return;
@@ -706,7 +706,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Noncombat damage from the creatures themselves, all dealt at once: their own deathtouch, lifelink, infect
         // apply. Their power as it resolves (rulings on Living Inferno).
         const events: DamageEvent[] = as.flatMap((x) =>
-          bs.flatMap((b): DamageEvent[] => {
+          (e.self ? [x] : bs).flatMap((b): DamageEvent[] => {
             const src = objectSource(s, x);
             const n = power(s, x);
             // Ram Through: with trample, the damage beyond lethal goes to the creature's controller (CR 120.4a).

@@ -1,8 +1,8 @@
 # Roadmap
 
-24,412 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,262 of
-9,979 (82%).
+24,443 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,285 of
+9,979 (83%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -109,11 +109,25 @@ line blocks.
    Rendmaw ("play a card with two or more card types"), Historian's Boon (the "triggers" variant), Hero of Bretagard
    (an exile trigger counting cards and permanents), Kid Loki (a static for each creature), Abby, Merciless Soldier
    (named tokens plus entering under an opponent's control), Astelli Reclaimer ("mana value X or less" in a target
-   with X the mana spent to cast it), Wurmquake (corrupted, then "another one of those tokens"). Next most played:
-   Pendant of Prosperity, Astrologian's Planisphere, Auron, Venerated Guardian, Torgal, A Fine Hound, The Everflowing
-   Well, Betor, Ancestor's Voice, Lonis, Cryptozoologist, Summon: Esper Valigarmanda, Mirror Shield, Champions of
-   Minas Tirith, Zurzoth, Chaos Rider, Timestream Navigator.
+   with X the mana spent to cast it), Wurmquake (corrupted, then "another one of those tokens"). Out after round 166:
+   The Everflowing Well (a permanent becomes a copy of a spell), Summon: Esper Valigarmanda (cast a card exiled with ~
+   with mana of any type), Champions of Minas Tirith ("that opponent may pay {X}", and "can't attack you" only, not
+   your planeswalkers, per the rulings), Zurzoth, Chaos Rider ("one or more Devils attack one or more players", "those
+   players"), Ashling, Rekindled (mana spendable only on spells with mana value 4 or greater), Gideon's Sacrifice (all
+   damage redirected to one permanent), Expand the Sphere (proliferate "the difference" times), Kellan, the Kid ("from
+   anywhere other than your hand"), The Master, Transcendent ("milled this turn"), Everlasting Torment (all damage as
+   though it had wither), Kotis, the Fangkeeper (cast any number of the exiled spells), Vial Smasher the Fierce (an
+   opponent at random, then that player or their planeswalker), Ragost, Deft Gastronaut (artifacts become Foods with a
+   granted ability), Observed Stasis ("remove enchanted creature from combat"), Eshki, Temur's Roar ("that spell's
+   power"), Pili-Pala ({Q} in a mana ability), Loyal Inventor (the card found goes to your hand or the top of your
+   library by a condition, after the shuffle), Mariposa Military Base ("you may have ~ enter tapped. If you do, ...").
+   Next most played: Lake of the Dead, Progenitor's Icon, Braids, Conjurer Adept, Dinosaurs on a Spaceship, Elspeth
+   Resplendent, Trinisphere, Sadistic Shell Game, The Pride of Hull Clade, Nahiri, Forged in Fury, Grishnákh, Brash
+   Instigator.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 166: Glorious Gale's "if it was a legendary spell" doesn't see a countered copy of a spell
+   (it ceased to exist); bots don't activate Timestream Navigator (they skip abilities that move their source); Wash
+   Out's color is the bot's usual color pick, not the color that hurts opponents most.
    Smaller gaps from round 165: bots don't plan around Angelic Arbiter (they may cast first and lose their attack, or
    attack and lose their spells); Cloud's Limit Break's "with different controllers" is one target per player, so a
    target whose controller changes before it resolves counts as that player's; Gruff Triplets' "named ~" uses the

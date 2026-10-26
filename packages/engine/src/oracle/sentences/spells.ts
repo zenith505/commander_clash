@@ -276,6 +276,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(.+?) deals damage to itself equal to its power$/i.exec(s)) && m[1] !== "~") {
     // The creature is the source of damage to itself (its deathtouch, lifelink, infect apply).
     const a = parseObject(m[1]!, ctx);
+    // Wave of Reckoning: "Each creature deals damage to itself equal to its power": each one, all at the same time.
+    if (a && isGroup(a) && /^each creature\b/i.test(m[1]!)) return [{ type: "bite", a, b: a, self: true }];
     return a && !isGroup(a) && !isSeveral(a) ? [{ type: "bite", a, b: a }] : null;
   }
   // "Each of those creatures deals damage equal to its power to ~" (Polukranos, Living Inferno): each of the targets

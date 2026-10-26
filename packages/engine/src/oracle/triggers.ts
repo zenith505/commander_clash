@@ -1668,6 +1668,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${kickedX[1]}, ${kickedX[2]}.`);
     return t && t !== "fail" && t.event === "selfEnters" ? { ...t, xKicked: true } : "fail";
   }
+  // Mirror Shield's "Whenever a creature with deathtouch blocks or becomes blocked by this creature, destroy that
+  // creature": the same events as "whenever ~ blocks or becomes blocked by a creature with deathtouch" (CR 509.3c, 509.3d).
+  const byIt = /^Whenever (an? creature with [a-z ]+?) blocks or becomes blocked by ~, (.+)$/.exec(line);
+  if (byIt) {
+    const t = parseTrigger(`Whenever ~ blocks or becomes blocked by ${byIt[1]}, ${byIt[2]}`);
+    return t && t !== "fail" && t.event === "selfBlocksOrBlockedByCreature" ? t : "fail";
+  }
   // Sword of Hours: "Whenever equipped creature deals combat damage, roll a d12. If the result is greater than the damage
   // dealt ...": the combat damage it dealt, all of it, the amount the trigger is about.
   const dealtAbove = /^(Whenever (?:~|equipped creature) deals combat damage), (roll a d\d+\. If the result is greater than) the damage dealt (or .+)$/.exec(line);
@@ -2594,6 +2601,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         // Neheb, Dreadhorde Champion: "you may discard any number of cards. If you do, draw that many cards and add that
         // much {R}": how many were discarded, not the damage.
         .replace(/(discard any number of cards\. If you do, draw )that many( cards and add )that much( \{[WUBRGC]\})/, "$1THAT_MANY$2THAT_MUCH$3");
+      // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
+      if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).

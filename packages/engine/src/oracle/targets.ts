@@ -1053,7 +1053,7 @@ export function parseTargetPhrase(
     // Thor, God of Thunder: "target Equipment, instant, or sorcery card from your graveyard": a card of any one of them.
     const listed = phrase.trim().replace(/^target /i, "").replace(/ (?:from|in) (?:your|a|an opponent's) graveyard$/, "");
     const list = /^([A-Z][a-z]+), ([a-z]+), or ([a-z]+) card$/.exec(listed);
-    if (list && /^target /i.test(phrase.trim()) && !Object.keys(extra).length) {
+    if (list && (opts.target || /^target /i.test(phrase.trim())) && !Object.keys(extra).length) {
       const anyOf = [list[1], list[2], list[3]].map((w) => parseTargetPhrase(`${w} card from your graveyard`));
       if (anyOf.some((f) => f?.kind !== "card")) return null;
       return { kind: "card", anyOf: anyOf.map((f) => ({ ...f!, owner: undefined })), ...(owner ? { owner } : {}), text };

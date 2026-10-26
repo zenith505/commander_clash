@@ -3003,6 +3003,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     // permanent, or everything when the damage would leave us low.
     const sac = e.effects.length === 1 && e.effects[0]!.type === "sacrifice" && e.effects[0]!.what.ref === "target" ? r.item.targets?.[e.effects[0]!.what.index] : undefined;
     if (sac?.kind === "object" && s.objects[sac.id]) return life <= 10 || worth(s, pid, s.objects[sac.id]!) <= 2;
+    // Risk Factor: "may have ~ deal 4 damage to them. If that player doesn't, you draw three cards": the damage while it
+    // leaves plenty of life.
+    const hit = e.effects.length === 1 && e.effects[0]!.type === "damage" ? e.effects[0]! : undefined;
+    if (hit?.type === "damage" && typeof hit.amount === "number") return life - hit.amount > 10;
     return allEffects(after.effects).some((x) => x.type === "damage" || x.type === "loseLife") ? life <= 15 : false;
   }
   // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each ..."

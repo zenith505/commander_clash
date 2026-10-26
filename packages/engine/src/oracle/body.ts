@@ -2375,12 +2375,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const haveYou = /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
+    // "Target opponent may have ~ deal 4 damage to them. If that player doesn't, you draw three cards." (Risk Factor): the
+    // same, the damage to that player.
+    const haveDeal = /^(?:Then )?([Tt]arget opponent) may have ~ (deal \d+ damage) to them$/.exec(s);
+    const haveYou = haveDeal ?? /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
     const haveIf = haveYou && /^If (?:the player|that player|they) (doesn't|don't|does|do), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (haveYou && haveIf) {
       const who = parsePlayer(haveYou[1]!.toLowerCase(), ctx);
       if (!who || who.ref === "you") return null;
-      const what = attempt(ctx, () => parseOne(`You ${haveYou[2]!}`, ctx));
+      const what = attempt(ctx, () => parseOne(haveDeal ? `~ ${haveDeal[2]!.replace(/^deal/, "deals")} to that player` : `You ${haveYou[2]!}`, ctx));
       if (!what || what.some((e) => pauses(e))) return null;
       ctx.milledThisWay = true;
       // "You mill X cards, where X is the number of influence counters on ~, and that player loses life equal to ..."
@@ -2398,7 +2401,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = two ? ((a, b) => (a && b ? [...a, ...b] : null))(one(two[1]!), one(two[2]!)) : one(haveIf[2]!);
       ctx.milledThisWay = undefined;
       if (!then) return null;
-      effects.push({ type: "eachMay", who, effects: what, text: `have ~'s controller ${haveYou[2]!}` }, { type: "if", cond: { kind: "theyChose", ...(/n't$/.test(haveIf[1]!) ? { not: true as const } : {}) }, effects: then });
+      effects.push({ type: "eachMay", who, effects: what, text: haveDeal ? `have ~ ${haveDeal[2]!} to them` : `have ~'s controller ${haveYou[2]!}` }, { type: "if", cond: { kind: "theyChose", ...(/n't$/.test(haveIf[1]!) ? { not: true as const } : {}) }, effects: then });
       si++;
       continue;
     }
@@ -4998,10 +5001,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // before it affects, as they were when it resolved (CR 611.2c), the same objects.
     // Recommission: "Return target artifact or creature card ... to the battlefield. If a creature enters this way, it enters
     // with an additional +1/+1 counter on it": judged as it would exist on the battlefield (CR 614.12), part of how it enters.
-    if (/^If a creature enters this way, it enters with an additional \+1\/\+1 counter on it$/.test(s)) {
+    // What Must Be Done: "It enters with two additional +1/+1 counters on it if it's a creature", the same.
+    const ifCreature = /^If a creature enters this way, it enters with an additional \+1\/\+1 counter on it$/.test(s) ? 1 : /^It enters with (two|three) additional \+1\/\+1 counters on it if it's a creature$/.exec(s)?.[1];
+    if (ifCreature) {
       const last = effects[effects.length - 1];
       if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.counters || last.countersFromLast || last.faceDown || last.atNextEndStep) return null;
-      last.counters = { "+1/+1": 1 };
+      last.counters = { "+1/+1": ifCreature === 1 ? 1 : ifCreature === "two" ? 2 : 3 };
       last.countersIfCreature = true;
       continue;
     }
@@ -7635,7 +7640,8 @@ export function scaleAmount(n: Amount, per: AmountExpr): Amount | null {
   if (typeof n !== "number") return null;
   if (n === 0) return 0;
   // "-1/-1 for each Swamp": the count times 1, made negative.
-  return { count: per.count, times: Math.abs(n) * (per.times ?? 1), ...(per.plus ? { plus: Math.abs(n) * per.plus } : {}), ...(n < 0 ? { negate: true } : {}) };
+  // "For each five counters removed this way" (Sage of Hours): each whole group (AmountExpr.per).
+  return { count: per.count, times: Math.abs(n) * (per.times ?? 1), ...(per.per ? { per: per.per } : {}), ...(per.plus ? { plus: Math.abs(n) * per.plus } : {}), ...(n < 0 ? { negate: true } : {}) };
 }
 
 /**

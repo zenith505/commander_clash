@@ -875,6 +875,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Out of the Tombs: "put two eon counters on ~, then mill cards equal to the number of eon counters on it": ~ is the
   // only object named, so "it" is ~.
   text = text.replace(/^([Pp]ut [^.~]+ counters? on ~, then [^.~]+ counters on )it\./, "$1~.");
+  // Wheel and Deal: "Any number of target opponents each discard their hands, then draw seven cards": each of them, as
+  // one wheel (sentences/spells.ts).
+  text = text.replace(/^(Any number of target opponents each) discard their hands, then draw (\w+ cards)\./, "$1 discards their hand, then draws $2.");
   // Forgotten Creation: "you may discard all the cards in your hand. If you do, draw that many cards": both or neither.
   text = text.replace(/^[Yy]ou may discard all the cards in your hand\. If you do, draw that many cards\.$/, "You may discard your hand, then draw that many cards.");
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");

@@ -2973,6 +2973,14 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push(st);
       continue;
     }
+    // Blessed Sanctuary: "Prevent all noncombat damage that would be dealt to you and creatures you control.": a prevention
+    // for you and one for each of those creatures (CR 615.1), read as two.
+    const preventYouAnd = /^Prevent all (combat |noncombat )?damage that would be dealt to you and (creatures|permanents) you control\.$/.exec(line);
+    const youAndParts = preventYouAnd && [parseStatic(`If a source would deal ${preventYouAnd[1] ?? ""}damage to you, prevent that damage.`), parseStatic(`Prevent all ${preventYouAnd[1] ?? ""}damage that would be dealt to ${preventYouAnd[2]} you control.`)];
+    if (youAndParts?.every((p) => p && !p.condition)) {
+      for (const p of youAndParts) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // Tenza, Godo's Maul: "Equipped creature gets +1/+1. As long as it's legendary, it gets an additional +2/+2. As long as
     // it's red, it has trample.": one static ability for each sentence, each "it" the equipped creature.
     const attachedParts = /^(Equipped|Enchanted) creature [^.]+\.(?: As long as it's [^,.]+, it [^.]+\.)+$/.test(line) ? line.split(/(?<=\.) /) : null;

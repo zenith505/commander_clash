@@ -259,9 +259,11 @@ export function parseCostKeyword(
     };
   }
   if ((m = /^Cumulative upkeep(?: |—)(.+?)\.?$/.exec(line))) {
-    const raw = m[1]!.replace(/^Pay /, "");
+    // "Cumulative upkeep {R} or {G}" (Earthen Goo): {R} or {G} for each age counter, chosen each time, which is a hybrid
+    // {R/G} for each (CR 702.24a, 107.4e).
+    const raw = m[1]!.replace(/^Pay /, "").replace(/^\{([WUBRG])\} or \{([WUBRG])\}$/, (x, a: string, b: string) => (a !== b ? `{${a}/${b}}` : x));
     const pay = parsePayCost(raw);
-    if (!pay || (pay.mana && !plainMana(pay.mana))) return "fail"; // "{G} or {W}", "Sacrifice a creature", ...
+    if (!pay || (pay.mana && !plainMana(pay.mana))) return "fail"; // "Sacrifice a creature", ...
     const what = describePayText(pay);
     return {
       trigger: {

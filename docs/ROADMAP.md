@@ -1,6 +1,6 @@
 # Roadmap
 
-24,822 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+24,930 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,544 of
 9,979 (85%).
 
@@ -1108,6 +1108,38 @@ line blocks.
    earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
    "if this spell was cast from exile" conditions on foretell cards (Cosmos Charger), Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
    Death's lures with extra clauses, Kingpin of Crime.
+
+## Lane B (bottom up)
+
+A second lane works up the list from the least played end while the main rounds go down from the top, until the two
+meet (Ken, Oct 26 2026). `npm run popular -- --least` lists the unsupported Commander-legal cards least played first:
+unranked ones, then ranks from the bottom. Lane B keeps its own notes here and leaves the list above to the main rounds.
+
+- Meld results (Brisela, Voice of Nightmares and the like) are left out of `--least`: they only exist melded and are
+  never in a deck (CR 712.4b); their halves are what's supported.
+- Round B1 (ranks 32,272 up to about 31,700, the bottom ~150 unsupported cards): Conspiracy's draft-matters cards with
+  no draft before the game (CR 905.2), prevention shields on ~, you or a player, combat activation conditions,
+  snow landwalk and desertwalk, "can block creatures with landwalk/shadow as though", the most common color, color
+  groups, "can't block black creatures", hybrid cumulative upkeep ("{R} or {G}"), "until end of combat", "sacrifice ~
+  unless you pay {1} for each ...", "When ~ becomes blocked", "more cards in hand than each opponent", targets
+  "blocking ~" / "blocking or blocked by ~", "can't attack if defending player controls ...". +108 (24,930 with round 172).
+- Skipped there, with reasons: Bone Shaman (which creatures a source damaged this turn); Sea Troll and Lurker (whether
+  it blocked or was blocked by something this turn); Lifelace and Purelace (a color change on a spell); Ronom Hulk
+  (protection from snow); Wandering Mage, Samite Censer-Bearer, Pearl Shard, Elvish Healer, Orim's Touch (prevention
+  forms not parsed yet: per-target amounts, "if it's a green creature, 2 instead"); Desert Nomads (prevent damage
+  from Deserts); Balduvian Fallen (mana spent on a cumulative upkeep payment); Viashino Bey (an attack requirement
+  that depends on the declaration itself); Heroism (per-attacker pay-or-prevent); Ogre Enforcer (lethal damage from a
+  single source); Groffskithur ("target card named ~" in a graveyard: a target filter by the source's name); Urborg
+  Panther (a cost that sacrifices creatures by name); Sworn Defender and Lesser Werewolf (power-dependent combat
+  tricks).
+- Next for Lane B, least played first: Possessed Nomad/Centaur/Barbarian (threshold, "is black" and a granted
+  ability), Indentured Oaf and Enchanted Being (prevent damage to or from creatures of a color), Cylian Sunsinger
+  ("each other creature with the same name"), Wormwood Dryad and Treefolk ("gains forestwalk ... and deals 1 damage
+  to you"), Tombfire, Trapfinder's Trick, Endangered Armodon (state trigger), Wirecat, Ivory Guardians, Zealots
+  en-Dal, Vaporous Djinn and Warping Wurm (phase out unless you pay), Psionic Entity and Reckless Embermage ("and 3
+  damage to itself"), Walking Dream, Branded and Veteran Brawlers ("can't block if you control an untapped land"),
+  Skizzik Surger (echo by sacrificing lands), Burning Palm Efreet, Smoke Teller and Aven Soulgazer (look at a
+  face-down creature), Rebuking Ceremony, Vexing Beetle, Goblin Furrier, Monstrous Hound.
 
 ## Known gaps (from earlier rounds)
 

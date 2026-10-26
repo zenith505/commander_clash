@@ -60,8 +60,10 @@ describe("echo and cumulative upkeep", () => {
     supported(troll, remora, lifeAge, mulldrifter, scout, cruise, husk, mangler);
     expect(compileCard(troll).triggers[0]).toMatchObject({ event: "yourUpkeep", ifEcho: true });
     expect(compileCard(lifeAge).triggers[0]!.body.effects[0]).toEqual({ type: "cumulativeUpkeep", pay: { life: 1 } });
-    // Costs with choices or non-mana actions aren't modeled yet.
-    expect(isFullySupported(card("Or Test", "Enchantment", "{G}", { oracleText: "Cumulative upkeep {G} or {W}" }))).toBe(false);
+    // "{G} or {W}" for each age counter is a hybrid {G/W} each (CR 702.24a, 107.4e; Lane B round 1). Other costs with
+    // choices or non-mana actions aren't modeled yet.
+    expect(isFullySupported(card("Or Test", "Enchantment", "{G}", { oracleText: "Cumulative upkeep {G} or {W}" }))).toBe(true);
+    expect(isFullySupported(card("Or Life Test", "Enchantment", "{G}", { oracleText: "Cumulative upkeep—Pay 1 life or sacrifice a creature." }))).toBe(false);
     expect(isFullySupported(card("Discard Echo", "Creature — Ape", "{G}", { power: "1", toughness: "1", oracleText: "Echo—Discard a card." }))).toBe(false);
   });
 

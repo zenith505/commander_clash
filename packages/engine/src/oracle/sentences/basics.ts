@@ -474,6 +474,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Uro: "When ~ enters, sacrifice it unless it escaped" (CR 702.138b): whether it escaped can't change.
   if (/^[Ss]acrifice (?:~|it) unless (?:it|~) escaped$/.test(s) && ctx.selfIt && ctx.lastObjectTarget === undefined)
     return [{ type: "if", cond: { kind: "state", cond: { kind: "self", is: "escaped" } }, effects: [], otherwise: [sacrificeSelf] }];
+  // Megatherium, Extravagant Spirit, Fettergeist, Phantasmal Sphere: "sacrifice ~ unless you pay {1} for each card in your hand", the
+  // number counted as it resolves (CR 608.2h).
+  if ((m = /^(?:[Tt]hen )?[Ss]acrifice (~|it) unless you pay (\{\d+\}) for each (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    // Phantasmal Sphere: "for each +1/+1 counter on it", on ~.
+    const n = parseCount(m[3]!.replace(/ on it$/, " on ~"), ctx, true);
+    if (!n) return null;
+    return [{ type: "may", effects: [], pay: { mana: m[2]! }, payTimes: n, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} for each ${m[3]} to keep ~` }];
+  }
   // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const pay = parsePayCost(m[2]!);
@@ -685,8 +693,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(?:it|that creature) gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.subjectIt && !ctx.spell)
     return [{ type: "pumpPerBlocker", what: { ref: "subject" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: false }];
   // Prevention (CR 615): shields for the next N damage this turn, and Fog.
-  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to (any target|target .+?) this turn$`, "i").exec(s))) {
-    const to = /^any target$/i.test(m[2]!) ? parseDamageRecipient(m[2]!, ctx) : parseObject(m[2]!, ctx);
+  // "... dealt to ~ this turn" (Revered Elder), "to you" (Conservator), "to target player or planeswalker" (Noble Vestige),
+  // "dealt this turn to target creature you control" (Samite Alchemist), "to enchanted creature" (Fylgja).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt (?:to (any target|target .+?|~|it|you|enchanted creature|equipped creature) this turn|this turn to (target .+?|~|you))$`, "i").exec(s))) {
+    const who = (m[2] ?? m[3])!;
+    // "It" in an ability that says nothing else it could be is its source (Balduvian Hydra).
+    const self = /^it$/i.test(who) && !ctx.spell && !ctx.targets.length && !ctx.subject && !ctx.subjectIt;
+    const to = /^(?:any target|target (?:player|opponent) or planeswalker)$/i.test(who) ? parseDamageRecipient(who, ctx) : /^you$/i.test(who) ? ({ ref: "you" } as const) : self ? ({ ref: "self" } as const) : parseObject(who, ctx);
     return to ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];

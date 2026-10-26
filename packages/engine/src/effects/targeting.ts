@@ -4,7 +4,7 @@ import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
-import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
+import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
@@ -51,7 +51,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (o.zone !== "battlefield") return false;
   // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
   // the source (see pickOptions, isLegalTarget).
-  if (spec.bound || spec.saddledSource) return false;
+  if (spec.bound || spec.saddledSource || spec.drafted) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
@@ -60,6 +60,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
   if (spec.notColors?.some((col) => c.colors.includes(col))) return false;
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
+  if (spec.mostCommonColor !== undefined) {
+    const most = mostCommonColors(s, view ? (id) => view(s.objects[id]!) : undefined);
+    if (c.colors.some((col) => most.includes(col)) !== spec.mostCommonColor) return false;
+  }
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
   if (spec.owner === "you" && o.owner !== controller) return false;
@@ -303,7 +307,7 @@ function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<Target
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
-  if (spec.bound) return false; // not worked out yet (see objectMatches)
+  if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
@@ -794,6 +798,19 @@ export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, s
     const lk = s.lastKnown?.[me.id];
     const blocking = onField ? me.blocking : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk.blocking : undefined;
     if (!blocking?.includes(t.id) || s.objects[t.id]?.attacking === undefined) return false;
+  }
+  if (spec.blockingSource && t.kind === "object") {
+    // A creature blocking the source is still blocking it while both are in combat (CR 509.1h, 506.4); one the source
+    // blocks is still attacking.
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    if (!me) return false;
+    const onField = me.zone === "battlefield" && (sourceZc === undefined || (me.zoneChanges ?? 0) === sourceZc);
+    const lk = s.lastKnown?.[me.id];
+    const was = onField ? me : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk : undefined;
+    const o = s.objects[t.id];
+    const blocks = !!was?.blockedBy?.includes(t.id) && o?.blocking !== undefined;
+    const blocked = spec.blockingSource === "either" && !!was?.blocking?.includes(t.id) && o?.attacking !== undefined;
+    if (!blocks && !blocked) return false;
   }
   if ((!spec.lesserPowerThanSource && !spec.greaterPowerThanSource) || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];

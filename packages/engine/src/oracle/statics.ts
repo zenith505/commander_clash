@@ -570,6 +570,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
+  // Sigardian Paladin: "as long as you've put one or more +1/+1 counters on a creature this turn", a creature as the
+  // counter was put on it (rulings); Beast, Erudite Aerialist: on ~ itself; Fairgrounds Trumpeter: "if a +1/+1 counter
+  // was put on a permanent under your control this turn", by anyone (rulings).
+  if (/^you've put one or more \+1\/\+1 counters on a creature this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "plusOnesPutThisTurn", byYou: true, creature: true } }, min: 1 };
+  if (/^you've put one or more \+1\/\+1 counters on ~ this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "plusOnesPutThisTurn", byYou: true, self: true } }, min: 1 };
+  if (/^a \+1\/\+1 counter was put on a permanent under your control this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "plusOnesPutThisTurn", onYours: true } }, min: 1 };
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
@@ -586,8 +592,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
   // "If there are thirty or more counters among artifacts and creatures you control" (Lux Artillery): every kind, added up.
-  if ((m = new RegExp(`^there are ${NUM} or more counters among (.+ you control)$`).exec(text))) {
-    const amount = parseCount(`counters among ${m[2]}`, null);
+  // Tom Bombadil: "as long as there are four or more lore counters among Sagas you control": that kind only.
+  if ((m = new RegExp(`^there are ${NUM} or more (?:${COUNTER} )?counters among (.+ you control)$`).exec(text))) {
+    const amount = parseCount(`${m[2] ? `${m[2]} ` : ""}counters among ${m[3]}`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // "If there are two or more ki counters on ~" (the Kamigawa flip cards).
@@ -770,6 +777,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
   if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
+  // Warden of the Inner Sky: "as long as this creature has three or more counters on it": of every kind together.
+  if ((m = new RegExp(`^(?:~|it) has ${NUM} or more counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: "*", min: num(m[1]!) };
   // "~ has trample as long as it has ten or more +1/+1 counters on it" (Primordial Hydra).
   if ((m = new RegExp(`^(?:~|it) has ${NUM} or more ${COUNTER} counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both

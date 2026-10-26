@@ -267,6 +267,12 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
   // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
+  // "Each creature you control named ~" (Gruff Triplets): with the source's name (CR 201.5), as it last existed if it's gone.
+  const namedSelf = /^(each (?:other )?[a-z]+ you control) named ~$/i.exec(x);
+  if (namedSelf) {
+    const each = parseObjectNow(namedSelf[1]!, ctx, cards);
+    return each?.ref === "each" && each.filter.named === undefined ? { ...each, filter: { ...each.filter, named: "~", text: `${each.filter.text ?? namedSelf[1]} named ~` } } : null;
+  }
   // "Populate. The token created this way gains haste." (Determined Iteration).
   if ((ctx.lastCreated || ctx.lastCreatedAny) && /^the token created this way$/i.test(x)) return { ref: "created" };
   // "Put all land cards from among them onto the battlefield tapped ... untap those lands" (Animist's Awakening).

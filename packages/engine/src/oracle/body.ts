@@ -37,6 +37,10 @@ export interface Ctx {
   auraCard?: boolean;
   /** "Exile the top card of your library" came before: "that card's mana value" is that card's. */
   exiledTop?: boolean;
+  /** The instruction before exiled cards from the top of a library (face up): "for each blue card exiled this way" (Oona, Queen of the Fae). */
+  afterExileTop?: boolean;
+  /** Another player chose a card in your graveyard to return (O-Kagachi Made Manifest): "that card" is that card. */
+  chosenFromYard?: boolean;
   /** A reflexive trigger after "you may sacrifice another creature": "that creature's power" is the sacrificed one's. */
   sacrificedIt?: boolean;
   /** A revealFromHand instruction came before, here or in the ability whose reflexive trigger this is: "for each card revealed this way". */
@@ -126,6 +130,8 @@ export interface Ctx {
    * with (CR 107.3m, 107.3a), known as the trigger's targets are chosen, like a spell's.
    */
   ownX?: boolean;
+  /** An enters trigger of its own ("When ~ enters"): "the amount of mana spent to cast it" is its spell's (CR 601.2h). */
+  selfEntered?: boolean;
   /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
   whereX?: boolean;
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
@@ -651,7 +657,7 @@ const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
 /** One ability's text to its targets and effects, or null if any of it can't be compiled. */
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
   const instead = /^(Counter target spell unless its controller pays \{\d+\})\. If (you control [^,.]+), counter that spell unless its controller pays (\{\d+\}) instead\.$/.exec(text.trim());
@@ -668,7 +674,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
@@ -741,6 +747,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.eventRecipient ? { eventRecipient: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
+    ...(opts.selfEntered ? { selfEntered: true } : {}),
     ...(opts.ownX ? { ownX: true } : {}),
     ...(opts.sacrificedIt ? { sacrificedIt: true } : {}),
     ...(opts.amassed ? { amassed: true } : {}),
@@ -1208,6 +1215,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Insurrection: "Untap all creatures and gain control of them until end of turn. They gain haste until end of turn.":
   // the same creatures throughout (rulings), those there as it resolves (CR 611.2c).
   text = text.replace(/^Untap all creatures and gain control of them until end of turn\. They gain haste until end of turn\.$/, "Untap all creatures. Gain control of all creatures until end of turn. All creatures gain haste until end of turn.");
+  // Cloud's Limit Break: "destroy any number of target tapped creatures with different controllers": as it's cast, up to
+  // one for each player, the same as "for each player, ... up to one target ... that player controls" (CR 601.2c).
+  text = text.replace(/(^|\. )Destroy any number of target ([a-z ]+?) creatures with different controllers\./, "$1For each player, destroy up to one target $2 creature that player controls.");
   // "Until end of turn, target creature gains trample and gets +1/+0 for each card you've drawn this turn" (Fists of
   // Flame): both until end of turn, the bonus counted as it resolves (rulings, CR 608.2h).
   text = text.replace(/(^|\. )Until end of turn, target creature gains ([a-z]+) and gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1Target creature gains $2 until end of turn. It gets $3 until end of turn for each $4.");
@@ -1398,6 +1408,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
+    ctx.afterExileTop = last?.type === "exileTop";
+    // Akroma, Vision of Ixidor: one instruction, before the conditions below read its "if it has" (sentences/permanents.ts).
+    if (/^[Uu]ntil end of turn, each other creature you control gets \+1\/\+1 if it has flying, \+1\/\+1 if it has first strike, and so on for /.test(s)) {
+      const akroma = parseSentence(capital(s), ctx);
+      if (!akroma) return null;
+      effects.push(...akroma);
+      continue;
+    }
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
     // Swashbuckler Extraordinaire: "you may sacrifice one or more Treasures. When you do, up to that many target creatures
     // gain double strike until end of turn." Any number, none too; the reflexive trigger (CR 603.12) has up to as many
@@ -5060,11 +5078,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Put up to two creature cards from among the milled cards onto the battlefield" (The Grand Evolution): under your
     // control, chosen as it resolves.
     const fromMilled =
-      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s);
+      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
-      const upTo = /^up to (\w+) (.+) cards$/.exec(fromMilled[1]!);
+      const upTo = /^up to (\w+) (.+) cards?$/.exec(fromMilled[1]!);
       const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       const must = /^(?:Then )?[Pp]ut an? /.test(s);
       // Gyruda, Doom of Depths: "each player mills four cards. Put a creature card with an even mana value from among the
@@ -5093,6 +5111,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "mill" || prev.who.ref !== "you" || prev.n !== 1) return null;
       effects.push({ type: "mayCastFromGraveyard", what: { ref: "milled" }, play: true });
+      continue;
+    }
+    // O-Kagachi Made Manifest: "defending player chooses a nonland card in your graveyard. Return that card to your hand.":
+    // the defending player picks one as it resolves (not a target), if there is one, for you (CR 608.2c).
+    const oppChooses = /^(defending player|target opponent) chooses an? (.+? card) in your graveyard$/i.exec(s);
+    if (oppChooses && /^(?:You r|R)eturn that card to your hand$/.test(sentences[si + 1] ?? "")) {
+      const chooser = parsePlayer(oppChooses[1]!.toLowerCase(), ctx);
+      const filter = parseSearchFilter(oppChooses[2]!);
+      if (!chooser || filter === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, chooser, ...(filter ? { filter } : {}) });
+      ctx.chosenFromYard = true;
+      si++;
       continue;
     }
     // "Mill five cards, then return a creature card milled this way to your hand" (Zoological Study): one of them if
@@ -6032,7 +6062,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // A planeswalker card enters with its loyalty (CR 306.5b): no choice either (The Prismatic Bridge).
       const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Planeswalker") && !filter.anyOf;
       const tribal = !filter.types?.length && !!filter.subtypes?.length && filter.subtypes.every((x) => CREATURE_TYPES.has(x));
-      if (onto && !safe && !tribal) return null;
+      // Tom Bombadil: "a Saga card", an enchantment that's never an Aura, entering with its lore counter (CR 714.3a).
+      const saga = !filter.types?.length && filter.subtypes?.length === 1 && filter.subtypes[0] === "Saga";
+      if (onto && !safe && !tribal && !saga) return null;
       if (sharesM && (onto || filter.types?.length !== 1 || filter.types[0] !== "Creature")) return null;
       const reveal: Effect = { type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}), ...(sharesM ? { sharesCreatureTypeWithSubject: true as const } : {}) };
       effects.push(mayUntil ? { type: "may", effects: [reveal], text: `reveal cards from the top of your library until ${/^[aeiou]/.test(until[1]!) ? "an" : "a"} ${until[1]!}${sharesM ? " that shares a creature type with it" : ""} is revealed` } : reveal);

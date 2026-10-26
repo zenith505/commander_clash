@@ -57,6 +57,8 @@ export interface ResolveCtx {
   treasureSpent?: number;
   /** The mana spent to cast the spell, the spell its permanent was, or the spell a cast trigger is about, by type (CR 601.2h). */
   spent?: ManaSpent;
+  /** How much mana was spent to cast the spell, or the spell an enters trigger's permanent was (CR 601.2h): 0 if it wasn't cast. */
+  manaSpent?: number;
   /** What was sacrificed to cast it, as it last existed. */
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
@@ -167,6 +169,7 @@ export function continueResolution(s: GameState): Resolution {
     treasureSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.treasureSpent ?? 0) : (item.treasureSpent ?? item.event?.treasureSpent ?? 0),
     // A copy of a spell wasn't cast: no mana was spent on it (rulings on adamant).
     spent: item.kind === "spell" ? (item.copy ? undefined : s.objects[item.objectId!]?.spent) : item.event?.spent,
+    manaSpent: item.kind === "spell" ? (item.copy ? 0 : (s.objects[item.objectId!]?.manaSpent ?? 0)) : (item.event?.manaSpent ?? 0),
     sacrificed: item.sacrificed,
     stationed: item.stationed,
     sourceUntaps: item.sourceUntaps,
@@ -193,6 +196,8 @@ export function continueResolution(s: GameState): Resolution {
   s.leftTogether = undefined;
   s.resolving = null;
   if (r.endTurn) return endTheTurn(s, item), "done";
+  // Narci, Fable Singer: it has finished resolving and left the stack (rulings).
+  if (item.finalChapter !== undefined) fireEvent(s, { type: "finalChapterResolved", player: item.controller, amount: item.finalChapter });
   if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId, item);
   if (item.manaAbility) manaAbilityResolved(s, item, r.made ?? []);
   return "done";
@@ -386,6 +391,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = ex && s.objects[ex.id];
     return o && o.zone === "exile" && (o.zoneChanges ?? 0) === ex.zc ? [o] : [];
   }
+  if (ref.ref === "chosenFromYard") {
+    const c = s.resolving?.chosenFromYard;
+    const o = c && s.objects[c.id];
+    return o && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+  }
   if (ref.ref === "revealed") {
     const rv = s.resolving?.revealed;
     const o = rv && s.objects[rv.id];
@@ -436,7 +446,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return here ? [subj!, ...others] : others;
   }
   if (ref.ref === "each") {
-    const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
+    const filter0 = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
+    // "Named ~" (Gruff Triplets): its name now, or as it last existed (CR 201.5, 608.2h).
+    const me0 = filter0.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const filter = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
@@ -664,6 +677,7 @@ export const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   colorsSpent: ctx.colorsSpent,
   treasureSpent: ctx.treasureSpent,
   spent: ctx.spent,
+  manaSpent: ctx.manaSpent,
   sacrificed: ctx.sacrificed,
   stationed: ctx.stationed,
   chosen: ctx.chosen,

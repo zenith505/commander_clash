@@ -159,6 +159,8 @@ export type TriggerSourceEvent =
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "foretold"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
+  /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
+  | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
@@ -638,7 +640,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && !(t.ifNotToken && entering.isToken) && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || fromGraveyardMatches(s, t.ifFromGraveyard, entering, you)) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -646,8 +648,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.x,
       entering.kicked,
       // Whom its spell's gift was promised to: "the chosen player" (CR 702.174b).
-      entering.gift !== undefined || entering.evidence || entering.treasureSpent || entering.spent || entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl"
-        ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}), ...(entering.spent ? { spent: entering.spent } : {}), ...(entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl" ? { castAlt: entering.castAlt } : {}) }
+      entering.gift !== undefined || entering.evidence || entering.treasureSpent || entering.spent || entering.manaSpent || entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl"
+        ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}), ...(entering.spent ? { spent: entering.spent } : {}), ...(entering.manaSpent ? { manaSpent: entering.manaSpent } : {}), ...(entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl" ? { castAlt: entering.castAlt } : {}) }
         : undefined,
       entering.colorsSpent?.length,
     );
@@ -935,6 +937,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
       add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
+  } else if (ev.type === "finalChapterResolved") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFinalChapterResolves", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold") {
     const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : "youCollectEvidence";
     for (const id of s.battlefield) {
@@ -1067,7 +1074,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const readAhead = !!compileCard(defOf(s, o)).readAhead && characteristics(s, o).hasPrintedAbilities && o.enteredTurn === s.turn;
       const from = s.triggerQueue.length;
       add(o, controllerOf(s, o), (e, t) => e === "chapter" && before < t.chapter! && t.chapter! <= after && (!readAhead || t.chapter === after));
-      for (const t of s.triggerQueue.slice(from)) t.chapter = true;
+      // The final chapter ability: the greatest chapter number among the Saga's chapter abilities (rulings on Narci).
+      const last = Math.max(0, ...abilitiesOf(s, o).triggers.map((t) => (t.event === "chapter" ? (t.chapter ?? 0) : 0)));
+      for (const t of s.triggerQueue.slice(from)) {
+        t.chapter = true;
+        if (triggerOf(s, t)?.chapter === last) t.finalChapter = defMv(defOf(s, o));
+      }
     }
     for (const id of s.battlefield) {
       const w = obj(s, id);
@@ -1512,7 +1524,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
-    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
+    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
     const granted = spell && item && !ev.copy ? grantedCascades(s, item, spell, ev.controller) : [];
     // "Whenever you cast a spell with cascade" (Aurora Phoenix): printed, or given to it as it was cast.
@@ -2082,6 +2094,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
     ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
     ...(t.chapter ? { chapter: true as const } : {}),
+    ...(t.finalChapter !== undefined ? { finalChapter: t.finalChapter } : {}),
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).
     ...((t.transformsAt ?? s.objects[t.sourceId]?.transforms) ? { sourceTransforms: t.transformsAt ?? s.objects[t.sourceId]!.transforms } : {}),
   });

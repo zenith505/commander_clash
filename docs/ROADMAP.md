@@ -1,7 +1,7 @@
 # Roadmap
 
-24,382 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,245 of
+24,412 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,262 of
 9,979 (82%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -101,10 +101,24 @@ line blocks.
    exiles four other cards, not escape), Moxite Refinery ("remove X counters" of any kinds as a cost), Reverse the
    Polarity ("counter all other spells"; "creatures can't be blocked this turn" means the creatures there as it
    resolves, CR 611.2c), Battle Cry Goblin and the other pack tactics cards (no rulings on when the attackers' total
-   power is counted). Next most played: The Kami War, Angelic Arbiter, Iridescent Hornbeetle, Fblthp, Lost on the
-   Range, Oona, Queen of the Fae, Teyo, Geometric Tactician, Esper Origins, Life of the Party, Akroma, Vision of
-   Ixidor, Narci, Fable Singer, Cloud's Limit Break.
+   power is counted). Out after round 165: Fblthp, Lost on the Range (plot a card from the top of your library), Teyo,
+   Geometric Tactician (its −2: no attacks unless conflicting directions, rulings; not done yet), Gavel of the
+   Righteous ("remove a counter" of any kind as an equip cost, so a choice of kind), Minthara, Merciless Soul (ward
+   {X} that changes with the game), Terra, Magical Adept // Esper Terra (the back face: token copies of enchantments,
+   "up to three lore counters", chapter IV's mana and exile-and-return), Balefang (a token named Baneslayer Angel),
+   Rendmaw ("play a card with two or more card types"), Historian's Boon (the "triggers" variant), Hero of Bretagard
+   (an exile trigger counting cards and permanents), Kid Loki (a static for each creature), Abby, Merciless Soldier
+   (named tokens plus entering under an opponent's control), Astelli Reclaimer ("mana value X or less" in a target
+   with X the mana spent to cast it), Wurmquake (corrupted, then "another one of those tokens"). Next most played:
+   Pendant of Prosperity, Astrologian's Planisphere, Auron, Venerated Guardian, Torgal, A Fine Hound, The Everflowing
+   Well, Betor, Ancestor's Voice, Lonis, Cryptozoologist, Summon: Esper Valigarmanda, Mirror Shield, Champions of
+   Minas Tirith, Zurzoth, Chaos Rider, Timestream Navigator.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 165: bots don't plan around Angelic Arbiter (they may cast first and lose their attack, or
+   attack and lose their spells); Cloud's Limit Break's "with different controllers" is one target per player, so a
+   target whose controller changes before it resolves counts as that player's; Gruff Triplets' "named ~" uses the
+   card's printed name; "the amount of mana spent to cast it" reads only on a spell or in its own enters or cast
+   trigger.
    Smaller gaps from round 164: with Krark's Thumb, bots always keep the won coin; "flip a coin until you lose a flip"
    keeps a won coin of each pair (a player could keep the lost one to end the run early), and a second Thumb counts as
    one. Evercoat Ursine's "play one of them" picks in the card picker, then casts or plays the card as usual.

@@ -17,7 +17,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
-  p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|~)$/, "$2's $1");
+  p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|that card|~)$/, "$2's $1");
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
   // modified creatures you control".
   p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
@@ -44,6 +44,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
   if (/^the total mana value of those exiled cards$/i.test(p)) return { count: { kind: "exiledTopManaValue" } };
+  // Iridescent Hornbeetle: "for each +1/+1 counter you've put on creatures under your control this turn", as they were
+  // put, even on creatures that have left since (rulings).
+  if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
@@ -135,6 +138,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
     if (spec?.kind !== "object") return null;
     return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: m[1]! } } };
+  }
+  // Oona, Queen of the Fae: "for each card of the chosen color exiled this way", after "target opponent exiles the top X
+  // cards of their library": the cards that exile took, still in exile (CR 400.7).
+  if (each && ctx?.afterExileTop && (m = /^(.+? card|card of the chosen color) exiled this way$/.exec(p))) {
+    const filter: TargetSpec | null | undefined = m[1] === "card of the chosen color" ? { kind: "card", types: [], notTypes: [], notColors: [], chosen: "color", text: m[1] } : parseSearchFilter(m[1]!);
+    return filter ? { count: { kind: "exiledTopMatching", filter } } : null;
   }
   // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
@@ -375,6 +384,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (of?.ref === "castSpell") return count({ kind: "eventAmount" });
     return of?.ref === "target" ? count({ kind: "manaSpentOn", of }) : null;
   }
+  // "The amount of mana spent to cast this spell" (Memory Deluge, Toph): the spell's own, or in its own enters trigger the
+  // spell the permanent was (0 if it wasn't cast, rulings), or in "when you cast this spell" (Prossh) the spell's (CR 601.2h).
+  if (/^(?:the )?amount of mana spent to cast (?:this spell|this creature|~|it|her|him|them)$/.test(p)) {
+    return ctx?.spell || ctx?.selfEntered || ctx?.selfCastSpell ? count({ kind: "manaSpent" }) : null;
+  }
   // "For each counter on ~" (Twitching Doll): every kind.
   if ((m = /^counters? on (~|it)$/.exec(p))) {
     const of = whoseObject(m[1] === "~" ? "~'s" : "its", ctx);
@@ -397,7 +411,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit), "counters on permanents you control"
   // (Hydra Trainer): the counters on those permanents added up.
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
-  if ((m = new RegExp(`^(?:${COUNTER} )?counters (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures) you control)$`).exec(p))) {
+  if ((m = new RegExp(`^(?:${COUNTER} )?counters (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) you control)$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }
@@ -529,6 +543,7 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
+  if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
   if (x === "that card's") return ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" ? { ref: "target", index: 0 } : null;
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
   if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;

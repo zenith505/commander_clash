@@ -132,6 +132,8 @@ export type Count =
   | { kind: "cardsExiledThisWay"; filter?: TargetSpec }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
+  /** "For each card returned to your hand this way" (Paradoxical Outcome): the cards it returned that you own, still in your hand (a token isn't a card; another player's goes to their hand). */
+  | { kind: "returnedToYourHand" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
   | { kind: "revealedFromHand" }
   /** Parley: "for each nonland card revealed this way" after "each player reveals the top card of their library" (`land`: land cards instead). */
@@ -1466,7 +1468,7 @@ export type StaticCondition =
   /** "Unless it's paired with a creature with soulbond" (CR 702.95b): `not` for "unless". */
   | { kind: "paired"; withKeyword?: string; not?: true }
   /** Morbid: "if a creature died this turn" (CR 700.4); `n`: "if two or more creatures died this turn"; `yours`: "under your control". */
-  | { kind: "creatureDied"; n?: number; yours?: true }
+  | { kind: "creatureDied"; n?: number; yours?: true; /** "A creature not named ~" (Ebondeath, Dracolich): with another name as it last existed. */ notNamedSelf?: true }
   /**
    * "If no creatures are on the battlefield", "if four or more creatures are attacking" (Arrow Volley Trap), "if there are
    * thirteen or more creatures on the battlefield": how many permanents matching `filter` there are, under anyone's control.

@@ -746,7 +746,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      // Its subtypes then: "if that creature was a Cleric" (Taborax, Hope's Demise, CR 608.2h).
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), subtypes: [...ev.chars.subtypes], ...(ev.chars.allCreatureTypes ? { allCreatureTypes: true as const } : {}), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       // The Auras attached to it then, by their controllers then (Hateful Eidolon): one gone too, as it last existed.
       const auraControllers = (ev.attachments ?? []).flatMap((aid) => {
         const a = s.objects[aid];

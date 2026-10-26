@@ -19,6 +19,7 @@ import { cardNameOptions } from "../names";
 import { voteWins } from "./run-votes";
 import { defMv } from "../faces";
 import { putCounters } from "../counters";
+import { CREATURE_TYPES } from "../keywords";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -613,7 +614,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 return !!o && printedMatches(f, defOf(s, o));
               })(e.cond.filter)
             : e.cond.kind === "subjectIs"
-            ? ((f) => objects(s, { ref: "subject" }, ctx).some((o) => objectMatches(s, f, o, ctx.controller, false)))(e.cond.filter)
+            ? ((f) => {
+                // Gone from the battlefield: a creature type as it last existed (CR 608.2h), when that's all it asks.
+                const o = objects(s, { ref: "subject" }, ctx)[0];
+                const typeOnly = Object.entries(f).every(([k, v]) => ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k) && (!Array.isArray(v) || k === "subtypes" || !v.length));
+                if (o?.zone !== "battlefield" && ctx.lki?.subtypes && typeOnly && f.subtypes?.length) return f.subtypes.some((t) => ctx.lki!.subtypes!.includes(t) || (!!ctx.lki!.allCreatureTypes && CREATURE_TYPES.has(t)));
+                return objects(s, { ref: "subject" }, ctx).some((x) => objectMatches(s, f, x, ctx.controller, false));
+              })(e.cond.filter)
             : e.cond.kind === "targetCardWas"
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"

@@ -816,3 +816,215 @@ describe("Lunar Insight", () => {
     expect(handOf(s, ap).length).toBe(hand - 1 + 3);
   });
 });
+
+const dancing = card("Dancing from Dark to Dawn", "Enchantment", "{3}{G}{G}", { cmc: 5, oracleText: "Whenever you cast a creature spell, put X +1/+1 counters on target creature you control, where X is that spell's mana value.\nLandfall — Whenever a land you control enters, create a 2/2 green Bear creature token." });
+
+describe("Dancing from Dark to Dawn", () => {
+  it("is fully supported", () => supported(dancing));
+  it("X +1/+1 counters on target creature you control, X the creature spell's mana value", () => {
+    let { s, ap, ids } = setup([card("Big Beast", "Creature — Beast", "{3}{G}", { cmc: 4, power: "4", toughness: "4" })]);
+    putOnBattlefield(s, ap, dancing);
+    const b = putOnBattlefield(s, ap, bear());
+    s = run(s, planCast(s, ap, ids[0]!));
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(b)] });
+    s = resolveAll(s);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(4);
+  });
+});
+
+const ebondeath = card("Ebondeath, Dracolich", "Legendary Creature — Zombie Dragon", "{2}{B}{B}", { cmc: 4, power: "5", toughness: "2", oracleText: "Flash\nFlying\nEbondeath enters tapped.\nYou may cast this card from your graveyard if a creature not named Ebondeath, Dracolich died this turn.", keywords: ["Flying", "Flash"] });
+
+describe("Ebondeath, Dracolich", () => {
+  it("is fully supported", () => supported(ebondeath));
+  it("can be cast from your graveyard only after a creature not named Ebondeath died this turn", () => {
+    let { s, ap } = setup([]);
+    const e = into(s, ap, ebondeath, "graveyard");
+    const via = { via: "permission" as const };
+    expect(planCast(s, ap, e, undefined, undefined, undefined, undefined, via)).toBeNull();
+    // Another Ebondeath dying doesn't count.
+    const other = putOnBattlefield(s, ap, ebondeath);
+    moveObject(s, other, "graveyard");
+    expect(planCast(s, ap, e, undefined, undefined, undefined, undefined, via)).toBeNull();
+    const b = putOnBattlefield(s, ap, bear());
+    moveObject(s, b, "graveyard");
+    s = resolveAll(run(s, planCast(s, ap, e, undefined, undefined, undefined, undefined, via)));
+    expect(zone(s, e)).toBe("battlefield");
+    expect(s.objects[e]!.tapped).toBe(true);
+  });
+});
+
+const scythe = card("Reaper's Scythe", "Artifact — Equipment", "{2}{B}", { cmc: 3, oracleText: "Job select\nAt the beginning of your end step, put a soul counter on this Equipment for each player who lost life this turn.\nEquipped creature gets +1/+1 for each soul counter on this Equipment and is an Assassin in addition to its other types.\nDeath Sickle — Equip {2}" });
+
+describe("Reaper's Scythe", () => {
+  it("is fully supported", () => supported(scythe));
+  it("a soul counter for each player who lost life this turn, you too", () => {
+    let { s, ap, opp } = setup([]);
+    const sc = putOnBattlefield(s, ap, scythe);
+    s = loseLife(s, ap, 1) ?? s;
+    s = loseLife(s, opp, 2) ?? s;
+    s = resolveAll(passUntil(s, "end", ap));
+    expect(s.objects[sc]!.counters.soul).toBe(2);
+  });
+});
+
+const beastie = card("Curator Beastie", "Creature — Beast", "{4}{G}{G}", { cmc: 6, power: "6", toughness: "6", oracleText: "Reach\nColorless creatures you control enter with two additional +1/+1 counters on them.\nWhenever this creature enters or attacks, manifest dread. (Look at the top two cards of your library. Put one onto the battlefield face down as a 2/2 creature and the other into your graveyard. Turn it face up any time for its mana cost if it's a creature card.)", keywords: ["Reach"] });
+const golem = card("Clay Golem", "Artifact Creature — Golem", "{2}", { cmc: 2, power: "2", toughness: "2" });
+
+describe("Curator Beastie", () => {
+  it("is fully supported", () => supported(beastie));
+  it("colorless creatures you control enter with two additional +1/+1 counters; not green ones", () => {
+    let { s, ap, ids } = setup([golem, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { cmc: 2, power: "2", toughness: "2" })]);
+    putOnBattlefield(s, ap, beastie);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[ids[1]!]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+});
+
+const rotpriest = card("Necrogen Rotpriest", "Creature — Phyrexian Zombie Cleric", "{2}{B}{G}", { cmc: 4, power: "1", toughness: "5", oracleText: "Toxic 2 (Players dealt combat damage by this creature also get two poison counters.)\nWhenever a creature you control with toxic deals combat damage to a player, that player gets an additional poison counter.\n{1}{B}{G}: Target creature you control with toxic gains deathtouch until end of turn.", keywords: ["Toxic"] });
+
+describe("Necrogen Rotpriest", () => {
+  it("is fully supported", () => supported(rotpriest));
+  it("a creature you control with toxic hits a player: one more poison counter; one without toxic: none", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, rotpriest);
+    const t = putOnBattlefield(s, ap, card("Toxic Rat", "Creature — Rat", "{B}", { power: "1", toughness: "1", oracleText: "Toxic 1", keywords: ["Toxic"] }));
+    const b = putOnBattlefield(s, ap, bear());
+    s = resolveAll(hit(s, ap, [t, b], opp));
+    expect(s.players[opp]!.poison).toBe(2);
+  });
+});
+
+const entrancer = card("Dreamdew Entrancer", "Creature — Frog Wizard", "{2}{G}{U}", { cmc: 4, power: "3", toughness: "4", oracleText: "Reach\nWhen this creature enters, tap up to one target creature and put three stun counters on it. If you control that creature, draw two cards.", keywords: ["Reach"] });
+
+describe("Dreamdew Entrancer", () => {
+  it("is fully supported", () => supported(entrancer));
+  it("your own creature: tapped, three stun counters, and you draw two", () => {
+    let { s, ap, ids } = setup([entrancer]);
+    const b = putOnBattlefield(s, ap, bear());
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = resolveAll(s);
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(b)] }));
+    const hand = handOf(s, ap).length;
+    void hand;
+    expect(s.objects[b]!.tapped).toBe(true);
+    expect(s.objects[b]!.counters.stun).toBe(3);
+  });
+  it("draws two only for your own creature", () => {
+    const go = (mine: boolean) => {
+      let { s, ap, ids, opp } = setup([entrancer]);
+      const b = putOnBattlefield(s, mine ? ap : opp, bear());
+      s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+      const hand = handOf(s, ap).length;
+      s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(b)] }));
+      return handOf(s, ap).length - hand;
+    };
+    expect(go(true)).toBe(2);
+    expect(go(false)).toBe(0);
+  });
+});
+
+const skullport = card("Skullport Merchant", "Creature — Dwarf Citizen", "{2}{B}", { cmc: 3, power: "1", toughness: "4", oracleText: "When this creature enters, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\n{1}{B}, Sacrifice another creature or a Treasure: Draw a card." });
+
+describe("Skullport Merchant", () => {
+  it("is fully supported", () => supported(skullport));
+  it("sacrifice a Treasure or another creature to draw; not itself or another artifact", () => {
+    let { s, ap, ids } = setup([skullport]);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    const m = ids[0]!;
+    const treasure = s.battlefield.find((id) => s.objects[id]!.isToken && /^Treasure/.test(named(s, id)))!;
+    const b = putOnBattlefield(s, ap, bear());
+    const relicId = putOnBattlefield(s, ap, relic);
+    expect(planActivate(s, ap, m, 0, [], undefined, undefined, undefined, { sacrifice: [m] })).toBeNull();
+    expect(planActivate(s, ap, m, 0, [], undefined, undefined, undefined, { sacrifice: [relicId] })).toBeNull();
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planActivate(s, ap, m, 0, [], undefined, undefined, undefined, { sacrifice: [treasure] })));
+    expect(zone(s, treasure)).toBeUndefined();
+    putOnBattlefield(s, ap, swamp);
+    s = resolveAll(run(s, planActivate(s, ap, m, 0, [], undefined, undefined, undefined, { sacrifice: [b] })));
+    expect(zone(s, b)).toBe("graveyard");
+    expect(handOf(s, ap).length).toBe(hand + 2);
+  });
+});
+
+const outcome = card("Paradoxical Outcome", "Instant", "{3}{U}", { cmc: 4, oracleText: "Return any number of target nonland, nontoken permanents you control to their owners' hands. Draw a card for each card returned to your hand this way." });
+
+describe("Paradoxical Outcome", () => {
+  it("is fully supported", () => supported(outcome));
+  it("draws for each card returned to your hand; one another player owns goes to theirs and isn't counted", () => {
+    let { s, ap, ids, opp } = setup([outcome]);
+    const a = putOnBattlefield(s, ap, bear());
+    const r = putOnBattlefield(s, ap, relic);
+    const stolen = putOnBattlefield(s, opp, bear());
+    s.objects[stolen]!.controller = ap;
+    invalidateCharacteristics(s);
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(a), tgt(r), tgt(stolen)])));
+    expect(zone(s, stolen)).toBe("hand");
+    expect(handOf(s, opp)).toContain(stolen);
+    // -1 for the spell, +2 returned, +2 drawn.
+    expect(handOf(s, ap).length).toBe(hand - 1 + 2 + 2);
+  });
+});
+
+const kaalia = card("Kaalia, Zenith Seeker", "Legendary Creature — Human Cleric", "{R}{W}{B}", { cmc: 3, power: "3", toughness: "3", oracleText: "Flying, vigilance\nWhen Kaalia enters, look at the top six cards of your library. You may reveal an Angel card, a Demon card, and/or a Dragon card from among them and put them into your hand. Put the rest on the bottom of your library in a random order.", keywords: ["Flying", "Vigilance"] });
+
+describe("Kaalia, Zenith Seeker", () => {
+  it("is fully supported", () => supported(kaalia));
+  it("up to one Angel, one Demon and one Dragon from the top six", () => {
+    let { s, ap, ids } = setup([kaalia]);
+    const angel = into(s, ap, card("Angel", "Creature — Angel", "{3}{W}", { power: "3", toughness: "3" }), "library");
+    const demon = into(s, ap, card("Demon", "Creature — Demon", "{3}{B}", { power: "3", toughness: "3" }), "library");
+    const demon2 = into(s, ap, card("Demon Two", "Creature — Demon", "{3}{B}", { power: "3", toughness: "3" }), "library");
+    const dragon = into(s, ap, card("Dragon", "Creature — Dragon", "{3}{R}", { power: "3", toughness: "3" }), "library");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 0, max: 3 });
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [demon, demon2] })).toThrow();
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [angel, demon, dragon] }));
+    expect(handOf(s, ap)).toEqual(expect.arrayContaining([angel, demon, dragon]));
+    expect(handOf(s, ap)).not.toContain(demon2);
+  });
+});
+
+const taborax = card("Taborax, Hope's Demise", "Legendary Creature — Demon Cleric", "{2}{B}", { cmc: 3, power: "2", toughness: "2", oracleText: "Flying\nTaborax has lifelink as long as it has five or more +1/+1 counters on it.\nWhenever another nontoken creature you control dies, put a +1/+1 counter on Taborax. If that creature was a Cleric, you may draw a card. If you do, you lose 1 life.", keywords: ["Flying"] });
+
+describe("Taborax, Hope's Demise", () => {
+  it("is fully supported", () => supported(taborax));
+  it("a counter for each nontoken creature of yours that dies; a Cleric: may draw and lose 1 life", () => {
+    let { s, ap } = setup([]);
+    const t = putOnBattlefield(s, ap, taborax);
+    const b = putOnBattlefield(s, ap, bear());
+    const c = putOnBattlefield(s, ap, card("Acolyte", "Creature — Human Cleric", "{W}", { power: "1", toughness: "1" }));
+    const hand = handOf(s, ap).length;
+    const life = lifeOf(s, ap);
+    moveObject(s, b, "graveyard");
+    s = resolveAll(s);
+    expect(s.objects[t]!.counters["+1/+1"]).toBe(1);
+    expect(handOf(s, ap).length).toBe(hand);
+    moveObject(s, c, "graveyard");
+    s = resolveAll(s);
+    expect(s.objects[t]!.counters["+1/+1"]).toBe(2);
+    expect(handOf(s, ap).length).toBe(hand + 1);
+    expect(lifeOf(s, ap)).toBe(life - 1);
+  });
+});
+
+const cloud = card("Cloud, Planet's Champion", "Legendary Creature — Human Soldier Mercenary", "{3}{R}{W}", { cmc: 5, power: "4", toughness: "4", oracleText: "During your turn, as long as Cloud is equipped, it has double strike and indestructible. (This creature deals both first-strike and regular combat damage. Damage and effects that say \"destroy\" don't destroy this creature.)\nEquip abilities you activate that target Cloud cost {2} less to activate." });
+
+describe("Cloud, Planet's Champion", () => {
+  it("is fully supported", () => supported(cloud));
+  it("double strike and indestructible only during your turn while equipped", () => {
+    let { s, ap } = setup([]);
+    const c = putOnBattlefield(s, ap, cloud);
+    expect(kw(s, c, "Double strike")).toBe(false);
+    const sword = putOnBattlefield(s, ap, card("Sword", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +1/+0.\nEquip {1}" }));
+    s.objects[sword]!.attachedTo = c;
+    invalidateCharacteristics(s);
+    expect(kw(s, c, "Double strike")).toBe(true);
+    expect(kw(s, c, "Indestructible")).toBe(true);
+    s = passUntil(s, "main1", next(s, ap));
+    expect(kw(s, c, "Double strike")).toBe(false);
+  });
+});

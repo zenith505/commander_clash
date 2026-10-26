@@ -981,9 +981,18 @@ export function compile(d: CardDef): CompiledCard {
     // entering (CR 614.1c), which applies as it would exist on the battlefield (CR 614.12, rulings on Master Chef).
     // Kalain, Reclusive Painter: "... for each mana from a Treasure spent to cast them" (see perSpentFrom).
     // Gev, Scaled Scorch: "... for each opponent who lost life this turn": counted as each one would enter.
-    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them| for each (opponent who lost life this turn))?\\.$`).exec(line);
+    // Curator Beastie: "Colorless creatures you control enter with two additional +1/+1 counters on them": without
+    // "other", only where this permanent couldn't be one of them (as for "each other ..." above).
+    const pluralAll = new RegExp(`^(?!Other )([A-Z][a-z]+ creatures you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them\\.$`).exec(line);
+    const othersPlural = pluralAll ? ([pluralAll[0], pluralAll[1], pluralAll[2], pluralAll[3], undefined, undefined] as unknown as RegExpExecArray) : new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them| for each (opponent who lost life this turn))?\\.$`).exec(line);
     if (othersPlural) {
-      const g = parseGroup(`each ${othersPlural[1]!.replace(/s you control$/, " you control")}`);
+      const g = parseGroup(`each ${(pluralAll ? othersPlural[1]!.toLowerCase() : othersPlural[1]!).replace(/s you control$/, " you control")}`);
+      const f = g?.filter.kind === "object" ? g.filter : undefined;
+      const selfMatches = !f || f.colorCount === "colorless" ? !d.colors.length : !f.colors?.length || f.colors.some((c) => d.colors.includes(c as never));
+      if (pluralAll && (!f || f.types?.length !== 1 || f.types[0] !== "Creature" || f.subtypes?.length || (f.colorCount !== "colorless" && !f.colors?.length) || (f.colorCount !== undefined && f.colorCount !== "colorless") || (d.types.includes("Creature") && selfMatches))) {
+        out.unsupported.push(raw);
+        continue;
+      }
       const spentFrom = othersPlural[4] && !othersPlural[5] ? (/Treasure/.test(othersPlural[4]) ? "treasure" : "artifact") : undefined;
       const per = othersPlural[5] ? parseCount(othersPlural[5], null, true) : undefined;
       if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || per === null) out.unsupported.push(raw);

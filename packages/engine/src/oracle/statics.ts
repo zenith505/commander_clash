@@ -153,8 +153,11 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return { ...st, text: line, zone: "graveyard", ...(condition ? { condition } : {}) };
   }
   let negate = false;
-  if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  let alsoYourTurn = false;
+  if ((m = /^(.+?) as long as (.+)$/.exec(text)) && !/^During your turn, /.test(text)) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
+  // Cloud, Planet's Champion: "During your turn, as long as ~ is equipped, it has double strike and indestructible": both.
+  else if ((m = /^During your turn, as long as ([^,]+), (.+)$/.exec(text))) [cond, statement, alsoYourTurn] = [m[1], m[2], true];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
   // Zurgo, Thunder's Decree: "During your end step, Warrior tokens you control have ..." (the end step only, not cleanup,
   // CR 513).
@@ -201,7 +204,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
-  const condition0 = parseStaticCondition(cond, st);
+  const condition1 = parseStaticCondition(cond, st);
+  const yourTurn = alsoYourTurn ? parseStaticCondition("it's your turn", st) : undefined;
+  const condition0 = !alsoYourTurn ? condition1 : condition1 && yourTurn ? { kind: "allOf" as const, conds: [yourTurn, condition1] } : null;
   // "Unless you control N or more X" is "as long as you control N-1 or fewer X".
   const condition = !negate ? condition0 : condition0?.kind === "control" && condition0.min !== undefined && condition0.max === undefined && !condition0.differentNames && !condition0.otherThanSubject ? (({ min, ...rest }) => ({ ...rest, max: min! - 1 }))(condition0) : null;
   return condition ? { ...st, text: line, condition } : null;
@@ -712,6 +717,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
+  if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };

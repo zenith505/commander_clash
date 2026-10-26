@@ -1092,6 +1092,7 @@ export function moveObject(
   // triggers say "put into a graveyard" or "leaves the battlefield".
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedNamesThisTurn ??= []).push(o.faceDown ? "" : last.name);
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && !o.isToken) (s.nontokenDiedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
@@ -2864,6 +2865,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.linkedFreeCasts = undefined;
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
+  s.diedNamesThisTurn = undefined;
   s.nontokenDiedThisTurn = undefined;
   s.toGraveyardThisTurn = undefined;
   s.cardsToGraveyardThisTurn = undefined;

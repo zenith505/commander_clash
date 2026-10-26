@@ -743,6 +743,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "castAnother": // checked before the spell counts itself (CR 601.2f, 601.2i)
       return (s.castThisTurn ?? []).some((c) => c.player === you);
     case "creatureDied":
+      if (cond.notNamedSelf) return (s.diedNamesThisTurn ?? []).some((n) => !n || !sameName(n, defOf(s, src).name));
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
     case "meldPartner": {
       // "If you both own and control ~ and a creature named Bruna, the Fading Light" (CR 701.42): ~ as it is now.

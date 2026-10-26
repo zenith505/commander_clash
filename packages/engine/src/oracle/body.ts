@@ -1252,6 +1252,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Self-Destruct: "Target creature you control deals X damage to any other target and X damage to itself, where X is its
   // power": one X, its power as this resolves (rulings).
   text = text.replace(/^Target creature you control deals X damage to any other target and X damage to itself, where X is its power\.$/, "Target creature you control deals damage equal to its power to any other target and to itself.");
+  // Necrogen Rotpriest: "that player gets an additional poison counter": one more, from this trigger (CR 122.1).
+  text = text.replace(/\bthat player gets an additional poison counter\b/g, "that player gets a poison counter");
   // "~ deals 3 damage to each of your opponents" (Aurelia, the Law Above) is "each opponent".
   text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
@@ -3731,6 +3733,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectIs[1]!], text: subjectIs[1]! } }, effects: inner });
       continue;
     }
+    // Taborax, Hope's Demise: "Whenever another nontoken creature you control dies, put a +1/+1 counter on ~. If that
+    // creature was a Cleric, you may draw a card. If you do, you lose 1 life.": the creature as it last existed (CR
+    // 608.2h); both sentences under the condition.
+    const subjectWas = (ctx.subjectIt || ctx.subject) && effects.length ? /^If that creature was an? ([A-Z][a-z]+), (you may [^.]+)$/.exec(s) : null;
+    const wasDo = subjectWas && /^If you do, ([^.]+)\.?$/.exec(sentences[si + 1] ?? "");
+    if (subjectWas && CREATURE_TYPES.has(subjectWas[1]!) && (wasDo || !/^(?:Otherwise|If)\b/.test(sentences[si + 1] ?? ""))) {
+      const sub = parseBody(`${capital(subjectWas[2]!)}.${wasDo ? ` If you do, ${wasDo[1]}.` : ""}`, {});
+      if (!sub || sub.targets.length || /~|\bit\b|\bthat creature\b/.test(`${subjectWas[2]} ${wasDo?.[1] ?? ""}`)) return null;
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectWas[1]!], text: subjectWas[1]! } }, effects: sub.effects });
+      if (wasDo) si++;
+      continue;
+    }
     // Ajani's Chosen: "Whenever an enchantment you control enters, create a 2/2 white Cat creature token. If that enchantment
     // is an Aura, you may attach it to the token." Only if the Aura can legally enchant the token, both still on the
     // battlefield as this resolves (rulings, CR 701.3b).
@@ -4457,6 +4471,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!amount || ctx.targets.length !== i + 1) return null;
       const filter: TargetSpec = { kind: t.kind, bound: { key, at: "most", amount }, text: `${atMost[2]} less than or equal to ${atMost[3]}` };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+      continue;
+    }
+    // Dreamdew Entrancer: "Tap up to one target creature and put three stun counters on it. If you control that creature,
+    // draw two cards.": the target as it is now, still legal (none chosen: false).
+    const ifYours = /^If you control (?:that creature|that permanent), (.+)$/.exec(s);
+    if (ifYours) {
+      const i = ctx.lastObjectTarget;
+      const t = i !== undefined ? ctx.targets[i] : undefined;
+      const prev = effects[effects.length - 1];
+      if (i === undefined || t?.kind !== "object" || t.many || t.controller || !prev || !mentionsTarget(prev, i)) return null;
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(ifYours[1]!), ctx);
+      if (!fx || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "you control" } }, effects: fx });
       continue;
     }
     // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can

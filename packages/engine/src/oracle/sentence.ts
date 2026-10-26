@@ -55,6 +55,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+    } else if ((m = /^You may reveal (an? [A-Z][a-z]+ card), (an? [A-Z][a-z]+ card), and\/or (an? [A-Z][a-z]+ card) from among them and put them into your hand$/.exec(s))) {
+      // "You may reveal an Angel card, a Demon card, and/or a Dragon card from among them and put them into your hand"
+      // (Kaalia, Zenith Seeker): up to one of each, as Kiora's two above.
+      const specs = [m[1]!, m[2]!, m[3]!].map((w) => parseSearchFilter(w.replace(/^an? /, "")));
+      if (specs.some((f) => !f)) return null;
+      const anyOf = specs as NonNullable<(typeof specs)[number]>[];
+      Object.assign(dig, { count: 3, upTo: true, filter: { kind: "card", anyOf, text: `${m[1]}, ${m[2]}, and/or ${m[3]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
     } else if (/^For each card type, you may put a card of that type from among (?:them|the revealed cards) into your hand$/.test(s)) {
       // Atraxa, Grand Unifier: up to one card for each card type (CR 205.2a), a card with more than one type taken as any
       // one of them (rulings), as Kiora's "and/or" (oneOfEach).

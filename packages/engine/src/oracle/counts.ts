@@ -267,6 +267,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
+  if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
+  // Reaper's Scythe: "for each player who lost life this turn", you too.
+  if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
@@ -569,7 +572,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (x === "the amassed army's") return ctx?.amassed ? { ref: "amassed" } : null;
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   // "That spell's mana value": the targeted spell (Imp's Mischief).
-  if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
+  // With a target that isn't a spell, in a cast trigger, the spell cast (Dancing from Dark to Dawn), below.
+  if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined && !(x === "that spell's" && ctx.castSpell && ctx.targets[ctx.lastObjectTarget]?.kind !== "spell")) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   // "Return target card from your graveyard to your hand. You gain life equal to that card's mana value": the card
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).

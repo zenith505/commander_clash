@@ -1542,6 +1542,8 @@ export interface GameState {
   damageBatch?: { events: DamageEvent[]; answers: number[] };
   /** The controllers of the creatures that died this turn, one entry per creature (morbid, CR 700.4). */
   diedThisTurn?: PlayerId[];
+  /** Their names, as they last existed ("" for a face-down one, CR 708.2): "a creature not named ~ died this turn" (Ebondeath). */
+  diedNamesThisTurn?: string[];
   /** The same for nontoken creatures (Gadrak, the Crown-Scourge). */
   nontokenDiedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */
@@ -2006,6 +2008,8 @@ export interface Resolving {
   countersPutThisWay?: { id: ObjectId; zc: number; kind?: string }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
+  /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */
+  returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
   returnedNontoken?: PlayerId[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */

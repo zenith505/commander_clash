@@ -1753,6 +1753,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o.zone === "battlefield" && !o.isToken && s.resolving) (s.resolving.returnedNontoken ??= []).push(controllerOf(s, o));
         const token = o.isToken;
         moveObject(s, o.id, "hand");
+        if (!token && s.objects[o.id]?.zone === "hand" && s.resolving) (s.resolving.returnedToHand ??= []).push(o.id);
         if (e.setsDid && s.resolving && (token || s.objects[o.id]?.zone === "hand")) s.resolving.did = true;
       }
       return;

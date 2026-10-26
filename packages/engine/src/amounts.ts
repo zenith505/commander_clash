@@ -268,6 +268,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "returnedToYourHand":
+      return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "exiledTopManaValue":
@@ -724,6 +726,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "returnedToYourHand":
+      return "#cards returned to your hand";
     case "milledManaValue":
       return "the total mana value of the milled cards";
     case "exiledTopMatching":

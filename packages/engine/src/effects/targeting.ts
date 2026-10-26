@@ -1,8 +1,8 @@
 import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
-import { compileCard } from "../oracle";
+import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
+import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -120,7 +120,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   }
   if (spec.toughnessAbovePower && !(c.types.includes("Creature") && toughness(s, o) > power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
-  if (spec.manaAbility && !(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length)) return false;
+  if (spec.manaAbility && !hasManaAbility(s, o, c)) return false;
   if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view, controller)) return false;
@@ -911,7 +911,7 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
   // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
   if (e.filter.saddledSource) {
     const { saddledSource: _, ...filter } = e.filter;
@@ -934,10 +934,11 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
     const max = Math.max(...ids.map(of));
     return ids.filter((id) => of(id) === max);
   }
-  if (e.least !== "toughness") return ids;
-  // Bolster: the least toughness, or tied for it (CR 701.39a).
-  const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));
-  return ids.filter((id) => toughness(s, obj(s, id)) === min);
+  if (!e.least) return ids;
+  // Bolster: the least toughness, or tied for it (CR 701.39a); "the least power among creatures they control" likewise.
+  const stat = (id: ObjectId) => (e.least === "power" ? power(s, obj(s, id)) : toughness(s, obj(s, id)));
+  const min = Math.min(...ids.map(stat));
+  return ids.filter((id) => stat(id) === min);
 }
 
 /**
@@ -958,4 +959,17 @@ function subjectPermanentTypes(s: GameState): { id: ObjectId; types: string[] } 
 function attackedBattle(s: GameState, o: GameObject): boolean {
   const b = attackedPlaneswalker(s, o);
   return !!b && objIsType(s, b, "Battle");
+}
+
+/**
+ * Whether a permanent has a mana ability (CR 605.1), activated or triggered: its basic land types' (CR 305.6), its own and
+ * the ones granted to it, from `c`, its characteristics as they are or as the layers have them so far (Raggadragga's
+ * "each creature you control with a mana ability gets +2/+2" applies after the abilities are added, CR 613.1f).
+ */
+function hasManaAbility(s: GameState, o: GameObject, c: Characteristics): boolean {
+  if (o.zone !== "battlefield") return !!(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length);
+  if (!c.landAbilitiesLost && c.subtypes.some((st) => basicLandManaAbility(st))) return true;
+  const own = c.hasPrintedAbilities ? compileCard(defOf(s, o)) : undefined;
+  if (own && (own.mana.length || own.manaTriggers?.length)) return true;
+  return c.grantedAbilities.some((t) => compileGranted(t).mana.length || compileGranted(t).manaTriggers?.length);
 }

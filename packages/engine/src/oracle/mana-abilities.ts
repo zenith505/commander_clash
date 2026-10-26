@@ -392,7 +392,7 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   const level = /^(.+) or to gain a Class level$/.exec(m[1]!);
   if (level) only.classLevel = true;
   // "Of the chosen type" (Unclaimed Territory): the type its source's controller chose for it (see spend.ts boundSpend).
-  for (const part of (level ? level[1]! : m[1]!).split(/,? or (?=activate |cast )/)) {
+  for (const part of (level ? level[1]! : m[1]!).split(/,? or (?:to )?(?=activate |cast )/)) {
     let x: RegExpExecArray | null;
     // "Cast a spell of the chosen type" (Eclipsed Realms): any spell with that creature type (CR 205.3m).
     if (/^cast (?:a spell|spells) of the chosen type$/.test(part) && !only.spells) only.spells = { kind: "spell", chosen: "type", text: "spells of the chosen type" };

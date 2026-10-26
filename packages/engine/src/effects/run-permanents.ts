@@ -1482,7 +1482,8 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   if (objIsType(s, me, "Creature") && !compileCard(defOf(s, me)).reconfigure) return false;
   // "Equip planeswalker": to a planeswalker as though it were a creature (Luxior rulings).
   const creature = objIsType(s, host, "Creature") || (!!asCreature && !aura && objIsType(s, host, "Planeswalker"));
-  return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : creature && objectMatches(s, { kind: "object", text: "" }, host, who, false, meChars);
+  const only = aura ? undefined : abilitiesOf(s, me).attachOnly; // O-Naginata
+  return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : creature && objectMatches(s, only ?? { kind: "object", text: "" }, host, who, false, meChars);
 }
 
 /** Attach an Aura to a player (CR 701.3a): "enchant player" (CR 702.5d), with a new timestamp (701.3c). */

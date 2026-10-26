@@ -78,7 +78,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
-  [/^Whenever you proliferate, (.+)$/, "youProliferate"],
+  [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you scry or surveil, (.+)$/, "youScryOrSurveil"],
   [/^Whenever you scry, (.+)$/, "youScry"],
   [/^Whenever you surveil, (.+)$/, "youSurveil"],
@@ -674,6 +674,12 @@ function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | nu
 
 /** Valgavoth, Harrower of Souls: "Whenever an opponent loses life for the first time during each of their turns, ..." */
 function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Cat Collector: "Whenever you gain life for the first time during each of your turns, ...".
+  const gain = /^Whenever you gain life for the first time during each of your turns, (.+)$/.exec(line);
+  if (gain) {
+    const body = parseBody(gain[1]!, {});
+    return body ? { event: "youGainLife", firstOnTheirTurn: true, body } : "fail";
+  }
   const m = /^Whenever an opponent loses life for the first time during each of their turns, (.+)$/.exec(line);
   if (!m) return null;
   const body = parseBody(m[1]!, { eventPlayer: true });
@@ -911,7 +917,12 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever a creature you control with deathtouch deals combat damage to a player" (Fynn, the Fangbearer): the
   // keyword as it deals the damage.
-  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+) (deals combat damage to .+)$/.exec(line);
+  // "Whenever a creature you control with a counter on it deals combat damage to a player" (Ray Fillet): any kind.
+  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+|with a counter on it) (deals combat damage to .+)$/.exec(line);
+  // Samut, Vizier of Naktamun: "..., if that creature entered this turn, draw a card": an intervening if (CR 603.4) that
+  // stays true once it is, so it's the same as a creature that entered this turn dealing the damage.
+  const enteredIf = /^(Whenever (?:another|an?) .+? you control deals combat damage to a player), if that creature entered this turn, (.+)$/.exec(line);
+  if (enteredIf) line = `${enteredIf[1]}, ${enteredIf[2]}`;
   // "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix, Guided by Fate): this
   // creature, enchanted or not, or another that matches; each one that deals the damage triggers it once.
   const orSelf = /^Whenever ~ or (an? .+? you control deals combat damage to .+)$/.exec(line);
@@ -932,9 +943,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { subjectIt: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
+  if (enteredIf && (orSelf || filter.enteredThisTurn)) return "fail";
   return {
     event: "creatureYouControlDealsCombatDamageToPlayer",
-    dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
+    dealer: { filter: { ...filter, controller: "you", ...(enteredIf ? { enteredThisTurn: true as const } : {}), text: `${m[2]} you control${enteredIf ? " that entered this turn" : ""}` }, ...(m[1] === "another" ? { other: true } : {}), ...(orSelf ? { orSelf: true as const } : {}) },
     body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
     ...(m[3] === "a player or battle" ? { orBattle: true as const } : {}),
@@ -954,7 +966,7 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   // "Whenever a creature you control with deathtouch attacks" (Hooded Blightfang), "Whenever a creature with flying
   // attacks" (Windreader Sphinx): one with it as it's declared.
-  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?) attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with a mana ability| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature(?: with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
@@ -1000,13 +1012,14 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   if (!w) return null;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
   // "A creature you control with a +1/+1 counter on it" (Byrke, Long Ear of the Law): one with it as it's declared.
-  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with [a-z ]+$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
-  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with [a-z ]+$|$)/, "");
+  // "A creature you control with a mana ability" (Raggadragga).
+  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with a mana ability$| with [a-z ]+$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
+  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with a mana ability$| with [a-z ]+$|$)/, "");
   if (!filter || filter.kind !== "object" || filter.controller || (filter.chosen && filter.chosen !== "type") || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   const body = parseBody(w[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
   if (!body) return "fail";
   if (any) return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: w[2]! }, anyone: true, ...(w[1] === "another" ? { other: true } : {}) }, body };
-  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: filter.chosen ? `${w[2]!.replace(/ of the chosen type$/, "")} you control of the chosen type` : / with [a-z ]+$/.test(w[2]!) && !/ with an? /.test(w[2]!) ? w[2]!.replace(/ with /, " you control with ") : `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
+  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: filter.chosen ? `${w[2]!.replace(/ of the chosen type$/, "")} you control of the chosen type` : / with [a-z ]+$/.test(w[2]!) && (!/ with an? /.test(w[2]!) || / with a mana ability$/.test(w[2]!)) ? w[2]!.replace(/ with /, " you control with ") : `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
 }
 
 /**
@@ -1326,6 +1339,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "leavesGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] !== "leave your graveyard" ? { to: "exile" as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
+  } else if ((m = /^Whenever one or more cards are put into exile from graveyards and\/or the battlefield( during your turn)?, (.+)$/.exec(line))) {
+    // Ketramose, the New Dawn: cards (not tokens) of anyone's, for any reason, in one event.
+    batch = { what: "exiledFromGraveyardsOrBattlefield" };
+    yourTurn = !!m[1];
+    rest = m[2]!;
   } else if ((m = /^Whenever one or more cards are put into exile from your library and\/or your graveyard, (.+)$/.exec(line))) {
     // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
     batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };
@@ -1666,12 +1684,12 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
-  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+!? — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
   const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);
@@ -1757,6 +1775,25 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const drawTheirTurn = /^Whenever you draw a card during an opponent's turn, (.+)$/.exec(line);
   if (drawTheirTurn) {
     const t = parseTrigger(`Whenever you draw a card, ${drawTheirTurn[1]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
+  }
+  // "Whenever you get one or more {E}, ~ deals that much damage to any target" (Aether Revolt): "that much" is how many
+  // you got; "during your turn" (Brotherhood Scribe) is a condition on the event.
+  const energy = /^Whenever you get one or more \{E\}( during your turn)?, (.+)$/.exec(line);
+  if (energy) {
+    let text = energy[2]!;
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch && /\bX\b/.test(text)) return "fail";
+    if (thatMuch) text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    let body = parseBody(text, {});
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, energy[2]!) };
+    return { event: "youGetEnergy", body, ...(energy[1] ? { activeIf: { kind: "yourTurn" as const } } : {}) };
+  }
+  // Voracious Tome-Skimmer: "Whenever you cast a spell during an opponent's turn, ...": the same, checked as you cast it.
+  const castTheirTurn = /^Whenever you cast a spell during an opponent's turn, (.+)$/.exec(line);
+  if (castTheirTurn) {
+    const t = parseTrigger(`Whenever you cast a spell, ${castTheirTurn[1]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
   }
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
@@ -1942,11 +1979,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
   // "Whenever this token and at least one other creature token attack" (Valor's Reach Tag Team): other tokens.
-  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|other creature tokens?|[A-Z][a-z]+) attack, (.+)$/.exec(line);
+  // "Whenever ~ and at least one other creature attack" (Sokka, Lateral Strategist).
+  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures?|other creature tokens?|[A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {
     const tokens = /^other creature tokens?$/.test(battalion[2]!);
     if (tokens) return ((t) => (t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), withOthersToken: true as const } : "fail"))(parseTrigger(`Whenever ~ attacks, ${battalion[3]}`));
-    const type = battalion[2] === "other creatures" ? undefined : battalion[2]!;
+    const type = /^other creatures?$/.test(battalion[2]!) ? undefined : battalion[2]!;
     if (type && !CREATURE_TYPES.has(type)) return "fail";
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
     return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), ...(type ? { withOthersType: type } : {}) } : "fail";
@@ -2045,7 +2083,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
@@ -2053,8 +2091,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // A milled-cards batch (Infesting Radroach) is watched from graveyards too (see the batch event in effects/triggers.ts).
     if ((!YARD_EVENTS.includes(t.event) && !(t.event === "batch" && t.batch?.milled && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
-    const attach = / attached to that creature$/.test(yard[2]!);
-    if (attach && !(t.event === "permanentEnters" && t.enters?.filter.types?.includes("Creature")) && t.event !== "anotherCreatureYouControlEnters") return "fail";
+    // Sword of the Meek: "..., then attach it to that creature": it returns even if it can't be attached (rulings).
+    const attach = / attached to that creature$|, then attach it to that creature$/.test(yard[2]!);
+    // "When a Ninja you control enters" (Smoke Shroud): a creature type means a creature.
+    const creature = (f: TargetSpec | undefined) => !!f && (!!f.types?.includes("Creature") || (!f.types?.length && !!f.subtypes?.length && f.subtypes.every((x) => CREATURE_TYPES.has(x))));
+    if (attach && !(t.event === "permanentEnters" && creature(t.enters?.filter)) && t.event !== "anotherCreatureYouControlEnters") return "fail";
     const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
     return body ? { ...t, body, zone: "graveyard" } : "fail";
   }
@@ -2144,7 +2185,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // the controller of the planeswalker it attacks (CR 506.2), as it triggers and resolves (rulings).
   const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
   const moreCond: StaticCondition | null = thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: defMore[1] as "lands" | "creatures", eventPlayer: true } : null;
-  const ifCond = putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // Deathbringer Regent: "When ~ enters, if you cast it from your hand and there are five or more other creatures on the
+  // battlefield": both, the first about how it entered (see ifCastFromHand).
+  const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast it from your hand and (.+)$/.exec(intervening[2]!) : null;
+  if (fromHandAnd) intervening![3] = `if you cast it from your hand, ${intervening![3]}`;
+  const ifCond = putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -2513,7 +2558,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When ~ enters, if it was kicked, ...": an intervening if (CR 603.4) on how it was cast.
       let body0 = m[1]!;
       let ifKicked: SpellCondition | undefined;
-      const kicked = /^if it was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
+      const kicked = /^if (?:it|~) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
       if (kicked) {
         // "When you cast ~, if it was kicked, exile target land." (Sowing Mycospawn): the spell as it was cast.
         if (event !== "selfEnters" && event !== "selfCast") return "fail" as const;
@@ -2681,8 +2726,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
+      // Body Launderer: "When ~ dies, return another target non-Rogue creature card with equal or lesser power from your
+      // graveyard": ~'s power as it last existed (rulings), fixed as the target is chosen (TargetSpec.bound).
+      const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
+      if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
+      if (body && lesserPower) {
+        const [tg, ...more] = body.targets;
+        if (!tg || more.length || tg.kind !== "card" || tg.bound || tg.power) return "fail" as const;
+        body = { ...body, targets: [{ ...tg, bound: { key: "power", at: "most", amount: { count: { kind: "power", of: { ref: "self" } } } }, text: `${tg.text} with equal or lesser power` }], text: body0 };
+      }
       if (body && fewer) {
         // The one return of the card itself, maybe delayed to the next end step.
         const effs = body.effects.length === 1 && body.effects[0]!.type === "delayed" ? body.effects[0]!.effects : body.effects;

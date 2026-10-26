@@ -341,8 +341,8 @@ export function normalizeSelf(d: CardDef): string {
   const comma = full.split(",")[0]!;
   const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:of|the) /.exec(full)?.[1] : undefined;
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
-  // "Sliver" for "Sliver Queen").
-  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+$/.exec(full)?.[1] : undefined;
+  // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated.
+  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
@@ -983,6 +983,16 @@ export function compile(d: CardDef): CompiledCard {
     // Gev, Scaled Scorch: "... for each opponent who lost life this turn": counted as each one would enter.
     // Curator Beastie: "Colorless creatures you control enter with two additional +1/+1 counters on them": without
     // "other", only where this permanent couldn't be one of them (as for "each other ..." above).
+    // Gorma, the Gullet: "Nontoken creatures you control enter with an additional +1/+1 counter on them for each creature
+    // that died under your control this turn": from a permanent already on the battlefield, so not Gorma itself or
+    // creatures entering with it (rulings), counted as each one would enter.
+    const gorma = new RegExp(`^Nontoken creatures you control enter with an additional ${COUNTER} counter on them for each (creature that died under your control this turn)\\.$`).exec(line);
+    if (gorma) {
+      const per = parseCount(gorma[2]!, null, true);
+      if (!per) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], token: false, controller: "you", text: "nontoken creature you control" }, counter: counterKind(gorma[1]!), n: 1, per, text: line });
+      continue;
+    }
     const pluralAll = new RegExp(`^(?!Other )([A-Z][a-z]+ creatures you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them\\.$`).exec(line);
     const othersPlural = pluralAll ? ([pluralAll[0], pluralAll[1], pluralAll[2], pluralAll[3], undefined, undefined] as unknown as RegExpExecArray) : new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them| for each (opponent who lost life this turn))?\\.$`).exec(line);
     if (othersPlural) {
@@ -1446,6 +1456,11 @@ export function compile(d: CardDef): CompiledCard {
       const filter = card?.kind === "card" ? { ...card, owner: undefined, text: `${yardExile[2]} card` } : undefined;
       if (yardExile[2] && !filter) out.unsupported.push(raw);
       else out.graveyardExile = { whose: yardExile[3] === "a" ? "any" : yardExile[3] === "your" ? "yours" : "opponents", ...(yardExile[1] === "card or token" ? { tokens: true as const } : {}), ...(filter ? { filter } : {}), ...(yardExile[4] ? { counter: counterKind(yardExile[4]) } : {}) };
+      continue;
+    }
+    // Ugin's Nexus: a replacement effect of the permanent's own (CR 614.1a); its controller takes the turn (CR 500.7).
+    if (line === "If ~ would be put into a graveyard from the battlefield, instead exile it and take an extra turn after this one.") {
+      out.exileForExtraTurn = true;
       continue;
     }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {
@@ -2220,6 +2235,13 @@ export function compile(d: CardDef): CompiledCard {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;
     }
+    // "You don't lose the game for having 0 or less life" (CR 704.5a); Marina Vendrell's Grimoire says both at once.
+    const zeroLife = /^You (have no maximum hand size and )?don't lose the game for having 0 or less life\.$/.exec(line);
+    if (zeroLife) {
+      if (zeroLife[1]) out.noMaxHandSize = out.noMaxHandSize || true;
+      out.noZeroLifeLoss = true;
+      continue;
+    }
     const handSize = new RegExp(`^(Your|Each opponent's) maximum hand size is (?:${NUM}|(increased|reduced) by ${NUM})\\.$`).exec(line);
     if (handSize) {
       const n = num((handSize[2] ?? handSize[4])!);
@@ -2659,6 +2681,25 @@ export function compile(d: CardDef): CompiledCard {
       out.noPlayerCounters = true;
       continue;
     }
+    // O-Naginata, Konda's Banner: an Equipment that can't become attached to anything else, and becomes unattached once its
+    // creature stops fitting, its own bonus included (rulings; CR 301.5c, 704.5n).
+    {
+      const only = d.subtypes.includes("Equipment") ? /^~ can be attached only to an? ((?:legendary )?creature(?: with (?:power|toughness) \d+ or greater)?)\.$/.exec(line) : null;
+      const spec = only && parseTargetPhrase(only[1]!);
+      if (spec?.kind === "object") {
+        out.attachOnly = { ...spec, text: only![1]! };
+        continue;
+      }
+    }
+    // Aeve, Progenitor Ooze: a token copy of it isn't legendary (a type-changing effect of its own, CR 205.4, 613.1d).
+    if (line === "~ isn't legendary if it's a token.") {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "loseTypes", types: ["Legendary"] }], condition: { kind: "self", is: "token" }, text: raw });
+      continue;
+    }
+    if (line === "Creatures your opponents control can't have +1/+1 counters put on them.") {
+      out.opponentsCreaturesNoCounters = "+1/+1";
+      continue;
+    }
     if (line === "Counters can't be put on artifacts, creatures, enchantments, or lands.") {
       out.noCountersOn = ["Artifact", "Creature", "Enchantment", "Land"];
       continue;
@@ -2985,6 +3026,27 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
+    // Hunter's Blowgun: "Equipped creature has deathtouch during your turn. Otherwise, it has reach.": one keyword during
+    // your turn, the other during the others'.
+    const blowgun = /^Equipped creature has ([a-z ]+) during your turn\. Otherwise, it has ([a-z ]+)\.$/.exec(line);
+    if (blowgun) {
+      const [mine, others] = [parseConditionalStatic(`During your turn, equipped creature has ${blowgun[1]}.`), parseStatic(`Equipped creature has ${blowgun[2]}.`)];
+      if (mine?.condition?.kind === "yourTurn" && mine.affects.kind === "attached" && others?.affects.kind === "attached" && !others.condition && [...mine.mods, ...others.mods].every((m) => m.kind === "addKeywords")) {
+        out.statics.push({ ...mine, text: line }, { ...others, condition: { kind: "yourTurn", not: true }, text: line });
+        continue;
+      }
+    }
+    // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste
+    // if you control a Warrior, and flying if you control a Wizard": each keyword while its condition holds.
+    const byControl = /^Equipped creature has (.+)\.$/.exec(line);
+    const controlParts = byControl ? byControl[1]!.split(/, (?:and )?/) : [];
+    if (byControl && controlParts.length > 1 && controlParts.every((p) => /^[a-z ]+ if you control an? [A-Z][a-z]+$/.test(p))) {
+      const parts = controlParts.map((p) => /^([a-z ]+) if (you control an? [A-Z][a-z]+)$/.exec(p)!).map((m) => parseConditionalStatic(`As long as ${m[2]}, equipped creature has ${m[1]}.`));
+      if (parts.every((st) => st && st.affects.kind === "attached" && st.condition && st.mods.every((m) => m.kind === "addKeywords"))) {
+        for (const st of parts) out.statics.push({ ...st!, text: line });
+        continue;
+      }
+    }
     // Scion of Draco: "Each creature you control has vigilance if it's white, hexproof if it's blue, ...": one static
     // ability giving each keyword to the creatures of that color (layer 6, after colors in layer 5, CR 613.1e-f).
     const byColor = /^Each creature you control has (.+)\.$/.exec(line);
@@ -3062,7 +3124,7 @@ export function compile(d: CardDef): CompiledCard {
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game." Rite of Harmony's "Whenever a creature or
     // enchantment you control enters this turn, draw a card" too (CR 603.7b).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

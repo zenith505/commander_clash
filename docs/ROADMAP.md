@@ -1,8 +1,8 @@
 # Roadmap
 
-24,654 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,438 of
-9,979 (84%).
+24,761 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,505 of
+9,979 (85%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -38,8 +38,7 @@ line blocks.
    commander"); Helga, Skittish Seer (its mana's spend restriction); Jinnie Fay, Jetmir's Second ("if you would create one or more
    tokens, you may instead": a choice at every token creation, and tokens are created in many places, some outside a
    resolution); Conspiracy Theorist, Cayth, Phial of
-   Galadriel and Shadowgrange Archfiend (a line each with no piece yet); Serum Snare (the bounced permanent's last known
-   mana value), Elturel Survivors (lands the defending player controls), Within Range (creatures attacking each
+   Galadriel and Shadowgrange Archfiend (a line each with no piece yet); Elturel Survivors (lands the defending player controls), Within Range (creatures attacking each
    opponent); Blatant Thievery ("for each opponent, gain control of target permanent that player controls": whether the
    spell can be cast when an opponent controls no permanent it could target isn't settled by CR 601.2c or the
    rulings); Thieving Varmint ("spells you don't own": the mana spending rule needs the spell's owner wherever mana is
@@ -159,19 +158,47 @@ line blocks.
    spell targets a commander you control ... instead"), Killer Service (pay mana and sacrifice as one "may" cost),
    Sapling of Colfenor (gain toughness and lose power from the revealed card). Round 170 went down the list to Cloud,
    Planet's Champion (rank 7,020), skipping over the cards still listed by `npm run popular`.
-   Next most played: Grindstone, Halo Forager, Chandra, Spark Hunter, Moritte of the Frost, Reyhan, Last of the Abzan,
+   Out after round 171, each needing a piece of its own: Haakon, Stromgald Scourge (cast only from the graveyard, and
+   Knight spells from the graveyard), Averna, the Chaos Bloom (a land among the cards cascade exiles), Anax, Hardened
+   in the Forge ("if the creature had power 4 or greater, create two ... instead"), Armory Automaton
+   ("attach any number of target Equipment"), Meteor Crater ("a color of a permanent you control"), Charitable Levy
+   (collection counters, "then if there are three or more ... sacrifice it. If you do"), Glen Elendra's Answer
+   (counter all spells and abilities opponents control), Desertion (a countered card put onto the battlefield instead),
+   Chandra, Spark Hunter (+2: "sacrifice an artifact or discard a card. If you do"), Phyrexian Unlife and Lich's Tomb
+   and Transcendence (life at 0 or less with damage as infect, a sacrifice per life lost, life gained per life lost),
+   Kindred Boon (a target "of the chosen type" isn't bound when targets are chosen), Starving Revenant (no count of the
+   cards a surveil kept on top), Mistbreath Elder (returning another creature with "if you do / otherwise"), Cult
+   Conscript ("a non-Skeleton creature died this turn": the deaths this turn keep no creature types), Verdeloth the
+   Ancient ("other" applies to the Treefolk only), Mandate of Peace ("end the combat phase"), Spectra Ward ("this effect
+   doesn't remove Auras"), Chain Assassination ("if another creature died this turn"), Knight of New Alara (+1/+1 for
+   each of its colors), Welcome the Dead (cards put into your graveyard from your hand or library this turn), Konda's
+   Banner (creatures that share a color or a creature type with the equipped creature), Fork and Evereth ("except that
+   the copy is red"), Benefactor's Draught ("whenever a creature an opponent controls blocks" for the turn), Blood for
+   Bones (a battlefield return then "another" to the hand), Voracious Bibliophile (draw as many as the spell has
+   targets), Locket of Yesterdays (cards with the same name as the spell), Huskburster Swarm (creature cards you own in
+   exile and in your graveyard), Larval Scoutlander ("a land or Lander"), Urdnan, Dromoka Warrior (double strike
+   "if that creature has two or more +1/+1 counters ... instead"), Admiral Brass, Unsinkable (a Pirate returned with
+   base power and toughness 4/4), Alena, Kessig Trapper (the
+   greatest power among creatures that entered this turn), Kyoshi Island Plaza (Shrines you control), Widespread
+   Brutality (the amassed Army deals damage equal to its power). Round 171 went down the list to Hunter's Blowgun (rank
+   7,721), skipping over the cards still listed by `npm run popular`.
+   Next most played: Godsend, Kiora, the Crashing Wave, The Red Terror, Amped Raptor, Repeated Reverberation, Obeka,
+   Brute Chronologist, Outlaws' Merriment, Moldgraf Monstrosity, Myojin of Cryptic Dreams, Radagast the Brown, Caves
+   of Chaos Adventurer, Errant and Giada, Quicksilver Elemental, Secret of Bloodbending, Chiss-Goria, Forge Tyrant,
+   Molecule Man, Runadi, Behemoth Caller, Confiscation Coup, Gryff's Boon, Zoyowa Lava-Tongue, Don't Move, Role
+   Reversal; and from before round 171: Grindstone, Halo Forager, Moritte of the Frost, Reyhan, Last of the Abzan,
    Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal Extortion, Hot Pursuit, Reidane, God
    of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper, Jolted Awake, Dream-Thief's Bandana,
    Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication, Calamity, Galloping Inferno, Shifting
    Grift, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant, Kaervek, the Punisher,
-   Crawling Barrens, Balan, Wandering Knight, Marcus, Mutant Mayor, Soul Snare, Primal Growth, Phyrexian Unlife,
-   Tainted Remedy, Plague Drone, Roar of Challenge; and from before round 170: Obsessive Pursuit, Serra the
-   Benevolent, Gemcutter Buccaneer, Oblivion Stone, Nissa of Shadowed Boughs, Chandra, Flameshaper, Iron Man, Titan of
-   Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the Exemplary, Curator's Ward, Realm of Koh, Mercurial
-   Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft Engine,
-   Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of Herons,
-   Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's Toll,
-   Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
+   Crawling Barrens, Balan, Wandering Knight, Marcus, Mutant Mayor, Soul Snare, Primal Growth, Tainted Remedy, Plague
+   Drone, Roar of Challenge, Obsessive Pursuit, Serra the Benevolent, Gemcutter Buccaneer, Oblivion Stone, Nissa of
+   Shadowed Boughs, Chandra, Flameshaper, Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko,
+   Zaxara, the Exemplary, Curator's Ward, Realm of Koh, Mercurial Spelldancer, Vraska, the Silencer, Vren, the
+   Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft Engine, Agatha of the Vile Cauldron, The Ancient One,
+   Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of Herons, Shelob, Dread Weaver, Price of Glory, Roar of
+   Resistance, Heartless Conscription, Bloatfly Swarm, War's Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond,
+   Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
    Smaller gaps from round 170: "if that creature was a Cleric" (Taborax) reads the dead creature's last known
    subtypes only when the condition is about types alone; Stranglehold stops searches that pick from the library

@@ -323,6 +323,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
+  // Sword of the Meek: "Return ~ from your graveyard to the battlefield, then attach it to that creature": it returns,
+  // then the Equipment is attached if it can be (CR 701.3b); it stays unattached otherwise (rulings).
+  if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield and then attach it to that creature$/.test(s))
+    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }, { type: "attach", what: { ref: "subject" }, source: { ref: "created" }, equipmentOnly: true }];
   // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
   // battlefield" (Corpse Dance), "put the top creature card of defending player's graveyard onto the battlefield under
   // your control" (Bone Dancer), "Put the top card of your graveyard on the bottom of your library" (Soldevi Digger),
@@ -923,9 +927,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
   // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
-  if ((m = /^Creatures( without flying)? can't block this turn$/.exec(s))) {
-    const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
-    return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
+  // "Creatures with power 3 or less can't block this turn" (Temur Charm): those entering later too, and each creature's
+  // power as blockers are declared (rulings).
+  if ((m = /^Creatures( without flying| with power \d+ or less)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
+    return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
   }
   // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until
   // the turn ends.
@@ -1090,6 +1096,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(.+?) sacrifices? a creature (?:with the greatest power among creatures (?:they control|that player controls)|they control with the greatest power)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
+  }
+  // Witch-king, Bringer of Ruin: "defending player sacrifices a creature with the least power among creatures they
+  // control": the least, or tied for it, that player choosing among those tied.
+  if ((m = /^(.+?) sacrifices? a creature with the least power among creatures (?:they control|that player controls)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", least: "power" }] : null;
   }
   // Olórin's Searing Light: "Each opponent exiles a creature with the greatest power among creatures that player
   // controls": each chooses in turn order, then they're exiled at once (rulings, CR 101.4).

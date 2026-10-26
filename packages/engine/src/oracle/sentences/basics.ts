@@ -166,8 +166,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
   // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information
   // says who controlled it if it's gone by then (CR 608.2h).
-  // "Target player may search their library for a card named [name]" (Partner with, CR 702.124j).
-  if ((m = /^(Its controller|That creature's controller|That permanent's controller|That land's controller|That player|[Tt]arget player) may search their library for (.+)$/.exec(s))) {
+  // "Target player may search their library for a card named [name]" (Partner with, CR 702.124j). "When enchanted creature
+  // dies, that creature's controller may search ..." (Pattern of Rebirth): who controlled it as it last existed.
+  if ((m = /^([Ii]ts controller|[Tt]hat creature's controller|[Tt]hat permanent's controller|[Tt]hat land's controller|That player|[Tt]arget player) may search their library for (.+)$/.exec(s))) {
     const who = m[1] === "That player" ? (ctx.lastPlayerTarget === undefined && ctx.lastObjectTarget !== undefined ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
     if (!who || / your /.test(m[2]!)) return null;
     const fx = parseSearch(`Search your library for ${m[2]!.replace(/ their hand\b/, " your hand")}`);
@@ -706,6 +707,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Until your next turn, you may cast (sorcery|creature|artifact|enchantment) spells as though they had flash$/.exec(s))) {
     const filter = parseTargetPhrase(`${m[1]} spell`);
     return filter?.kind === "spell" ? [{ type: "flashUntilNextTurn", filter: { ...filter, text: `${m[1]} spells` } }] : null;
+  }
+  // Winding Canyons: "You may cast creature spells this turn as though they had flash" (CR 702.8a).
+  if ((m = /^You may cast (sorcery|creature|artifact|enchantment) spells this turn as though they had flash$/.exec(s))) {
+    const filter = parseTargetPhrase(`${m[1]} spell`);
+    return filter?.kind === "spell" ? [{ type: "flashUntilNextTurn", filter: { ...filter, text: `${m[1]} spells` }, thisTurn: true }] : null;
   }
   if (/^Until your next turn, your opponents can't cast spells from anywhere other than their hands$/.test(s)) return [{ type: "opponentsHandOnlyUntilNextTurn" }];
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];

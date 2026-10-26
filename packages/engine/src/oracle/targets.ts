@@ -499,8 +499,9 @@ function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   const m = / that player controls$/i.exec(phrase);
   if (m && ctx.eventPlayer) return [phrase.slice(0, m.index), true];
   // "Target nonland permanent card from that player's graveyard" (Tinybones, the Pickpocket): a card that player owns.
-  const yard = / from that player's graveyard$/i.exec(phrase);
-  if (yard && ctx.eventPlayer) return [`${phrase.slice(0, yard.index)} from a graveyard`, true];
+  // Rakshasa Debaser: "target creature card from defending player's graveyard": the player it's attacking (CR 506.2).
+  const yard = / from (that|defending) player's graveyard$/i.exec(phrase);
+  if (yard && (yard[1] === "that" ? ctx.eventPlayer : ctx.defending)) return [`${phrase.slice(0, yard.index)} from a graveyard`, true];
   // "Whenever ~ attacks, tap target creature defending player controls": the player it's attacking (CR 506.2, rulings).
   const d = / defending player controls$/i.exec(phrase);
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];
@@ -699,6 +700,14 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
     const anyOf: TargetSpec[] = [{ kind: "object", token: true, text: "token" }, { kind: "object", subtypes: [singular(tokenOr[2]!)], text: singular(tokenOr[2]!) }];
     return { filter: { ...base.filter, anyOf, text: phrase.trim().toLowerCase() }, other: base.other };
   }
+  // "Each creature you control that's an artifact or Human" (Paladin Danse, Steel Maverick): either one.
+  const typeOr = /^((?:[Aa]ll |[Ee]ach )?(?:other )?creatures? you control) that(?:'s| is| are|'re) (?:an? )?(artifact|enchantment)s? or (?:an? )?([A-Z][a-z]+)$/.exec(p);
+  if (typeOr && CREATURE_TYPES.has(singular(typeOr[3]!))) {
+    const base = parseGroup(typeOr[1]!, bare, count);
+    if (!base || base.filter.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", types: [capital(typeOr[2]!)], text: typeOr[2]! }, { kind: "object", subtypes: [singular(typeOr[3]!)], text: singular(typeOr[3]!) }];
+    return { filter: { ...base.filter, anyOf, text: phrase.trim().toLowerCase() }, other: base.other };
+  }
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);
@@ -788,6 +797,10 @@ export function parseTargetPhrase(
   // Clavileño: "attacking Vampire that isn't a Demon" is an attacking non-Demon Vampire (creature types only).
   const typeIsnt = /^(target )?((?:[a-z]+ )*)([A-Z][a-z]+) that isn't an? ([A-Z][a-z]+)$/.exec(phrase.trim());
   if (typeIsnt && CREATURE_TYPES.has(typeIsnt[3]!) && CREATURE_TYPES.has(typeIsnt[4]!)) return parseTargetPhrase(`${typeIsnt[1] ?? ""}${typeIsnt[2]}non-${typeIsnt[4]} ${typeIsnt[3]}`, opts);
+  // Bounty Agent: "legendary permanent that's an artifact, creature, or enchantment" is a legendary artifact, creature,
+  // or enchantment.
+  const thatsA = /^(target )?((?:[a-z]+ )*)permanent that's an? ((?:artifact|creature|enchantment|land|planeswalker|battle)(?:, (?:artifact|creature|enchantment|land|planeswalker|battle))*,? or (?:artifact|creature|enchantment|land|planeswalker|battle))$/.exec(phrase.trim());
+  if (thatsA) return parseTargetPhrase(`${thatsA[1] ?? ""}${thatsA[2]}${thatsA[3]}`, opts);
   // Yenna, Redtooth Regent: "enchantment you control that doesn't have the same name as another permanent you control".
   const unique = / that doesn't have the same name as another permanent you control$/.exec(phrase.trim());
   if (unique) {
@@ -967,10 +980,16 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
+  }
+  // "Each creature you control with a mana ability" (Raggadragga): an activated or triggered one (CR 605.1).
+  const manaAb = / with a mana ability$/.exec(p);
+  if (manaAb) {
+    extra.manaAbility = true;
+    p = p.slice(0, manaAb.index);
   }
   const without = / without an? ([+-]1\/[+-]1) counters? on (?:it|them)/.exec(p);
   if (without) {

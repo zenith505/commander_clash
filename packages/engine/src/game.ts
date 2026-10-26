@@ -820,6 +820,13 @@ export function moveObject(
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard.`);
   }
+  // Ugin's Nexus: exiled instead, and its controller takes an extra turn after this one (CR 500.7, 614.1a).
+  if (to === "graveyard" && fromZone === "battlefield" && abilitiesOf(s, o).exileForExtraTurn) {
+    to = "exile";
+    const pid = controllerOf(s, o);
+    (s.extraTurns ??= []).push({ player: pid });
+    log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard; ${player(s, pid).name} will take an extra turn after this one.`);
+  }
   const shuffleIn = to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).shuffleInsteadOfGraveyard;
   if (shuffleIn) {
     to = "library";
@@ -1231,7 +1238,9 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersPrepared) becomePrepared(s, o);
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
-  if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
+  // Read ahead granted by another permanent (Barbara Wright) applies as it enters too (CR 614.12).
+  const readAhead = !!printed.readAhead || characteristics(s, o).grantedAbilities.some((t) => !!compileGranted(t).readAhead);
+  if (saga && !readAhead) putCounters(s, o, "lore", 1, true);
   // "Look at an opponent's hand, then choose a card type" (Arachne): the opponent first.
   if (printed.entersChoosePlayer && printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", except: "you", lookHand: true });
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
@@ -1246,7 +1255,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
   // it as it would exist on the battlefield (CR 614.12, rulings).
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -1703,10 +1712,11 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   }
   player(s, pid).life += n;
   const gained = ((s.turnLog ??= {}).gainedLife ??= []);
-  if (!gained.includes(pid)) gained.push(pid);
+  const first = !gained.includes(pid);
+  if (first) gained.push(pid);
   const total = (s.turnLog.lifeGained ??= {});
   total[pid] = (total[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeGained", player: pid, amount: n });
+  fireEvent(s, { type: "lifeGained", player: pid, amount: n, first });
 }
 
 /** A rule for one player this turn (Courageous Resolve): see GameState.turnRules. */
@@ -2827,7 +2837,7 @@ function startNextTurn(s: GameState, skipping = false) {
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
-  if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller));
+  if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller) && r.turn === undefined);
   if (!s.flashUntil?.length) s.flashUntil = undefined;
   if (s.graveGrants) s.graveGrants = s.graveGrants.filter((g) => g.turn === s.turn).length ? s.graveGrants.filter((g) => g.turn === s.turn) : undefined;
   if (s.handOnlyUntil) s.handOnlyUntil = s.handOnlyUntil.filter((r) => !began.has(r.controller));
@@ -4904,7 +4914,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
   const own = compileCard(d).flashIf;
   if (own && staticConditionNow(s, own, "", pid)) return true;
   if (turnRule(s, pid, "flash")) return true;
-  if (s.flashUntil?.some((r) => r.controller === pid && printedMatches(r.filter, d))) return true;
+  if (s.flashUntil?.some((r) => r.controller === pid && (r.turn === undefined || r.turn === s.turn) && printedMatches(r.filter, d))) return true;
   // Progenitor's Icon: the next such spell this turn.
   if (s.nextCast?.some((r) => r.flash && r.controller === pid && r.turn === s.turn && printedMatches(r.filter, d))) return true;
   return s.battlefield.some((id) => {
@@ -6248,7 +6258,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
   if (banned) return banned;
   // Solemnity: a cost that puts counters on an artifact, creature, enchantment or land can't be paid (rulings).
-  if (ab.putCounters && countersBanned(s, o)) return `counters can't be put on ${d.name}`;
+  if (ab.putCounters && countersBanned(s, o, ab.putCounters.counter)) return `counters can't be put on ${d.name}`;
   // The Immortal Sun: no loyalty abilities (CR 606.3) while it's on the battlefield.
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     const sun = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).noLoyaltyAbilities);
@@ -7762,7 +7772,7 @@ function askEntersChoice(s: GameState): boolean {
       const n = compileCard(defOf(s, o)).tribute ?? 0;
       const to = o.tribute?.to;
       // Solemnity: the chosen opponent can't pay tribute (rulings).
-      if (to === undefined || player(s, to).lost || countersBanned(s, o)) {
+      if (to === undefined || player(s, to).lost || countersBanned(s, o, "+1/+1")) {
         if (to !== undefined && !player(s, to).lost) log(s, `${player(s, to).name} can't pay tribute for ${defOf(s, o).name}: counters can't be put on it.`);
         q.shift();
         if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
@@ -7984,7 +7994,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
-      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -8064,6 +8074,7 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (player(s, c.controller).attackBansNextTurn?.some((b) => b.turn === s.turn && b.player === hit)) return `${c.name} can't attack ${player(s, hit).name}${attacked !== undefined || planeswalker ? "'s permanents" : ""} this turn`;
   if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
+  if (c.cantAttackPlayersOnly.includes(defender) && !planeswalker && attacked === undefined) return `${c.name} can't attack ${player(s, defender).name}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
   if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;
   // Xantcha: nor its owner's planeswalkers (a battle its owner protects isn't one).
@@ -8937,7 +8948,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
-      if (p.life <= 0) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a
+      if (p.life <= 0 && !zeroLifeOk(s, p.id)) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a
       else if (p.drewFromEmptyLibrary) changed = playerLoses(s, p.id, "drew from an empty library") || changed; // 704.5b
       else if ((p.poison ?? 0) >= 10) changed = playerLoses(s, p.id, "ten poison counters") || changed; // 704.5c
       else {
@@ -9104,7 +9115,9 @@ function attachmentSBAs(s: GameState): boolean {
     } else if (c.subtypes.includes("Equipment") && o.attachedTo) {
       // Unattached from anything but a creature, and when it becomes a creature itself (CR 301.5c, 704.5n, 704.5p).
       // Also when the creature has protection from the Equipment's color (CR 702.16d).
-      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host))) {
+      // And from one an "~ can be attached only to" no longer allows (O-Naginata rulings).
+      const only = abilitiesOf(s, o).attachOnly;
+      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host)) || (only && !objectMatches(s, only, host, controllerOf(s, o), false))) {
         if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
         o.attachedTo = undefined;
         invalidateCharacteristics(s);
@@ -9205,6 +9218,14 @@ export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"
       const rule = what === "lose" ? a.cantLose : a.cantWin;
       return !!rule && (rule === "you" ? you === pid : you !== pid);
     });
+  });
+}
+
+/** "You don't lose the game for having 0 or less life" (Marina Vendrell's Grimoire): a permanent `pid` controls says so. */
+export function zeroLifeOk(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)].some((a) => a.noZeroLifeLoss);
   });
 }
 

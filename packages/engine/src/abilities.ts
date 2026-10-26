@@ -197,7 +197,8 @@ export type Count =
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   /** "For each of its colors" (Breathe Your Last): its colors now, or as it last existed on the battlefield (CR 608.2h). */
   | { kind: "colorsOf"; of: ObjRef }
-  | { kind: "life"; who: PlayerRef }
+  /** `highest`: "the highest life total among your opponents" (Malignus): the greatest of theirs, not the sum. */
+  | { kind: "life"; who: PlayerRef; highest?: true }
   /** "The difference" between your starting life total and your life total when it is less (Shadow of Mortality); 0 otherwise. */
   | { kind: "lifeBelowStart" }
   /** "The number of experience counters you have" (CR 122.1). */
@@ -268,6 +269,8 @@ export type Count =
   /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
   /** "The greatest mana value among cards in exile" (Ulamog, the Defiler): every player's exiled cards, a face-down one 0 (CR 708.2). */
   | { kind: "greatestMvInExile" }
+  /** "There are seven or more cards in exile" (Ketramose): every player's exiled cards, face-down ones too (rulings). */
+  | { kind: "cardsInExile" }
   | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
@@ -373,7 +376,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1248,7 +1251,7 @@ export type Modification =
   /** "Can't attack a player it has already attacked this turn" (Port Razer): attacking a planeswalker still can (rulings). */
   | { kind: "cantAttackSamePlayer" }
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
-  | { kind: "cantAttackYou"; /** "That combat" (Illusionist's Gambit): only in the added combat phase with this key. */ combatKey?: number }
+  | { kind: "cantAttackYou"; /** "That combat" (Illusionist's Gambit): only in the added combat phase with this key. */ combatKey?: number; /** Blazing Archon's "can't attack you": the player only, not their planeswalkers or battles (CR 508.1c). */ playerOnly?: true }
   /**
    * "Can't attack those players or planeswalkers they control this combat" (Chaos Dragon): the players, worked out as the
    * effect starts ("highestRoll": the opponents who had the highest result of the last "each player rolls", ties
@@ -1389,7 +1392,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn"; not?: true }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1473,7 +1476,7 @@ export type StaticCondition =
    * "If no creatures are on the battlefield", "if four or more creatures are attacking" (Arrow Volley Trap), "if there are
    * thirteen or more creatures on the battlefield": how many permanents matching `filter` there are, under anyone's control.
    */
-  | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
+  | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number; /** "Five or more other creatures" (Deathbringer Regent): not counting the source. */ other?: true }
   /** "If an opponent lost life this turn". */
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
   /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
@@ -1484,6 +1487,8 @@ export type StaticCondition =
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
    */
   | { kind: "noCombatDamageSinceLastTurn" }
+  /** Nightkin Ambusher: "as long as defending player has a rad counter": the player the source is attacking (CR 506.2, 728). */
+  | { kind: "defendingHasRad" }
   /** "If a player was dealt combat damage by a Zombie this turn" (Lost Monarch of Ifnir): by a creature of that type. */
   | { kind: "playerCombatDamaged"; subtype: string }
   /** "If an opponent was dealt combat damage by a legendary creature this turn" (Blitzball): whoever controlled it (rulings). */
@@ -1686,7 +1691,8 @@ export type Effect =
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
       /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
       /** `castSpell`: "that spell deals ..." in a cast trigger (Sorcerer Class): the spell, as it last existed if it has left the stack (rulings, CR 608.2h). */
-      by?: "subject" | "attached" | "castSpell" | { target: number };
+      /** `created`: "That creature deals ..." after putting a card onto the battlefield (Too Greedily, Too Deep): the one permanent this resolution put there, if it's still there. */
+      by?: "subject" | "attached" | "castSpell" | "created" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }
@@ -1867,7 +1873,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -3054,7 +3060,7 @@ export type Effect =
   /** `everyone`: "Players can't lose life this turn" (Everybody Lives!), each player in the game as it resolves. */
   | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
-  | { type: "flashUntilNextTurn"; filter: TargetSpec }
+  | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
   /**
    * Goblin Welder: "If both targets are still legal as this ability resolves, that player simultaneously sacrifices the
    * artifact and returns the artifact card to the battlefield": targets `artifact` and `card` (rulings: neither if either is illegal).
@@ -3574,6 +3580,8 @@ export type TriggerEvent =
   | "selfExerted"
   /** "Whenever you exert a creature": the exerted creature is the subject. */
   | "youExert"
+  /** "Whenever you get one or more {E}" (Aether Revolt): energy counters put on you, "that much" their number (CR 107.14). */
+  | "youGetEnergy"
   | "permanentCountersPut"
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"
@@ -3828,7 +3836,8 @@ export interface TriggeredAbility {
   eventX?: true;
   /** For "permanentIsDealtDamage": what has to be dealt damage. */
   dealtFilter?: TargetSpec;
-  /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn. */
+  /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn.
+   * For "youGainLife": "for the first time during each of your turns" (Cat Collector): your first life gain this turn, on your turn. */
   firstOnTheirTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
@@ -4141,7 +4150,8 @@ export interface TriggeredAbility {
 export interface BatchTrigger {
   /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
   /** `created`: "Whenever you create one or more creature tokens" (Staff of the Storyteller), tokens that player created (CR 111.2). */
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "created";
+  /** `exiledFromGraveyardsOrBattlefield`: "cards are put into exile from graveyards and/or the battlefield" (Ketramose): anyone's. */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "exiledFromGraveyardsOrBattlefield" | "created";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";
@@ -4776,6 +4786,8 @@ export interface CompiledCard {
   statics: StaticAbility[];
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
+  /** "~ can be attached only to a creature with power 3 or greater" (O-Naginata): an Equipment's limit (run-permanents.ts canAttachTo, SBA 704.5n). */
+  attachOnly?: TargetSpec;
   /** Daybreak Coronet: "Enchant creature with another Aura attached to it": an Aura other than this one (CR 303.4c, 704.5m). */
   enchantAnotherAura?: true;
   entersTapped: boolean;
@@ -4804,6 +4816,8 @@ export interface CompiledCard {
   /** "If this land would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a), as an ability it has (Realmbreaker's gift). */
   exileIfLeavesSelf?: true;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
+  /** Ugin's Nexus: "If ~ would be put into a graveyard from the battlefield, instead exile it and take an extra turn after this one." (game.ts moveObject). */
+  exileForExtraTurn?: true;
   exileInsteadOfGraveyard?: boolean;
   /** An instant or sorcery whose last instruction is "Exile ~.": exiled as it finishes resolving (CR 608.2n). */
   exileSelfOnResolve?: true;
@@ -5026,6 +5040,8 @@ export interface CompiledCard {
   noPlayerCounters?: true;
   /** Solemnity: "Counters can't be put on artifacts, creatures, enchantments, or lands." Permanents with any of these card types (counters.ts countersBanned). */
   noCountersOn?: string[];
+  /** Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." (counters.ts countersBanned). */
+  opponentsCreaturesNoCounters?: CounterKind;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
   boastTwice?: true;
   /**
@@ -5210,6 +5226,11 @@ export interface CompiledCard {
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).
    */
   cantLose?: "you" | "opponents";
+  /**
+   * "You don't lose the game for having 0 or less life" (Marina Vendrell's Grimoire, Phyrexian Unlife): its controller
+   * skips the state-based action of CR 704.5a while it's on the battlefield; they can still lose any other way.
+   */
+  noZeroLifeLoss?: true;
   cantWin?: "you" | "opponents";
   /**
    * The Golden Throne: "If you would lose the game, instead exile ~ and your life total becomes 1." A replacement effect

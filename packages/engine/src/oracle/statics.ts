@@ -175,6 +175,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Sab-Sunen, Luxa Embodied: "~ can't attack or block unless it has an even number of counters on it" (of all kinds).
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it has an? (even|odd) number of counters on it$/.exec(text))) [statement, cond] = [m[1], `it has an ${m[2] === "even" ? "odd" : "even"} number of counters on it`];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
+  // Ketramose, the New Dawn: "~ can't attack or block unless there are seven or more cards in exile": while there are fewer.
+  else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless there are ${NUM} or more cards in exile$`).exec(text))) [statement, cond] = [m[1], `there are fewer than ${m[2]} cards in exile`];
+  // Kefnet the Mindful: "~ can't attack or block unless you have seven or more cards in hand": while you have fewer.
+  else if ((m = new RegExp(`^(~ can't (?:attack or block|attack|block)) unless you have ${NUM} or more cards in hand$`).exec(text))) [statement, cond] = [m[1], `you have fewer than ${m[2]} cards in hand`];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
@@ -574,10 +578,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const n = m[2] ? 1 : m[1] ? num(m[1]) : 1;
     return { kind: "onBattlefield", filter: { ...spec, text: `attacking ${m[3]}` }, min: n, ...(m[2] ? { max: 1 } : {}) };
   }
+  if ((m = new RegExp(`^there are fewer than ${NUM} cards in exile$`).exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInExile" } }, max: num(m[1]!) - 1 };
   // "If there are thirteen or more creatures on the battlefield" (Blasphemous Edict).
   if ((m = new RegExp(`^there are ${NUM} or more (.+) on the battlefield$`).exec(text))) {
     const g = parseGroup(`all ${m[2]}`);
-    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!) } : null;
+    return g ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!), ...(g.other ? { other: true as const } : {}) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };
@@ -726,6 +731,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
+  // Nightkin Ambusher: "~ can't be blocked as long as defending player has a rad counter": the player it's attacking.
+  if (text === "defending player has a rad counter" && st.affects.kind === "self") return { kind: "defendingHasRad" };
   if (text === "an opponent was dealt combat damage by a legendary creature this turn") return { kind: "opponentCombatDamagedByLegendary" };
   if ((m = /^a player was dealt combat damage by an? ([A-Z][a-z]+) this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature") return { kind: "playerCombatDamaged", subtype: m[1]! };
   // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
@@ -941,6 +948,7 @@ export function parseAffected(subject: string): Affects | null {
     const types = ["Creature"];
     let combat: "attacking" | "blocking" | undefined;
     let colorless = false;
+    let multicolored = false;
     let tapped: boolean | undefined;
     let legendary: boolean | undefined;
     let status: TargetSpec["status"];
@@ -955,7 +963,9 @@ export function parseAffected(subject: string): Affects | null {
       else if (CREATURE_TYPES.has(w)) subtypes.push(w);
       // "Attacking creatures you control get +1/+0": whichever are attacking right now (CR 611.3a).
       else if ((w.toLowerCase() === "attacking" || w.toLowerCase() === "blocking") && !combat) combat = w.toLowerCase() as "attacking" | "blocking";
-      else if (w.toLowerCase() === "colorless" && !colorless) colorless = true; // CR 105.2c
+      else if (w.toLowerCase() === "colorless" && !colorless && !multicolored) colorless = true; // CR 105.2c
+      // "Other multicolored creatures you control get +1/+0" (Rienne, Angel of Rebirth): two or more colors (CR 105.2b).
+      else if (w.toLowerCase() === "multicolored" && !colorless && !multicolored) multicolored = true;
       // "Untapped creatures you control get +0/+2": whichever are untapped right now, like attacking ones.
       else if (/^(un)?tapped$/i.test(w) && tapped === undefined) tapped = w.toLowerCase() === "tapped";
       // "Legendary creatures you control get +2/+2" (supertype, CR 205.4d), "nonlegendary creatures".
@@ -969,12 +979,12 @@ export function parseAffected(subject: string): Affects | null {
       else if (/^historic$/i.test(w) && !historic) historic = true;
       else return null;
     }
-    const specWords = [historic ? "historic" : undefined, nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
+    const specWords = [historic ? "historic" : undefined, nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, multicolored ? "multicolored" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
     const spec: TargetSpec | undefined = specWords.length
       ? {
           kind: "object",
           ...(combat ? { combat } : {}),
-          ...(colorless ? { colorCount: "colorless" as const } : {}),
+          ...(colorless ? { colorCount: "colorless" as const } : multicolored ? { colorCount: "multicolored" as const } : {}),
           ...(tapped !== undefined ? { tapped } : {}),
           ...(legendary === true ? { supertypes: ["Legendary"] } : legendary === false ? { notSupertypes: ["Legendary"] } : {}),
           ...(status ? { status } : {}),
@@ -1009,6 +1019,8 @@ export function parseAffected(subject: string): Affects | null {
   // "Creatures with ice counters on them" (Rimescale Dragon) likewise.
   // "Equipment you control have equip {0}" (Puresteel Paladin): the plural of Equipment is Equipment.
   if ((m = /^(Other )?Equipment you control$/.exec(x))) return parseAffected(`Each ${m[1] ? "other " : ""}Equipment you control`);
+  // Barbara Wright: "Sagas you control have read ahead" (an enchantment subtype, CR 205.3h).
+  if (x === "Sagas you control") return { kind: "filter", types: ["Enchantment"], subtypes: ["Saga"], controller: "you" };
   const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
   const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;
@@ -1142,6 +1154,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     }
     return mods;
   }
+  // Colossus of Akros: "it has trample and can attack as though it didn't have defender".
+  if ((m = /^(has [a-z ]+?) and (can attack as though (?:it|they) didn't have defender)$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[2]!);
+    return first && second ? [...first, ...second] : null;
+  }
   if ((m = /^(?:has|have) (.+)$/.exec(rest))) return parseGrants(m[1]!);
   if (/^can block (?:an additional|any number|up to|\w+ additional)/.test(rest)) {
     const more = parseExtraBlocks(rest);
@@ -1191,6 +1209,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // "Creatures with flying can't attack you or planeswalkers you control" (Sandwurm Convergence, CR 508.1c): "you" is the
   // source's controller.
   if (/^can't attack you or planeswalkers you control$/.test(rest)) return [{ kind: "cantAttackYou" }];
+  // Blazing Archon: "Creatures can't attack you": you, but not your planeswalkers (CR 508.1c).
+  if (/^can't attack you$/.test(rest)) return [{ kind: "cantAttackYou", playerOnly: true }];
   if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
   if (/^can't attack its owner or planeswalkers its owner controls$/.test(rest)) return [{ kind: "cantAttackOwner", planeswalkers: true }];
   // Xantcha: "attacks each combat if able and can't attack its owner or planeswalkers its owner controls".

@@ -196,6 +196,8 @@ export interface Characteristics {
   cantTurnFaceUp: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
+  /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
+  cantAttackPlayersOnly: PlayerId[];
   mustBeBlocked: boolean;
   allMustBlock: boolean;
   mustBlock: boolean;
@@ -290,6 +292,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSacrificed: false,
     cantTurnFaceUp: false,
     cantAttackPlayers: [],
+    cantAttackPlayersOnly: [],
     mustBeBlocked: false,
     allMustBlock: false,
     mustBlock: false,
@@ -755,7 +758,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "onBattlefield": {
       let n = 0;
-      for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
+      for (const [id, c] of chars) if (!(cond.other && id === sourceId) && objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
       return (cond.max === undefined || n <= cond.max) && (cond.min === undefined || n >= cond.min);
     }
     case "life": {
@@ -770,6 +773,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "defendingHasRad":
+      return src.attacking !== undefined && (s.players[src.attacking]?.rad ?? 0) > 0;
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];
       return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);
@@ -966,6 +971,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
+      if (cond.is === "token") return !!src.isToken; // Aeve, Progenitor Ooze
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
@@ -1122,6 +1128,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "loseTypes":
       c.types = c.types.filter((t) => !m.types.includes(t));
+      c.supertypes = c.supertypes.filter((t) => !m.types.includes(t)); // "isn't legendary" (Aeve)
       c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? ""));
       // Planeswalker types (CR 205.3j) aren't in a list of their own: no longer a planeswalker, it has none (CR 205.3d).
       if (m.types.includes("Planeswalker") && !c.types.includes("Battle")) c.subtypes = c.subtypes.filter((st) => subtypeSet(st) !== null);
@@ -1348,7 +1355,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackYou": {
       if (m.combatKey !== undefined && m.combatKey !== s.thatCombat) return;
       const you = controllerOfInst(e, chars);
-      if (!c.cantAttackPlayers.includes(you)) c.cantAttackPlayers.push(you);
+      const list = m.playerOnly ? c.cantAttackPlayersOnly : c.cantAttackPlayers;
+      if (!list.includes(you)) list.push(you);
       return;
     }
     case "cantBeBlockedByGreaterPower":

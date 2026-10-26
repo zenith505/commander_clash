@@ -97,9 +97,10 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return who && who.ref !== "you" ? [{ type: "mill", who, n: { count: { kind: "cardsInHand", who: who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { ref: "eachOne" } : who } } }] : null;
   }
   // "Target player mills twice X cards" (Drown in Dreams), "mill twice X cards" (The Master of Keys).
-  if ((m = /^(?:(.+?) mills|[Mm]ill) twice X cards$/.exec(s))) {
+  // "Target player mills three times X cards" (Jace, the Perfected Mind).
+  if ((m = /^(?:(.+?) mills|[Mm]ill) (twice|three times) X cards$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
-    return who ? [{ type: "mill", who, n: { count: { kind: "x" }, times: 2 } }] : null;
+    return who ? [{ type: "mill", who, n: { count: { kind: "x" }, times: m[2] === "twice" ? 2 : 3 } }] : null;
   }
   // "Target opponent exiles the top half of their library, rounded up" (Ulamog, the Defiler): half their own library.
   if ((m = /^(.+?) exiles the top half of (?:their|his or her) library(?:, rounded (up|down))?$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
@@ -368,6 +369,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(m[1]!);
     return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can't be countered`, uncounterable: true }] : null;
   }
+  // Progenitor's Icon: "The next spell of the chosen type you cast this turn can be cast as though it had flash" (CR
+  // 702.8a): the type chosen as the source entered, bound as this resolves; the first such spell uses it up.
+  if ((m = /^[Tt]he next (spell of the chosen type|(?:[a-z]+ )?spell) you cast this turn can be cast as though it had flash$/.exec(s))) {
+    const filter: TargetSpec | null = m[1] === "spell of the chosen type" ? { kind: "spell", chosen: "type", text: "spell of the chosen type" } : parseTargetPhrase(m[1]!);
+    return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can be cast as though it had flash`, flash: true }] : null;
+  }
   // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
   // Double Major: "Copy target creature spell you control, except it isn't legendary if the spell is legendary" (CR 707.9b):
   // the copy's copiable values aren't legendary, nor is the token it becomes (CR 608.3f).
@@ -490,6 +497,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // An ability's X: one announced for its cost (Kozilek, the Great Distortion; checked in oracle/activated.ts).
     if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.activated && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];
+  }
+  // Press the Enemy, after "Return target spell or nonland permanent ...": "You may cast an instant or sorcery spell with
+  // equal or lesser mana value from your hand without paying its mana cost": no more than that target's mana value as it
+  // last existed (a spell's with its X, rulings), as this resolves (TargetSpec.bound).
+  if ((m = /^(?:You may c|C)ast an? (.+? spell) with equal or lesser mana value from your hand without paying its mana cost$/.exec(s)) && (/^You/.test(s) || ctx.mayNow) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget] && !ctx.targets[ctx.lastObjectTarget]!.many) {
+    const filter = parseTargetPhrase(m[1]!);
+    if (filter?.kind !== "spell" || filter.controller || filter.targetsWhat || filter.manaValue || filter.bound) return null;
+    const amount = { count: { kind: "manaValue" as const, of: { ref: "target" as const, index: ctx.lastObjectTarget } } };
+    return [{ type: "castFromHand", filter: { ...filter, bound: { key: "manaValue", at: "most", amount }, text: `${m[1]} with equal or lesser mana value` } }];
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),
   // "... with mana value X or less ..." (Electrodominance: its X), "... an instant or sorcery spell from your hand ...",

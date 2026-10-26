@@ -155,7 +155,9 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (r.scratch ??= {});
       if (!sc.vote) {
         r.votes = [];
-        sc.vote = { queue: turnOrderFrom(s, ctx.controller), ...(e.choose ? { choose: true as const } : {}) };
+        // "Starting with the next opponent in turn order" (Sadistic Shell Game): the controller chooses last.
+        const order = turnOrderFrom(s, ctx.controller);
+        sc.vote = { queue: e.startNext ? [...order.slice(1), ...order.slice(0, 1)] : order, ...(e.choose ? { choose: true as const } : {}) };
       }
       const v = sc.vote;
       while (v.queue.length) {
@@ -165,8 +167,8 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (v.left === undefined) {
           // "Each player may choose": one pick or none, whatever gives extra votes.
           const extra = e.choose ? { get: 0, may: 0 } : extraVotes(s, voter);
-          v.left = e.choose ? 0 : 1 + extra.get;
-          v.may = e.choose ? 1 : extra.may;
+          v.left = e.choose ? (e.mustChoose ? 1 : 0) : 1 + extra.get;
+          v.may = e.choose ? (e.mustChoose ? 0 : 1) : extra.may;
         }
         const options = voteOptions(s, e, ctx, voter);
         // "A creature they control" with none: that player isn't asked (CR 101.3); the others still choose.
@@ -202,7 +204,9 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const seen = e.secret ? r.votes!.filter((x) => x.voter === voter) : r.votes!;
           const so = seen.length ? ` (${seen.map((x) => `${player(s, x.voter).name}: ${voteLabel(s, x.choice)}`).join(", ")})` : "";
           const whose = chooser === voter ? "" : ` for ${player(s, voter).name}`;
-          const prompt = e.choose ? `${e.text}${so}` : `vote${whose}${mine ? " an additional time" : ""}: ${e.text}${so}`;
+          // "A creature you don't control": the controller's, said so to the other players.
+          const what = voter === ctx.controller ? e.text : e.text.replace(/\byou don't control\b/, `${player(s, ctx.controller).name} doesn't control`);
+          const prompt = e.choose ? `${what}${so}` : `vote${whose}${mine ? " an additional time" : ""}: ${e.text}${so}`;
           s.pending = {
             kind: "chooseOption",
             player: chooser,

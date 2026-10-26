@@ -881,9 +881,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
       }
+      const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.condDest && condNow ? e.condDest.dest : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).
@@ -1187,7 +1188,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const options = sc.looked.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
         const yardHas = (f: TargetSpec) => player(s, ctx.controller).graveyard.some((id) => printedMatches(f, defOf(s, obj(s, id))));
-        const count = e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.countIfYard?.has.every(yardHas) ? e.countIfYard.count : e.count;
+        const count = e.countX ? Math.max(0, ctx.x ?? 0) : e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : (e.countIfYard?.min ? player(s, ctx.controller).graveyard.filter((id) => printedMatches(e.countIfYard!.has[0]!, defOf(s, obj(s, id)))).length >= e.countIfYard.min : e.countIfYard?.has.every(yardHas)) ? e.countIfYard!.count : e.count;
         const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         if (!e.sacrificeFirst) log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of ${from === pid ? "their" : `${player(s, from).name}'s`} library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
@@ -1196,7 +1197,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
+          const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
@@ -1243,7 +1244,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
-      else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.play ? " and may play it this turn" : ""}.`);
+      else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.playFree ? " and may cast it this turn without paying its mana cost" : e.play ? " and may play it this turn" : ""}.`);
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
       r.digTook = found.length > 0;
@@ -1254,7 +1255,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
             // Face up (CR 406.3); "you may play the exiled card this turn" is that object's only (CR 400.7).
             moveObject(s, id, "exile");
             const o = obj(s, id);
-            if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+            if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.playFree ? { castOnly: true as const, free: true as const } : {}) };
           } else if (faceDown) {
             // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
             moveObject(s, id, "battlefield", { controller: p.id, faceDown });

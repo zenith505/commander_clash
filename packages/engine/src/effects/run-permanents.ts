@@ -339,6 +339,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       fireEvent(s, { type: "solved", id: o.id, controller: controllerOf(s, o) });
       return;
     }
+    case "becameCrewed": {
+      // "Whenever this Vehicle becomes crewed" (CR 702.122e): its crew ability resolved, whatever it is now.
+      const o = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      if (o?.zone === "battlefield") fireEvent(s, { type: "crewed", id: o.id });
+      return;
+    }
     case "becomeSaddled":
       // Only permanents can become saddled (CR 702.171b).
       for (const o of objects(s, e.what, ctx)) {

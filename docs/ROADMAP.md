@@ -1,7 +1,7 @@
 # Roadmap
 
-24,443 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,285 of
+24,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,312 of
 9,979 (83%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -88,8 +88,7 @@ line blocks.
    for "that creature" this turn), Angel of Jubilation (no paying life or sacrificing creatures for any cost),
    Olivia, Crimson Bride (the returned creature gains a leaves condition on legendary Vampires), Relentless Dead
    ("you may pay {X}" on a dies trigger, then a target with mana value X), Cache Grab ("if you control a Squirrel or
-   returned a Squirrel card this way"), Rot Hulk (up to X targets, X the number of opponents), Crown of Gondor (an
-   equip cost that's lower while you're the monarch), Calix, Destiny's Hand ("until target enchantment you control
+   returned a Squirrel card this way"), Rot Hulk (up to X targets, X the number of opponents), Calix, Destiny's Hand ("until target enchantment you control
    leaves the battlefield"), Xenagos, the Reveler (any number of creature and land cards from among seven onto the
    battlefield), Great Unclean One (a token for each opponent with less life than you). Out after round 164: Agility
    Bobblehead (up to X targets, X counted as it's activated; "can't be blocked except by creatures with haste"),
@@ -119,12 +118,24 @@ line blocks.
    though it had wither), Kotis, the Fangkeeper (cast any number of the exiled spells), Vial Smasher the Fierce (an
    opponent at random, then that player or their planeswalker), Ragost, Deft Gastronaut (artifacts become Foods with a
    granted ability), Observed Stasis ("remove enchanted creature from combat"), Eshki, Temur's Roar ("that spell's
-   power"), Pili-Pala ({Q} in a mana ability), Loyal Inventor (the card found goes to your hand or the top of your
-   library by a condition, after the shuffle), Mariposa Military Base ("you may have ~ enter tapped. If you do, ...").
-   Next most played: Lake of the Dead, Progenitor's Icon, Braids, Conjurer Adept, Dinosaurs on a Spaceship, Elspeth
-   Resplendent, Trinisphere, Sadistic Shell Game, The Pride of Hull Clade, Nahiri, Forged in Fury, Grishnákh, Brash
-   Instigator.
+   power"), Pili-Pala ({Q} in a mana ability), Mariposa Military Base ("you may have ~ enter tapped. If you do, ...").
+   Out after round 167: Dinosaurs on a Spaceship and Deep-Sea Kraken (abilities that work while the card is exiled,
+   triggered by a time counter coming off or by "if ~ is suspended"; the many ways counters are removed don't send such
+   events yet), The Infamous Cruelclaw ("cast that card by discarding a card rather than paying its mana cost", a new
+   alternative cost with its own prompt and bot), Squandered Resources (mana of a type the sacrificed land could
+   produce: which land is sacrificed decides the color, and autopay picks colors before costs), Greymond, Avacyn's
+   Stalwart (two abilities chosen as it enters; only one chosen keyword is kept), Shelinda, Yevon Acolyte ("put a
+   counter on that creature if ... Otherwise, put a counter on ~"), Gaea's Blessing ("put into your graveyard from your
+   library" triggers). Round 167 went down the list to Accumulate Wisdom (rank 5,595).
+   Next most played: Cosima, God of the Voyage, Emperor of Bones, Bloatfly Swarm, War's Toll, Yasharn, Implacable
+   Earth, Undercover Operative, Quintorius Kand, Orvar, the All-Form, Aminatou, Veil Piercer, Narset, Enlightened
+   Exile, Share the Spoils, Arcbond, Sanctum of All, Master Warcraft, Zoyowa's Justice.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 167: Grishnákh's "power less than or equal to the amassed Army's power" is the Army's power
+   as the target is chosen; bots don't activate Progenitor's Icon; Trinisphere counts a hybrid {2/W} symbol as its
+   mana value (2) whichever half is paid; Elspeth Resplendent's +1 puts its two counters on one after the other (the
+   rulings say at the same time, which matters only to "whenever counters are put" triggers); bots play Lake of the
+   Dead and its kin only when they control a land to sacrifice.
    Smaller gaps from round 166: Glorious Gale's "if it was a legendary spell" doesn't see a countered copy of a spell
    (it ceased to exist); bots don't activate Timestream Navigator (they skip abilities that move their source); Wash
    Out's color is the bot's usual color pick, not the color that hurts opponents most.
@@ -749,7 +760,7 @@ line blocks.
    graveyard):
    - "With power / mana value less than or equal to <amount>" works for targets, groups, searches and free casts, and
      "you may ... if that creature's power is less than or equal to" (Nimbus Champion); still out: "that damage" in other
-     trigger shapes (Broodcaller Scourge, Glamdring), Old Man of the Sea, Sphere of Annihilation, Quag Feast
+     trigger shapes (Broodcaller Scourge), Old Man of the Sea, Sphere of Annihilation, Quag Feast
      ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester ("their total power"), Sundering
      Archaic (colors spent).
    - "Your team" is "you" (CR 102.4), as is Azra Bladeseeker's "each player on your team", and "Partner with" works (27
@@ -819,8 +830,7 @@ line blocks.
    objects named earlier, exile now and return later, "until your next end step", "if you controlled that permanent"):
    - Still out: haste for a card put from the hand with a filter or from the graveyard (Meek Attack, Treacherous Urge,
      Swift Warkite, Greasefang); "gets ... and gains" with no duration (Goblin Ski Patrol); Manaform Hellkite and
-     Urabrask's Forge (X/X tokens); "investigate X times"
-     (Disorder in the Court); "any number of target ... return each of them" (Semester's End, Brago); Flickerform
+     Urabrask's Forge (X/X tokens); "any number of target ... return each of them" (Semester's End, Brago); Flickerform
      ("and all Auras attached to it"); Memory Jar (exile hands face down); Teferi's Time Twist, Phelia, Koya, Norin,
      Conciliator's Duelist, Mistmeadow Vanisher, Vizier of Deferment, Charming Prince; Avacyn and Resurrection Orb,
      From the Catacombs, Moira and Teshar, Kheru Lich Lord; copy tokens with "except" or "for each" (Hate Mirage,
@@ -839,7 +849,7 @@ line blocks.
    Left from the reflexive spells and "triggers an additional time" round (CR 603.12 on instants and sorceries,
    amass's "when you do" and "the amassed Army", 603.2d):
    - Reflexive spells still out: Ill-Timed Explosion ("the greatest mana value among cards discarded this way" carried
-     into the trigger), Grishnákh ("power less than or equal to the amassed Army's power"), Goblin Plate Mail ("attach
+     into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
    - "Triggers an additional time" still out: Bifur, Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
      of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All, The
@@ -855,7 +865,7 @@ line blocks.
    - Only cast, dies and combat-damage-to-a-player events can be such a trigger; still out: tapped for mana (High
      Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Subira ("a creature you control with power 2 or
      less" as the dealer), Spiritualize and the rest of the 11 unsupported ones.
-   - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Leyline of Resonance, Loki,
+   - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Loki,
      Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
      that targets" (Danitha, Sword of Hope), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
    - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.

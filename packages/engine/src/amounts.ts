@@ -28,6 +28,8 @@ export interface AmountCtx {
   tapped?: number;
   /** A reflexive trigger after a roll: its result ("with total mana value X or less, where X is the result"). */
   rolled?: number;
+  /** A reflexive trigger after amassing: the amassed Army's power as its targets are chosen (Grishnákh, Brash Instigator). */
+  amassedPower?: number;
   /** The source as it last existed, if it has left the battlefield (CR 608.2h). */
   lki?: LastKnown;
   /** Kicker costs paid for the spell (or the spell its permanent was), CR 702.33d. */

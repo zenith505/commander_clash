@@ -283,7 +283,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Exile each permanent with the most votes or tied for most votes" (Council's Judgment): what the vote chose.
   if (ctx.vote?.among && !ctx.vote.choose && /^each (?:permanent|card) with the most votes or tied for most votes$/i.test(x)) return { ref: "voted" };
   // "Destroy each permanent chosen this way" (Druid of Purification): every one a player chose.
-  if (ctx.vote?.choose && /^each permanent chosen this way$/i.test(x)) return { ref: "voted", any: true };
+  // "Destroy the chosen creatures" (Sadistic Shell Game) likewise.
+  if (ctx.vote?.choose && /^(?:each permanent chosen this way|the chosen creatures)$/i.test(x)) return { ref: "voted", any: true };
   // "Put a +1/+1 counter on target creature you control, then double the number of +1/+1 counters on each creature that had
   // a +1/+1 counter put on it this way" (Fangs of Kalonia).
   // "Goad each creature that had a double strike counter put on it this way" (Spectacular Showdown).
@@ -472,7 +473,8 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "power":
     case "toughness":
     case "counters":
-      return c.of.ref === "self";
+      // "The amassed Army's power" in the reflexive trigger after amassing: fixed as its targets are chosen (settleDivided).
+      return c.of.ref === "self" || (c.kind === "power" && c.of.ref === "amassed");
     case "manaValue":
       // "That spell's mana value" in a cast trigger (Hammerhead Tyrant): as it was cast, fixed then (settleDivided).
       return c.of.ref === "castSpell";

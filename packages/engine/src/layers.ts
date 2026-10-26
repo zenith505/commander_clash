@@ -613,6 +613,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
     case "monarch":
+      if (cond.none) return s.monarch === undefined;
       return cond.opponent ? s.monarch !== undefined && s.monarch !== you : (s.monarch === you) !== !!cond.not;
     case "initiative":
       return s.initiative === you;

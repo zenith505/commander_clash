@@ -541,11 +541,11 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
  * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
  * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f); casting a commander free
- * from the command zone, for the commander tax (Geode Golem, CR 903.8).
+ * from the command zone, for the commander tax (Geode Golem, CR 903.8); any free cast while Trinisphere raises what it costs.
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command"));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -1245,7 +1245,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
   // it as it would exist on the battlefield (CR 614.12, rulings).
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -3996,9 +3996,24 @@ export function freeCastable(s: GameState, pid: PlayerId, id: ObjectId, manaOk =
   const ways: CostChoices[] = [{}, ...castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land")).map((face) => ({ face })), ...(altCost(defOf(s, o), "prototype") ? [{ alt: "prototype" as const }] : [])];
   return ways.some((how) => {
     const problem = castProblem(s, pid, id, undefined, undefined, undefined, undefined, undefined, how);
-    return problem === null || (manaOk && /^not enough mana/.test(problem));
+    // Under Trinisphere a free spell can cost mana too (CR 601.2f), paid as it's cast.
+    return problem === null || ((manaOk || costFloorInPlay(s)) && /^not enough mana/.test(problem));
   });
 }
+
+/** The least mana a spell costs now: Trinisphere's three while it's untapped (spellCostAtLeast), or 0. */
+function spellCostFloor(s: GameState): number {
+  let min = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const n = abilitiesOf(s, o).spellCostAtLeast;
+    if (n && !(n.whileUntapped && o.tapped)) min = Math.max(min, n.n);
+  }
+  return min;
+}
+
+/** Trinisphere is on the battlefield, untapped: a spell cast without paying its mana cost can still cost mana (costAtLeast). */
+export const costFloorInPlay = (s: GameState) => spellCostFloor(s) > 0;
 
 export function castProblem(
   s: GameState,
@@ -4210,7 +4225,8 @@ export function castProblem(
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
   // Timely Ward: with a commander among its targets; before they're chosen, a commander on the battlefield to target.
   const commanderTarget = !!compileCard(d).flashIfTargetsCommander && (targets ? targets.some((t) => t.kind === "object" && !!s.objects[t.id]?.isCommander && s.objects[t.id]!.zone === "battlefield") : s.battlefield.some((b) => obj(s, b).isCommander));
-  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
+  const yoursTarget = !!compileCard(d).flashIfTargetsYours && (targets ? targets.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, s.objects[t.id]!) === pid) : s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid));
+  const instantSpeed = choices?.alt === "sneak" || yoursTarget || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -4433,7 +4449,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const kx = x * xCount(kicked);
     // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
     const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
-    return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) };
+    return costAtLeast(s, { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) });
   }
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
@@ -4475,7 +4491,18 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   for (const c of compileCard(d).costLessIfTargets ?? [])
     if (how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false)) || (t.kind === "stack" && c.filter.kind === "spell" && !!c.filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], c.filter.targetsWhat, pid)))) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more - less) };
+  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more - less) });
+}
+
+/**
+ * Trinisphere: "each spell that would cost less than three mana to cast costs three mana to cast", applied to the total
+ * cost once it's determined, increases and reductions included, before it's locked in (CR 601.2f, rulings); a spell cast
+ * without paying its mana cost too. The difference is generic mana. Its mana value doesn't change.
+ */
+function costAtLeast(s: GameState, r: { cost: ParsedCost; extra: number }): { cost: ParsedCost; extra: number } {
+  const min = spellCostFloor(s);
+  const mana = manaValue(r.cost) + r.extra;
+  return mana < min ? { cost: r.cost, extra: r.extra + min - mana } : r;
 }
 
 /**
@@ -4873,6 +4900,8 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
   if (own && staticConditionNow(s, own, "", pid)) return true;
   if (turnRule(s, pid, "flash")) return true;
   if (s.flashUntil?.some((r) => r.controller === pid && printedMatches(r.filter, d))) return true;
+  // Progenitor's Icon: the next such spell this turn.
+  if (s.nextCast?.some((r) => r.flash && r.controller === pid && r.turn === s.turn && printedMatches(r.filter, d))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     // Teferi, Mage of Zhalfir: the card's owner's Teferi, whoever casts it.
@@ -7163,13 +7192,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
         if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
         return;
       }
-      // It never entered (rulings): nothing sees it enter or leave.
       log(s, `${p.name} doesn't discard a card, so ${pend.source} goes to its owner's graveyard instead.`);
-      s.entersChoices = (s.entersChoices ?? []).filter((c) => c.id !== o.id);
-      s.battlefield = s.battlefield.filter((x) => x !== o.id);
-      o.zone = "stack"; // in no zone list, so moving it isn't leaving the battlefield
-      moveObject(s, o.id, "graveyard");
-      invalidateCharacteristics(s);
+      neverEnters(s, o);
+      return;
+    }
+    if (pend.what === "sacrificeInstead") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a permanent offered");
+      sacrificedInstead(s, o, choice, entry?.enters);
       return;
     }
     if (pend.what === "tribute") {
@@ -7247,7 +7276,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -7557,6 +7586,27 @@ function amplifyChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { 
 }
 
 /**
+ * A permanent that would have entered goes to its owner's graveyard instead (Mox Diamond, Lake of the Dead): it never
+ * entered (rulings), so nothing sees it enter or leave.
+ */
+function neverEnters(s: GameState, o: GameObject) {
+  s.entersChoices = (s.entersChoices ?? []).filter((c) => c.id !== o.id);
+  s.battlefield = s.battlefield.filter((x) => x !== o.id);
+  o.zone = "stack"; // in no zone list, so moving it isn't leaving the battlefield
+  moveObject(s, o.id, "graveyard");
+  invalidateCharacteristics(s);
+}
+
+/** Lake of the Dead: the permanent chosen is sacrificed, then it enters (CR 614.1a). */
+function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId, enters?: { x?: number }) {
+  const x = obj(s, id);
+  log(s, `${player(s, controllerOf(s, o)).name} sacrifices ${nameOf(s, id)}, so ${defOf(s, o).name} enters.`);
+  if (x.zone === "battlefield") moveObject(s, id, "graveyard", { sacrificed: true });
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
+/**
  * Ask for the next "as ~ enters, choose ..." choice still to be made. It's made as the permanent
  * enters (CR 614.12), so before state-based actions and before its enters triggers go on the stack.
  */
@@ -7658,6 +7708,24 @@ function askEntersChoice(s: GameState): boolean {
       const filter = compileCard(defOf(s, o)).entersDiscardInstead!;
       const cards = player(s, you).hand.filter((id) => printedMatches(filter, defOf(s, obj(s, id))));
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "discardInstead", options: [...cards, "none"], labels: [...cards.map((id) => `Discard ${nameOf(s, id)}`), "Don't (it goes to the graveyard)"], objectId: o.id, prompt: `discard a ${filter.text} for it to enter` };
+      return true;
+    }
+    if (c.what === "sacrificeInstead") {
+      // Lake of the Dead (CR 614.1a): a Swamp its controller controls, if they have one to sacrifice; otherwise it goes
+      // to the graveyard instead. It isn't on the battlefield yet, so it can't be the one.
+      const you = controllerOf(s, o);
+      const filter = compileCard(defOf(s, o)).entersSacrificeInstead!;
+      const options = s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, filter, obj(s, id), you, false) && canBeSacrificed(s, obj(s, id)));
+      if (options.length <= 1) {
+        q.shift();
+        if (options.length) sacrificedInstead(s, o, options[0]!, c.enters);
+        else {
+          log(s, `${player(s, you).name} has no ${filter.text} to sacrifice, so ${defOf(s, o).name} goes to its owner's graveyard instead.`);
+          neverEnters(s, o);
+        }
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "sacrificeInstead", options, labels: options.map((id) => `Sacrifice ${nameOf(s, id)}`), objectId: o.id, prompt: `sacrifice a ${filter.text} for it to enter` };
       return true;
     }
     if (c.what === "anchor") {

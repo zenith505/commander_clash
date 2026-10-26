@@ -623,6 +623,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     // Mox Diamond: a land card if there is one.
     if (pend.kind === "chooseOption" && pend.what === "discardInstead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Lake of the Dead: a tapped Swamp first (its mana is spent already), a token or a basic before anything else.
+    if (pend.kind === "chooseOption" && pend.what === "sacrificeInstead") {
+      const worth = (id: string) => (obj(s, id).tapped ? 0 : 2) + (obj(s, id).isToken || characteristics(s, obj(s, id)).supertypes.includes("Basic") ? 0 : 1);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => worth(a) - worth(b))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Sylvan Library: 4 life for a card only while well ahead on life; otherwise it goes back.
     if (pend.kind === "chooseOption" && pend.what === "payOrTop") return [{ type: "chooseOption", player: pid, choice: s.players[pid]!.life >= 30 ? "pay" : "top" }];
@@ -1254,7 +1259,13 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
   // A land from the graveyard (Crucible of Worlds) first: it keeps a card in hand. A modal double-faced card's land face
   // last: its other face is a spell we may want.
   const spellFace = (id: ObjectId) => !!s.cards[obj(s, id).cardId]?.faces?.some((f) => !f.types.includes("Land"));
-  const rank = (a: Extract<Action, { type: "playLand" }>) => (obj(s, a.objectId).zone === "graveyard" ? 0 : spellFace(a.objectId) ? 2 : 1);
+  // Lake of the Dead costs a Swamp: last, and never with no Swamp to sacrifice (it would only go to the graveyard).
+  const sacInstead = (id: ObjectId) => compileCard(defOf(s, obj(s, id))).entersSacrificeInstead;
+  const rank = (a: Extract<Action, { type: "playLand" }>) => (obj(s, a.objectId).zone === "graveyard" ? 0 : sacInstead(a.objectId) ? 3 : spellFace(a.objectId) ? 2 : 1);
+  options.splice(0, options.length, ...options.filter((x) => {
+    const f = sacInstead(x.action.objectId);
+    return !f || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, f, obj(s, id), pid, false));
+  }));
   options.sort((a, b) => rank(a.action) - rank(b.action));
   if (options.some((x) => rank(x.action) < 2)) return (options.find((x) => !x.tapped && rank(x.action) < 2) ?? options.find((x) => rank(x.action) < 2))!.action;
   return (options.find((x) => !x.tapped) ?? options[0])?.action ?? null;
@@ -3636,6 +3647,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (ab.body.effects.some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite: bots don't end their turn early
+      if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step

@@ -1203,7 +1203,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         crew: Number(m[1]),
         body: {
           targets: [],
-          effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }], duration: "endOfTurn" }],
+          effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }], duration: "endOfTurn" }, { type: "becameCrewed" }],
           text: "~ becomes an artifact creature until end of turn.",
         },
         text: `Crew ${m[1]}`,

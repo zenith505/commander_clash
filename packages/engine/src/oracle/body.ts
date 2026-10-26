@@ -1384,7 +1384,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
   let digWhere: AmountExpr | undefined;
   // A look that a "you may pay ... If you do," before it depends on (see payFirst).
-  let digPaid: { pay: PayCost; text: string } | null = null;
+  let digPaid: { pay?: PayCost; text: string } | null = null;
   /** "If an Equipment is put onto the battlefield this way, you may attach it to a creature you control": after the dig. */
   let afterDig: Effect[] = [];
   // "If {B} was spent to cast ~, you may have target creature get -3/-3 until end of turn" (Cankerous Thirst): the "you
@@ -1882,6 +1882,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (fx?.length !== 1 || fx[0]!.type !== "search" || !card) return null;
       effects.push({ ...fx[0]!, mayInstead: { dest: { zone: "battlefield" }, card } });
       si += 3;
+      continue;
+    }
+    // Loyal Inventor: "you may search your library for an artifact card, reveal it, then shuffle. Put that card into your
+    // hand if you control an Assassin. Otherwise, put that card on top of your library.": shuffled first, then put where the
+    // condition says, as it's put there.
+    const searchThen = /^([Yy]ou may )?[Ss]earch your library for (an? [^,]+ card), reveal it, then shuffle$/.exec(s);
+    const handIf = searchThen && /^Put that card into your hand if (.+)$/.exec(sentences[si + 1] ?? "");
+    if (searchThen && handIf && sentences[si + 2]?.replace(/\.$/, "") === "Otherwise, put that card on top of your library") {
+      const fx = parseOne(`Search your library for ${searchThen[2]}, reveal it, then shuffle and put that card on top`, ctx);
+      const cond = parseStaticCondition(handIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.dest.zone !== "libraryTop" || !cond) return null;
+      const search: Effect = { ...fx[0]!, condDest: { cond, dest: { zone: "hand" } } };
+      effects.push(searchThen[1] ? { type: "may", effects: [search], text: [s, sentences[si + 1], sentences[si + 2]].join(". ").replace(/^[Yy]ou may /, "") } : search);
+      si += 2;
       continue;
     }
     // Dina's Guidance: "Search your library for a creature card, reveal it, put it into your hand or graveyard, then
@@ -2688,6 +2702,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si += 2;
         continue;
       }
+      // Nahiri, Forged in Fury: "You may cast Equipment spells this way without paying their mana costs": those for free, or
+      // for their costs if you'd rather (rulings), the rest for their costs.
+      const freeKind = !free.free && !impulseIf && !exTop[1] && !exEqualN ? /^You may cast (Equipment|artifact|creature|enchantment|instant|sorcery) spells this way without paying their mana costs\.?$/.exec(sentences[si + 2] ?? "") : null;
+      if (freeKind) {
+        const k = freeKind[1]!;
+        const freeFor: TargetSpec = k === "Equipment" ? { kind: "card", subtypes: ["Equipment"], text: "Equipment card" } : { kind: "card", types: [capital(k)], text: `${k} card` };
+        effects.push({ ...impulse, free: true, orPay: true, freeFor } as Effect);
+        si += 2;
+        continue;
+      }
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
@@ -3107,16 +3131,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from (your|an opponent's) graveyard) without paying its mana cost$/.exec(s);
-    if (castTarget) {
+    // Wrexial, the Risen Deep: "from that player's graveyard", the player it dealt combat damage to; "If that spell would be
+    // put into a graveyard, exile it instead".
+    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from (your|an opponent's|that player's) graveyard) without paying its mana cost$/.exec(s);
+    if (castTarget && (castTarget[2] !== "that player's" || ctx.eventPlayer)) {
       const theirs = castTarget[2] !== "your";
       const rider = sentences[si + 1]?.replace(/\.$/, "");
-      const exileAfter = rider === `If that spell would be put into ${theirs ? "their" : "your"} graveyard, exile it instead` ? (true as const) : !theirs && rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
+      const exileAfter = rider === `If that spell would be put into ${theirs ? "their" : "your"} graveyard, exile it instead` || (theirs && rider === "If that spell would be put into a graveyard, exile it instead") ? (true as const) : !theirs && rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
       const before = ctx.targets.length;
       const what = parseCardTarget(castTarget[1]!, ctx, theirs ? undefined : "you");
       const t = ctx.targets[before];
       // A land card can't be cast (CR 305.9).
-      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || t.owner !== (theirs ? "opponent" : "you") || !t.types?.length || t.types.includes("Land")) return null;
+      if (!what || (!exileAfter && !theirs) || ctx.targets.length !== before + 1 || t?.kind !== "card" || (castTarget[2] === "that player's" ? t.owner || t.controller !== "eventPlayer" : t.owner !== (theirs ? "opponent" : "you")) || !t.types?.length || t.types.includes("Land")) return null;
       effects.push({ type: "castTargetFree", what, ...(exileAfter ? { exileAfter } : {}) });
       if (exileAfter) si++;
       continue;
@@ -3854,8 +3880,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences.splice(si + 1, 2, put[1]!, "Put the rest on the bottom in a random order");
       continue;
     }
-    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
+    // Cream of the Crop: "You may look at the top X cards of your library, where X is that creature's power. If you do, put
+    // one of those cards on top ...": the whole look is optional.
+    const mayLook = !dig && /^If you do, put /.test(sentences[si + 1] ?? "") ? /^[Yy]ou may (look at the top .+)$/.exec(s) : null;
+    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(mayLook ? mayLook[1]! : s);
     if (look && !dig && (!look[3] || look[2] === "X")) {
+      if (mayLook) {
+        digPaid = { text: [s, ...sentences.slice(si + 1, si + 3)].join(". ") };
+        sentences[si + 1] = capital(sentences[si + 1]!.replace(/^If you do, /, ""));
+      }
       const def = look[3] ? parseCount(look[3], ctx) : undefined;
       if (look[3] && !def) return null;
       dig = { type: "dig", n: def ? replaceX(X, def) : amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
@@ -3911,7 +3944,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         done.countIfYard = { has, count: num(yardInstead[3]!) };
         si++;
       }
-      if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
+      // Accumulate Wisdom: "Put each of those cards into your hand instead if there are three or more Lesson cards in your
+      // graveyard": all of them, checked as it resolves.
+      const lessons = !yardInstead && done.into === "hand" && done.count === 1 && !done.upTo && !done.filter && done.rest === "bottom" && !done.random && !done.kickedCount && !done.countX && typeof done.n === "number"
+        ? new RegExp(`^Put each of those cards into your hand instead if there are ${NUM} or more ([A-Z][a-z]+) cards in your graveyard\\.?$`).exec(sentences[si + 1] ?? "")
+        : null;
+      if (lessons) {
+        done.countIfYard = { has: [{ kind: "card", subtypes: [lessons[2]!], text: `${lessons[2]} card` }], count: done.n as number, min: num(lessons[1]!) };
+        si++;
+      }
+      if (digPaid) effects.push({ type: "may", effects: [done], ...(digPaid.pay ? { pay: digPaid.pay } : {}), text: digPaid.text });
       else effects.push(done);
       effects.push(...afterDig);
       afterDig = [];
@@ -4535,7 +4577,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         if (last?.type === "may" && !last.pay && last.effects.length === 1 && last.effects[0]!.type === "exile") return { into: last.effects, at: 0 };
         return last?.type === "exile" && last.what.ref === "target" ? { into: effects, at: effects.length - 1 } : null;
       }
-      for (let i = effects.length - 1; i >= prevStart && i >= 0; i--) if (effects[i]!.type === "exile") return { into: effects, at: i };
+      // "Then investigate X times" is a sentence of its own by now: tokens made between don't change which exile it is.
+      for (let i = effects.length - 1; i >= 0 && (i >= prevStart || effects.slice(i + 1).every((e) => e.type === "createToken")); i--) if (effects[i]!.type === "exile") return { into: effects, at: i };
       return null;
     })();
     if (later && laterAt) {
@@ -4664,12 +4707,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Starting with you, each player may choose an artifact or enchantment you don't control" (Druid of Purification):
     // each one in turn order picks one or none, seeing the earlier picks (rulings); not targeted, and not a vote.
-    const eachMayChoose = /^[Ss]tarting with you, each player may choose an? (.+)$/.exec(s);
+    // Sadistic Shell Game: "Starting with the next opponent in turn order, each player chooses a creature you don't control":
+    // the same, but each one must choose one while there's one to choose (rulings: knowing the earlier choices).
+    const eachMayChoose = /^[Ss]tarting with (you|the next opponent in turn order), each player (may choose|chooses) an? (.+)$/.exec(s);
     if (eachMayChoose) {
       if (ctx.vote) return null;
-      const spec = parseTargetPhrase(eachMayChoose[1]!);
+      const spec = parseTargetPhrase(eachMayChoose[3]!);
       if (spec?.kind !== "object" || spec.chosen || spec.counter) return null;
-      effects.push({ type: "vote", among: { ...spec, text: eachMayChoose[1]! }, choose: true, text: `choose ${/^[aeiou]/i.test(eachMayChoose[1]!) ? "an" : "a"} ${eachMayChoose[1]}` });
+      const must = eachMayChoose[2] === "chooses";
+      if (must !== (eachMayChoose[1] !== "you")) return null; // the templates printed so far
+      effects.push({ type: "vote", among: { ...spec, text: eachMayChoose[3]! }, choose: true, ...(must ? { mustChoose: true as const, startNext: true as const } : {}), text: `choose ${/^[aeiou]/i.test(eachMayChoose[3]!) ? "an" : "a"} ${eachMayChoose[3]}` });
       ctx.vote = { among: true, choose: true };
       continue;
     }
@@ -5193,7 +5240,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "If you control a Demon, each opponent loses 2 life and you gain 2 life. Otherwise, you lose 2 life." (Unholy Annex).
       // Gravelighter: "draw a card if a creature died this turn. Otherwise, each player sacrifices a creature of their
       // choice": whether a creature died, not whether a card was drawn (rulings).
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied");
+      // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
+      // Perfected Mind): counted after the mill before it.
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard");
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -6347,6 +6396,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!reflexive) return null;
       si = sentences.length;
       effects.push({ type: "if", cond: { kind: "excessDealt" }, effects: [{ type: "reflexive", body: reflexive, ...(withX !== text ? { xExcess: true as const } : {}) }] });
+      continue;
+    }
+    // Djeru and Hazoret: "Until end of turn, you may cast the exiled card without paying its mana cost": a permission for
+    // the rest of the turn, the usual timing rules applying (CR 601.3), unlike The Key to the Vault's cast as it resolves.
+    if (/^(?:Until end of turn, you may cast the exiled card without paying its mana cost|You may cast the exiled card (?:this turn )?without paying its mana cost (?:this turn|until end of turn))$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "dig" || prev.into !== "exile" || prev.play || prev.castFree || prev.count !== 1 || prev.filter?.types?.includes("Land") || !prev.filter?.types?.length) return null;
+      prev.play = "thisTurn";
+      prev.playFree = true;
       continue;
     }
     // "You may play the exiled card this turn" after looking at the top cards and exiling one (Nahiri's Warcrafting).

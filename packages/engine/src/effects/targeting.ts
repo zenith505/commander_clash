@@ -598,7 +598,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const tappedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "tappedThisWay";
   // "With lesser mana value" in a dies trigger (Scrap Trawler): the one that died, as it last existed (ctx.lki).
   const subjectBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "subject";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t);
+  // Grishnákh, Brash Instigator: "with power less than or equal to the amassed Army's power", as the target is chosen.
+  const amassedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "power" && t.bound.amount.count.of.ref === "amassed";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -625,6 +627,12 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
       const n = Math.max(0, ctx.tapped * (bound!.amount.times ?? 1) + (bound!.amount.plus ?? 0));
       const old = rest[bound!.key];
       t = { ...rest, [bound!.key]: bound!.at === "exact" ? { min: n, max: n } : bound!.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) }, text: rest.text.replace(/ X or (less|greater)$/, ` ${n} or $1`) };
+    }
+    if (amassedBound(t) && ctx.amassedPower !== undefined) {
+      const { bound, ...rest } = t;
+      const n = ctx.amassedPower + (bound!.amount.plus ?? 0);
+      const old = rest.power;
+      t = { ...rest, power: bound!.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : bound!.at === "exact" ? { min: n, max: n } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) }, text: rest.text.replace(/ with power less than or equal to the amassed army's power$/i, ` with power ${n} or less`) };
     }
     // "With total mana value X or less": the X announced (CR 107.3a), or before then anything.
     if (t.total?.rolled) t = { ...t, total: { key: t.total.key, max: ctx.rolled ?? 0 }, text: t.text.replace(/ X or less\)$/, ` ${ctx.rolled ?? 0} or less)`) };

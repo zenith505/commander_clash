@@ -1246,7 +1246,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cards from their hand and puts them on top in any order"; "That player shuffles that card into their library";
   "look at the top two (five) cards of target player's library. Put one of them into their graveyard (and the rest
   on top in any order)"; "return two target lands you control". Bots now aim "target player sacrifices" edicts
-  (Diabolic Edict too), punishers, hand-to-library and Wu Spy's mill at an opponent, not themselves. +69 (25,160 with round 174).
+  (Diabolic Edict too), punishers, hand-to-library and Wu Spy's mill at an opponent, not themselves. +69, two of
+  them (Training Drone, Temple Thief) also done by round 175: +67 (25,215 with rounds 174 and 175).
 - Skipped there, with reasons: Kaervek's Hex and Tropical Storm (two amounts to one creature must be one damage
   event, CR 120.2); Mammoth Harness (a block trigger about "the other creature"); Telekinesis (two effects tied to
   one target's untap steps); Nulltread Gargantuan ("put a creature you control on top of its owner's library", a

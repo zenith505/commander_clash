@@ -1834,6 +1834,18 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Trinisphere (CR 601.2f): the total cost of each spell, whoever casts it.
+    const atLeast = /^(As long as ~ is untapped, )?[Ee]ach spell that would cost less than (two|three|four) mana to cast costs \2 mana to cast\.$/.exec(line);
+    if (atLeast && !out.spellCostAtLeast) {
+      out.spellCostAtLeast = { n: num(atLeast[2]!), ...(atLeast[1] ? { whileUntapped: true as const } : {}) };
+      continue;
+    }
+    // Lake of the Dead: "If ~ would enter, sacrifice a Swamp instead. If you do, ...": one permanent of a land type.
+    const sacInstead = /^If ~ would enter, sacrifice an? ([A-Z][a-z]+) instead\. If you do, put ~ onto the battlefield\. If you don't, put it into its owner's graveyard\.$/.exec(line);
+    if (sacInstead && /^(?:Plains|Island|Swamp|Mountain|Forest)$/.test(sacInstead[1]!) && !out.entersSacrificeInstead && !out.entersDiscardInstead) {
+      out.entersSacrificeInstead = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [sacInstead[1]!], controller: "you", text: sacInstead[1]! };
+      continue;
+    }
     if (line === "If a nontoken creature would enter and it wasn't cast, exile it instead.") {
       out.exileUncastCreatures = true;
       continue;
@@ -2633,6 +2645,12 @@ export function compile(d: CardDef): CompiledCard {
       out.flashIfTargetsCommander = true;
       continue;
     }
+    // Flash Photography: "... if it targets a permanent you control": one of its targets as it's cast (rulings: chosen
+    // as it's cast, CR 601.2c); starting to cast it then needs a permanent of yours to target.
+    if (line === "You may cast ~ as though it had flash if it targets a permanent you control.") {
+      out.flashIfTargetsYours = true;
+      continue;
+    }
     // "~ has flash as long as you've committed a crime this turn" (Take for a Ride), "You may cast ~ as though it had
     // flash if you control a Human" (Bard's Company), "Spell mastery — If there are two or more instant and/or sorcery
     // cards in your graveyard, you may cast ~ as though it had flash": whether it can be cast at instant speed now (CR
@@ -2736,7 +2754,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Equip {4}. This ability costs {1} less to activate for each color of the creature it targets." (Dragonfire Blade)
     const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line);
-    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer;
+    // "Equip {4}. This ability costs {3} less to activate if you're the monarch." (Crown of Gondor): checked as it's
+    // activated (CR 602.2b, 601.2f).
+    const equipLessIf = !equipLessPer ? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate if ([^.]+)\.$/.exec(line) : null;
+    const lessCond = equipLessIf ? parseStaticCondition(equipLessIf[3]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer ?? (lessCond ? equipLessIf : null);
     if (equip && d.subtypes.includes("Equipment")) {
       // CR 702.6a: "[Cost]: Attach this permanent to target creature you control. Activate only as a sorcery."
       out.activated.push({
@@ -2748,6 +2770,7 @@ export function compile(d: CardDef): CompiledCard {
         text: line,
         equip: true,
         ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
+        ...(lessCond ? { costLessIf: { n: Number(equipLessIf![2]), cond: lessCond } } : {}),
       });
       continue;
     }

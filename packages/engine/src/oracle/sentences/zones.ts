@@ -44,6 +44,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "exileTop", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, plus: -1 } }] : null;
   }
+  // Doomsday Excruciator: "each player exiles all but the bottom six cards of their library face down": each their own top
+  // cards, none with six or fewer (rulings); nobody may look at them (CR 406.3).
+  if ((m = new RegExp(`^[Ee]ach (player|opponent) exiles all but the bottom (${NUM}) cards of their library face down$`).exec(s)))
+    return [{ type: "exileFaceDown", from: "top", who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, plus: -num(m[2]!) } }];
   // Everything Comes to Dust: "Exile all creatures except those that share a creature type with a creature that convoked
   // ~, all artifacts, and all enchantments": an artifact or enchantment creature goes too, as an artifact or enchantment.
   if (s === "Exile all creatures except those that share a creature type with a creature that convoked ~, all artifacts, and all enchantments" && ctx.spell)
@@ -565,11 +569,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [put];
   }
   // Pendant of Prosperity: "~'s owner may put a land card from their hand onto the battlefield": that player chooses.
-  if ((m = /^~'s owner may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
-    const who = parsePlayer("~'s owner", ctx);
-    const filter = parseSearchFilter(m[2]!);
+  // Braids, Conjurer Adept: "At the beginning of each player's upkeep, that player may put an artifact, creature, or land
+  // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
+  if ((m = /^(~'s owner|[Tt]hat player) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/^T/, "t"), ctx);
+    const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (!who || filter === null) return null;
-    return [{ type: "putFromHand", who, ...(filter ? { filter } : {}), ...(m[3] ? { tapped: true } : {}), may: true }];
+    return [{ type: "putFromHand", who, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true }];
   }
   // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
   // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).

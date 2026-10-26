@@ -492,6 +492,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!pay) return null;
     return [{ type: "may", effects: [], pay, otherwise: [{ type: "tap", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~ untapped` }];
   }
+  // Rush of Inspiration: "discard a card at random unless you pay {E}{E}": the choice is made on resolution, after the
+  // draw before it; without the energy, the card is discarded.
+  if ((m = /^(?:[Tt]hen )?[Dd]iscard a card( at random)? unless you pay ((?:\{E\})+)$/.exec(s))) {
+    const pay = parsePayCost(m[2]!);
+    if (!pay) return null;
+    return [{ type: "may", effects: [], pay, otherwise: [{ type: "discard", who: { ref: "you" }, n: 1, ...(m[1] ? { random: true } : {}) }], keep: true, text: `Pay ${m[2]} not to discard a card${m[1] ?? ""}` }];
+  }
   // "Sacrifice ~ unless you discard a card" (Masticore), "sacrifice it unless you discard a card at random" (Balduvian
   // Horde): the choice is made on resolution; with no card to discard, it's sacrificed (rulings).
   if ((m = /^[Ss]acrifice (~|it) unless you discard a card( at random)?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {

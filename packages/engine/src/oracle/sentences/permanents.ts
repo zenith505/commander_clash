@@ -260,7 +260,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
-  if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);
     if (!what) return null;
     // "Create a token that's a copy of it .... Then exile all other Nightmare tokens you control" (Abyssal Harvester): other
@@ -441,6 +441,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const first = parseSentence(`Put ${m[1]} on ${m[7]}`, ctx);
     const second = first && parseSentence(`Put ${m[4]} on ${m[7]}`, ctx);
     if (first && second) return [...first, ...second];
+  }
+  // Elspeth Resplendent: "Put a +1/+1 counter and a counter from among flying, first strike, lifelink, or vigilance on it":
+  // the kind chosen as it resolves, then both kinds, one after the other here (rulings: at the same time).
+  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and a counter from among ${COUNTER}, ${COUNTER}, ${COUNTER}, or ${COUNTER} on (that creature|it)$`, "i").exec(s)) && new Set(m.slice(4, 8)).size === 4) {
+    const what = parseObject(m[8]!, ctx);
+    const first = parseSentence(`Put ${m[1]} on ${m[8]}`, ctx);
+    if (!what || isGroup(what) || !first) return null;
+    return [{ type: "counters", what, counter: counterKind(m[4]!), orCounter: counterKind(m[5]!), orCounters: [counterKind(m[6]!), counterKind(m[7]!)], n: 1 }, ...first];
   }
   // "Put a +1/+1 counter and a lifelink counter on target creature" (Unexpected Fangs): the same on the target.
   if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and (${NUMX} ${COUNTER} counters?) on (target .+)$`, "i").exec(s))) {
@@ -769,6 +777,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(head ? head[1]! : m[1]!, ctx);
     const mods = head ? parseChanges(head[2]!) : [];
     return extra && what && mods ? [{ type: "continuous", what, mods: [...mods, extra], duration: "endOfTurn" }] : null;
+  }
+  // The Pride of Hull Clade: "Until end of turn, target creature you control gets +1/+0, gains "Whenever this creature deals
+  // combat damage to a player, draw cards equal to its toughness," and can attack as though it didn't have defender": all
+  // three until end of turn, one after the other here (the body moves "until end of turn" to the end).
+  if ((m = /^(Target .+?) gets ([+-]\d+\/[+-]\d+), gains "([^"]+?),?" and can attack as though it didn't have defender until end of turn$/.exec(s))) {
+    const before = ctx.targets.length;
+    const first = parseSentence(`${m[1]} gets ${m[2]} and gains "${m[3]}." until end of turn`, ctx);
+    const second = first && ctx.targets.length === before + 1 && ctx.lastObjectTarget === before ? parseSentence("It can attack this turn as though it didn't have defender", ctx) : null;
+    if (first && second) return [...first, ...second];
+    ctx.targets.length = before;
+    return null;
   }
   // Continuous changes until end of turn: "X gets +2/+2 and gains flying", "X loses all abilities
   // and becomes a blue Frog with base power and toughness 1/1", "X has base power and toughness 0/1".

@@ -121,6 +121,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^Whenever ~ becomes untapped, (.+)$/, "selfBecomesUntapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
+  [/^Whenever ~ becomes crewed, (.+)$/, "selfBecomesCrewed"],
   [/^Whenever ~ mutates, (.+)$/, "selfMutates"],
   [/^Whenever you exert a creature, (.+)$/, "youExert"],
   [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
@@ -133,7 +134,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous", "selfMutates",
-  "selfBecomesUntapped",
+  "selfBecomesUntapped", "selfBecomesCrewed",
 ];
 
 /** "Each other opponent" after "deals combat damage to an opponent": each opponent but that player (see parsePlayer). */
@@ -627,17 +628,17 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (short && !/\bloses X life\.?$/.test(text)) return "fail";
   const thatMuch = /\bIf [^.,]+ mana was spent to cast that spell, [^.]*\bthat much\b/.test(text) && !/\bX\b/.test(text) && !m[2];
   if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
-  if (targetsOnly) {
-    const that = `that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`;
-    if (!text.includes(that)) return "fail";
+  // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
+  const subjectRef = targetsOnly && text.includes(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
+  if (subjectRef) {
     // Read as the subject, whatever it is now (rulings: as it last existed, if it left).
-    text = text.replaceAll(that, "that creature");
+    text = text.replaceAll(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`, "that creature");
   }
-  let body = parseBody(text, { castSpell: true, eventPlayer: true, ...(targetsOnly ? { subject: true } : {}) });
+  let body = parseBody(text, { castSpell: true, eventPlayer: true, ...(subjectRef ? { subject: true } : {}) });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, subjectTarget: true as const } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

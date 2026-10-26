@@ -183,6 +183,8 @@ export type TriggerSourceEvent =
   | { type: "playerCountersPut"; player: PlayerId; counter: string; amount: number; by: PlayerId }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
   | { type: "becameMonstrous"; id: ObjectId; x: number }
+  /** A crew ability of this Vehicle resolved (CR 702.122e). */
+  | { type: "crewed"; id: ObjectId }
   /** A mutating spell merged with this permanent (CR 702.140d). */
   | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
@@ -1123,6 +1125,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When this Class becomes level 2": an ability it has from that level on (CR 716.2a), so it has it now.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e, t) => e === "selfBecomesLevel" && t.level === ev.level);
+  } else if (ev.type === "crewed") {
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesCrewed");
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
@@ -1514,7 +1519,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
       if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       s.nextCast = s.nextCast!.filter((x) => x !== d);
-      // "Has cascade": the spell's own cascade ability triggers (CR 702.85a).
+      // "Has cascade": the spell's own cascade ability triggers (CR 702.85a). "Can be cast as though it had flash": used
+      // up now, whenever it was cast.
+      if (d.flash) continue;
       if (d.uncounterable) {
         if (spell) spell.uncounterableCast = true;
       } else if (d.cascade && spell) {
@@ -2032,10 +2039,18 @@ export function checkStateTriggers(s: GameState) {
   }
 }
 
+/** The amassed Army's power now, or as it last existed on the battlefield (CR 608.2h). */
+function amassedPowerNow(s: GameState, a: { id: ObjectId; zc: number }): number {
+  const o = s.objects[a.id];
+  if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === a.zc) return power(s, o);
+  const lk = s.lastKnown?.[a.id];
+  return lk && lk.zc === a.zc ? (lk.power ?? 0) : 0;
+}
+
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}) });
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);

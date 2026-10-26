@@ -106,6 +106,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } } };
   }
+  // Sword of the Paruns: "As long as equipped creature is tapped, tapped creatures you control get +2/+0": while the
+  // creature it's attached to is tapped (or untapped), the rest applies; unattached, neither does.
+  if ((m = /^As long as (enchanted|equipped) creature is (tapped|untapped), ((?:un)?tapped creatures you control get .+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[3]!)}.`);
+    if (!st || st.condition) return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], tapped: m[2] === "tapped", text: `${m[2]} creature` } } };
+  }
   // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
   if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
@@ -553,6 +560,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };
+  // "One or fewer cards in hand" (Djeru and Hazoret): fewer than two.
+  if ((m = new RegExp(`^you have ${NUM} or fewer cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) + 1, fewer: true };
   if ((m = new RegExp(`^you have exactly ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), exactly: true };
   // "If you control eight or more artifacts with the same name as one another" (Mechanized Production): all of them
   // artifacts (rulings).
@@ -623,6 +632,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you're not the monarch$/.test(text)) return { kind: "monarch", not: true };
+  if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
@@ -1239,7 +1249,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
-  return parseStaticLine(line) ?? parseTransform(line);
+  const st = parseStaticLine(line) ?? parseTransform(line);
+  if (st) return st;
+  // Glamdring: "Equipped creature has first strike and gets +1/+0 for each instant and sorcery card in your graveyard"
+  // says the same as "gets ... and has first strike".
+  const m = /^(Equipped|Enchanted) creature has ([a-z]+(?: [a-z]+)?) and gets ([+-]\d+\/[+-]\d+ for each [^,"]+)\.$/.exec(line);
+  const swapped = m ? parseStaticLine(`${m[1]} creature gets ${m[3]} and has ${m[2]}.`) : null;
+  return swapped ? { ...swapped, text: line } : null;
 }
 
 /**

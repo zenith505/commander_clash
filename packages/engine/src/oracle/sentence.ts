@@ -127,6 +127,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       Object.assign(dig, { count: 1, upTo: true, filter, into: "exile" });
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
+    } else if ((m = new RegExp(`^Put one of (?:them|those cards) on top of your library(?: and the rest ${REST})?$`).exec(s))) {
+      // Cream of the Crop: one of them must go back on top.
+      Object.assign(dig, { count: 1, upTo: false, required: true, into: "libraryTop" });
+      if (m[1]) Object.assign(dig, restOf(m[1]));
     } else if ((m = new RegExp(`^Put up to one of them on top of your library(?: and the rest ${REST})?$`).exec(s))) {
       // Thassa's Oracle.
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });

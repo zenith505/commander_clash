@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
+import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -443,10 +443,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
+      // "Of the chosen type": the source's; with none chosen, it does nothing (rulings on Progenitor's Icon).
+      const filter = e.filter.chosen ? bindChosen(e.filter, o?.chosen) : e.filter;
+      if (filter.chosen) {
+        log(s, `${src}: no type was chosen, so it does nothing.`);
+        return;
+      }
+      if (e.flash) log(s, `${src}: ${player(s, ctx.controller).name} may cast ${e.text.replace(/^the next (.+?) you cast this turn can be cast .*$/, (_, w: string) => (w === "spell of the chosen type" ? `their next ${filter.subtypes?.join(" ") ?? ""} spell` : `their next ${w}`))} this turn as though it had flash.`);
       for (const caster of e.who ? players(s, e.who, ctx) : [ctx.controller])
         (s.nextCast ??= []).push({
           controller: caster,
-          filter: e.filter,
+          filter,
           sourceId: id ?? "",
           sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
           body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
@@ -454,6 +461,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           ...(e.cascade ? { cascade: true as const } : {}),
           ...(e.uncounterable ? { uncounterable: true as const } : {}),
           ...(e.fromHand ? { fromHand: true as const } : {}),
+          ...(e.flash ? { flash: true as const } : {}),
         });
       return;
     }
@@ -857,6 +865,10 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
       return;
     }
     if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : "hand");
+    // Press the Enemy: "with equal or lesser mana value" reads a spell returned this way as it was on the stack, X
+    // included (rulings, CR 202.3e).
+    const moved = item.objectId && s.objects[item.objectId];
+    if (moved && item.x && s.resolving) (s.resolving.countered ??= {})[moved.id] = { zc: moved.zoneChanges ?? 0, x: item.x };
     log(s, instead === "exile" ? `${by} exiles ${what}.` : `${by} returns ${what} to its owner's hand.`);
     return;
   }

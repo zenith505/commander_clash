@@ -2943,6 +2943,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Fevered Suspicion: "Each opponent exiles cards from the top of their library until they exile a nonland card. You may
+    // cast any number of spells from among those nonland cards without paying their mana costs." The same, opponents only;
+    // what isn't cast stays exiled (rulings).
+    if (/^[Ee]ach opponent exiles cards from the top of their library until they exile a nonland card$/.test(s) && /^You may cast any number of spells from among those nonland cards without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true, opponents: true });
+      si++;
+      continue;
+    }
     // Plargg and Nassari: "... An opponent chooses a nonland card exiled this way. You may cast up to two spells from among
     // the other cards exiled this way without paying their mana costs." You choose the opponent (rulings).
     if (

@@ -782,3 +782,35 @@ describe("Vexing Shusher", () => {
     expect(s.players[ap]!.life).toBe(life + 3);
   });
 });
+
+const fevered = card("Fevered Suspicion", "Sorcery", "{6}{B}{R}", { cmc: 8, keywords: ["Rebound"], oracleText: "Each opponent exiles cards from the top of their library until they exile a nonland card. You may cast any number of spells from among those nonland cards without paying their mana costs.\nRebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)" });
+
+describe("Fevered Suspicion", () => {
+  it("is fully supported", () => supported(fevered));
+  it("each opponent exiles down to a nonland card; you cast the ones you want for free, the rest stay exiled", () => {
+    let { s, ap, ids, opp } = setup([fevered]);
+    for (const l of [swamp, swamp, swamp, swamp]) putOnBattlefield(s, ap, l);
+    const land = into(s, opp, card("Forest", "Basic Land — Forest"), "library");
+    const gift = into(s, opp, lifeSpell("Their Gift", "{1}{W}", 2), "library");
+    s.players[opp]!.library = [land, gift, ...s.players[opp]!.library.filter((id) => id !== land && id !== gift)];
+    const life = s.players[ap]!.life;
+    s = run(s, planCast(s, ap, ids[0]!));
+    let offered: string[] = [];
+    for (let i = 0; i < 80 && (s.pending || s.stack.length); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseOption" && p.what === "castFromAmong") {
+        offered = [...offered, ...p.options];
+        s = act(s, { type: "chooseOption", player: ap, choice: p.options.includes(gift) ? gift : "none" });
+      } else if (p?.kind === "castFree") s = run(s, planCast(s, ap, p.objectId));
+      else if (p) s = run(s, botActions(s, p.player));
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(offered).toContain(gift);
+    expect(offered).not.toContain(land);
+    expect(s.players[ap]!.life).toBe(life + 3);
+    expect(zone(s, land)).toBe("exile");
+    expect(zone(s, ids[0]!)).toBe("exile");
+    // Nothing from your own library.
+    expect(s.log.some((l) => /exiled from the top of each opponent's library/.test(l.text))).toBe(true);
+  });
+});

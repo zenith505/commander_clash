@@ -27,8 +27,8 @@ export function compileGranted(text: string): CompiledCard {
     // Saga): double quotes once it's an ability of its own.
     const own = innerQuotes(text);
     // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}"), a crew ability to
-    // a Vehicle (Swift Reconfiguration).
-    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : [];
+    // a Vehicle (Swift Reconfiguration), read ahead to a Saga (Barbara Wright).
+    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
     hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
@@ -176,6 +176,12 @@ export function parseGrants(text: string): Modification[] | null {
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
     if (/^(?:persist|undying)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
+      continue;
+    }
+    // Read ahead (CR 702.155a): how a Saga enters and which chapters trigger the turn it entered; one granted by another
+    // permanent applies as it enters (CR 614.12; see finishEntering) and that turn.
+    if (/^read ahead$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Read ahead" });
       continue;
     }
     // Riot is a replacement effect for how it enters (CR 702.136a), each instance on its own (702.136b): one granted by

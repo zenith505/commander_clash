@@ -6235,11 +6235,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `)
         // "You may have target creature get -2/-2 until end of turn", "... it gain reach", "... Ally creatures you control
         // gain first strike", "... enchanted creature fight target creature": they do it, if you choose (CR 608.2d).
-        .replace(/^Have (.+?) (get|gain|lose|fight|deal) (?=\S)/, (all, who: string, verb: string) => {
+        // Embodiment of Insight: "you may have target land you control become a 3/3 Elemental creature ...".
+        .replace(/^Have (.+?) (get|gain|lose|fight|deal|become) (?=\S)/, (all, who: string, verb: string) => {
           if (/^(?:target (?:player|opponent)|that player|its controller|each opponent|you)$/.test(who)) return all;
           const it = /^(?:it|her|him)$/.test(who);
           const subject = it ? (ctx.selfIt || ctx.selfCard ? "~" : "It") : who.charAt(0).toUpperCase() + who.slice(1);
           const plural = !it && /\b(?:creatures|permanents)\b/.test(who);
+          if (verb === "become" && (it || plural)) return all;
           return `${subject} ${plural ? verb : verb === "lose" ? "loses" : `${verb}s`} `;
         });
       ctx.mayNow = true;
@@ -6802,7 +6804,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).
     if (/^(?:It's still an? (land|artifact|enchantment)|They're still (?:lands|artifacts|enchantments))$/i.test(s)) {
-      const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes" || (x.kind === "addTypes" && x.types.includes("Creature"))));
+      // "You may have target land you control become a 3/3 Elemental creature ... It's still a land." (Embodiment of
+      // Insight): the effect the "may" makes.
+      const lastFx = effects[effects.length - 1];
+      const pool = lastFx?.type === "may" && lastFx.effects.length === 1 ? lastFx.effects : effects;
+      const last = [...pool].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes" || (x.kind === "addTypes" && x.types.includes("Creature"))));
       if (!last || last.type !== "continuous") return null;
       // "Becomes a 2/2 Assembly-Worker artifact creature" already keeps its card types (CR 205.1b).
       // Every prior card type, subtype and supertype stays, and a new supertype ("a legendary 6/6 ...") is added (205.1b).

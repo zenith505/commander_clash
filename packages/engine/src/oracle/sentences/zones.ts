@@ -1095,6 +1095,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
   }
+  // Witch-king, Bringer of Ruin: "defending player sacrifices a creature with the least power among creatures they
+  // control": the least, or tied for it, that player choosing among those tied.
+  if ((m = /^(.+?) sacrifices? a creature with the least power among creatures (?:they control|that player controls)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", least: "power" }] : null;
+  }
   // Olórin's Searing Light: "Each opponent exiles a creature with the greatest power among creatures that player
   // controls": each chooses in turn order, then they're exiled at once (rulings, CR 101.4).
   if ((m = /^(.+?) exiles? a creature with the greatest power among creatures (?:they control|that player controls)$/i.exec(s))) {

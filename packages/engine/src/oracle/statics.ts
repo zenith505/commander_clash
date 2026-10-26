@@ -1016,6 +1016,8 @@ export function parseAffected(subject: string): Affects | null {
   // "Creatures with ice counters on them" (Rimescale Dragon) likewise.
   // "Equipment you control have equip {0}" (Puresteel Paladin): the plural of Equipment is Equipment.
   if ((m = /^(Other )?Equipment you control$/.exec(x))) return parseAffected(`Each ${m[1] ? "other " : ""}Equipment you control`);
+  // Barbara Wright: "Sagas you control have read ahead" (an enchantment subtype, CR 205.3h).
+  if (x === "Sagas you control") return { kind: "filter", types: ["Enchantment"], subtypes: ["Saga"], controller: "you" };
   const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
   const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;

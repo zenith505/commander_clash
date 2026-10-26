@@ -5,7 +5,7 @@ import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbilit
 import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
-import { compileCard } from "../oracle";
+import { compileCard, compileGranted } from "../oracle";
 import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
@@ -1074,7 +1074,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.counter === "lore" && o.zone === "battlefield") {
       const after = o.counters.lore ?? 0;
       const before = after - ev.amount;
-      const readAhead = !!compileCard(defOf(s, o)).readAhead && characteristics(s, o).hasPrintedAbilities && o.enteredTurn === s.turn;
+      const readAhead = ((!!compileCard(defOf(s, o)).readAhead && characteristics(s, o).hasPrintedAbilities) || characteristics(s, o).grantedAbilities.some((g) => !!compileGranted(g).readAhead)) && o.enteredTurn === s.turn;
       const from = s.triggerQueue.length;
       add(o, controllerOf(s, o), (e, t) => e === "chapter" && before < t.chapter! && t.chapter! <= after && (!readAhead || t.chapter === after));
       // The final chapter ability: the greatest chapter number among the Saga's chapter abilities (rulings on Narci).
@@ -1098,6 +1098,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentCountersPut" && !!t.countersOrPlayer && (t.countersKind === undefined || t.countersKind === ev.counter) && (!t.countersByYou || ev.by === ctrl), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      // "Whenever you get one or more {E}" (Aether Revolt): once for the counters put at once.
+      if (ev.counter === "energy" && ctrl === ev.player) add(w, ctrl, (e) => e === "youGetEnergy", undefined, undefined, undefined, undefined, undefined, undefined, info);
     }
   } else if (ev.type === "exerted") {
     // Exert's linked "When you do" (CR 607.2h), and "whenever you exert a creature" (the creature is the subject).
@@ -1745,8 +1747,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (you !== ev.player) add(o, you, (e) => e === "opponentSearchesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "draw") {
-    for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
-      const you = controllerOf(s, o);
+    const draws = (o: GameObject, you: PlayerId) =>
       add(o, you, (e, t) => {
         if (e !== "playerDraws" || !t.draws) return false;
         const by = t.draws.by;
@@ -1756,7 +1757,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
-    }
+    for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) draws(o, controllerOf(s, o));
+    // Dogged Detective: "Whenever an opponent draws their second card each turn, you may return ~ from your graveyard to
+    // your hand": a card in its owner's graveyard (CR 113.6m).
+    fromGraveyards(draws);
   } else if (ev.type === "batch") {
     // "One or more" triggers: once for the whole event, if anything it moved matches (CR 603.2c). Leaving the battlefield
     // or a graveyard looks back in time (CR 603.10a): permanents leaving at the same time see it, as they were, and ones

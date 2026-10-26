@@ -341,8 +341,8 @@ export function normalizeSelf(d: CardDef): string {
   const comma = full.split(",")[0]!;
   const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:of|the) /.exec(full)?.[1] : undefined;
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
-  // "Sliver" for "Sliver Queen").
-  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+$/.exec(full)?.[1] : undefined;
+  // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated.
+  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
   const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
   // "King Darien" for "King Darien XLVIII": a legendary card's name without its regnal number.
   const regnal = comma === full && !ofThe && !first && d.supertypes?.includes("Legendary") ? /^(.+ .+) [IVXLC]+$/.exec(full)?.[1] : undefined;
@@ -983,6 +983,16 @@ export function compile(d: CardDef): CompiledCard {
     // Gev, Scaled Scorch: "... for each opponent who lost life this turn": counted as each one would enter.
     // Curator Beastie: "Colorless creatures you control enter with two additional +1/+1 counters on them": without
     // "other", only where this permanent couldn't be one of them (as for "each other ..." above).
+    // Gorma, the Gullet: "Nontoken creatures you control enter with an additional +1/+1 counter on them for each creature
+    // that died under your control this turn": from a permanent already on the battlefield, so not Gorma itself or
+    // creatures entering with it (rulings), counted as each one would enter.
+    const gorma = new RegExp(`^Nontoken creatures you control enter with an additional ${COUNTER} counter on them for each (creature that died under your control this turn)\\.$`).exec(line);
+    if (gorma) {
+      const per = parseCount(gorma[2]!, null, true);
+      if (!per) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], token: false, controller: "you", text: "nontoken creature you control" }, counter: counterKind(gorma[1]!), n: 1, per, text: line });
+      continue;
+    }
     const pluralAll = new RegExp(`^(?!Other )([A-Z][a-z]+ creatures you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them\\.$`).exec(line);
     const othersPlural = pluralAll ? ([pluralAll[0], pluralAll[1], pluralAll[2], pluralAll[3], undefined, undefined] as unknown as RegExpExecArray) : new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them( for each mana from (?:a Treasure|an artifact source) spent to cast them| for each (opponent who lost life this turn))?\\.$`).exec(line);
     if (othersPlural) {
@@ -2991,6 +3001,17 @@ export function compile(d: CardDef): CompiledCard {
     if (grantedRipple) {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
+    }
+    // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste
+    // if you control a Warrior, and flying if you control a Wizard": each keyword while its condition holds.
+    const byControl = /^Equipped creature has (.+)\.$/.exec(line);
+    const controlParts = byControl ? byControl[1]!.split(/, (?:and )?/) : [];
+    if (byControl && controlParts.length > 1 && controlParts.every((p) => /^[a-z ]+ if you control an? [A-Z][a-z]+$/.test(p))) {
+      const parts = controlParts.map((p) => /^([a-z ]+) if (you control an? [A-Z][a-z]+)$/.exec(p)!).map((m) => parseConditionalStatic(`As long as ${m[2]}, equipped creature has ${m[1]}.`));
+      if (parts.every((st) => st && st.affects.kind === "attached" && st.condition && st.mods.every((m) => m.kind === "addKeywords"))) {
+        for (const st of parts) out.statics.push({ ...st!, text: line });
+        continue;
+      }
     }
     // Scion of Draco: "Each creature you control has vigilance if it's white, hexproof if it's blue, ...": one static
     // ability giving each keyword to the creatures of that color (layer 6, after colors in layer 5, CR 613.1e-f).

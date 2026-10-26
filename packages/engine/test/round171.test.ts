@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, island, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
-import { attackProblem, moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { draw, compileCard, attackProblem, moveObject, loseLife, spellCost, potentialAttackers, abilityProblem, blockProblem, botActions, controllerOf, parseManaCost, planMana, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -532,5 +532,201 @@ describe("Smoke Shroud", () => {
     expect(zone(s, aura)).toBe("battlefield");
     expect(s.objects[aura]!.attachedTo).toBe(ninja);
     expect(kw(s, ninja, "Flying")).toBe(true);
+  });
+});
+
+const revolt = card("Aether Revolt", "Enchantment", "{2}{R}{R}", {cmc: 4,keywords: ["Revolt"],oracleText: "Revolt — As long as a permanent left the battlefield under your control this turn, if a source you control would deal noncombat damage to an opponent or a permanent an opponent controls, it deals that much damage plus 2 instead.\nWhenever you get one or more {E}, this enchantment deals that much damage to any target."});
+const colossus = card("Salvation Colossus", "Artifact Creature — Construct", "{6}{W}{W}", {cmc: 8,power: "9",toughness: "9",keywords: ["Flying","Vigilance","Unearth","Trample"],oracleText: "Flying, vigilance, trample\nWhenever you attack, other creatures you control get +2/+2 and gain indestructible until end of turn.\nUnearth—Pay eight {E}. (Pay eight energy counters: Return this card from your graveyard to the battlefield. It gains haste. Exile it at the beginning of the next end step or if it would leave the battlefield. Unearth only as a sorcery.)"});
+const imskir = card("Imskir Iron-Eater", "Legendary Creature — Demon", "{6}{B}{R}", {cmc: 8,power: "5",toughness: "5",keywords: ["Affinity"],oracleText: "Affinity for artifacts (This spell costs {1} less to cast for each artifact you control.)\nWhen Imskir enters, you draw X cards and you lose X life, where X is half the number of artifacts you control, rounded down.\n{3}{R}, Sacrifice an artifact: Imskir deals damage equal to the sacrificed artifact's mana value to any target."});
+const witch = card("Witch-king, Bringer of Ruin", "Legendary Creature — Wraith Noble", "{4}{B}{B}", {cmc: 6,power: "5",toughness: "3",keywords: ["Flying"],oracleText: "Flying\nWhenever Witch-king attacks, defending player sacrifices a creature with the least power among creatures they control."});
+const gorma = card("Gorma, the Gullet", "Legendary Creature — Pest Frog", "{1}{B}{G}", {cmc: 3,power: "1",toughness: "1",keywords: ["Lifelink"],oracleText: "Lifelink\nWhenever another creature you control dies, put a +1/+1 counter on Gorma.\nNontoken creatures you control enter with an additional +1/+1 counter on them for each creature that died under your control this turn."});
+const baldric = card("Multiclass Baldric", "Artifact — Equipment", "{1}", {cmc: 1,keywords: ["Equip"],oracleText: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste if you control a Warrior, and flying if you control a Wizard.\nAs long as you have a full party, prevent all damage that would be dealt to equipped creature.\nEquip {2}"});
+const insight = card("Embodiment of Insight", "Creature — Elemental", "{4}{G}", {cmc: 5,power: "4",toughness: "4",keywords: ["Vigilance","Landfall"],oracleText: "Vigilance\nLand creatures you control have vigilance.\nLandfall — Whenever a land you control enters, you may have target land you control become a 3/3 Elemental creature with haste until end of turn. It's still a land."});
+const detective = card("Dogged Detective", "Creature — Human Rogue", "{1}{B}", {cmc: 2,power: "2",toughness: "1",keywords: ["Surveil"],oracleText: "When this creature enters, surveil 2. (Look at the top two cards of your library, then put any number of them into your graveyard and the rest on top of your library in any order.)\nWhenever an opponent draws their second card each turn, you may return this card from your graveyard to your hand."});
+const tower = card("Avengers Tower", "Land", "", {cmc: 0,oracleText: "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a Hero spell or to activate an ability of a Hero source.\n{4}, {T}: Look at the top three cards of your library. You may reveal a Hero card from among them and put it into your hand. Put the rest on the bottom of your library in any order."});
+const barbara = card("Barbara Wright", "Legendary Creature — Human Advisor", "{1}{W}", {cmc: 2,power: "1",toughness: "3",keywords: ["History Teacher","Doctor's companion"],oracleText: "History Teacher — Sagas you control have read ahead. (As a Saga enters, choose a chapter and start with that many lore counters. Skipped chapters don't trigger.)\nDoctor's companion (You can have two commanders if the other is the Doctor.)"});
+const siphoner = card("Glint-Sleeve Siphoner", "Creature — Human Rogue", "{1}{B}", {cmc: 2,power: "2",toughness: "1",keywords: ["Menace"],oracleText: "Menace\nWhenever this creature enters or attacks, you get {E} (an energy counter).\nAt the beginning of your upkeep, you may pay {E}{E}. If you do, you draw a card and you lose 1 life."});
+const eldest = card("The Eldest Reborn", "Enchantment — Saga", "{4}{B}", {cmc: 5,oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Each opponent sacrifices a creature or planeswalker of their choice.\nII — Each opponent discards a card.\nIII — Put target creature or planeswalker card from a graveyard onto the battlefield under your control."});
+const ornament = card("Ornament", "Artifact", "{1}", { cmc: 1 });
+const plain = (name: string, type: string, p = "2", t = "2") => card(name, `Creature — ${type}`, "{1}", { cmc: 1, power: p, toughness: t });
+
+describe("Aether Revolt", () => {
+  it("whenever you get energy it deals that much damage to any target; with revolt, 2 more to an opponent", () => {
+    supported(revolt, siphoner);
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, revolt);
+    const sip = into(s, ap, siphoner, "hand");
+    s = resolveAll(run(s, planCast(s, ap, sip)));
+    expect(s.players[ap]!.energy).toBe(1);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(lifeOf(s, opp)).toBe(39);
+    // A permanent left the battlefield under your control: revolt (CR 207.2c ability word).
+    const orn = putOnBattlefield(s, ap, ornament);
+    moveObject(s, orn, "graveyard");
+    const sip2 = into(s, ap, siphoner, "hand");
+    s = resolveAll(run(s, planCast(s, ap, sip2)));
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(lifeOf(s, opp)).toBe(36);
+  });
+});
+
+describe("Salvation Colossus", () => {
+  it("unearth by paying eight energy", () => {
+    supported(colossus);
+    let { s, ap } = setup([]);
+    const c = into(s, ap, colossus, "graveyard");
+    s.players[ap]!.energy = 7;
+    expect(planActivate(s, ap, c, 0)).toBeNull();
+    s.players[ap]!.energy = 8;
+    s = resolveAll(run(s, planActivate(s, ap, c, 0)));
+    expect(zone(s, c)).toBe("battlefield");
+    expect(s.players[ap]!.energy).toBe(0);
+    expect(kw(s, c, "Haste")).toBe(true);
+  });
+  it("whenever you attack, other creatures get +2/+2 and indestructible", () => {
+    let { s, ap, opp } = setup([]);
+    const c = putOnBattlefield(s, ap, colossus);
+    const b = putOnBattlefield(s, ap, bear());
+    s = resolveAll(attack(s, ap, [{ attacker: c, defender: opp }]));
+    expect(pt(s, b)).toBe("4/4");
+    expect(kw(s, b, "Indestructible")).toBe(true);
+    expect(pt(s, c)).toBe("9/9");
+  });
+});
+
+describe("Imskir Iron-Eater", () => {
+  it("enters: you draw X and lose X life, X half your artifacts rounded down", () => {
+    supported(imskir);
+    let { s, ap } = setup([]);
+    for (let i = 0; i < 5; i++) putOnBattlefield(s, ap, ornament);
+    const im = into(s, ap, imskir, "hand");
+    const hand = handOf(s, ap).length;
+    s = resolveAll(run(s, planCast(s, ap, im)));
+    expect(handOf(s, ap).length).toBe(hand - 1 + 2);
+    expect(lifeOf(s, ap)).toBe(38);
+  });
+  it("{3}{R}, sacrifice an artifact: damage equal to its mana value", () => {
+    let { s, ap, opp } = setup([]);
+    const im = putOnBattlefield(s, ap, imskir);
+    const big = putOnBattlefield(s, ap, card("Big Rock", "Artifact", "{4}", { cmc: 4 }));
+    s = resolveAll(run(s, planActivate(s, ap, im, 0, [{ kind: "player", id: opp }], undefined, undefined, undefined, { sacrifice: [big] })));
+    expect(zone(s, big)).toBe("graveyard");
+    expect(lifeOf(s, opp)).toBe(36);
+  });
+});
+
+describe("Witch-king, Bringer of Ruin", () => {
+  it("attacks: defending player sacrifices the creature with the least power", () => {
+    supported(witch);
+    let { s, ap, opp } = setup([]);
+    const w = putOnBattlefield(s, ap, witch);
+    const big = putOnBattlefield(s, opp, bear());
+    const small = putOnBattlefield(s, opp, plain("Squire", "Human Soldier", "1", "2"));
+    s = settle(attack(s, ap, [{ attacker: w, defender: opp }]), ap);
+    expect(zone(s, small)).toBe("graveyard");
+    expect(zone(s, big)).toBe("battlefield");
+  });
+});
+
+describe("Gorma, the Gullet", () => {
+  it("nontoken creatures enter with a +1/+1 counter for each creature that died under your control this turn", () => {
+    supported(gorma);
+    let { s, ap } = setup([]);
+    const g = putOnBattlefield(s, ap, gorma);
+    const b1 = putOnBattlefield(s, ap, bear());
+    const b2 = putOnBattlefield(s, ap, bear());
+    moveObject(s, b1, "graveyard");
+    moveObject(s, b2, "graveyard");
+    s = resolveAll(s);
+    expect(pt(s, g)).toBe("3/3");
+    const b3 = into(s, ap, bear(), "hand");
+    s = resolveAll(run(s, planCast(s, ap, b3)));
+    expect(pt(s, b3)).toBe("4/4");
+  });
+});
+
+describe("Multiclass Baldric", () => {
+  it("each keyword only while you control its class", () => {
+    supported(baldric);
+    let { s, ap } = setup([]);
+    const eq = putOnBattlefield(s, ap, baldric);
+    const b = putOnBattlefield(s, ap, bear());
+    s.objects[eq]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    expect(kw(s, b, "Lifelink")).toBe(false);
+    putOnBattlefield(s, ap, plain("Acolyte", "Human Cleric"));
+    expect(kw(s, b, "Lifelink")).toBe(true);
+    expect(kw(s, b, "Deathtouch")).toBe(false);
+    putOnBattlefield(s, ap, plain("Thief", "Human Rogue"));
+    expect(kw(s, b, "Deathtouch")).toBe(true);
+    expect(kw(s, b, "Haste")).toBe(false);
+    expect(kw(s, b, "Flying")).toBe(false);
+  });
+});
+
+describe("Embodiment of Insight", () => {
+  it("landfall: a land becomes a 3/3 haste Elemental, still a land, and has vigilance", () => {
+    supported(insight);
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, insight);
+    const land = into(s, ap, forest, "hand");
+    s = act(s, { type: "playLand", player: ap, objectId: land });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(land)] }));
+    expect(pt(s, land)).toBe("3/3");
+    const c = characteristics(s, s.objects[land]!);
+    expect(c.types).toEqual(expect.arrayContaining(["Land", "Creature"]));
+    expect(kw(s, land, "Haste")).toBe(true);
+    expect(kw(s, land, "Vigilance")).toBe(true);
+  });
+});
+
+describe("Dogged Detective", () => {
+  it("an opponent draws their second card this turn: you may return it from your graveyard to your hand", () => {
+    supported(detective);
+    let { s, ap, opp } = setup([]);
+    const d = into(s, ap, detective, "graveyard");
+    draw(s, opp, 1);
+    s = resolveAll(s);
+    expect(zone(s, d)).toBe("graveyard");
+    draw(s, opp, 1);
+    s = resolveAll(s);
+    expect(zone(s, d)).toBe("hand");
+  });
+  it("not for your own second card", () => {
+    let { s, ap } = setup([]);
+    const d = into(s, ap, detective, "graveyard");
+    draw(s, ap, 2);
+    s = resolveAll(s);
+    expect(zone(s, d)).toBe("graveyard");
+  });
+});
+
+describe("Avengers Tower", () => {
+  it("its colored mana is only for Hero spells or abilities of Hero sources", () => {
+    supported(tower);
+    const m = compileCard(tower).mana[1]!;
+    expect(m.spendOnly).toMatchObject({ spells: { subtypes: ["Hero"] }, abilities: { subtypes: ["Hero"] } });
+  });
+});
+
+describe("Barbara Wright", () => {
+  it("Sagas you control have read ahead", () => {
+    supported(barbara);
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, barbara);
+    const saga = into(s, ap, eldest, "hand");
+    s = settle(run(s, planCast(s, ap, saga)), ap);
+    expect(s.pending?.kind).toBe("chooseOption");
+    expect(pending(s).what).toBe("readAhead");
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "2" }), ap);
+    expect(s.objects[saga]!.counters.lore).toBe(2);
+  });
+  it("without her, a Saga starts at chapter I", () => {
+    let { s, ap } = setup([]);
+    const saga = into(s, ap, eldest, "hand");
+    s = settle(run(s, planCast(s, ap, saga)), ap);
+    expect(s.objects[saga]!.counters.lore).toBe(1);
   });
 });

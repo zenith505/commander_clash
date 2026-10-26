@@ -1672,7 +1672,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -1764,6 +1764,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (drawTheirTurn) {
     const t = parseTrigger(`Whenever you draw a card, ${drawTheirTurn[1]}`);
     return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn", not: true } } : "fail";
+  }
+  // "Whenever you get one or more {E}, ~ deals that much damage to any target" (Aether Revolt): "that much" is how many
+  // you got; "during your turn" (Brotherhood Scribe) is a condition on the event.
+  const energy = /^Whenever you get one or more \{E\}( during your turn)?, (.+)$/.exec(line);
+  if (energy) {
+    let text = energy[2]!;
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch && /\bX\b/.test(text)) return "fail";
+    if (thatMuch) text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    let body = parseBody(text, {});
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, energy[2]!) };
+    return { event: "youGetEnergy", body, ...(energy[1] ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   // Voracious Tome-Skimmer: "Whenever you cast a spell during an opponent's turn, ...": the same, checked as you cast it.
   const castTheirTurn = /^Whenever you cast a spell during an opponent's turn, (.+)$/.exec(line);

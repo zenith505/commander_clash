@@ -934,10 +934,11 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
     const max = Math.max(...ids.map(of));
     return ids.filter((id) => of(id) === max);
   }
-  if (e.least !== "toughness") return ids;
-  // Bolster: the least toughness, or tied for it (CR 701.39a).
-  const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));
-  return ids.filter((id) => toughness(s, obj(s, id)) === min);
+  if (!e.least) return ids;
+  // Bolster: the least toughness, or tied for it (CR 701.39a); "the least power among creatures they control" likewise.
+  const stat = (id: ObjectId) => (e.least === "power" ? power(s, obj(s, id)) : toughness(s, obj(s, id)));
+  const min = Math.min(...ids.map(stat));
+  return ids.filter((id) => stat(id) === min);
 }
 
 /**

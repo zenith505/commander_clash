@@ -97,6 +97,21 @@ export function parseGraveyardKeyword(
     return costs.every((c) => c) ? { buyback: "", costs: costs as AdditionalCost[], text: m[1]!.replace(/^./, (c) => c.toLowerCase()).replace(/, (\w)/g, (_, c: string) => ` and ${c.toLowerCase()}`) } : "fail";
   }
   if ((m = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\.$`).exec(line))) return { escapesWith: num(m[1]!) };
+  // Salvation Colossus: "Unearth—Pay eight {E}": the cost is energy alone (CR 107.14, 702.84a).
+  if ((m = new RegExp(`^Unearth—Pay ${NUM} \\{E\\}\\.?$`).exec(line))) {
+    return {
+      unearth: {
+        manaCost: "",
+        energyCost: num(m[1]!),
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        zone: "graveyard",
+        body: { targets: [], effects: [{ type: "unearth" }], text: "Return ~ from your graveyard to the battlefield. It gains haste. Exile it at the beginning of the next end step or if it would leave the battlefield." },
+        text: `Unearth—Pay ${m[1]} {E}`,
+      },
+    };
+  }
   if ((m = /^Unearth ((?:\{[^}]+\})+)$/.exec(line))) {
     if (!parseManaCost(m[1]!).supported || parseManaCost(m[1]!).hasX) return "fail";
     return {

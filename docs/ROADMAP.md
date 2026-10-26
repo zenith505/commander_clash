@@ -1,7 +1,7 @@
 # Roadmap
 
-24,585 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,383 of
+24,654 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,438 of
 9,979 (84%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -152,14 +152,31 @@ line blocks.
    may), Endurance Bobblehead (up to X targets with X counted as it's activated), Esix, Fractal Bloom (a token
    replacement that copies a creature you choose). Round 169 went down the list to Venser, the Sojourner (rank 6,376),
    skipping over the cards still listed by `npm run popular`.
-   Next most played: Obsessive Pursuit, Serra the Benevolent, Gemcutter Buccaneer, Oblivion Stone, Nissa of Shadowed
-   Boughs, Chandra, Flameshaper, Iron Man, Titan of Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the
-   Exemplary, Curator's Ward, Realm of Koh, Mercurial Spelldancer, Vraska, the Silencer, Vren, the Relentless,
-   Hauntwoods Shrieker, The Mycotyrant, Lifecraft Engine, Agatha of the Vile Cauldron, Cloudpost, The Ancient One,
-   Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of Herons, Shelob, Dread Weaver, Price of Glory, Roar of
-   Resistance, Heartless Conscription; and from before round 169: Bloatfly Swarm, War's Toll, Quintorius Kand,
-   Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
+   Out after round 170: Carth the Lion (a loyalty cost raised for planeswalkers you control), Scorched Ruins and Lotus
+   Vale (sacrifice two untapped lands as they enter), Hooded Blightfang (its second ability needs a "deals damage to a
+   planeswalker" trigger; the first parses now), Combustion Man (damage unless a player pays, an amount chosen as it
+   resolves), Cosmic Rebirth ("if you don't put it onto the battlefield" after a may), Bane's Contingency ("if that
+   spell targets a commander you control ... instead"), Killer Service (pay mana and sacrifice as one "may" cost),
+   Sapling of Colfenor (gain toughness and lose power from the revealed card). Round 170 went down the list to Cloud,
+   Planet's Champion (rank 7,020), skipping over the cards still listed by `npm run popular`.
+   Next most played: Grindstone, Halo Forager, Chandra, Spark Hunter, Moritte of the Frost, Reyhan, Last of the Abzan,
+   Herigast, Erupting Nullkite, Mazemind Tome, Asmodeus the Archfiend, Temporal Extortion, Hot Pursuit, Reidane, God
+   of the Worthy, Long River Lurker, Zariel, Archduke of Avernus, Psychic Paper, Jolted Awake, Dream-Thief's Bandana,
+   Drana, the Last Bloodchief, Chandra, Legacy of Fire, Theoretical Duplication, Calamity, Galloping Inferno, Shifting
+   Grift, Vivien, Monsters' Advocate, Sam, Loyal Attendant, Wrenn and Six, Crystalline Giant, Kaervek, the Punisher,
+   Crawling Barrens, Balan, Wandering Knight, Marcus, Mutant Mayor, Soul Snare, Primal Growth, Phyrexian Unlife,
+   Tainted Remedy, Plague Drone, Roar of Challenge; and from before round 170: Obsessive Pursuit, Serra the
+   Benevolent, Gemcutter Buccaneer, Oblivion Stone, Nissa of Shadowed Boughs, Chandra, Flameshaper, Iron Man, Titan of
+   Innovation, Gornog, the Red Reaper, Fire Lord Zuko, Zaxara, the Exemplary, Curator's Ward, Realm of Koh, Mercurial
+   Spelldancer, Vraska, the Silencer, Vren, the Relentless, Hauntwoods Shrieker, The Mycotyrant, Lifecraft Engine,
+   Agatha of the Vile Cauldron, The Ancient One, Whisperwood Elemental, Erdwal Illuminator, Sigarda, Host of Herons,
+   Shelob, Dread Weaver, Price of Glory, Roar of Resistance, Heartless Conscription, Bloatfly Swarm, War's Toll,
+   Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving Amalgam.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 170: "if that creature was a Cleric" (Taborax) reads the dead creature's last known
+   subtypes only when the condition is about types alone; Stranglehold stops searches that pick from the library
+   (search and name-a-card effects), not "look at the top N" effects (those aren't searches, CR 701.23); Curator
+   Beastie's "Colorless creatures you control enter with additional counters" supports one color word or colorless.
    Smaller gaps from round 169: Bonecrusher Giant's test uses its creature face alone (the card data has both faces).
    Smaller gaps from round 168: bots activate The Wandering Emperor's loyalty abilities only on their own turn; bots
    don't activate Vexing Shusher; Glen Elendra Guardian's counter picker is the one for "remove counters from among",

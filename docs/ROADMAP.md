@@ -1,7 +1,7 @@
 # Roadmap
 
-24,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,312 of
+24,522 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,931 of 4,988 (98%), top 10,000: 8,343 of
 9,979 (83%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -127,10 +127,29 @@ line blocks.
    Stalwart (two abilities chosen as it enters; only one chosen keyword is kept), Shelinda, Yevon Acolyte ("put a
    counter on that creature if ... Otherwise, put a counter on ~"), Gaea's Blessing ("put into your graveyard from your
    library" triggers). Round 167 went down the list to Accumulate Wisdom (rank 5,595).
-   Next most played: Cosima, God of the Voyage, Emperor of Bones, Bloatfly Swarm, War's Toll, Yasharn, Implacable
-   Earth, Undercover Operative, Quintorius Kand, Orvar, the All-Form, Aminatou, Veil Piercer, Narset, Enlightened
-   Exile, Share the Spoils, Arcbond, Sanctum of All, Master Warcraft, Zoyowa's Justice.
+   Out after round 168: Cosima, God of the Voyage (an ability that works while it's exiled, like Dinosaurs on a
+   Spaceship), Yasharn, Implacable Earth ("players can't pay life or sacrifice nonland permanents to cast spells or
+   activate abilities": a check on every cost, autopay and bots included), Orvar, the All-Form ("when a spell or ability
+   an opponent controls causes you to discard ~": who caused a discard isn't kept), Share the Spoils (each player plays
+   from its exiled cards on their own turn, with mana of any type, and "whenever an opponent loses the game"), Sanctum
+   of All (Shrine triggers that trigger an additional time), Master Warcraft (you declare everyone's attackers and
+   blockers), Chef's Kiss (gaining control of a spell, then targets chosen at random), Make an Example (each opponent
+   separates their creatures into piles: a pile prompt per opponent), Perplexing Chimera (exchanging control of a
+   permanent and a spell), Karn, Living Legacy ("pay any amount of mana" as an effect), Benevolent Blessing (protection
+   that doesn't remove your Auras and Equipment already attached), Ashling, the Limitless (spells that gain evoke as
+   they're cast), Omnath, Locus of All ("three mana in any combination of its colors" from a trigger), Crypt Rats
+   ("spend only black mana on X": a spend rule for part of a cost), Summons of Saruman (casting from among the milled
+   cards). Round 168 went down the list to Glen Elendra Guardian (rank 5,741), skipping over the cards still listed by
+   `npm run popular`.
+   Next most played: Bloatfly Swarm, War's Toll, Quintorius Kand, Aminatou, Veil Piercer, Arcbond, Rot Hulk, Thieving
+   Amalgam, Nicanzil, Current Conductor, Gatta and Luzzu, Aether Refinery, Emeritus of Ideation, Green Slime, Welcome to
+   . . . // Jurassic Park, Finale of Promise, Troyan, Gutsy Explorer, Radiant Destiny, Case of the Uneaten Feast, Raul,
+   Trouble Shooter, Entropic Battlecruiser, Cait Sith, Tamiyo, the Moon Sage, Scouring Swarm, Liesa, Feather, Bring to
+   Light, Staff of Eden, Thada Adel, Doran, Besieged by Time.
    `npm run popular` reads every ranked card (31,917), so it doesn't run dry at rank 5,000.
+   Smaller gaps from round 168: bots activate The Wandering Emperor's loyalty abilities only on their own turn; bots
+   don't activate Vexing Shusher; Glen Elendra Guardian's counter picker is the one for "remove counters from among",
+   which asks even when the Guardian has one kind of counter.
    Smaller gaps from round 167: Grishnákh's "power less than or equal to the amassed Army's power" is the Army's power
    as the target is chosen; bots don't activate Progenitor's Icon; Trinisphere counts a hybrid {2/W} symbol as its
    mana value (2) whichever half is paid; Elspeth Resplendent's +1 puts its two counters on one after the other (the

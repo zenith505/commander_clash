@@ -603,7 +603,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "discover": {
       // CR 701.57a: the mana value of the spell it would be is checked too (701.57a), the card's own for the cards we have.
-      const p = player(s, ctx.controller);
+      const who = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (who === undefined) return;
+      const p = player(s, who);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
         const n = amountNow(s, e.n, ctx);
@@ -732,6 +734,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst";
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => !stackOnly(k)) ? [{ ...x, keywords: x.keywords.filter((k) => !stackOnly(k)) }] : []));
       if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.whileSpell ? { whileSpell: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
+      return;
+    }
+    case "spellUncounterable": {
+      // Vexing Shusher: the targeted spell, if it's still a legal target (CR 608.2b).
+      const t = ctx.targets[e.index];
+      const item = ctx.legal[e.index] && t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+      if (!item) return;
+      item.uncounterable = true;
+      log(s, `${src}: ${item.kind === "spell" && item.objectId ? defOf(s, obj(s, item.objectId)).name : "that spell"} can't be countered.`);
       return;
     }
     case "counterSpell": {
@@ -914,7 +925,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (!o) return false;
   const d = defOf(s, o);
   const compiled = compileCard(d);
-  if (compiled.cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
+  if (compiled.cantBeCountered || (o.uncounterableCast && !item.copy) || item.uncounterable) return true;
   // Banefire: its X, chosen as it was cast (a copy has the same X, CR 707.10).
   if (compiled.cantBeCounteredX !== undefined && (item.x ?? 0) >= compiled.cantBeCounteredX) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).

@@ -789,8 +789,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // battlefield this turn. Return it to your hand. Then the Ring tempts you." The same, then the Ring.
   text = text.replace(/^[Cc]hoose ((?:up to one )?target [^.]+? in your graveyard(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)\. Return it to your hand\.(?=$| Then )/, "Return $1 to your hand.");
   // Brought Back: "Choose up to two target permanent cards in your graveyard that were put there from the battlefield this
-  // turn. Return them to the battlefield tapped." is one instruction; they return at the same time.
-  text = text.replace(/^[Cc]hoose (up to (?:one|two|three) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
+  // turn. Return them to the battlefield tapped." is one instruction; they return at the same time. Continue?: up to four.
+  text = text.replace(/^[Cc]hoose (up to (?:one|two|three|four) target [^.]+? in your graveyard that were put there from the battlefield this turn)\. Return them to the battlefield( tapped)?\.$/, "Return $1 to the battlefield$2.");
   // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
   // can't be the targets of blue or black spells this turn": two instructions.
   text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
@@ -868,6 +868,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nissa's Pilgrimage: "..., reveal those cards, and put one onto the battlefield tapped and the rest into your hand. Then
   // shuffle." is Cultivate's search.
   text = text.replace(/^(Search your library for up to \w+ [^.]+? cards, reveal those cards), and (put one [^.]+? and the rest into your hand)\. Then shuffle\./, "$1, $2, then shuffle.");
+  // Jarad's Orders: "Search your library for up to two creature cards and reveal them. Put one into your hand and the
+  // other into your graveyard. Then shuffle." Viewpoint Synchronization: "... up to three basic land cards and reveal
+  // them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle." One search each.
+  text = text.replace(/^(Search your library for up to (?:two|three) [^.]+? cards) and reveal them\. Put (one|two of them) ([^.]+? and the other [^.]+?)(?:\. Then shuffle|, then shuffle)\./, (_, a: string, b: string, c: string) => `${a}, reveal them, put ${b.toLowerCase()} ${c}, then shuffle.`);
   // Out of the Tombs: "put two eon counters on ~, then mill cards equal to the number of eon counters on it": ~ is the
   // only object named, so "it" is ~.
   text = text.replace(/^([Pp]ut [^.~]+ counters? on ~, then [^.~]+ counters on )it\./, "$1~.");
@@ -1098,13 +1102,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
   // the rest into your hand." (Murmurs from Beyond): one instruction each, the opponent choosing among the revealed cards.
+  // Karn, Scion of Urza: "Put that card into your hand and exile the other with a silver counter on it" too.
   text = text.replace(
     /\bSearch your library for ([^.]+?) and reveal them\. (Target opponent|An opponent) chooses (one|two)(?: of (?:them|those cards))?\. Put (?:that card|the chosen cards?) (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)(?:\. Then shuffle|, then shuffle)\./g,
     (_, what, who, n, to, rest) => `Search your library for ${what}; ${who.toLowerCase()} chooses ${n}; put them ${to} and the rest ${rest}.`,
   );
   text = text.replace(
-    /\bReveal the top (\w+) cards of your library\. (Target opponent|An opponent) chooses (one of (?:them|those cards)|an? [a-z]+ card from among them)\. Put that card (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard))?(\.|, then )/g,
-    (_, n, who, which, to, rest, end) => `Reveal the top ${n} cards of your library; ${who.toLowerCase()} chooses ${which.replace(/ of (?:them|those cards)$/, "")}; put it ${to}${rest ? ` and the rest ${rest}` : ""}.${end === "." ? "" : " Then "}`,
+    /\bReveal the top (\w+) cards of your library\. (Target opponent|An opponent) chooses (one of (?:them|those cards)|an? [a-z]+ card from among them)\. Put that card (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard)| and (exile the other with an? [a-z]+ counter on it))?(\.|, then )/g,
+    (_, n, who, which, to, rest, exile, end) => `Reveal the top ${n} cards of your library; ${who.toLowerCase()} chooses ${which.replace(/ of (?:them|those cards)$/, "")}; put it ${to}${rest ? ` and the rest ${rest}` : exile ? ` and ${exile}` : ""}.${end === "." ? "" : " Then "}`,
   );
   // "Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your
   // hand and the other into your graveyard." (Fact or Fiction), "Reveal the top five cards of your library and separate
@@ -1165,7 +1170,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )(Each player chooses an? [a-z]+ they control)\. Destroy the rest\./g, "$1$2 and the rest are destroyed.");
   // "Put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card." (Waterbender
   // Ascension): "it" is ~.
-  text = text.replace(/(\bcounters? on ~\. Then if) it has (?=\w+ or more [a-z+\/0-9-]+ counters on it, )/g, "$1 ~ has ");
+  // Sab-Sunen, Luxa Embodied: "Then if it has an odd number of counters on it, draw two cards" too.
+  text = text.replace(/(\bcounters? on ~\. Then if) it has (?=\w+ or more [a-z+\/0-9-]+ counters on it, |an? (?:even|odd) number of counters on it, )/g, "$1 ~ has ");
   // Strixhaven Stadium: "Then if it has ten or more point counters on it, remove them all and that player loses the game":
   // the point counters on ~, then the player its trigger is about (checked only as it resolves, rulings).
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more ([a-z]+) counters on it, )remove them all and (that player loses the game)\./g, "$1remove all $2 counters from ~, then $3.");
@@ -1264,6 +1270,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(If ~ has [^,.]+ counters on it), exile it, then return it to the battlefield\./, "$1, exile ~, then return it to the battlefield.");
   // Gisa, Glorious Resurrector: "They gain decayed" is about the cards just put onto the battlefield.
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
+  // Emperor of Bones: "put a creature card exiled with ~ onto the battlefield under your control with a finality counter on
+  // it. It gains haste. Sacrifice it at the beginning of the next end step." One instruction about that permanent.
+  text = text.replace(/([Pp]ut a creature card exiled with ~ onto the battlefield under your control with a finality counter on it)\. It gains haste\. Sacrifice it at the beginning of the next end step\./, "$1, and it gains haste until it is sacrificed when the next end step begins.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
   text = text.replace(/\bUntil your next turn, it gains ([a-z ]+)\./g, "It gains $1 until your next turn.");
   // Sylvan Awakening: "Until your next turn, all lands you control become 2/2 Elemental creatures with reach,
@@ -2594,8 +2603,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Cunning Rhetoric: "exile the top card of that player's library. You may play that card for as long as it remains
     // exiled, and you may spend mana as though it were mana of any color to cast it." Face up (CR 406.3), a land played
     // as your land play (rulings), mana of any type for a spell (CR 609.4b).
-    if (!exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) && /^You may play that card for as long as it remains exiled(, and you may spend mana as though it were mana of any color to cast it)?$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
-      effects.push({ type: "impulse", n: 1, until: "exiled", who: { ref: "eventPlayer" }, ...(/any color/.test(sentences[si + 1]!) ? { anyType: true as const } : {}) });
+    // Ramirez DePietro, Pillager: "You may cast that card for as long as it remains exiled": spells only, no land play.
+    if (!exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) && /^You may (?:play|cast) that card for as long as it remains exiled(, and you may spend mana as though it were mana of any color to cast it)?$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", who: { ref: "eventPlayer" }, ...(/^You may cast/.test(sentences[si + 1]!) ? { castOnly: true as const } : {}), ...(/any color/.test(sentences[si + 1]!) ? { anyType: true as const } : {}) });
       ctx.exiledTop = true;
       si++;
       continue;
@@ -2862,6 +2872,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Narset, Enlightened Exile: "exile target noncreature, nonland card with mana value less than ~'s power from a
+    // graveyard and copy it. You may cast the copy without paying its mana cost." Cast as it resolves, or never; a
+    // permanent spell copy becomes a token (CR 608.3f). Her power is checked on targeting and on resolution (CR 608.2b).
+    const exileCopy = /^[Ee]xile (target [^.]+ card [^.]*from (?:a|an opponent's|your) graveyard) and copy it$/.exec(s);
+    if (exileCopy && sentences[si + 1]?.replace(/\.$/, "") === "You may cast the copy without paying its mana cost") {
+      const what = parseObject(exileCopy[1]!, ctx, true);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index } });
+      si++;
+      continue;
+    }
     // Arcane Bombardment: "exile an instant or sorcery card at random from your graveyard. Then copy each card exiled with
     // this enchantment. You may cast any number of the copies without paying their mana costs." The copies are cast as
     // the ability resolves, or never (rulings); the cards stay exiled, linked to it (CR 607.2a).
@@ -2919,6 +2940,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs."
     if (/^[Ee]ach player exiles cards from the top of their library until they exile a nonland card$/.test(s) && /^You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true });
+      si++;
+      continue;
+    }
+    // Fevered Suspicion: "Each opponent exiles cards from the top of their library until they exile a nonland card. You may
+    // cast any number of spells from among those nonland cards without paying their mana costs." The same, opponents only;
+    // what isn't cast stays exiled (rulings).
+    if (/^[Ee]ach opponent exiles cards from the top of their library until they exile a nonland card$/.test(s) && /^You may cast any number of spells from among those nonland cards without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true, opponents: true });
       si++;
       continue;
     }
@@ -3032,6 +3061,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const lookCast = /^[Ll]ook at the top (two|three|four|five|six|seven|eight|nine|ten) cards of your library$/.exec(s);
     if (lookCast && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell from among them without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
+      continue;
+    }
+    // Cosmic Cube: "You may cast a spell from among them with mana value less than or equal to the greatest power among
+    // attacking creatures you control without paying its mana cost": that bound worked out as it resolves.
+    const lookCastMv = lookCast && /^You may cast a spell from among them with mana value less than or equal to (.+) without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (lookCast && lookCastMv && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
+      const x = parseCount(lookCastMv[1]!, ctx);
+      if (!x) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" } });
       si += 2;
       continue;
     }
@@ -3455,6 +3494,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "The owner of target permanent shuffles it into their library, then reveals the top card of their library. If it's a
     // permanent card, they put it onto the battlefield." (Chaos Warp): that owner's library, the card entering under their
     // control; nothing is revealed if the target is illegal (rulings).
+    // Zoyowa's Justice: "The owner of target artifact or creature ... shuffles it into their library. Then that player
+    // discovers X, where X is its mana value": that owner discovers (CR 701.57a), X its mana value as it last existed
+    // (rulings: an X in its cost is 0).
+    const ownerDiscovers = /^The owner of (target .+?) shuffles it into their library$/.exec(s) && /^Then that player discovers X, where X is its mana value\.?$/.exec(sentences[si + 1] ?? "");
+    if (ownerDiscovers) {
+      const what = parseObject(/^The owner of (target .+?) shuffles it into their library$/.exec(s)![1]!, ctx);
+      if (what?.ref !== "target" || what.n) return null;
+      effects.push({ type: "shuffleIntoLibrary", what }, { type: "discover", n: { count: { kind: "manaValue", of: { ref: "target", index: what.index } } }, who: { ref: "targetOwner", index: what.index } });
+      si++;
+      continue;
+    }
     const warp = /^The owner of (target .+?) shuffles it into their library, then reveals the top card of their library$/.exec(s);
     if (warp) {
       const what = parseObject(warp[1]!, ctx);
@@ -5514,6 +5564,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "searchFound", filter }, effects: then });
       continue;
     }
+    // Grimoire of the Dead: "Put all creature cards from all graveyards onto the battlefield under your control. They're
+    // black Zombies in addition to their other colors and types": all of them (as they enter, see returnAllFromGraveyard).
+    const theyAreAll = /^They're (white|blue|black|red|green) ([A-Z][a-z]+)s in addition to their other colors and types$/.exec(s);
+    if (theyAreAll) {
+      const prev = effects[effects.length - 1];
+      const mods = parseBecomes(`a ${theyAreAll[1]} ${theyAreAll[2]} in addition to its other colors and types`);
+      if (prev?.type !== "returnAllFromGraveyard" || prev.toHand || !mods || prev.alsoMods) return null;
+      prev.alsoMods = mods;
+      continue;
+    }
+    // Chainer, Dementia Master: "That creature is black and is a Nightmare in addition to its other creature types": black
+    // only, and a Nightmare too (rulings), as it enters.
+    const blackAnd = /^That creature is (white|blue|black|red|green) and is an? ([A-Z][a-z]+) in addition to its other creature types$/.exec(s);
+    if (blackAnd) {
+      const prev = effects[effects.length - 1];
+      const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[blackAnd[1] as "white"];
+      if (prev?.type !== "putOntoBattlefield" || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods || !CREATURE_TYPES.has(blackAnd[2]!)) return null;
+      prev.alsoMods = [{ kind: "setColors", colors: [color] }, { kind: "addTypes", types: [], subtypes: [blackAnd[2]!] }];
+      continue;
+    }
     // Valkyrie's Call: "It has flying and is an Angel in addition to its other types": the same as "It's an Angel with
     // flying in addition to its other types".
     const hasAndIs = /^It has ([a-z]+) and is (an? [A-Z][a-z]+) in addition to its other types$/.exec(s);
@@ -6061,6 +6131,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer(untilLand[1]!, ctx);
       if (!who) return null;
       effects.push({ type: "revealUntilLandToGraveyard", who });
+      si++;
+      continue;
+    }
+    // Mind Grind: "Each opponent reveals cards from the top of their library until they reveal X land cards, then puts all
+    // cards revealed this way into their graveyard." The spell's X (its "X can't be 0" is read by compile).
+    const untilXLand = ctx.spell && /^(Each opponent|Target opponent|Target player) reveals cards from the top of their library until they reveal X land cards$/i.exec(s);
+    if (untilXLand && /^(?:Then )?puts all cards revealed this way into their graveyard\.?$/i.test(sentences[si + 1] ?? "")) {
+      const who = parsePlayer(untilXLand[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealUntilLandToGraveyard", who, n: { count: { kind: "x" } } });
       si++;
       continue;
     }

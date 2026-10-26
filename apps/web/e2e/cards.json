@@ -6421,6 +6421,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "97febf6b-302c-4c41-8838-eef7c7353bdc",
+  "name": "Glen Elendra Guardian",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Faerie Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Wizard"
+  ],
+  "oracleText": "Flash\nFlying\nThis creature enters with a -1/-1 counter on it.\n{1}{U}, Remove a counter from this creature: Counter target noncreature spell. Its controller draws a card.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e3886fe8-9b76-4613-8891-4ec74657c087",
   "name": "Glorious Anthem",
   "manaCost": "{1}{W}{W}",
@@ -17079,6 +17113,34 @@
   "set": "bbd",
   "releasedAt": "2018-06-08",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2e338e09-5758-4cc2-9143-21f050a28677",
+  "name": "Viewpoint Synchronization",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Freerunning {2}{G} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nSearch your library for up to three basic land cards and reveal them. Put two of them onto the battlefield tapped and the other into your hand, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Freerunning"
+  ],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

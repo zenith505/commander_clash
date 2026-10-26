@@ -1150,7 +1150,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
-    addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // Glimmer Lens: "Whenever equipped creature and at least one other creature attack" (`withOthers`, as for battalion).
+    addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
     // "Whenever a creature attacks": anyone's, for the watcher's controller.

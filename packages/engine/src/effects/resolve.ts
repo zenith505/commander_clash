@@ -1045,6 +1045,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterUnlessPays":
     case "counterCause":
     case "counterSpell":
+    case "spellUncounterable":
     case "spellEntersWith":
     case "spellGains":
     case "counterEach":

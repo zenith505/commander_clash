@@ -42,9 +42,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "revealUntilLandToGraveyard":
       // Consuming Aberration: each one reveals until a land card, then puts all of them, that one too, into their
       // graveyard; with no land card, the whole library (rulings). Revealing, not milling (CR 701.20a, 701.17a).
+      // Mind Grind: until X land cards, all of the library with fewer (rulings).
       for (const pid of apnap(s, players(s, e.who, ctx))) {
         const p = player(s, pid);
-        const at = p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land"));
+        let lands = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
+        const at = lands < 1 ? -1 : p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land") && --lands === 0);
         const ids = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         if (!ids.length) continue;
         log(s, `${p.name} reveals ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} and puts ${ids.length === 1 ? "it" : "them"} into their graveyard.`);
@@ -838,7 +840,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           max,
           ...(agent?.controller !== undefined ? { controlling: p.id } : {}),
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
-          ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others) } : {}),
+          ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others), ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),
           ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}),
@@ -884,7 +886,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.condDest && condNow ? e.condDest.dest : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.condDest && condNow ? e.condDest.dest : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).
@@ -1049,6 +1051,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of got) moveObject(s, id, zone(e.to), e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
         if (e.rest) for (const id of rest) moveObject(s, id, zone(e.rest));
       });
+      // Karn, Scion of Urza: "exile the other with a silver counter on it".
+      if (e.rest?.counter) {
+        for (const id of rest) {
+          const o = obj(s, id);
+          if (o.zone === "exile") o.counters[e.rest.counter] = (o.counters[e.rest.counter] ?? 0) + 1;
+        }
+        if (rest.length) log(s, `${p.name} exiles ${rest.map((id) => defOf(s, obj(s, id)).name).join(", ")} with a ${e.rest.counter} counter on it.`);
+      }
       return;
     }
     case "vault": {

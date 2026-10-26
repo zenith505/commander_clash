@@ -1313,7 +1313,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
     // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
-    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0);
+    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type), opts.x ?? 0, controllerOf(s, target) === o.controller);
     if (Object.keys(more).length) {
       const counters = { ...opts.counters };
       for (const [k, n] of Object.entries(more)) counters[k] = (counters[k] ?? 0) + n;
@@ -4277,6 +4277,8 @@ export function castProblem(
   const xp = xProblem(costX || kickX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
   if (xp) return xp;
   if (kickX && (x ?? 0) < (kicker?.xMin ?? 0)) return "X can't be 0";
+  // Mind Grind: "X can't be 0", so it can't be cast without paying its mana cost either (rulings, CR 107.3b).
+  if (manaX && !costX && (x ?? 0) < (compileCard(d).xMin ?? 0)) return "X can't be 0";
   // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
   // additional cost (Toxic Deluge's rulings).
   if ((free || plotted) && !madness && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
@@ -5819,7 +5821,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "removeCounters") {
       // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
       const pool = counterCostCandidates(s, pid, o, c);
-      const what = `${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`;
+      const what = `${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? `from ${d.name}` : `from among ${c.filter.text}`}`;
       const chosen = choices?.counters;
       if (!chosen) {
         if (pool.reduce((n, x) => n + x.n, 0) < c.n) return `you need to remove ${what} to ${doing}`;
@@ -5989,7 +5991,7 @@ export function untapViaMana(s: GameState, pid: PlayerId, source: GameObject, c:
 export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string; n: number }[] {
   return s.battlefield.flatMap((id) => {
     const x = obj(s, id);
-    if (controllerOf(s, x) !== pid || (c.other && id === source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
+    if (controllerOf(s, x) !== pid || (c.other && id === source.id) || (c.self && id !== source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
     return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
   });
 }
@@ -6219,7 +6221,7 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
 /** Teferi, Temporal Archmage's emblem: loyalty abilities any time you could cast an instant (you have priority). */
 const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   // Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant."
-  (!!o && !!abilitiesOf(s, o).selfLoyaltyAtInstantSpeed) ||
+  (!!o && (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === true || (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === "enteredThisTurn" && o.enteredTurn === s.turn))) ||
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
 export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {

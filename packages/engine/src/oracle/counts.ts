@@ -112,6 +112,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const text = `${m[3]!} ${who}`;
     return { count: { kind: "greatestPower", filter: { ...spec, text }, ...(m[2] ? { other: true as const } : {}), ...(m[1] === "toughness" ? { toughness: true as const } : {}), ...(whose ? { whose } : {}) } };
   }
+  // Shriekwood Devourer: "the greatest power among those creatures": the attackers of the trigger's event, those still on
+  // the battlefield as it resolves (rulings).
+  if (!each && /^the greatest power among those creatures$/i.test(p) && ctx?.lastGroup && "ref" in ctx.lastGroup && ctx.lastGroup.ref === "eventGroup")
+    return { count: { kind: "greatestPower", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "those creatures" }, inEventGroup: true } };
   // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
   // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
   // "The total power of attacking creatures" (Klauth): every player's attackers.
@@ -193,6 +197,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // into the hand otherwise).
   // Heliod, the Warped Eclipse: "for each card your opponents have drawn this turn": all of them together.
   if (/^cards? your opponents have drawn this turn$/i.test(p)) return { count: { kind: "drawnThisTurn", who: { ref: "eachOpponent" } } };
+  if (/^cards? you've discarded this turn$/i.test(p)) return { count: { kind: "discardedThisTurn", who: { ref: "you" } } };
   if ((m = /^cards? (you've|you have|they've|they have|that player has) drawn this turn$/i.exec(p))) {
     const who = /^you/i.test(m[1]!) ? ({ ref: "you" } as PlayerRef) : whosePlayer(/^they/i.test(m[1]!) ? "their" : "that player's", ctx);
     return who && { count: { kind: "drawnThisTurn", who } };
@@ -570,7 +575,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
     if (x === "its" && (ctx.selfIt || ctx.selfCard || ctx.activated)) return { ref: "self" };
     // "Return target creature card from your graveyard to the battlefield. You gain life equal to that creature's
     // toughness" (Cleric Class): the card targeted, as the permanent it became (rulings).
-    if (x === "that creature's" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && ctx.targets[0]!.types?.includes("Creature")) return { ref: "target", index: 0 };
+    // Death: "Return target creature card from your graveyard to the battlefield. You lose life equal to its mana value."
+    if ((x === "that creature's" || (x === "its" && ctx.spell)) && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && ctx.targets[0]!.types?.includes("Creature")) return { ref: "target", index: 0 };
   }
   return null;
 }

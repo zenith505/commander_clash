@@ -765,7 +765,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "removeCounters") {
         // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
         if (d.counters !== undefined) continue;
-        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
       }
       if (c.kind === "returnToHand") {
         // Ninjutsu: click the unblocked attacker to return (CR 702.49a).
@@ -914,7 +914,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const range = compiled.sacrificedReduction ? xRange(plan) : undefined;
       const max = range ? range.max : maxX(plan);
       const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : max, ...(range?.min ? { min: range.min } : {}), ...(extra ? { extra } : {}) });
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : Math.max(max, compiled.xMin ?? 0), ...(range?.min ? { min: range.min } : !costX && compiled.xMin ? { min: compiled.xMin } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
     const kickX = d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
@@ -963,7 +963,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
       if (c.kind === "removeCounters") {
         if (d.counters !== undefined) continue;
-        return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+        return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} ${c.self ? "from it" : `from among ${c.filter.text}`}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
       }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
@@ -3794,7 +3794,7 @@ function LibrarySearch({
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
   };
-  const where = (i: number) => (pending.firstTo ? (i === 0 ? pending.firstTo : pending.othersTo) : null);
+  const where = (i: number) => (pending.firstTo ? (i < (pending.firstN ?? 1) ? pending.firstTo : pending.othersTo) : null);
   return (
     <div className="modal-backdrop">
       <div className="modal search">
@@ -3841,7 +3841,7 @@ function LibrarySearch({
               : dig
               ? `The rest go ${dig.rest}.${pending.totalMv !== undefined ? ` Total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.` : ""}`
               : pending.firstTo
-                ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
+                ? pending.firstN ? `The first ${pending.firstN} you find go ${pending.firstTo}, the other ${pending.othersTo}.` : `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal
                 ? `Revealing ${found.length}.`
                 : pending.bottom

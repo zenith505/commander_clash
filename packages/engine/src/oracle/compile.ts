@@ -2521,6 +2521,11 @@ export function compile(d: CardDef): CompiledCard {
       out.selfLoyaltyAtInstantSpeed = true;
       continue;
     }
+    // The Wandering Emperor: only on the turn it entered, and still one loyalty ability that turn (rulings, CR 606.3).
+    if (line === "As long as ~ entered this turn, you may activate ~'s loyalty abilities any time you could cast an instant.") {
+      out.selfLoyaltyAtInstantSpeed = "enteredThisTurn";
+      continue;
+    }
     if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
       out.loyaltyAtInstantSpeed = true;
       continue;
@@ -3112,8 +3117,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.activated.push(bindThisAbility(act, line));
       continue;
     }
-    // A spell's paragraphs are read as one text, so an ability word inside it goes (CR 207.2c).
-    if (isSpell) spellLines.push(stripAbilityWord(line));
+    // A spell's paragraphs are read as one text, so an ability word inside it goes (CR 207.2c). "X can't be 0." after an
+    // {X} spell's text (Mind Grind) is a rule about choosing X (CR 107.3), not an instruction.
+    if (isSpell && / X can't be 0\.$/.test(line) && parseManaCost(d.manaCost).hasX && !/\bX can't be 0\b/.test(line.slice(0, -" X can't be 0.".length))) {
+      out.xMin = 1;
+      spellLines.push(stripAbilityWord(line.slice(0, -" X can't be 0.".length)));
+    } else if (isSpell) spellLines.push(stripAbilityWord(line));
     else out.unsupported.push(raw);
   }
   if (paws) {

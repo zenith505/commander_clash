@@ -1,3 +1,4 @@
+import { DRAFTED_NAME } from "./draft";
 import type { AmountExpr, Effect, SearchDest, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { NUMBER_WORDS, X, BASIC_TYPES } from "./words";
@@ -101,6 +102,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   // "Up to two artifact, creature, and/or enchantment cards" (Brightglass Gearhulk): each card is any one of those card
   // types, the same as "artifact, creature, or enchantment cards".
   const TYPE = "(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)";
+  // Smuggler Captain: nothing was noted in a draft, so nothing is found (TargetSpec.drafted, oracle/draft.ts).
+  if (DRAFTED_NAME.test(phrase)) return { kind: "card", drafted: true, text: phrase };
   const p = phrase.replace(/\bcards\b/g, "card").replace(new RegExp(`^((?:${TYPE}, )*${TYPE},?) and/or (${TYPE} card)\\b`), "$1 or $2");
   // Pyre of Heroes: "a creature card that shares a creature type with the sacrificed creature and has mana value equal to
   // 1 plus that creature's mana value": the sacrificed creature as it last existed (rulings).

@@ -43,7 +43,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (o.zone !== "battlefield") return false;
   // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
   // the source (see pickOptions, isLegalTarget).
-  if (spec.bound || spec.saddledSource) return false;
+  if (spec.bound || spec.saddledSource || spec.drafted) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
@@ -293,7 +293,7 @@ function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<Target
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
-  if (spec.bound) return false; // not worked out yet (see objectMatches)
+  if (spec.bound || spec.drafted) return false; // not worked out yet (see objectMatches); nothing noted in a draft
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;

@@ -23,6 +23,7 @@ import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
+import { draftLine } from "./draft";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -533,6 +534,18 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // Conspiracy's draft-matters lines (CR 905.2) in a game no draft came before (oracle/draft.ts).
+    const drafted = draftLine(line);
+    if (drafted === null) continue;
+    if (typeof drafted === "string") line = drafted;
+    else if (drafted) {
+      // An ability that does nothing: its cost or trigger event as the card says, with no effect.
+      const ab = drafted.kind === "activated" ? parseActivated(`${drafted.cost}: Draw a card.`) : parseTrigger(`${drafted.when}, draw a card.`);
+      if (!ab || ab === "fail") out.unsupported.push(raw);
+      else if (drafted.kind === "activated") out.activated.push(bindThisAbility({ ...(ab as ActivatedAbility), body: { targets: [], effects: [], text: line, inert: true } }, line));
+      else out.triggers.push(bindThisAbility({ ...(ab as TriggeredAbility), body: { targets: [], effects: [], text: line, inert: true } }, line));
+      continue;
+    }
     // Poisonous N given to other creatures ("All Sliver creatures have poisonous 1", Virulent Sliver; "Enchanted creature
     // has poisonous 3"): "Whenever this creature deals combat damage to a player, that player gets N poison counters"
     // (CR 702.70a), one ability for each instance (702.70b).

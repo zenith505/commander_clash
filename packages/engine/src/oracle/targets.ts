@@ -791,6 +791,13 @@ export function parseTargetPhrase(
     target?: true;
   } = {},
 ): TargetSpec | null {
+  // Regicide: "creature that's one or more of the colors chosen as you drafted cards named ~": no colors were chosen
+  // without a draft, so nothing fits (TargetSpec.drafted, oracle/draft.ts).
+  const drafted = /^(.+?) that's one or more of the colors chosen as you drafted cards named ~$/.exec(phrase);
+  if (drafted) {
+    const head = parseTargetPhrase(drafted[1]!, opts);
+    return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);

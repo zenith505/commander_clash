@@ -471,6 +471,12 @@ export interface TargetSpec {
    */
   bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /**
+   * Chosen or noted as you drafted cards (Conspiracy, CR 905.2b): "a card with a name you noted for cards named ~",
+   * "one or more of the colors chosen as you drafted cards named Regicide". No draft comes before a game here, so
+   * nothing was noted and nothing fits (rulings).
+   */
+  drafted?: true;
+  /**
    * "With mana value less than or equal to the number of cards in its controller's graveyard" (Drown in the Loch): each
    * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
    */
@@ -3493,6 +3499,8 @@ export interface AbilityBody {
   text: string;
   /** "This ability still resolves if its target becomes illegal" (Gilded Drake): it isn't removed by CR 608.2b. */
   resolvesAnyway?: true;
+  /** Does nothing at all: a draft-matters ability with nothing noted in a draft (oracle/draft.ts), like Volatile Chimera's. */
+  inert?: true;
   /** "This ability can't be copied" (Gogo, Master of Mimicry), "~ can't be copied" (See Double): an effect that would copy it makes no copy. */
   uncopyable?: true;
   /**

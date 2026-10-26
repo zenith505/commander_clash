@@ -2470,7 +2470,7 @@ export type Effect =
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).

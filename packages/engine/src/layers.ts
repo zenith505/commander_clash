@@ -396,7 +396,7 @@ function gather(s: GameState): Inst[] {
   const out: Inst[] = [];
   let order = 0;
   for (const e of s.effects) {
-    const base = { timestamp: e.timestamp, sourceId: e.sourceId, sourceName: e.sourceName, untilEndOfTurn: e.duration === "endOfTurn", controller: e.controller };
+    const base = { timestamp: e.timestamp, sourceId: e.sourceId, sourceName: e.sourceName, untilEndOfTurn: e.duration === "endOfTurn" || e.duration === "endOfCombat", controller: e.controller };
     // "For as long as it has a vow counter on it": only those that still do.
     const fixed = e.group ? [] : e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected;
     const held = e.notGranted ? fixed.filter((id) => e.notGranted![id]) : [];

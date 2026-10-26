@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
-import { blockProblem, botActions, compileCard, doesNothingNow, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { blockProblem, botActions, compileCard, doesNothingNow, isFullySupported, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -416,5 +416,94 @@ describe("The most common color among all permanents, or tied for it", () => {
     expect(zone(s, g)).toBe("battlefield");
     s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(r)])));
     expect(zone(s, r)).toBe("hand");
+  });
+});
+
+const valorous = card("Valorous Charge", "Sorcery", "{1}{W}{W}", {cmc: 3,oracleText: "White creatures get +2/+0 until end of turn."});
+const rankAndFile = card("Rank and File", "Creature — Zombie", "{2}{B}{B}", {cmc: 4,power: "3",toughness: "3",oracleText: "When this creature enters, green creatures get -1/-1 until end of turn."});
+const hyenas = card("Gibbering Hyenas", "Creature — Hyena", "{2}{G}", {cmc: 3,power: "3",toughness: "2",oracleText: "This creature can't block black creatures."});
+const veteran = card("Orcish Veteran", "Creature — Orc", "{2}{R}", {cmc: 3,power: "2",toughness: "2",oracleText: "This creature can't block white creatures with power 2 or greater.\n{R}: This creature gains first strike until end of turn."});
+const hinterland = card("Hinterland Drake", "Creature — Drake", "{2}{U}", {cmc: 3,power: "2",toughness: "3",keywords: ["Flying"],oracleText: "Flying\nThis creature can't block artifact creatures."});
+const sacredKnight = card("Sacred Knight", "Creature — Human Knight", "{3}{W}", {cmc: 4,power: "3",toughness: "2",oracleText: "This creature can't be blocked by black and/or red creatures."});
+const goo = card("Earthen Goo", "Creature — Ooze", "{2}{R}", {cmc: 3,power: "2",toughness: "2",keywords: ["Trample","Cumulative upkeep"],oracleText: "Trample\nCumulative upkeep {R} or {G} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nThis creature gets +1/+1 for each age counter on it."});
+const murk = card("Murk Dwellers", "Creature — Zombie", "{3}{B}", {cmc: 4,power: "2",toughness: "2",oracleText: "Whenever this creature attacks and isn't blocked, it gets +2/+0 until end of combat."});
+const jadeStatue = card("Jade Statue", "Artifact", "{4}", {cmc: 4,oracleText: "{2}: This artifact becomes a 3/6 Golem artifact creature until end of combat. Activate only during combat."});
+
+describe("Color groups, blocking restrictions by color, hybrid cumulative upkeep, until end of combat", () => {
+  it("are fully supported", () => supported(valorous, rankAndFile, hyenas, veteran, hinterland, sacredKnight, goo, murk, jadeStatue));
+
+  it("Valorous Charge: white creatures get +2/+0, every player's; Rank and File: green creatures get -1/-1", () => {
+    let { s, ap, ids } = setup([valorous, rankAndFile]);
+    const opp = next(s, ap);
+    const w1 = putOnBattlefield(s, ap, colored("White Bear", "{1}{W}"));
+    const w2 = putOnBattlefield(s, opp, colored("White Bear", "{1}{W}"));
+    const g = putOnBattlefield(s, opp, colored("Green Bear", "{1}{G}"));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect([pt(s, w1), pt(s, w2), pt(s, g)]).toEqual(["4/2", "4/2", "2/2"]);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    expect(zone(s, g)).toBe("battlefield");
+    expect(pt(s, g)).toBe("1/1");
+  });
+
+  it("Gibbering Hyenas can't block black creatures; Orcish Veteran white ones with power 2 or greater; Hinterland Drake artifact creatures", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const black = putOnBattlefield(s, ap, colored("Black Bear", "{1}{B}"));
+    const white1 = putOnBattlefield(s, ap, card("White Cub", "Creature — Bear", "{W}", { power: "1", toughness: "1" }));
+    const white2 = putOnBattlefield(s, ap, colored("White Bear", "{1}{W}"));
+    const golem = putOnBattlefield(s, ap, card("Golem", "Artifact Creature — Golem", "{2}", { power: "2", toughness: "2" }));
+    const h = putOnBattlefield(s, opp, hyenas);
+    const v = putOnBattlefield(s, opp, veteran);
+    const d = putOnBattlefield(s, opp, hinterland);
+    s = toBlocks(s, ap, [black, white1, white2, golem].map((attacker) => ({ attacker, defender: opp })));
+    const can = (b: string, a: string) => blockProblem(s, s.objects[b]!, s.objects[a]!) === null;
+    expect([can(h, black), can(h, white2)]).toEqual([false, true]);
+    expect([can(v, white1), can(v, white2), can(v, black)]).toEqual([true, false, true]);
+    expect([can(d, golem), can(d, black)]).toEqual([false, true]);
+  });
+
+  it("Sacred Knight can't be blocked by black and/or red creatures", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const k = putOnBattlefield(s, ap, sacredKnight);
+    const r = putOnBattlefield(s, opp, colored("Red Bear", "{1}{R}"));
+    const br = putOnBattlefield(s, opp, colored("Rakdos Bear", "{B}{R}"));
+    const g = putOnBattlefield(s, opp, colored("Green Bear", "{1}{G}"));
+    s = toBlocks(s, ap, [{ attacker: k, defender: opp }]);
+    expect([r, br, g].map((b) => blockProblem(s, s.objects[b]!, s.objects[k]!) === null)).toEqual([false, false, true]);
+  });
+
+  it("Earthen Goo's cumulative upkeep {R} or {G}: {R} or {G} for each age counter (a hybrid {R/G} each)", () => {
+    expect(compileCard(goo).triggers[0]!.body.effects).toEqual([{ type: "cumulativeUpkeep", pay: { mana: "{R/G}" } }]);
+    let { s, ap } = setup([]);
+    const g = putOnBattlefield(s, ap, goo);
+    s.objects[g]!.counters.age = 1;
+    // Its next upkeep: a second age counter, then {R/G}{R/G} or it's sacrificed; Forests pay it.
+    s = passUntil(passUntil(s, "end", ap), "upkeep", ap);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseMay");
+    expect(s.objects[g]!.counters.age).toBe(2);
+    expect(pt(s, g)).toBe("4/4");
+  });
+
+  it("Murk Dwellers: +2/+0 until end of combat when it attacks and isn't blocked; Jade Statue is a creature until end of combat", () => {
+    let { s, ap } = setup([]);
+    const opp = next(s, ap);
+    const m = putOnBattlefield(s, ap, murk);
+    const j = putOnBattlefield(s, ap, jadeStatue);
+    s = toBlocks(s, ap, [{ attacker: m, defender: opp }]);
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [] });
+    s = resolveAll(s);
+    expect(pt(s, m)).toBe("4/2");
+    s = resolveAll(run(s, planActivate(s, ap, j, 0)));
+    expect(pt(s, j)).toBe("3/6");
+    s = passUntil(s, "endCombat", ap);
+    expect(pt(s, m)).toBe("4/2");
+    s = passUntil(s, "main2", ap);
+    expect(pt(s, m)).toBe("2/2");
+    expect(objIsType(s, s.objects[j]!, "Creature")).toBe(false);
+    expect(compileCard(jadeStatue).activated[0]!.body.effects[0]).toMatchObject({ duration: "endOfCombat" });
+    expect(s.objects[j]!.zone).toBe("battlefield");
+    expect(planActivate(s, ap, j, 0)).toBeNull(); // only during combat
   });
 });

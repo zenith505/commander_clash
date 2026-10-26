@@ -1218,6 +1218,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const filter = parseTargetPhrase(`creature with power ${m[1]} or ${m[2]}`);
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
+  // "Can't block black creatures" (Gibbering Hyenas), "can't block artifact creatures", "can't block creatures with flying",
+  // "can't block white creatures with power 2 or greater" (Orcish Veteran): attackers it can't block (CR 509.1b).
+  if ((m = /^can't block ((?:[a-z]+ )*creatures(?: with .+)?)$/.exec(rest)) && !/\b(?:this turn|each combat|you control|your opponents control|alone)\b/.test(m[1]!)) {
+    const [head, ...more] = m[1]!.split(/ (?=with )/);
+    const filter = parseTargetPhrase([head!.split(" ").map(singular).join(" "), ...more].join(" "));
+    return filter?.kind === "object" && !filter.controller && (filter.types?.includes("Creature") || filter.allTypes?.includes("Creature")) ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: m[1]! } }] : null;
+  }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
   // "Creatures with flying can't attack you or planeswalkers you control" (Sandwurm Convergence, CR 508.1c): "you" is the
   // source's controller.
@@ -1271,7 +1278,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".
-    const [head, ...rest] = m[1]!.split(/ (?=with )/);
+    // "Black and/or red creatures" (Sacred Knight): those that are either color, or both.
+    const [head, ...rest] = m[1]!.replace(/^(white|blue|black|red|green) and\/or (white|blue|black|red|green) /, "$1 or $2 ").split(/ (?=with )/);
     const phrase = [head!.split(" ").map(singular).join(" "), ...rest].join(" ");
     const filter = parseTargetPhrase(phrase);
     return filter && filter.kind === "object" ? [{ kind: "cantBeBlockedBy", filter: { ...filter, text: m[1]! } }] : null;

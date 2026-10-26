@@ -188,6 +188,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // (Mana Sculpt): the same as with the time first (Mana Drain).
   const addLater = /^([Aa]dd .+) at the beginning of your next main phase$/.exec(s);
   if (addLater) return parseSentence(`At the beginning of your next main phase, ${addLater[1]!.replace(/^A/, "a")}`, ctx);
+  // "It gets +2/+0 until end of combat" (Murk Dwellers): read as "until end of turn", then ended with the combat phase
+  // instead (CR 500.5a). Only effects that change objects for a while.
+  const combat = /^(.+) until end of combat$/.exec(s);
+  if (combat && !/\buntil\b/.test(combat[1]!)) {
+    const fx = parseSentence(`${combat[1]} until end of turn`, ctx);
+    return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
+  }
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
   // Take the Bait: "Untap all attacking creatures and goad them": the same creatures, untapped then goaded (CR 701.15a).

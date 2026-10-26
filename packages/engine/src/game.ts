@@ -2647,6 +2647,11 @@ function advanceStep(s: GameState): void {
     // "Whenever that creature deals combat damage to a player this combat" (Stensian Sanguinist): this combat is over.
     s.floatingTriggers = s.floatingTriggers?.filter((f) => f.until !== "endOfCombat");
     if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
+    // Effects that last "until end of combat" expire at the end of the combat phase (CR 500.5a).
+    if (s.effects.some((e) => e.duration === "endOfCombat")) {
+      s.effects = s.effects.filter((e) => e.duration !== "endOfCombat");
+      invalidateCharacteristics(s);
+    }
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;

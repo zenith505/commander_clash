@@ -3005,6 +3005,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     // permanent, or everything when the damage would leave us low.
     const sac = e.effects.length === 1 && e.effects[0]!.type === "sacrifice" && e.effects[0]!.what.ref === "target" ? r.item.targets?.[e.effects[0]!.what.index] : undefined;
     if (sac?.kind === "object" && s.objects[sac.id]) return life <= 10 || worth(s, pid, s.objects[sac.id]!) <= 2;
+    // Risk Factor: "may have ~ deal 4 damage to them. If that player doesn't, you draw three cards": the damage while it
+    // leaves plenty of life.
+    const hit = e.effects.length === 1 && e.effects[0]!.type === "damage" ? e.effects[0]! : undefined;
+    if (hit?.type === "damage" && typeof hit.amount === "number") return life - hit.amount > 10;
     return allEffects(after.effects).some((x) => x.type === "damage" || x.type === "loseLife") ? life <= 15 : false;
   }
   // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each ..."
@@ -3645,7 +3649,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
-      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
+      // Removing all of them (Sage of Hours) can't loop either: it's weighed below.
+      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && (ab.removeCounters.all || !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter)));
       // A coin flip's own cost is weighed with what winning and losing do (flipWorth).
       const flips = flipBranches(ab.body);
       // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.
@@ -3701,6 +3706,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       // "Discard your hand" (Tarrian's Journal): only with at most one card in it, which then becomes a land worth tapping.
       if (ab.discardHand && hand > 1) continue;
+      // "Remove all +1/+1 counters from ~": only with some to remove, five for each extra turn (Sage of Hours).
+      if (ab.removeCounters?.all && (o.counters[ab.removeCounters.counter] ?? 0) < (allEffects(ab.body.effects).some((e) => e.type === "extraTurn" && typeof e.n === "object" && !!e.n.per) ? 5 : 1)) continue;
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0) && !(ab.discardHand && objIsType(s, o, "Artifact"))) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)

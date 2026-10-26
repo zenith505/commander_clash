@@ -173,8 +173,8 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
-const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "body"]);
+const FLOATING_EVENTS = new Set<string>(["permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks"]);
+const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "body"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
@@ -235,6 +235,9 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
+  // Noxious Assault: "Whenever a creature blocks this turn, its controller gets a poison counter" (CR 603.7b).
+  const blocks = /^Whenever (an? creature(?: you control| an opponent controls)?) blocks this turn, (.+)$/.exec(s);
+  if (blocks) return floatingTrigger(`This turn, whenever ${blocks[1]!} blocks, ${blocks[2]!}`, after, ctx);
   // "Whenever you gain life this turn, each opponent loses that much life" (Vizkopa Guildmage): the same as "This turn,
   // whenever you gain life, ..." (CR 603.7b), each life gain event once (CR 119.10).
   const gain = /^Whenever you gain life this turn, (.+)$/.exec(s);
@@ -821,6 +824,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "~ deals damage to each opponent equal to the number of tapped creatures that opponent controls" (Mjölnir, Storm
   // Hammer): each opponent's own count.
   text = text.replace(/(deals damage to each opponent equal to the number of [^.]+?) that opponent controls\b/g, "$1 that player controls");
+  // Aria of Flame: "put a verse counter on ~, then it deals damage equal to the number of verse counters on it to ...":
+  // "it" is ~.
+  text = text.replace(/\b(put an? [a-z]+ counter on ~, then) it deals damage equal to the number of ([a-z]+) counters on it to\b/gi, "$1 ~ deals damage equal to the number of $2 counters on ~ to");
+  // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
+  // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
+  text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
+  // Nalia de'Arnise: "put a +1/+1 counter on each creature you control and those creatures gain deathtouch until end of
+  // turn": the same as two sentences, "those creatures" the same group.
+  text = text.replace(/\b(put an? [^.]+? counter on each [^.]+? you control) and those creatures gain ([^.]+? until end of turn)\./gi, "$1. Those creatures gain $2.");
+  // Torture Chamber: "~ deals damage to you equal to the number of pain counters on it": "it" is ~.
+  text = text.replace(/(~ deals damage to [^.]+? equal to the number of [^.]+? counters on) it\b/g, "$1 ~");
   // Acidic Soil: "~ deals damage to each player equal to the number of lands they control": each that player's own.
   text = text.replace(/(deals damage to each (?:player|opponent) equal to the number of [^.]+?) they control\b/g, "$1 that player controls");
   // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
@@ -1515,6 +1529,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
+    // Jadelight Ranger: "it explores, then it explores again": one exploration after the other (CR 701.44), the same
+    // creature.
+    if (/^(?:[Tt]hen )?[Ii]t explores again\.?$/.test(s)) {
+      if (last?.type !== "explore") return null;
+      effects.push({ ...last });
+      continue;
+    }
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     ctx.afterAnyMill = last?.type === "mill";
     ctx.afterExileTop = last?.type === "exileTop";
@@ -1638,6 +1659,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Virtue of Courage: "you may exile that many cards from the top of your library. You may play those cards this
     // turn." Whether to exile them is the choice; once they're exiled, each may be played (CR 406.3, 400.7).
+    // Harnesser of Storms: "you may exile the top card of your library. Until end of turn, you may play that card." The same.
+    if (/^[Yy]ou may exile the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "Until end of turn, you may play that card") {
+      effects.push({ type: "may", effects: [{ type: "impulse", n: 1, until: "thisTurn" }], text: "exile the top card of your library" });
+      si++;
+      continue;
+    }
     const mayExileTop = new RegExp(`^[Yy]ou may exile ${NUMX} cards from the top of your library$`).exec(s);
     if (mayExileTop && sentences[si + 1]?.replace(/\.$/, "") === "You may play those cards this turn") {
       effects.push({ type: "may", effects: [{ type: "impulse", n: amt(mayExileTop[1]!), until: "thisTurn" }], text: `exile ${mayExileTop[1] === "X" ? "that many" : mayExileTop[1]} cards from the top of your library` });
@@ -2276,17 +2303,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // card from a graveyard, cast with its usual timing this turn (rulings).
     // Savvy Trader: "exile target permanent card from your graveyard. You may play that card for as long as it remains
     // exiled": a land too, with a land play (CR 305.1).
-    const youCast0 = /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    // Thor, God of Thunder: "Until the end of your next turn, you may play that card" (Practiced Scrollsmith: "cast").
+    const untilNext = /^Until the end of your next turn, you may (cast|play) that card$/.exec(s);
+    const youCast0 = untilNext ? ([s, untilNext[1]!, "until the end of your next turn", undefined] as unknown as RegExpExecArray) : /^You may (cast|play) (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
     // "You may cast that card this turn" after something other than an exile (Emry) is read elsewhere.
     const youCast = youCast0 && (youCast0[2] !== "this turn" || effects[effects.length - 1]?.type === "exile") && (youCast0[1] === "cast" || (youCast0[2] !== "this turn" && !youCast0[3] && effects[effects.length - 1]?.type === "exile")) ? youCast0 : null;
     if (youCast) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "exile" || prev.linked || prev.ownerMay || prev.youMay || prev.what.ref !== "target" || (prev.what.n ?? 1) !== 1) return null;
       const thisTurn = youCast[2] === "this turn";
+      const nextTurn = youCast[2] === "until the end of your next turn";
       const play = youCast[1] === "play";
       const exileAfter = !play && sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into a graveyard, exile it instead";
-      if ((thisTurn || play) && ctx.targets[prev.what.index]?.kind !== "card") return null;
-      prev.youMay = { ...(youCast[3] ? { anyType: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(play ? { play: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
+      if ((thisTurn || nextTurn || play) && ctx.targets[prev.what.index]?.kind !== "card") return null;
+      prev.youMay = { ...(youCast[3] ? { anyType: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(nextTurn ? { nextTurn: true as const } : {}), ...(play ? { play: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
       if (exileAfter) si++;
       continue;
     }
@@ -2356,12 +2386,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    const haveYou = /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
+    // "Target opponent may have ~ deal 4 damage to them. If that player doesn't, you draw three cards." (Risk Factor): the
+    // same, the damage to that player.
+    const haveDeal = /^(?:Then )?([Tt]arget opponent) may have ~ (deal \d+ damage) to them$/.exec(s);
+    const haveYou = haveDeal ?? /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
     const haveIf = haveYou && /^If (?:the player|that player|they) (doesn't|don't|does|do), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (haveYou && haveIf) {
       const who = parsePlayer(haveYou[1]!.toLowerCase(), ctx);
       if (!who || who.ref === "you") return null;
-      const what = attempt(ctx, () => parseOne(`You ${haveYou[2]!}`, ctx));
+      const what = attempt(ctx, () => parseOne(haveDeal ? `~ ${haveDeal[2]!.replace(/^deal/, "deals")} to that player` : `You ${haveYou[2]!}`, ctx));
       if (!what || what.some((e) => pauses(e))) return null;
       ctx.milledThisWay = true;
       // "You mill X cards, where X is the number of influence counters on ~, and that player loses life equal to ..."
@@ -2379,7 +2412,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const then = two ? ((a, b) => (a && b ? [...a, ...b] : null))(one(two[1]!), one(two[2]!)) : one(haveIf[2]!);
       ctx.milledThisWay = undefined;
       if (!then) return null;
-      effects.push({ type: "eachMay", who, effects: what, text: `have ~'s controller ${haveYou[2]!}` }, { type: "if", cond: { kind: "theyChose", ...(/n't$/.test(haveIf[1]!) ? { not: true as const } : {}) }, effects: then });
+      effects.push({ type: "eachMay", who, effects: what, text: haveDeal ? `have ~ ${haveDeal[2]!} to them` : `have ~'s controller ${haveYou[2]!}` }, { type: "if", cond: { kind: "theyChose", ...(/n't$/.test(haveIf[1]!) ? { not: true as const } : {}) }, effects: then });
       si++;
       continue;
     }
@@ -2726,6 +2759,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "impulse", n: 1, until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" });
       ctx.exiledTop = true;
       sentences.splice(si + 2, 1);
+      continue;
+    }
+    // Caves of Chaos Adventurer: "Exile the top card of your library. If you've completed a dungeon, you may play that card
+    // this turn without paying its mana cost. Otherwise, you may play that card this turn." A condition about the game,
+    // checked as it resolves; either way the card is exiled and may be played this turn.
+    const freeIf = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If ([^,]+), you may play that card this turn without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (freeIf && sentences[si + 2]?.replace(/\.$/, "") === "Otherwise, you may play that card this turn") {
+      const cond = parseStaticCondition(freeIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || cond.kind !== "completedDungeon") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond }, effects: [{ type: "impulse", n: 1, until: "thisTurn", free: true }], otherwise: [{ type: "impulse", n: 1, until: "thisTurn" }] });
+      ctx.exiledTop = true;
+      si += 2;
       continue;
     }
     // Unstable Amulet, Furious Rise: "Exile the top card of your library. You may play it until you exile another card
@@ -3756,6 +3801,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [more], otherwise: [prev] };
       continue;
     }
+    // Uglúk of the White Hand: "Whenever another creature you control dies, put a +1/+1 counter on ~. If that creature was
+    // a Goblin or Orc, put two +1/+1 counters on ~ instead.": the creature as it last existed (CR 608.2h).
+    const wasEither = (ctx.subject || ctx.subjectIt) ? /^If that creature was an? ([A-Z][a-z]+) or ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on ~ instead$/.exec(s) : null;
+    if (wasEither && CREATURE_TYPES.has(wasEither[1]!) && CREATURE_TYPES.has(wasEither[2]!)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "counters" || prev.what.ref !== "self" || prev.counter !== "+1/+1" || prev.n !== 1) return null;
+      // Either one: a filter's subtypes match any of them.
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [wasEither[1]!, wasEither[2]!], text: `${wasEither[1]} or ${wasEither[2]}` };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, n: num(wasEither[3]!) }], otherwise: [prev] };
+      continue;
+    }
     // Andúril, Flame of the West: "Create two tapped 1/1 white Spirit creature tokens with flying. If that creature is
     // legendary, instead create two of those tokens that are tapped and attacking." The attacker as it is when this
     // resolves, or as it last existed (CR 608.2h); one or the other.
@@ -4331,6 +4387,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si += paidFaceDown.next - 1;
         continue;
       }
+      // Arahbo, Roar of the World: "If you do, it gains trample and gets +X/+X until end of turn, where X is its power":
+      // X defined by the text (CR 107.3c), counted as it resolves (CR 608.2h).
+      const whereIn = payFirst.payX ? null : /^(.+), where X is ([^"]+)$/.exec(then[1]!);
+      if (whereIn) {
+        ctx.whereX = true;
+        const fx = attempt(ctx, () => parseOne(cap(whereIn[1]!), ctx));
+        ctx.whereX = false;
+        const def = fx && parseCount(whereIn[2]!, ctx);
+        if (!fx || !def || (fx.length > 1 && fx.some((e) => pauses(e)))) return null;
+        effects.push({ type: "may", effects: replaceX(fx, def), pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` });
+        payFirst = null;
+        continue;
+      }
       // "If you do, create a 2/2 black Zombie Berserker creature token, then attach ~ to it": both parts depend
       // on the payment, in order.
       const inner =
@@ -4821,7 +4890,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const castOnce = asCast && !dividedOnly && ctx.spell && /^ as you cast (?:~|this spell)$/.test(asCast[0]);
       if (asCast && !dividedOnly && !castOnce) return false;
       // "~ deals X damage ..., where X is the number of age counters on it" (Magmatic Core): "it" is ~.
-      const what = /^~ /.test(s) ? where[2]!.replace(/ counters on it$/, " counters on ~") : where[2]!;
+      // Runadi, Behemoth Caller: "that creature enters with X additional +1/+1 counters on it, where X is its mana value
+      // minus 4": "its" is the creature spell the cast trigger is about.
+      const what = /^~ /.test(s) ? where[2]!.replace(/ counters on it$/, " counters on ~") : ctx.castSpell && /^[Tt]hat creature enters with X additional /.test(s) ? where[2]!.replace(/^its /, "that spell's ") : where[2]!;
       // "Creatures you controlled as you cast this spell": those you control then.
       const counted = parseCount(asCast ? what.slice(0, asCast.index).replace(/ you controlled$/, " you control") : what, ctx);
       if (!counted) return false;
@@ -4972,6 +5043,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // next end step." (Ilharg) likewise.
     // "Prevent all damage that would be dealt to those permanents this turn" (Mutational Advantage): the ones the effect just
     // before it affects, as they were when it resolved (CR 611.2c), the same objects.
+    // Recommission: "Return target artifact or creature card ... to the battlefield. If a creature enters this way, it enters
+    // with an additional +1/+1 counter on it": judged as it would exist on the battlefield (CR 614.12), part of how it enters.
+    // What Must Be Done: "It enters with two additional +1/+1 counters on it if it's a creature", the same.
+    const ifCreature = /^If a creature enters this way, it enters with an additional \+1\/\+1 counter on it$/.test(s) ? 1 : /^It enters with (two|three) additional \+1\/\+1 counters on it if it's a creature$/.exec(s)?.[1];
+    if (ifCreature) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.counters || last.countersFromLast || last.faceDown || last.atNextEndStep) return null;
+      last.counters = { "+1/+1": ifCreature === 1 ? 1 : ifCreature === "two" ? 2 : 3 };
+      last.countersIfCreature = true;
+      continue;
+    }
     const those = /^(Prevent all (?:combat )?damage that would be dealt (?:to and dealt by|to|by)) those (?:permanents|creatures) this turn$/.exec(s);
     if (those) {
       const last = effects[effects.length - 1];
@@ -5429,7 +5511,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Then you may put a land card from your hand onto the battlefield. If you put a Cave onto the battlefield this way,
     // you gain 4 life." (Spelunking): about the permanent it became. "If you put an artifact onto the battlefield this way,
     // put two +1/+1 counters on it" (Oviya, Automech Artisan): "it" is that permanent.
-    const putThisWay = /^If you put an? ([A-Z][a-z]+|[a-z]+) onto the battlefield this way, (.+)$/.exec(s);
+    // Howlpack Piper: "You may put a creature card from your hand onto the battlefield. If it's a Wolf or Werewolf, untap
+    // this creature": the same, about the permanent put.
+    const putThisWay = /^If you put an? ([A-Z][a-z]+|[a-z]+) onto the battlefield this way, (.+)$/.exec(s) ?? (/^If it's an? [A-Z][a-z]+ or [A-Z][a-z]+, untap ~$/.test(s) ? /^If it's an? ([A-Z][a-z]+ or [A-Z][a-z]+), (untap ~)$/.exec(s) : null);
     if (putThisWay) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
@@ -6001,6 +6085,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const rest = parseOne(capital(energyThen[2]!), ctx);
         if (!rest) return null;
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "getEnergy", who: { ref: "you" }, n: energyThen[1]!.length / 3 }, ...rest] });
+        continue;
+      }
+      // The Misty Mountains Cold: "Then if you control four or more Treasures, sacrifice this Saga. If you do, create a 6/6
+      // red Dragon creature token with flying": only if it was sacrificed, which needs the condition first.
+      const condSac = ifDid[1] === "do" && prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : undefined;
+      if (condSac?.type === "sacrifice" && condSac.what.ref === "self") {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        (prev as Extract<Effect, { type: "if" }>).effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
         continue;
       }
       // "You may put a land card from your hand onto the battlefield. If you don't, draw a card." (Hakbal of the Surging
@@ -6871,6 +6964,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       last.loseAtEnd = true;
       continue;
     }
+    // "Take an extra turn after this one. Skip the untap step of that turn." (Savor the Moment, CR 614.10)
+    if (/^Skip the untap step of that turn$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1) return null;
+      last.skipUntap = true;
+      continue;
+    }
     // The Pacts: "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." A delayed trigger
     // made as the spell resolves (CR 603.7a; none if it doesn't resolve, rulings). Paying is up to you; if you don't or
     // can't, you lose (CR 104.3e).
@@ -7593,7 +7693,8 @@ export function scaleAmount(n: Amount, per: AmountExpr): Amount | null {
   if (typeof n !== "number") return null;
   if (n === 0) return 0;
   // "-1/-1 for each Swamp": the count times 1, made negative.
-  return { count: per.count, times: Math.abs(n) * (per.times ?? 1), ...(per.plus ? { plus: Math.abs(n) * per.plus } : {}), ...(n < 0 ? { negate: true } : {}) };
+  // "For each five counters removed this way" (Sage of Hours): each whole group (AmountExpr.per).
+  return { count: per.count, times: Math.abs(n) * (per.times ?? 1), ...(per.per ? { per: per.per } : {}), ...(per.plus ? { plus: Math.abs(n) * per.plus } : {}), ...(n < 0 ? { negate: true } : {}) };
 }
 
 /**

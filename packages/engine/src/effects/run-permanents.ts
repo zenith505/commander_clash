@@ -1561,4 +1561,6 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
     return "paused";
   }
   if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
+  // Done: "it explores, then it explores again" (Jadelight Ranger) starts over, revealing the same card if it stayed.
+  sc.explored = sc.may = undefined;
 }

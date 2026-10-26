@@ -2223,7 +2223,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // So is "it" after "if there are two or more ki counters on ~" (the Kamigawa flip cards).
     if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && /^At /.test(intervening[1]!))
       // "You may remove a +1/+1 counter from it" (Ingenious Prodigy) likewise.
-      rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.").replace(/^(you may remove an? \S+ counter from) it\./, "$1 ~.") : rest.replace(/\bit\b/g, "~");
+      // Riders of the Mark: "return it to its owner's hand. If you do, create a number of ... tokens equal to its toughness":
+      // ~ and ~'s (as it last existed, CR 608.2h).
+      rest = /^return it to its owner's hand\. If you do, create a number of [^.]+ equal to its (?:power|toughness)\.$/.test(rest) ? rest.replace(/^return it/, "return ~").replace(/ equal to its /, " equal to ~'s ") : /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.").replace(/^(you may remove an? \S+ counter from) it\./, "$1 ~.") : rest.replace(/\bit\b/g, "~");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     if (!t || t === "fail" || t.ifCond) return "fail";
     // "Whenever a Mountain you control enters, if you control at least five other Mountains" (Valakut, the Molten

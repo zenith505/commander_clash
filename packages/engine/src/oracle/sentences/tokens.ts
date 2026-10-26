@@ -351,7 +351,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Explore (CR 701.44)
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];
   // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you.
-  if ((m = /^(target creature you control|it) explores$/i.exec(s))) {
+  if ((m = /^(target creature you control|it|that creature) explores$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && what.ref !== "self" ? [{ type: "explore", what }] : what?.ref === "self" ? [{ type: "explore" }] : null;
   }

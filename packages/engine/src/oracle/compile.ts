@@ -468,6 +468,9 @@ export function compile(d: CardDef): CompiledCard {
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
       // the choice, then the counters, two abilities in one paragraph.
       .replace(/^(As ~ enters, choose a creature type\.) (~ enters with .+)$/m, "$1\n$2")
+      // Draconic Destiny: "Enchanted creature gets +1/+1 and has ... "{1}: ~ gets +1/+0 until end of turn." It's a Dragon in
+      // addition to its other types.": two static abilities of the Aura, the type not part of the quoted one (rulings).
+      .replace(/^((?:Enchanted|Equipped) creature [^\n]+") It's (an? [A-Z][a-z]+ in addition to its other types\.)$/m, (_, a: string, b: string) => `${a}\n${a.startsWith("Enchanted") ? "Enchanted" : "Equipped"} creature is ${b}`)
       // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
       // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
       .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
@@ -2259,6 +2262,15 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveStorm ??= []).push({ filter: f, text: line });
       continue;
     }
+    // Samut, Tyrant of Naktamun: "Instant and sorcery spells you control have split second" (CR 702.61a), while they're on
+    // the stack under its controller's control.
+    const giveSplit = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you control have split second\.$/.exec(line);
+    if (giveSplit) {
+      const f = parseTargetPhrase(`${giveSplit[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveSplitSecond ??= []).push(f);
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;
@@ -2634,6 +2646,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Cast this spell only during combat", "... only during your end step", "... only during the declare attackers step
     // and only if you've been attacked this step" (CR 506.8, 601.3).
+    // Serra Avenger: "You can't cast ~ during your first, second, or third turns of the game" (CR 601.3).
+    if (line === "You can't cast ~ during your first, second, or third turns of the game." && !out.castOnly) {
+      out.castOnly = { kind: "not", cond: { kind: "ownTurnAtMost", n: 3 } };
+      continue;
+    }
     // "You can't cast ~ unless an opponent lost life this turn" (Rakdos, Lord of Riots): the same as "cast ~ only if" (CR 601.3).
     const cantUnless = /^You can't cast ~ unless ([^.]+)\.$/.exec(line);
     const castOnly = cantUnless ? ([line, `if ${cantUnless[1]}`] as unknown as RegExpExecArray) : /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);
@@ -2848,6 +2865,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Creatures your opponents control can't have +1/+1 counters put on them.") {
       out.opponentsCreaturesNoCounters = "+1/+1";
+      continue;
+    }
+    if (line === "Creatures you control can't have -1/-1 counters put on them.") {
+      out.yourCreaturesNoCounters = "-1/-1";
+      continue;
+    }
+    if (line === "You can't get poison counters.") {
+      out.noPoisonForYou = true;
       continue;
     }
     if (line === "~ can't have counters put on it.") {
@@ -3376,6 +3401,8 @@ export function compile(d: CardDef): CompiledCard {
       // "Whenever ~ or another nontoken Spirit you control dies or deals combat damage to a player, ..." (Millicent,
       // Restless Revenant): a death and combat damage are never one event.
       /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
+      // Park Heights Maverick: "Whenever ~ deals combat damage to a player or dies, proliferate": the same.
+      /^Whenever ~ deals combat damage to a player or dies, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
@@ -3432,6 +3459,8 @@ export function compile(d: CardDef): CompiledCard {
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
+            : /^Whenever ~ deals combat damage to a player or dies, /.test(line)
+              ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
@@ -3618,6 +3647,15 @@ export function compile(d: CardDef): CompiledCard {
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))
     out.unsupported.push("(attached to enchanted creature, but it isn't an Aura enchanting a creature)");
+  // Vampirism: "Other creatures you control get -1/-1" on an Aura that enchants a creature, or on an Equipment: it isn't a
+  // creature itself, so "other" is other than the creature it's attached to.
+  if (!d.types.includes("Creature") && (d.subtypes.includes("Equipment") || (d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.length === 1 && out.enchant.types[0] === "Creature")))
+    out.statics = out.statics.map((st) => {
+      const a = st.affects;
+      if (a.kind !== "filter" || !a.other || !(a.types.includes("Creature") || a.spec?.types?.includes("Creature"))) return st;
+      const { other: _, ...rest } = a;
+      return { ...st, affects: { ...rest, otherThanAttached: true } };
+    });
   // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled; "attached to
   // target creature" (Gryff's Boon) needs none.
   if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield" && e.attachToTarget === undefined))) out.unsupported.push("(an Aura returning itself to the battlefield)");

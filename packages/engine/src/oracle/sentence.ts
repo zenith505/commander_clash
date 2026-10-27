@@ -238,6 +238,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const fx = parseSentence(remainsBecomes[1]!, ctx);
     return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "game" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
   }
+  // Tide Shaper: "target land becomes an Island for as long as ~ remains on the battlefield": the same as until end of turn,
+  // ending when ~ leaves instead (CR 611.2b, 305.7).
+  const remainsLand = !ctx.spell && /^([Tt]arget land becomes an? (?:Plains|Island|Swamp|Mountain|Forest)) for as long as ~ remains on the battlefield$/.exec(s);
+  if (remainsLand) {
+    const fx = parseSentence(`${remainsLand[1]} until end of turn`, ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "endOfTurn" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
+  }
   // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
   // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.
   // Splinter, Aging Champion: "you and another target player": a player other than you, so an opponent (CR 102.3).
@@ -303,7 +310,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
   // "Target creature gets +3/+0 until end of turn. When it dies this turn, manifest dread." (Turn Inside Out): "it" is
   // that target creature.
-  if (/^When it dies this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)
+  if (/^When it dies (?:under your control )?this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)
     return parsePermanentsSentence(s.replace(/^When it dies/, "When that creature dies"), ctx) ?? null;
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);

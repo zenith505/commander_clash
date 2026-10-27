@@ -274,12 +274,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // creature it targeted (CR 603.7), for the rest of this turn, with an effect that doesn't refer to that creature.
   // A spell's too (Scarblade's Malice: "When that creature dies this turn, create a 2/2 black and green Elf creature
   // token"), when the instruction isn't about the spell.
-  if ((m = /^When that creature dies this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && !(ctx.spell && /~/.test(m[1]!)) && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[1]!)) {
+  // Desperate Measures: "Target creature gets +1/-1 until end of turn. When it dies under your control this turn, draw two
+  // cards": the same, only if it dies while its controller is the spell's (ev.controller, as it last existed).
+  if ((m = /^When (?:that creature|it) dies( under your control)? this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many && !(ctx.spell && /~/.test(m[2]!)) && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[2]!) && (/^When that/.test(s) || ctx.targets.length === ctx.lastObjectTarget + 1)) {
     // Not one that targets (Fatal Fissure's earthbend): that target would be chosen as the trigger is put on the stack.
     const of = ctx.lastObjectTarget;
     const before = ctx.targets.length;
-    const inner = parseSentence(capital(m[1]!), ctx);
-    return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[1]!, thisTurn: true }] : null;
+    const inner = parseSentence(capital(m[2]!), ctx);
+    return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[2]!, thisTurn: true, ...(m[1] ? { underYourControl: true as const } : {}) }] : null;
   }
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
@@ -581,6 +583,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
+  // Aether Snap: "Remove all counters from all permanents": from each of them at once.
+  if (/^Remove all counters from all permanents$/i.test(s)) return [{ type: "removeAllCounters", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }];
   // "Move all counters from target creature onto another target creature" (CR 122.5).
   // The Ozolith: "move all counters from ~ onto target creature" (rulings: all of them or none).
   if ((m = /^Move all counters from (target .+?|~) onto ((?:another )?target .+)$/i.exec(s)) && (m[1] === "~") === !/^another /i.test(m[2]!)) {
@@ -841,7 +845,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Humble Defector: "Target opponent gains control of ~", for the rest of the game (layer 2); if ~ has left the
   // battlefield, nothing happens (rulings).
-  if ((m = /^(Target player|Target opponent) gains control of ~$/.exec(s)) && !ctx.spell) {
+  // Sleeper Agent: "When ~ enters, target opponent gains control of it": the same, "it" being ~.
+  if (((m = /^([Tt]arget player|[Tt]arget opponent) gains control of ~$/.exec(s)) || (ctx.selfIt && (m = /^([Tt]arget player|[Tt]arget opponent) gains control of it$/.exec(s)))) && !ctx.spell) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }

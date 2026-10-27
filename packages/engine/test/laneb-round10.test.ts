@@ -153,6 +153,7 @@ const splinterAgingChampion = card("Splinter, Aging Champion", "Legendary Creatu
 const tangledSkyline = card("Tangled Skyline", "Enchantment", "{4}{G}", { cmc: 5, keywords: ["Incubate","Transform"], oracleText: "When this enchantment enters, you gain 5 life and incubate 5. (Create an Incubator token with five +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)\nPhyrexians you control have reach." });
 const tinybonesPocketNuisance = card("Tinybones, Pocket Nuisance", "Legendary Creature — Skeleton Rogue", "{2}{B}", { cmc: 3, power: "2", toughness: "1", oracleText: "When Tinybones enters, each opponent discards a card.\nWhenever a player discards one or more cards, Tinybones deals 1 damage to each opponent." });
 const titanHunter = card("Titan Hunter", "Creature — Human Warrior", "{4}{B}", { cmc: 5, power: "4", toughness: "5", oracleText: "At the beginning of each player's end step, if no creatures died this turn, this creature deals 4 damage to that player.\n{1}{B}, Sacrifice a creature: You gain 4 life." });
+const valentinaAllegraDeFontaine = card("Valentina Allegra de Fontaine", "Legendary Creature — Human Spy Villain", "{2}{B}", { cmc: 3, power: "2", toughness: "3", keywords: ["Connive"], oracleText: "Other Villains you control are Heroes in addition to their other types.\n{T}: Target Hero you control connives. Activate only as a sorcery. (Draw a card, then discard a card. If you discarded a nonland card, put a +1/+1 counter on that creature.)" });
 const veteranMotorist = card("Veteran Motorist", "Creature — Dwarf Pilot", "{R}{W}", { cmc: 2, power: "3", toughness: "1", keywords: ["Scry"], colors: ["R","W"], oracleText: "When this creature enters, scry 2.\nWhenever this creature crews a Vehicle, that Vehicle gets +1/+1 until end of turn." });
 const walkerOfTheWastes = card("Walker of the Wastes", "Creature — Eldrazi", "{4}{C}", { cmc: 5, power: "4", toughness: "4", keywords: ["Trample"], oracleText: "({C} represents colorless mana.)\nTrample\nThis creature gets +1/+1 for each land you control named Wastes." });
 const wallOfEssence = card("Wall of Essence", "Creature — Wall", "{1}{W}", { cmc: 2, power: "0", toughness: "4", keywords: ["Defender"], oracleText: "Defender (This creature can't attack.)\nWhenever this creature is dealt combat damage, you gain that much life." });
@@ -163,7 +164,7 @@ const marchOfTheWorldOoze = card("March of the World Ooze", "Enchantment", "{3}{
 const raisedByGiants = card("Raised by Giants", "Legendary Enchantment — Background", "{5}{G}", { cmc: 6, oracleText: "Commander creatures you own have base power and toughness 10/10 and are Giants in addition to their other types." });
 
 describe("Type, color and power statics", () => {
-  it("are fully supported", () => supported(hivestone, captainsHook, caterwaulingBoggart, darkestHour, walkerOfTheWastes, earthSurge, bloodBaronOfVizkopa, sardianCliffstomper, grondTheGatebreaker, civicSaber, blessingOfTheNephilim, knightOfNewAlara, earthenAlly, aysenCrusader, precipitousDrop, spectralGrasp, apocalypseDemon, kudoKingAmongBears, marchOfTheWorldOoze, raisedByGiants));
+  it("are fully supported", () => supported(hivestone, valentinaAllegraDeFontaine, captainsHook, caterwaulingBoggart, darkestHour, walkerOfTheWastes, earthSurge, bloodBaronOfVizkopa, sardianCliffstomper, grondTheGatebreaker, civicSaber, blessingOfTheNephilim, knightOfNewAlara, earthenAlly, aysenCrusader, precipitousDrop, spectralGrasp, apocalypseDemon, kudoKingAmongBears, marchOfTheWorldOoze, raisedByGiants));
 
   it("Hivestone makes your creatures Slivers, not anyone else's", () => {
     const { s, ap, opp } = setup([]);
@@ -172,6 +173,16 @@ describe("Type, color and power statics", () => {
     putOnBattlefield(s, ap, hivestone);
     expect(chars(s, mine).subtypes).toEqual(expect.arrayContaining(["Bear", "Sliver"]));
     expect(chars(s, theirs).subtypes).not.toContain("Sliver");
+  });
+
+  it("Valentina Allegra de Fontaine makes your other Villains Heroes too", () => {
+    const { s, ap, opp } = setup([]);
+    const villain = putOnBattlefield(s, ap, creature("Test Villain", "Creature — Human Villain", "{B}", 1, 1));
+    const theirs = putOnBattlefield(s, opp, creature("Test Villain", "Creature — Human Villain", "{B}", 1, 1));
+    const v = putOnBattlefield(s, ap, valentinaAllegraDeFontaine);
+    expect(chars(s, villain).subtypes).toEqual(expect.arrayContaining(["Villain", "Hero"]));
+    expect(chars(s, theirs).subtypes).not.toContain("Hero");
+    expect(chars(s, v).subtypes).not.toContain("Hero");
   });
 
   it("Kudo and March of the World Ooze still set base power and toughness and add the type", () => {

@@ -1116,6 +1116,10 @@ export function moveObject(
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
+  if (fromZone === "battlefield" && to === "graveyard") {
+    const mine = (((s.turnLog ??= {}).permanentTypesToYard ??= {})[o.owner] ??= []);
+    for (const t of last.types) if (!mine.includes(t)) mine.push(t);
+  }
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
   if (to === "graveyard" && o.zone === "graveyard" && fromZone !== "graveyard" && !o.isToken) (s.cardsToGraveyardThisTurn ??= {})[o.owner] = (s.cardsToGraveyardThisTurn?.[o.owner] ?? 0) + 1;
   if (fromZone === "battlefield") {
@@ -3498,12 +3502,16 @@ export function canActAtSorcerySpeed(s: GameState, pid: PlayerId) {
  * and triggered abilities still work; so does a spell's split second only while it's on the stack.
  */
 export function splitSecondOnStack(s: GameState): boolean {
-  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && hasSplitSecond(s, s.objects[x.objectId]!, x.controller));
+  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && hasSplitSecond(s, s.objects[x.objectId]!, x.controller, x));
 }
 
-/** A spell's split second: its own, or Shadow the Hedgehog's for its controller's spells cast with mana from an artifact. */
-function hasSplitSecond(s: GameState, o: GameObject, controller: PlayerId): boolean {
+/**
+ * A spell's split second: its own, Samut, Tyrant of Naktamun's for its controller's spells of a kind, or Shadow the
+ * Hedgehog's for its controller's spells cast with mana from an artifact.
+ */
+function hasSplitSecond(s: GameState, o: GameObject, controller: PlayerId, item: StackItem): boolean {
   if (objHasKeyword(s, o, "Split second")) return true;
+  if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === controller && abilitiesOf(s, obj(s, id)).spellsHaveSplitSecond?.some((f) => spellMatches(s, f, item)))) return true;
   if (!o.spent?.from?.artifact) return false;
   return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === controller && !!abilitiesOf(s, obj(s, id)).splitSecondIfArtifactMana);
 }
@@ -8080,7 +8088,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
-      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -8181,6 +8189,7 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack unless defending player controls ${f.text}`;
+  if (c.attackUnlessYard && player(s, defender).graveyard.length < c.attackUnlessYard) return `${c.name} can't attack unless defending player has ${c.attackUnlessYard} or more cards in their graveyard`; // CR 508.1c
   for (const f of c.attackIfNot ?? [])
     if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack while defending player controls ${f.text}`;

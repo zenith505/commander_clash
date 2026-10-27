@@ -73,7 +73,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const putter = putterNow ?? owner;
   const { types, subtypes, allCreatureTypes } = characteristics(s, o);
   const isCreature = types.includes("Creature");
-  const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet")));
+  const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet"))) || (on === "creatureOrVehicle" && subtypes.includes("Vehicle"));
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
       if (mod.what !== "counters" || "onPlayer" in mod) return false;
@@ -91,6 +91,8 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
 export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n: number): number {
   if (n <= 0) return n;
   if (playerCountersBanned(s)) return 0;
+  // Melira, Sylvok Outcast: "You can't get poison counters" (the ones already there stay, rulings).
+  if (kind === "poison" && s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noPoisonForYou && controllerOf(s, s.objects[id]!) === pid)) return 0;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
     .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
@@ -254,7 +256,9 @@ export function countersBanned(s: GameState, o: GameObject, kind?: string): bool
   // one entering with them gets none, and a cost putting them can't be paid (rulings).
   if (kind === undefined || !types.includes("Creature")) return false;
   const pid = controllerOf(s, o);
-  return s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).opponentsCreaturesNoCounters === kind && controllerOf(s, s.objects[id]!) !== pid);
+  // Melira, Sylvok Outcast: "Creatures you control can't have -1/-1 counters put on them": the same for its controller's
+  // (the ones already there stay, rulings).
+  return s.battlefield.some((id) => (abilitiesOf(s, s.objects[id]!).opponentsCreaturesNoCounters === kind && controllerOf(s, s.objects[id]!) !== pid) || (abilitiesOf(s, s.objects[id]!).yourCreaturesNoCounters === kind && controllerOf(s, s.objects[id]!) === pid));
 }
 
 /** Solemnity: "Players can't get counters." No poison (infect damage then does nothing to a player), energy, experience or rad counters (rulings). */

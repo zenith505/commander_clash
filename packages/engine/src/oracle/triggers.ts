@@ -237,6 +237,8 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
       text = text.replace(/\bthe other creature\b/g, "that creature");
     }
+    // Mask of the Schemer: "it connives X, where X is the amount of damage it dealt to that player": that much.
+    if (o.thatMuch && event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage it dealt to that player\.$/, "$1that many$2.");
     // "With mana value less than or equal to that damage" (Glamdring): the damage dealt, like "that much".
     const thatMuch = o.thatMuch && /\bthat (?:much|many)\b|\bless than or equal to that damage\b/.test(text);
     if (thatMuch) {
@@ -1341,7 +1343,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   const sacCreated = /\b[Cc]reate [^.]+ tokens that are tapped and attacking\. Sacrifice them at the beginning of the next end step\./;
   // "Whenever you attack with eight or more creatures, those creatures get +4/+4 until end of turn" (Champions from
   // Beyond): the creatures that attacked, as they were declared.
-  const those = event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
+  // Lightmine Field: "Whenever one or more creatures attack, ~ deals damage to each of those creatures ...": anyone's
+  // attackers of that declaration.
+  const those = event === "creaturesYouControlAttack" && !(anyone && min) && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
   if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
@@ -2473,6 +2477,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const filter = parseTargetPhrase(tapped[1]!);
     const body = filter && filter.kind === "object" && parseBody(tapped[3]!, { subjectIt: true });
     return filter && body ? { event: tapped[2] === "tapped" ? "permanentBecomesTapped" : "permanentBecomesUntapped", tappedFilter: filter, body } : "fail";
+  }
+  // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
+  const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);
+  if (mutates) {
+    const filter = parseTargetPhrase(mutates[1]!);
+    const body = filter && filter.kind === "object" && parseBody(mutates[2]!, { subjectIt: true });
+    return filter && body ? { event: "permanentMutates", tappedFilter: filter, body } : "fail";
   }
   const block = parseBlockTrigger(line);
   if (block) return block;

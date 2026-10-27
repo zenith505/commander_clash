@@ -968,6 +968,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Lunar Force: "sacrifice ~ and counter that spell": two instructions; the spell is countered even if ~ is already gone
   // (rulings).
   text = text.replace(/^sacrifice ~ and counter that spell\.$/, "Sacrifice ~. Counter that spell.");
+  // The Thanos-Copter: "Vehicles you control become artifact creatures until end of turn": each one (CR 301.7b), the ones
+  // there as it resolves (CR 611.2c).
+  text = text.replace(/^Vehicles you control become artifact creatures until end of turn\.$/, "Each Vehicle you control becomes an artifact creature until end of turn.");
+  // Does Machines: "mill two cards, draw two cards, then discard two cards": one after another.
+  text = text.replace(/^([Mm]ill (?:a card|\w+ cards)), (draw (?:a card|\w+ cards), then discard (?:a card|\w+ cards))\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Spoils of Victory: "Search your library for a ... card and put that card onto the battlefield. Then shuffle." is the
+  // usual "..., put it onto the battlefield, then shuffle."
+  text = text.replace(/^(Search your library for an? [^.]+? card) and put that card onto the battlefield\. Then shuffle\.$/, "$1, put it onto the battlefield, then shuffle.");
   // Teyo, Lightshield Expert: "Put a +1/+1 counter on it if it's a creature. Put a loyalty counter on it if it's a
   // planeswalker.": each checked as it resolves (CR 608.2c); both if it's both (rulings).
   text = text.replace(/(^|\. )Put (an? [+\-/0-9a-z]+ counter) on it if it's an? (creature|planeswalker)(?=\.)/g, "$1If it's a $3, put $2 on it");
@@ -4064,6 +4072,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
+    // Interpret the Signs: "Reveal the top card of your library. Draw cards equal to that card's mana value."; Sifter Wurm:
+    // "You gain life equal to that card's mana value." The card stays on top.
+    const revealedMvThen = /^[Rr]eveal the top card of your library$/.test(s) ? /^(Draw cards|You gain life) equal to that card's mana value\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (revealedMvThen) {
+      const n = { count: { kind: "revealedManaValue" as const } };
+      effects.push({ type: "revealTop" }, revealedMvThen[1] === "Draw cards" ? { type: "draw", who: { ref: "you" }, n } : { type: "gainLife", who: { ref: "you" }, n });
+      si++;
+      continue;
+    }
     if (/^[Rr]eveal the top card of your library$/.test(s) || (atRandom && /^If that card has the chosen name, /.test(sentences[si + 1] ?? ""))) {
       const r = parseRevealedIf(sentences, si + 1, ctx);
       if (!r) return null;
@@ -6034,6 +6051,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
     // Handling): checked against the card this resolution's discard put into the graveyard (CR 701.9a).
     // Vohar, Vodalian Desecrator: "Draw a card, then discard a card. If you discarded an instant or sorcery card this way, ...".
+    // Fanatic of the Harrowing: "Each player discards a card. If you discarded a card this way, draw a card.": you did (with
+    // an empty hand, you didn't, CR 701.9b).
+    const youDiscarded = /^If you discarded a card this way, (.+)$/.exec(s);
+    if (youDiscarded) {
+      const prev = effects[effects.length - 1];
+      const inner = parseOne(capital(youDiscarded[1]!), ctx);
+      if (prev?.type !== "discard" || prev.who.ref !== "eachPlayer" || prev.n !== 1 || prev.upTo || prev.filter || prev.hand || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay", who: { ref: "you" } } }, min: 1 }, effects: inner });
+      continue;
+    }
     // Lord Windgrace: "Discard a card, then draw a card. If a land card is discarded this way, draw an additional card":
     // the discard before the draw.
     const ifDiscarded = /^If (?:an? (.+? card) (?:was|is) discarded|you discarded an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
@@ -6247,7 +6274,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (returnedIs && CREATURE_TYPES.has(returnedIs[1]!)) {
       const last = effects[effects.length - 1];
       const inner = parseOne(capital(returnedIs[2]!), ctx);
-      if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.what.n || !ctx.spell || !inner || /\b(?:it|its|that)\b/.test(returnedIs[2]!)) return null;
+      // Fearsome Awakening: "If it's a Dragon, put two +1/+1 counters on it": on that permanent.
+      const countersOnIt = /^put (?:a|an|one|two|three) \S+ counters? on it$/.test(returnedIs[2]!) && inner?.length === 1 && inner[0]!.type === "counters" && inner[0]!.what.ref === "created";
+      if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.what.n || !ctx.spell || !inner || (!countersOnIt && /\b(?:it|its|that)\b/.test(returnedIs[2]!))) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [returnedIs[1]!], text: returnedIs[1]! } }, effects: inner });
       continue;
     }
@@ -7836,11 +7865,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Soul Rend: "Destroy target creature if it's white. A creature destroyed this way can't be regenerated.": the
       // conditional destroy.
       const prev = effects[effects.length - 1];
+      // Kirtar's Wrath: "..., instead destroy all creatures, then create two 1/1 white Spirit creature tokens with flying.
+      // Creatures destroyed this way can't be regenerated.": the destroy done instead.
+      const insteadDestroy = /^Creatures destroyed this way/.test(s) && prev?.type === "if" && prev.otherwise && prev.effects[0]?.type === "destroy" && prev.effects.slice(1).every((e) => e.type !== "destroy") ? prev.effects[0] : undefined;
+      if (insteadDestroy?.type === "destroy") {
+        insteadDestroy.noRegen = true;
+        continue;
+      }
       const last = prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : prev;
       if (!last || last.type !== "destroy") return null;
       last.noRegen = true;
       // "Destroy target nonblack creature and target land. They can't be regenerated.": both.
       if (/^They\b/.test(s)) for (let i = effects.length - 2, e = effects[i]; e?.type === "destroy"; e = effects[--i]) e.noRegen = true;
+      // Part of the sentence before, for one after it ("If there are seven or more cards in your graveyard, instead ...",
+      // Kirtar's Wrath).
+      curStart = prevStart;
+      if (!thenParts.has(sentences[si]!)) curWhole = prevWhole;
       continue;
     }
     // Taigam, Master Opportunist: "copy it, then exile the spell you cast with four time counters on it. If it doesn't have

@@ -2448,6 +2448,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(["second", "third", "fourth", "fifth"].indexOf(position) + 1, lib.length - 1), 0, lib.shift()!);
           continue;
         }
+        if (e.beneath !== undefined) {
+          // Unexpectedly Absent: under the top X cards; on the bottom with fewer; on top with X = 0 (rulings).
+          const n = Math.max(0, amountNow(s, e.beneath, ctx));
+          log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their library beneath the top ${n} cards.`);
+          moveObject(s, o.id, "library", { top: true });
+          const lib = player(s, o.owner).library;
+          if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(n, lib.length - 1), 0, lib.shift()!);
+          continue;
+        }
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
         moveObject(s, o.id, "library", { top: position === "top" });
         if (o.zone === "library" && !o.isToken) (moved[o.owner] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });

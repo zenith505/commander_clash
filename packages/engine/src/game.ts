@@ -1899,6 +1899,8 @@ export function tapPermanent(s: GameState, o: GameObject, /** Tapped as it's dec
  */
 export function untapPermanent(s: GameState, o: GameObject) {
   if (!o.tapped) return;
+  // Frozen in Ice: "can't become untapped": nothing untaps it, so no stun counter is removed either (CR 122.1d).
+  if (o.zone === "battlefield" && characteristics(s, o).cantBecomeUntapped) return;
   if ((o.counters.stun ?? 0) > 0) {
     // Fear of Sleep Paralysis: the counter can't be removed, so it neither untaps nor loses it (rulings).
     if (countersStay(s, o, "stun")) return;
@@ -8085,7 +8087,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !bridged(s, o) &&
-      !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
+      !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0))) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),

@@ -192,10 +192,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
         else if (c.differentManaValues) names.add(String(o.faceDown ? 0 : defMv(defOf(s, o))));
+        else if (c.differentPowers) names.add(String(ch.power));
         else if (!c.differentNames) n++;
         else if (ch.name && !o.faceDown) names.add(ch.name);
       }
-      return c.differentNames || c.differentManaValues ? names.size : n;
+      return c.differentNames || c.differentManaValues || c.differentPowers ? names.size : n;
     }
     case "mostSharingCreatureType": {
       // White Lotus Tile: for each creature type, how many creatures you control have it; a changeling has every one
@@ -285,6 +286,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const done = s.resolving?.discardedAll ?? [];
       if (done.length) return done.reduce((n, id) => n + (s.objects[id] ? defMv(defOf(s, s.objects[id]!)) : 0), 0);
       return (s.resolving?.item.costDiscarded ?? []).reduce((n, k) => n + (s.cards[k] ? defMv(s.cards[k]!) : 0), 0);
+    }
+    case "revealedManaValue": {
+      const rv = s.resolving?.revealed;
+      const o = rv && s.objects[rv.id];
+      return o && (o.zoneChanges ?? 0) === rv.zc ? defMv(defOf(s, o)) : 0;
     }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
@@ -387,6 +393,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return c.of.reduce((n, x) => n + evalCount(s, x, ctx), 0);
     case "greater":
       return Math.max(evalCount(s, c.of[0], ctx), evalCount(s, c.of[1], ctx));
+    case "constant":
+      return c.n;
     case "difference":
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
     case "absDifference":
@@ -779,7 +787,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":
       return "#cards in hand";
     case "handMoreThanYou":
@@ -804,6 +812,8 @@ function describeCount(c: Count): string {
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "discardedManaValue":
       return "the discarded card's mana value";
+    case "revealedManaValue":
+      return "the revealed card's mana value";
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
     case "cardsExiledThisWay":
@@ -913,6 +923,8 @@ function describeCount(c: Count): string {
       return "#permanents put into a graveyard this turn";
     case "sum":
       return c.of.map(describeCount).join(" + ");
+    case "constant":
+      return String(c.n);
     case "greater":
       return `the greater of ${describeCount(c.of[0])} and ${describeCount(c.of[1])}`;
     case "difference":

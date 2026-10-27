@@ -104,7 +104,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; /** "Enchanted creature gets +1/+1 for each other creature you control" (Bravado), "Each legendary creature you control gets +1/+1 for each other legendary creature you control" (Heroes' Podium): other than the permanent the static effect is applied to, not the source. */ otherThanAffected?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; /** "Enchanted creature gets +1/+1 for each other creature you control" (Bravado), "Each legendary creature you control gets +1/+1 for each other legendary creature you control" (Heroes' Podium): other than the permanent the static effect is applied to, not the source. */ otherThanAffected?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each different power among creatures you control" (Golden Ratio): each power once. */ differentPowers?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef; /** "The number of white cards in their hand" (Inquisition): only cards like this. */ filter?: TargetSpec }
   /**
@@ -137,6 +137,8 @@ export type Count =
   | { kind: "milledManaValue" }
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue" }
+  /** "Reveal the top card of your library. Draw cards equal to that card's mana value." (Interpret the Signs): the card "revealTop" revealed, while it's still that card. */
+  | { kind: "revealedManaValue" }
   /** "The total mana value of those exiled cards" (Ensnared by the Mara): of the cards an "exile the top N cards" before it exiled (GameState.resolving.exiledTopCards). */
   | { kind: "exiledTopManaValue" }
   /** "For each card of the chosen color exiled this way" (Oona, Queen of the Fae): of the cards the "exile the top X cards" before it exiled, those matching `filter` (a chosen color bound as it resolves), still in exile. */
@@ -385,6 +387,8 @@ export type Count =
   | { kind: "sum"; of: Count[] }
   /** "The number of Zombies you control or the number of Zombie cards in your graveyard, whichever is greater" (Prophet of the Scarab): the larger, counted as it resolves. */
   | { kind: "greater"; of: [Count, Count] }
+  /** A fixed number, inside "greater": "2 or the greatest power among Dinosaurs you control, whichever is greater" (Triumphant Chomp). */
+  | { kind: "constant"; n: number }
   /** "Equal to the difference" after "if that creature has greater power than ~" (Conformer Shuriken): the first less the second. */
   | { kind: "difference"; of: [Count, Count] }
   /** "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller. */
@@ -1257,6 +1261,8 @@ export type Modification =
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
+  /** "Can't become untapped" (Frozen in Ice): it doesn't untap in its untap step or from any effect (see untapPermanent). */
+  | { kind: "cantBecomeUntapped" }
   /** "Can't become suspected" (Airtight Alibi, CR 701.60): suspect effects don't apply to it. */
   | { kind: "cantBeSuspected" }
   /**
@@ -2181,7 +2187,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" | "fourth" | "fifth" }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" | "fourth" | "fifth"; /** "Just beneath the top X cards of that library" (Unexpectedly Absent): with `position` "top", under that many cards (on the bottom with fewer, rulings). */ beneath?: Amount }
   | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** "Exile all cards from all hands and graveyards" (Worldfire): the hand too, then the graveyard. */ hand?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "All cards with flashback" (Tombfire): cards that have it there, their own or given by an effect (CR 702.34a). */ withFlashback?: true; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
@@ -2256,7 +2262,7 @@ export type Effect =
    * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
    * (not targeted, rulings), from none up to `n`.
    */
-  | { type: "untapUpTo"; n: Amount; filter: TargetSpec }
+  | { type: "untapUpTo"; n: Amount; filter: TargetSpec; /** "That player untaps a land they control" (Hokori, Dust Drinker): who chooses and untaps, among their own (default: you). */ who?: PlayerRef }
   /**
    * "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
    * control": which ones are chosen as it resolves (CR 608.2d), none allowed; "for each creature tapped this way" counts them.
@@ -2892,7 +2898,7 @@ export type Effect =
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
-  | { type: "cantAttackRule"; filter: TargetSpec }
+  | { type: "cantAttackRule"; filter: TargetSpec; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */

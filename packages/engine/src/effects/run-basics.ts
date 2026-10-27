@@ -563,9 +563,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `Until end of turn, ${player(s, ctx.controller).name} doesn't lose unspent ${e.color ? `${COLOR_NAMES[e.color].toLowerCase()} ` : ""}mana as steps and phases end.`);
       return;
     case "cantAttackRule":
-      (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
+    {
+      const t = e.exceptTarget !== undefined ? ctx.targets[e.exceptTarget] : undefined;
+      const except = t?.kind === "object" ? { id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 } : undefined;
+      (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller, ...(except ? { except } : {}) });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
       return;
+    }
     case "costModThisTurn":
       (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
       log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);

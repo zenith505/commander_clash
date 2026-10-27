@@ -109,11 +109,22 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
     return a && b && typeof a === "object" && typeof b === "object" && "count" in a && "count" in b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
   }
+  // Phthisis: "its power plus its toughness"; Predator's Rapport: "that creature's power plus its toughness": the one
+  // object's, added up.
+  if ((m = /^(its|~'s|that creature's) power plus its toughness$/i.exec(p))) {
+    const [a, b] = [parseCount(`${m[1]} power`, ctx), parseCount(`${m[1]} toughness`, ctx)];
+    return a && b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
+  }
   // Prophet of the Scarab: "the number of Zombies you control or the number of Zombie cards in your graveyard, whichever
   // is greater".
   if ((m = /^(the number of .+?) or (the number of .+), whichever is greater$/i.exec(p))) {
     const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
     return a && b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "greater", of: [a.count, b.count] } } : null;
+  }
+  // Triumphant Chomp: "2 or the greatest power among Dinosaurs you control, whichever is greater".
+  if ((m = new RegExp(`^${NUM} or (the greatest .+), whichever is greater$`, "i").exec(p))) {
+    const c = parseCount(m[2]!, ctx);
+    return c && !c.times && !c.plus && !c.half ? { count: { kind: "greater", of: [{ kind: "constant", n: num(m[1]!) }, c.count] } } : null;
   }
   if ((m = new RegExp(`^${NUM} minus (.+)$`, "i").exec(p))) {
     const c = parseCount(m[2]!, ctx);
@@ -574,6 +585,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^different mana value among (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, differentManaValues: true } } : null;
+  }
+  // Golden Ratio: "for each different power among creatures you control": each power once, as the creatures have it.
+  if (each && (m = /^different power among (creatures) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, differentPowers: true } } : null;
   }
   // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
   if ((m = /^differently named (.+?) you control$/i.exec(p))) {

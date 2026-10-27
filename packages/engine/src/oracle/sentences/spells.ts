@@ -578,6 +578,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const creatures: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures" };
     return [{ type: "if", cond: { kind: "amountsCompare", a: { count: { kind: "permanents", filter: creatures, whose: { ref: "you" } } }, atLeast: { count: { kind: "permanents", filter: creatures, whose: { ref: "targetController", index } }, plus: 1 } }, effects: [{ type: "counterSpell", index }] }];
   }
+  // Corrupted Resolve: "Counter target spell if its controller is poisoned": has a poison counter as it resolves (CR
+  // 122.1f), checked then (CR 608.2c).
+  if (/^Counter target spell if its controller is poisoned$/i.test(s)) {
+    const index = addTarget(ctx, { kind: "spell", text: "target spell" });
+    return [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "poison", who: { ref: "targetController", index } } }, min: 1 }, effects: [{ type: "counterSpell", index }] }];
+  }
   if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).

@@ -1815,13 +1815,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   characteristic-defining P/T); Orcish Farmer ("until its controller's next untap step"); Hatchet Bully and Wandering
   Mage (a -1/-1 counter as a cost); Hint of Insanity, Haunting Echoes, Reap Intellect, Pick the Brain and Thought
   Hemorrhage (not looked at in depth).
+- Round B18 (harder skipped cards, least played first): "sacrifice it unless you ..." and other punishers as a may with
+  an otherwise: exile a card from your graveyard (Rotting Giant, Treacherous Vampire), "pay its mana cost" (Pendrell
+  Flux, Disruption Aura, Essence Leak; {X} is 0 and no mana cost can't be paid, CR 118.6, 107.3), pay 2 life
+  (Morgul-Knife Wound), "you lose 1 life unless you sacrifice" (Withercrown, with "base power 0"), "~ deals N damage to
+  you unless you discard a card / sacrifice another creature. If it deals damage to you this way, tap it" (Mishra's War
+  Machine, Minion of Leshrac), Elder Spawn, "discard a card unless you return a land / exile a historic card" (Tragic
+  Lesson, Urza's Tome), "target opponent gains control of ~ unless you sacrifice a land" (Custody Battle); "enters with
+  two -1/-1 counters unless you've cast another red spell this turn" (Hotheaded Giant, not counting itself only when it
+  was cast, rulings); an Aura's "when enchanted creature is turned face up" (Fatal Mutation); "if it's an opponent's
+  turn" and "for each 1 damage dealt to you this turn" (Discordant Spirit, Simulacrum); "if it was blocked this turn"
+  in a dies trigger (Fyndhorn Druid, CR 603.10a); "Whenever two or more creatures your opponents control attack, ~
+  can't block this combat" (Flummoxed Cyclops); "Players can't cycle cards" (Stabilizer, CR 702.29f); "activated
+  abilities with {T} in their costs can't be activated", mana abilities too (Serra Bestiary, Katabatic Winds, rulings);
+  Ironclaw Curse; Flaring Flame-Kin; Hint of Insanity; "prevent all damage that would be dealt (to ~) by target
+  creature this turn" (Stonewise Fortifier, Kry Shield); Ana Battlemage's "tap target untapped creature and that
+  creature deals damage equal to its power to its controller". No new prompt: the "you may" question and the existing
+  pickers ask. +28 (26,645 with round 186).
+- Skipped there, with reasons: Drake Familiar (returns an enchantment of any player: the pick is among one player's
+  permanents); Chisei, Heart of Oceans ("remove a counter from a permanent": a counter of any kind, chosen as it resolves); Demonic Hordes ("of an
+  opponent's choice" in multiplayer); Rapid Fire (rampage is a trigger, not a keyword a creature can gain);
+  Parallax Inhibitor (fading counters as a keyword); Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Spiny
+  Starfish ("when it regenerates this way": a shield with a rider, and choosing among shields, CR 616.1).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
-  supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Exiled Doomsayer (morph cost tax), Treacherous Vampire and Rotting Giant (sacrifice unless
-  you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
+  supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Exiled Doomsayer (morph cost tax), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
   the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Tribal Golem, Forethought
   Amulet; Reign of Terror ("for each creature that died this way"), Steeling
-  Stance (forecast), Exalted Dragon, Qal Sisma Behemoth, Stabilizer, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
+  Stance (forecast), Exalted Dragon, Qal Sisma Behemoth, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a

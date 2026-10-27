@@ -302,6 +302,7 @@ const hintOfInsanity = card("Hint of Insanity", "Sorcery", "{2}{B}", {cmc: 3,ora
 const stonewiseFortifier = card("Stonewise Fortifier", "Creature — Human Wizard", "{1}{W}", {cmc: 2,power: "2",toughness: "2",oracleText: "{4}{W}: Prevent all damage that would be dealt to this creature by target creature this turn."});
 const kryShield = card("Kry Shield", "Artifact", "{2}", {cmc: 2,oracleText: "{2}, {T}: Prevent all damage that would be dealt this turn by target creature you control. That creature gets +0/+X until end of turn, where X is its mana value."});
 const anaBattlemage = card("Ana Battlemage", "Creature — Human Wizard", "{2}{G}", {cmc: 3,power: "2",toughness: "2",keywords: ["Kicker"],oracleText: "Kicker {2}{U} and/or {1}{B} (You may pay an additional {2}{U} and/or {1}{B} as you cast this spell.)\nWhen this creature enters, if it was kicked with its {2}{U} kicker, target player discards three cards.\nWhen this creature enters, if it was kicked with its {1}{B} kicker, tap target untapped creature and that creature deals damage equal to its power to its controller."});
+const simulacrum = card("Simulacrum", "Instant", "{1}{B}", {cmc: 2,oracleText: "You gain life equal to the damage dealt to you this turn. Simulacrum deals damage to target creature you control equal to the damage dealt to you this turn."});
 const preyUpon = card("Prey Upon", "Sorcery", "{G}", { cmc: 1, oracleText: "Target creature you control fights target creature you don't control." });
 const murder = card("Murder", "Instant", "{1}{B}{B}", { cmc: 3, oracleText: "Destroy target creature." });
 const plainAura = card("Plain Aura", "Enchantment — Aura", "{W}", { cmc: 1, keywords: ["Enchant"], oracleText: "Enchant creature" });
@@ -316,7 +317,7 @@ const toTargets = (s: GameState) => {
 };
 
 describe("cast another red spell, turned face up, blocked this turn and other second-pass cards", () => {
-  it("compiles them", () => supported(hotheadedGiant, fatalMutation, discordantSpirit, fyndhornDruid, flummoxedCyclops, stabilizer, serraBestiary, katabaticWinds, ironclawCurse, flaringFlameKin, hintOfInsanity, stonewiseFortifier, kryShield, anaBattlemage));
+  it("compiles them", () => supported(hotheadedGiant, fatalMutation, discordantSpirit, fyndhornDruid, flummoxedCyclops, stabilizer, serraBestiary, katabaticWinds, ironclawCurse, flaringFlameKin, hintOfInsanity, stonewiseFortifier, kryShield, anaBattlemage, simulacrum));
 
   it("Hotheaded Giant: two -1/-1 counters unless you've cast another red spell this turn", () => {
     const { s: s0, ap, ids } = setup([hotheadedGiant]);
@@ -490,5 +491,29 @@ describe("cast another red spell, turned face up, blocked this turn and other se
     s = act(s, { type: "chooseTargets", player: ap, targets: [tgt(ogre)] } as Action);
     s = settle(s);
     expect([s.objects[ogre]!.tapped, before - life(s, opp)]).toEqual([true, 3]);
+  });
+
+  it("Simulacrum: gain life equal to the damage dealt to you this turn, and that much damage to your creature", () => {
+    const { s: s0, ap, ids } = setup([simulacrum]);
+    const ogre = putOnBattlefield(s0, ap, creature("Big Ogre", "Creature — Ogre", "{3}", 3, 3, { cmc: 3 }));
+    s0.damageThisTurn = { [ap]: 2 };
+    const before = life(s0, ap);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(ogre)])));
+    expect([life(s, ap) - before, s.objects[ogre]!.damage]).toEqual([2, 2]);
+  });
+
+  it("Echo—Exile a card from your graveyard: the Rotting Giant cost works for echo too (CR 702.30a)", () => {
+    const ape = card("Graveyard Echo", "Creature — Ape", "{G}", { cmc: 1, power: "1", toughness: "1", oracleText: "Echo—Exile a card from your graveyard." });
+    supported(ape);
+    const { s: s0, ap, ids } = setup([ape]);
+    const dead = into(s0, ap, greenBear(), "graveyard");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    s = toUpkeep(s, ap, { yes: true });
+    expect([zone(s, ids[0]!), zone(s, dead)]).toEqual(["battlefield", "exile"]);
+
+    const { s: t0, ap: bp, ids: tids } = setup([ape]);
+    let t = settle(run(t0, planCast(t0, bp, tids[0]!)));
+    t = toUpkeep(t, bp, { yes: false }); // not paying the echo cost (its cleanup discard left a card to exile)
+    expect(zone(t, tids[0]!)).toBe("graveyard");
   });
 });

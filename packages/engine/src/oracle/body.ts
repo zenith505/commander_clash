@@ -866,6 +866,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // Green Slime: "counter target activated or triggered ability from an artifact or enchantment source. If a permanent's
+  // ability is countered this way, destroy that permanent." Trickbind: "... activated abilities of that permanent can't be
+  // activated this turn." One instruction each, about the countered ability's source (see sentences/spells.ts).
+  text = text.replace(/(^|\. )([Cc]ounter target (?:activated or triggered|activated|triggered) ability[^.]*)\. If a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn)\./, "$1$2, and if a permanent's ability is countered this way, $3.");
+  // Mayael's Aria: "put a +1/+1 counter on each creature you control if you control a creature with power 5 or greater.
+  // Then you gain 10 life if .... Then you win the game if ...": each condition checked in turn as it resolves (rulings),
+  // the same as "If you control ..., put .... Then if you control ..., you gain .... Then if ..., you win the game."
+  text = text.replace(/^([a-z][^.]*?) if (you control a creature with power \d+ or greater)\.(?= Then )/, (_, a: string, c: string) => `If ${c}, ${a}.`);
+  text = text.replace(/\. Then ([a-z][^.]*?) if (you control a creature with power \d+ or greater)(?=\.)/g, ". Then if $2, $1");
+  // Dowsing Device: "Then transform ~ if you control four or more artifacts": checked as it resolves (CR 608.2c), the
+  // same as "Then if you control ..., transform ~".
+  text = text.replace(/(^|\. )Then transform ~ if (you control [^.]+)\./, "$1Then if $2, transform ~.");
+  // Red Death, Shipwrecker: "Goad target creature an opponent controls. That player draws a card.": the creature's
+  // controller, as it resolves.
+  text = text.replace(/^(Goad target creature an opponent controls\.) That player (draws a card\.)/, "$1 Its controller $2");
+  // Field-Tested Frying Pan: "create a Food token, then create a 1/1 white Halfling creature token and attach ~ to it": the
+  // Halfling, created second.
+  text = text.replace(/(create an? [^.,]+ token), then (create an? [^.,]+ creature token) and (attach ~ to it\.)/, (_, a: string, b: string, c: string) => `${a}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, then ${c}`);
+  // Fractal Harness: "create a 0/0 green and blue Fractal creature token. Put X +1/+1 counters on it and attach ~ to it":
+  // two instructions about the token, in that order.
+  text = text.replace(/(create an? [^.]+ creature token\. Put (?:X|\w+) \+1\/\+1 counters? on it) and attach (~ to it\.)/, "$1. Attach $2");
+  // Oreskos Explorer: "Search your library for up to X Plains cards, where X is .... Reveal those cards, put them into your
+  // hand, then shuffle." The same, into your hand.
+  text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.]+)\. Reveal those cards, put them into your hand, then shuffle\./, "$1$2earch your library for up to X $3, reveal them, put them into your hand, then shuffle, where X is $4.");
   // Kami's Flare: "~ also deals 2 damage to that permanent's controller if you control a modified creature": checked as it
   // resolves (CR 608.2c), the same as "If you control a modified creature, ~ deals 2 damage to ...".
   text = text.replace(/(^|\. )~ also deals (\d+) damage to that permanent's controller if (you control an? [a-z ]+ creature)\./, "$1If $3, ~ deals $2 damage to that permanent's controller.");
@@ -1405,6 +1429,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       text,
     };
   }
+  // Commodore Guff: "You draw X cards and ~ deals X damage to each opponent, where X is the number of planeswalkers you
+  // control": one X for both instructions.
+  text = text.replace(/(^|\. )You draw X cards and ~ deals X damage to each opponent, where X is ([^.]+)\./, "$1You draw X cards, where X is $2. ~ deals X damage to each opponent, where X is $2.");
   // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
   // number of descent counters on ~": the same X for both, which nothing in between changes.
   text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
@@ -7691,12 +7718,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         // "You may have target creature get -2/-2 until end of turn", "... it gain reach", "... Ally creatures you control
         // gain first strike", "... enchanted creature fight target creature": they do it, if you choose (CR 608.2d).
         // Embodiment of Insight: "you may have target land you control become a 3/3 Elemental creature ...".
-        .replace(/^Have (.+?) (get|gain|lose|fight|deal|become) (?=\S)/, (all, who: string, verb: string) => {
+        // Shadow Puppeteers: "you may have it become a red Dragon ... until end of turn", "it" being the trigger's subject.
+        .replace(/^Have (.+?) (get|gain|lose|fight|deal|become) (?=\S)/, (all, who: string, verb: string, at: number, whole: string) => {
           if (/^(?:target (?:player|opponent)|that player|its controller|each opponent|you)$/.test(who)) return all;
           const it = /^(?:it|her|him)$/.test(who);
           const subject = it ? (ctx.selfIt || ctx.selfCard ? "~" : "It") : who.charAt(0).toUpperCase() + who.slice(1);
           const plural = !it && /\b(?:creatures|permanents)\b/.test(who);
-          if (verb === "become" && (it || plural)) return all;
+          if (verb === "become" && (plural || (it && (subject !== "It" || / become an? copy\b/.test(whole) || !/ until end of turn$/.test(whole))))) return all;
           return `${subject} ${plural ? verb : verb === "lose" ? "loses" : `${verb}s`} `;
         });
       ctx.mayNow = true;

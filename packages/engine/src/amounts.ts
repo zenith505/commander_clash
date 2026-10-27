@@ -679,7 +679,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "graveyardManaValues": {
       const mvs = new Set<number>();
-      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) mvs.add(defMv(defOf(s, s.objects[id]!)));
+      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) if (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!))) mvs.add(defMv(defOf(s, s.objects[id]!)));
       return mvs.size;
     }
     case "greatestPower": {
@@ -986,7 +986,7 @@ function describeCount(c: Count): string {
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "graveyardManaValues":
-      return "#mana values in your graveyard";
+      return `#mana values${c.filter ? ` among ${c.filter.text}s` : ""} in your graveyard`;
     case "greatestPower":
       return `the ${c.total ? "total" : c.least ? "least" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestMvInExile":

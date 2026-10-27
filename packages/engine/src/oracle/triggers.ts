@@ -130,6 +130,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^Whenever ~ becomes untapped, (.+)$/, "selfBecomesUntapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
+  [/^Whenever ~ evolves, (.+)$/, "selfEvolves"],
   [/^Whenever ~ becomes crewed, (.+)$/, "selfBecomesCrewed"],
   [/^Whenever ~ mutates, (.+)$/, "selfMutates"],
   [/^Whenever you exert a creature, (.+)$/, "youExert"],
@@ -142,7 +143,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfMutates", "selfPhasesIn", "selfPhasesOut",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfEvolves", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
 ];
 
@@ -2626,10 +2627,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return filter && body ? { event: "permanentMutates", tappedFilter: filter, body } : "fail";
   }
   // Wildgrowth Walker: "Whenever a creature you control explores, ..." (CR 701.44b), that creature the subject.
-  const explores = /^Whenever a creature you control explores, (.+)$/.exec(line);
+  // Nicanzil, Current Conductor: "... explores a land card", "... explores a nonland card": what it revealed.
+  const explores = /^Whenever a creature you control explores( a land card| a nonland card)?, (.+)$/.exec(line);
   if (explores) {
-    const body = parseBody(explores[1]!, { subjectIt: true });
-    return body ? { event: "creatureYouControlExplores", body } : "fail";
+    const body = parseBody(explores[2]!, { subjectIt: true });
+    return body ? { event: "creatureYouControlExplores", body, ...(explores[1] ? { explored: explores[1] === " a land card" ? ("land" as const) : ("nonland" as const) } : {}) } : "fail";
   }
   const block = parseBlockTrigger(line);
   if (block) return block;
@@ -2871,6 +2873,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever an opponent plays a land, ${oppPlays[1]}`);
     return !t || t === "fail" || t.event !== "opponentPlaysLand" || t.subjectFilter ? "fail" : { ...t, subjectFilter: { kind: "object", types: ["Land"], notSupertypes: ["Basic"], text: "nonbasic land" } };
   }
+  // Elvish Mariner: "Whenever you scry, tap up to X target nonland permanents, where X is the number of cards looked at
+  // while scrying this way": how many cards that scry looked at (CR 701.22a), known as it triggers, so it can count
+  // targets (CR 601.2c, 603.3d; TriggeredAbility.eventX).
+  const scryX = /^Whenever you scry, (.+), where X is the number of cards looked at while scrying this way\.$/.exec(line);
+  if (scryX) {
+    const body = parseBody(`${scryX[1]}.`, { ownX: true });
+    return body ? { event: "youScry", body, eventX: true } : "fail";
+  }
   // "When ~ enters untapped, ..." (Mystic Sanctuary): entering untapped is part of the trigger event.
   const untapped = /^When(?:ever)? ~ enters untapped, (.+)$/.exec(line);
   if (untapped) {
@@ -3036,6 +3046,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         .replace(/(discard any number of cards\. If you do, draw )that many( cards and add )that much( \{[WUBRGC]\})/, "$1THAT_MANY$2THAT_MUCH$3");
       // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
+      // Field-Tested Frying Pan's grant: "~ gets +X/+X until end of turn, where X is the amount of life you gained": that much.
+      if (event === "youGainLife" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^(.*\bX\b.*), where X is the amount of life you gained\.$/, (_, body: string) => `${body.replace(/\bX\b/g, "that much")}.`);
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "youAreDealtCombatDamage" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).

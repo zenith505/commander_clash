@@ -1467,6 +1467,15 @@ export function parseTargetPhrase(
     ];
     p = "permanent";
   }
+  // Soldevi Adnate: "Sacrifice a black or artifact creature": a creature that's black or an artifact (TargetSpec.anyOf).
+  const colorOrArtifact = /^(white|blue|black|red|green) or artifact creature$/.exec(p);
+  if (colorOrArtifact && !extra.anyOf) {
+    extra.anyOf = [
+      { kind: "object", colors: [COLOR_WORDS[colorOrArtifact[1]!]!], text: colorOrArtifact[1]! },
+      { kind: "object", types: ["Artifact"], text: "artifact" },
+    ];
+    p = "creature";
+  }
   // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell"; Sokka, Bold Boomeranger:
   // "artifact or Lesson spell": either one (CR 205.3).
   const orSub = /^(creature|instant) or (spacecraft|aura)$|^(artifact) or (lesson)$/.exec(p);

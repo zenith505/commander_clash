@@ -699,6 +699,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       moveObject(s, id, "hand");
       return;
     }
+    case "commandersToHand": {
+      // Every commander you own (CR 903.3) in the command zone or your graveyard as this resolves, all at once.
+      const p = player(s, ctx.controller);
+      const mine = [...p.command, ...p.graveyard].filter((id) => obj(s, id).isCommander && obj(s, id).owner === p.id);
+      for (const id of mine) {
+        log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand from ${obj(s, id).zone === "command" ? "the command zone" : "their graveyard"}.`);
+        moveObject(s, id, "hand");
+      }
+      return;
+    }
     case "eachMayCounter": {
       // In turn order from its controller (rulings), each choosing one of their creatures or none.
       const sc = (s.resolving!.scratch ??= {});

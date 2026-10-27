@@ -736,6 +736,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Marcus, Mutant Mayor: "if that creature has a +1/+1 counter on it": the trigger's subject as it resolves, or as it
   // last existed (CR 608.2h).
   if ((m = new RegExp(`^that creature has an? ${COUNTER} counter on it$`).exec(text))) return { kind: "subjectCounter", counter: counterKind(m[1]!) };
+  // Hadana's Climb: "that creature has three or more +1/+1 counters on it".
+  if ((m = new RegExp(`^that creature has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "subjectCounter", counter: counterKind(m[2]!), min: num(m[1]!) };
   if ((m = /^an? (creature|planeswalker)(?: or (planeswalker))? an opponent controlled was dealt excess damage this turn$/.exec(text)))
     return { kind: "opponentsDealtExcess", types: [m[1], m[2]].filter(Boolean).map((x) => x!.charAt(0).toUpperCase() + x!.slice(1)) };
   // Liberator, Urza's Battlethopter: "if the amount of mana spent to cast that spell is greater than ~'s power", as
@@ -1432,6 +1434,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
   }
+  // Sigarda's Summons: "have base power and toughness 4/4, have flying, and are Angels in addition to their other types"
+  // (layers 4, 6 and 7b).
+  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+), ((?:has|have) [^,"]+), and (?:is an? ([A-Z][a-z]+)|are ([A-Z][a-z]+)) in addition to (?:its|their) other types$/.exec(rest))) {
+    const t = m[4] ?? singular(m[5]!);
+    const more = parseStaticMods(m[3]!);
+    if (!CREATURE_TYPES.has(t) || !more) return null;
+    return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more, { kind: "addTypes", types: [], subtypes: [t] }];
+  }
   // Porcelain Gallery: "have base power and toughness each equal to the number of creatures you control", counted as the
   // effect applies in layer 7b (CR 613.4b, 611.3a).
   if ((m = /^(?:has|have) base power and toughness each equal to (the number of .+)$/.exec(rest))) {
@@ -1919,6 +1929,11 @@ export function parseIsA(phrase: string, only: boolean): Modification[] | null {
 function parseStaticLine(line: string): StaticAbility | null {
   // Song of Serenity: "Creatures that are enchanted can't attack or block" is about enchanted creatures.
   let text = line.replace(/\.$/, "").replace(/^Creatures that are enchanted (?=can't )/, "Enchanted creatures ");
+  // Lifecraft Engine: "Each creature you control of the chosen type other than ~ gets +1/+1": the other ones.
+  text = text.replace(/^Each creature you control of the chosen type other than ~ (gets .+)$/, "Other creatures you control of the chosen type $1").replace(/^(Other creatures you control of the chosen type) gets /, "$1 get ");
+  // Katilda's Rising Dawn: "Enchanted creature has flying, lifelink, and protection from Vampires, and it gets +X/+X,
+  // where X is ...": the same as "gets +X/+X and has ..., where X is ...".
+  text = text.replace(/^(Enchanted creature) (has [^"]+?), and it (gets [+-]X\/[+-]X)(, where X is .+)$/, "$1 $3 and $2$4");
   // Earth Surge: "Each land gets +2/+2 as long as it's a creature": land creatures, which ones worked out as the effect
   // applies in layer 7c (CR 613.4c), so lands animated earlier are included.
   const landSurge = /^Each land (gets [+-]\d+\/[+-]\d+) as long as it's a creature$/.exec(text);
@@ -1988,6 +2003,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     const spec: TargetSpec | undefined = typing[1]!.startsWith("Slivers") ? { kind: "object", anyOf: [{ kind: "object", subtypes: ["Sliver"], text: "Sliver" }, { kind: "object", token: false, text: "nontoken creature" }], text: "Sliver or nontoken creature" } : undefined;
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", ...(spec ? { spec } : {}) }, mods: [mod], text: line, ...(typing[4] ? { offField: true as const } : {}) };
   }
+  // Lifecraft Engine: "Vehicle creatures you control are the chosen creature type in addition to their other types": a
+  // Vehicle while it's a creature (crewed, CR 301.7b), which the layer 4 dependency on its crew effect sees (CR 613.8a).
+  if (/^Vehicle creatures you control are the chosen creature type in addition to their other types$/.test(text))
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], subtypes: ["Vehicle"], text: "Vehicle creature you control" } }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
   // Laughing Jasper Flint: "Creatures you control but don't own are Mercenaries in addition to their other types" (layer 4,
   // CR 613.1d; who controls them is settled in layer 2 first).
   const notOwned = /^Creatures you control but don't own are ([A-Z][a-z]+) in addition to their other types$/.exec(text);

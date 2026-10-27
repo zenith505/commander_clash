@@ -880,9 +880,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.diedDamaged ?? []).some((d) => d.by.includes(sourceId));
     case "subjectCounter": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
-      if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) return (sub.counters[cond.counter] ?? 0) > 0;
+      const least = cond.min ?? 1;
+      if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) return (sub.counters[cond.counter] ?? 0) >= least;
       const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
-      return !!lk && lk.zc === subjectZc && (lk.counters?.[cond.counter] ?? 0) > 0;
+      return !!lk && lk.zc === subjectZc && (lk.counters?.[cond.counter] ?? 0) >= least;
     }
     case "subjectType": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;

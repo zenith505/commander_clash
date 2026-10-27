@@ -3352,6 +3352,16 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Varchild, Betrayer of Kjeldor: "Survivors your opponents control can't block, and they can't attack you or
+    // planeswalkers you control": two restrictions on the same group, as two sentences.
+    const cantBoth = /^([A-Z][a-z]+s your opponents control) can't block, and they (can't attack you or planeswalkers you control)\.$/.exec(line);
+    if (cantBoth) {
+      const [a, b] = [parseStatic(`${cantBoth[1]} can't block.`), parseStatic(`${cantBoth[1]} ${cantBoth[2]}.`)];
+      if (a && b && !a.condition && !b.condition) {
+        out.statics.push({ ...a, text: line }, { ...b, text: line });
+        continue;
+      }
+    }
     // Noble Quarry (bestow): "All creatures able to block ~ or enchanted creature do so": itself while it's a creature, the
     // creature it enchants while it's an Aura (CR 509.1c, 702.103).
     if (line === "All creatures able to block ~ or enchanted creature do so.") {
@@ -3414,6 +3424,14 @@ export function compile(d: CardDef): CompiledCard {
     const attachedStatics = attachedParts?.map((p, i) => (i === 0 ? parseStatic(p) : parseConditionalStatic(p.replace(/^As long as it's /, `As long as ${attachedParts[0]!.split(" ")[0]!.toLowerCase()} creature is `))));
     if (attachedStatics?.every((p) => p && p.affects.kind === "attached")) {
       for (const p of attachedStatics) out.statics.push({ ...p!, text: line });
+      continue;
+    }
+    // Radiant Destiny: "Creatures you control of the chosen type get +1/+1. As long as you have the city's blessing, they
+    // also have vigilance.": two static abilities about the same creatures, the second with its condition.
+    const groupAlso = /^((?:Other )?[Cc]reatures you control(?: of the chosen type)?) (get [^.]+)\. (As long as [^,.]+), they also (have [^.]+)\.$/.exec(line);
+    const groupStatics = groupAlso ? [parseStatic(`${groupAlso[1]} ${groupAlso[2]}.`), parseConditionalStatic(`${groupAlso[3]}, ${groupAlso[1]!.charAt(0).toLowerCase()}${groupAlso[1]!.slice(1)} ${groupAlso[4]}.`)] : null;
+    if (groupStatics?.every((p) => p && p.affects.kind !== "self") && !groupStatics[0]!.condition && groupStatics[1]!.condition) {
+      for (const p of groupStatics) out.statics.push({ ...p!, text: line });
       continue;
     }
     // Elenda, Saint of Dusk: "As long as <condition>, ~ gets +1/+1 and has menace. ~ gets an additional +5/+5 as long as

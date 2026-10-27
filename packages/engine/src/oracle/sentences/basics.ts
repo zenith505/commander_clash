@@ -459,6 +459,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || /\bthat\b/.test(m[1] ?? "")) return null;
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, ...(filter ? { filter } : {}) }];
   }
+  // Repopulate: "Shuffle all creature cards from target player's graveyard into that player's library": theirs.
+  if ((m = /^[Ss]huffle all (.+?) cards from target player's graveyard into that player's library$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[1]} card`);
+    if (!filter || /\bthat\b/.test(m[1]!)) return null;
+    const who = parsePlayer("target player", ctx);
+    return who ? [{ type: "shuffleZones", who, graveyard: true, filter }] : null;
+  }
   // Winds of Change: "Each player shuffles the cards from their hand into their library, then draws that many cards."
   // Whirlpool Warrior: "shuffle the cards from your hand into your library, then draw that many cards".
   if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles the cards from their hand into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) that many cards$/.exec(s))) {
@@ -670,7 +677,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Sacrifice ~ unless you sacrifice a land" (Bog Elemental, The Gitrog Monster): sacrificing one keeps it; with none to
   // sacrifice, or choosing not to, it's sacrificed.
   // "... unless you sacrifice two Swamps" (Mold Demon): both, or it's sacrificed (with fewer, they can't be).
-  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+  // Cosmic Larva: "... unless you sacrifice two lands" likewise.
+  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s|two lands)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const two = /^two /.test(m[2]!);
     const filter = pickFilter(two ? singular(m[2]!.slice(4)) : m[2]!.replace(/^(?:an?|another) /, ""));
     if (!filter || / or |,/.test(m[2]!)) return null;

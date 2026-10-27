@@ -558,6 +558,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
   // value, as it resolves, is countered (rulings).
   if (/^Target spell can't be countered$/i.test(s)) return [{ type: "spellUncounterable", index: addTarget(ctx, { kind: "spell", text: "target spell" }) }];
+  // Double Negative: "Counter up to two target spells": each one chosen, two different spells (CR 115.3, 115.6).
+  if (/^Counter up to two target spells$/.test(s)) {
+    const a = addTarget(ctx, { kind: "spell", text: "target spell", optional: true });
+    const b = addTarget(ctx, { kind: "spell", text: "target spell", optional: true, distinctFrom: [a] });
+    return [{ type: "counterSpell", index: a }, { type: "counterSpell", index: b }];
+  }
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the

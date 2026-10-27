@@ -754,7 +754,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       if (cond.eventPlayer) return eventPlayer !== undefined && eventPlayer !== you && !s.players[eventPlayer]!.lost && measure(eventPlayer) > mine;
       if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
-      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
+      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (cond.fewer ? measure(p) < mine : measure(p) > mine));
     }
     case "youMostLife":
       return !s.players[you]!.lost && s.turnOrder.every((p) => s.players[p]!.lost || s.players[p]!.life <= s.players[you]!.life);
@@ -933,7 +933,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "playedLandThisTurn":
       return (s.players[you]?.landsPlayedThisTurn ?? 0) > 0;
     case "someHandAtMost":
-      return s.players.some((p) => !p.lost && p.hand.length <= cond.n);
+      return s.players.some((p) => !p.lost && (!cond.opponent || p.id !== you) && p.hand.length <= cond.n);
     case "totalPower": {
       let n = 0;
       for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) n += cond.toughness ? c.toughness : c.power;
@@ -1040,6 +1040,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
       if (cond.is === "token") return !!src.isToken; // Aeve, Progenitor Ooze
+      if (cond.is === "dealtDamageThisTurn") return src.zone === "battlefield" && !!src.wasDealtDamage;
+      if (cond.is === "kicked") return !!src.kicked?.length;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));

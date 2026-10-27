@@ -886,6 +886,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Might of the Meek: "It also gets +1/+0 until end of turn if you control a Mouse": the condition read first, as it
   // resolves (CR 608.2c).
   text = text.replace(/(^|\. )(It|That creature) also gets ([^.]+?) until end of turn if (you control an? [A-Z][a-z]+)\./, (_, a: string, who: string, pt: string, cond: string) => `${a}If ${cond}, ${who.toLowerCase()} also gets ${pt} until end of turn.`);
+  // Rakdos Ickspitter: "~ deals 1 damage to target creature and that creature's controller loses 1 life": two
+  // instructions, in order; the controller as the creature is now or last existed (CR 608.2h).
+  text = text.replace(/^(~ deals \d+ damage to target creature) and (that creature's controller loses \d+ life)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Glistening Deluge: "Creatures that are green and/or white get an additional -2/-2 until end of turn": each one that's
+  // green, white or both, after "All creatures get -1/-1 until end of turn".
+  text = text.replace(/(^All creatures get -\d+\/-\d+ until end of turn\. )Creatures that are (white|blue|black|red|green) and\/or (white|blue|black|red|green) get an additional (-\d+\/-\d+) until end of turn\.$/, (_, a: string, c1: string, c2: string, pt: string) => `${a}${capital(c1)} or ${c2} creatures get ${pt} until end of turn.`);
+  // Lightning Reaver: "~ deals damage equal to the number of charge counters on it to each opponent": X, counted once as
+  // it resolves, to each of them.
+  text = text.replace(/^~ deals damage equal to (the number of [a-z+/0-9-]+ counters on (?:it|~)) to each opponent\.$/, "~ deals X damage to each opponent, where X is $1.");
+  // Lord of Tresserhorn: "you lose 2 life, you sacrifice two creatures, and target opponent draws two cards": three
+  // instructions, in order (it may be one of the creatures sacrificed, rulings).
+  text = text.replace(/^([Yy]ou lose \d+ life), you (sacrifice (?:two|three) creatures), and (target opponent draws (?:two|three) cards)\.$/, (_, a: string, b: string, c: string) => `${a}. ${capital(b)}. ${capital(c)}.`);
+  // Dinrova Horror: "return target permanent to its owner's hand, then that player discards a card": its owner.
+  text = text.replace(/^([Rr]eturn target (?:nonland )?permanent to its owner's hand), then that player discards a card\.$/, "$1, then its owner discards a card.");
+  // Hold for Questioning: "tap enchanted permanent and investigate": two instructions.
+  text = text.replace(/^([Tt]ap enchanted (?:permanent|creature)) and investigate\.$/, "$1. Investigate.");
+  // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
+  // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
+  text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
   // Court of Vantress: "If you're the monarch, you may create a token that's a copy of it. If you're not the monarch, you
   // may have ~ become a copy of it": both "it"s are the chosen target, not the token (only one branch happens).
   text = text.replace(/(If you're the monarch, you may create a token that's a copy of it\. If you're not the monarch, you may have ~ become a copy of) it\b/, "$1 the chosen permanent");
@@ -913,6 +932,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\bIf you control an? ((?:[A-Z][a-z]+, )+)or ([A-Z][a-z]+), /g, (_, list: string, last: string) => `If you control a ${[...list.split(", ").filter(Boolean), last].join(" or ")}, `);
   // Sigil Blessing: "Until end of turn, target creature you control gets +3/+3 and other creatures you control get +1/+1."
   text = text.replace(/^Until end of turn, (target creature you control) (gets [+-]\d+\/[+-]\d+) and (other creatures you control) (get [+-]\d+\/[+-]\d+)\.$/, "Target creature you control $2 until end of turn. Other creatures you control $4 until end of turn.");
+  // Zealous Persecution: "Until end of turn, creatures you control get +1/+1 and creatures your opponents control get
+  // -1/-1." Skulduggery: "Until end of turn, target creature you control gets +1/+1 and target creature an opponent
+  // controls gets -1/-1." Two instructions with the same duration, in order (CR 611.2c: each group is fixed as it resolves).
+  text = text.replace(/^Until end of turn, (creatures you control|target creature you control) (get|gets) ([+-]\d+\/[+-]\d+) and (creatures your opponents control|target creature an opponent controls) (get|gets) ([+-]\d+\/[+-]\d+)\.$/, (all, a: string, v1: string, p1: string, b: string, v2: string, p2: string) =>
+    (v1 === "get") === a.startsWith("creatures") && (v2 === "get") === b.startsWith("creatures") ? `${capital(a)} ${v1} ${p1} until end of turn. ${capital(b)} ${v2} ${p2} until end of turn.` : all);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.
@@ -2239,8 +2263,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "Sacrifice a creature. If you can't, sacrifice ~." (Eldrazi Monument): you must if you can, so only when none was.
-    const sacCant = /^If you can't, (.+)$/.exec(s);
-    if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) {
+    // Woebringer Demon: "At the beginning of each player's upkeep, that player sacrifices a creature of their choice. If the
+    // player can't, sacrifice ~.": the same, about that player.
+    const sacCant = /^If (you|the player|that player) can't, (.+)$/.exec(s);
+    if (sacCant) sacCant.splice(1, 1);
+    if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === (/^If you /.test(s) ? "you" : "eventPlayer") && sacPrev.n === 1 && !sacPrev.unless) {
       const before = ctx.targets.length;
       const inner = parseOne(capital(sacCant[1]!), ctx);
       if (!inner || ctx.targets.length !== before) return null;
@@ -4129,9 +4156,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Electrostatic Bolt: "If it's an artifact creature, ~ deals 4 damage to it instead"; Purifying Dragon: "it deals 1
     // damage to target creature defending player controls. If that creature is a Zombie, ~ deals 2 damage to it instead";
     // Rending Flame: "~ deals 5 damage to target creature or planeswalker. If that permanent is a Spirit, ~ also deals 2
-    // damage to that permanent's controller." All as it is when this resolves (CR 608.2c).
+    // damage to that permanent's controller." Burning Hands: "If that permanent is green, ~ deals 6 damage instead." All
+    // as it is when this resolves (CR 608.2c).
     const dmgIs = /^(?:~|it) deals \d+ damage to target (?:creature|creature or planeswalker)(?: defending player controls| an opponent controls)?$/.test(s)
-      ? /^If (?:that creature|that permanent|it's) (is an? (enchantment|artifact)|an? (artifact) creature|is (white|blue|black|red|green)(?: or (white|blue|black|red|green))?|has ([a-z]+)|(?:is )?an? ([A-Z][a-z]+)), (~ (?:also )?deals \d+ damage to (?:that creature's|that permanent's|its) controller|~ deals (\d+) damage to (?:it|that creature) instead)\.?$/.exec(sentences[si + 1] ?? "")
+      ? /^If (?:that creature|that permanent|it's) (is an? (enchantment|artifact)|an? (artifact) creature|is (white|blue|black|red|green)(?: or (white|blue|black|red|green))?|has ([a-z]+)|(?:is )?an? ([A-Z][a-z]+)), (~ (?:also )?deals \d+ damage to (?:that creature's|that permanent's|its) controller|~ deals (\d+) damage(?: to (?:it|that creature))? instead)\.?$/.exec(sentences[si + 1] ?? "")
       : null;
     const dmgKeyword = dmgIs?.[6] ? capital(dmgIs[6]) : undefined;
     const dmgSubject = !dmgIs ? undefined : /^If that permanent /.test(sentences[si + 1]!) ? "permanent" : /^If that creature /.test(sentences[si + 1]!) ? "creature" : "it";
@@ -4769,6 +4797,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(capital(exiledWay[1]!), ctx);
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "targetExiled", index }, effects: inner });
+      continue;
+    }
+    // Sphinx of Lost Truths: "Then if it wasn't kicked, discard three cards.": only when it wasn't (CR 702.33e), with no
+    // targets of its own.
+    const notKicked = /^(?:Then i|I)f (?:~|it) wasn't kicked, (.+)$/.exec(s);
+    if (notKicked && (ctx.spell || ctx.selfEntered)) {
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(notKicked[1]!), ctx);
+      if (!fx?.length || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "kicked" }, effects: [], otherwise: fx });
       continue;
     }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)

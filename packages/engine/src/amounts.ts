@@ -319,7 +319,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const own = () => (src?.zone === "battlefield" ? characteristics(s, src).name : (ctx.sourceName ?? (src ? defOf(s, src).name : "")));
       const filter = c.filter && (c.filter.named === "~" ? { ...c.filter, named: own() } : bindChosen(c.filter, ctx.chosen));
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
+      const affected = c.affectedController && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const whose = c.affectedController ? (affected ? [view(affected)?.controller ?? controllerOf(s, affected)] : []) : refPlayers(s, c.who, ctx);
+      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
     }
     case "life":
       if (c.highest) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.life));

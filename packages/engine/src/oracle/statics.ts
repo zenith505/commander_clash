@@ -619,7 +619,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
   // in your graveyard"; Vengeful Firebrand: "... a Warrior card ...": one or more.
-  if ((m = /^(?:there is an? (\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
+  if ((m = /^(?:there(?:'s| is) an? (\w+) card in your graveyard|an? (\w+) card is in your graveyard)$/.exec(text))) {
     const amount = parseCount(`the number of ${m[1] ?? m[2]} cards in your graveyard`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: 1 } : null;
   }
@@ -710,6 +710,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you played a land this turn$/.test(text)) return { kind: "playedLandThisTurn" };
   if ((m = new RegExp(`^a player has ${NUM} or fewer cards in hand$`).exec(text))) return { kind: "someHandAtMost", n: num(m[1]!) };
   if (/^a player has no cards in hand$/.test(text)) return { kind: "someHandAtMost", n: 0 };
+  if (/^an opponent has no cards in hand$/.test(text)) return { kind: "someHandAtMost", n: 0, opponent: true };
   if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
   // The Cases' "To solve" conditions (CR 719.3a), about this turn.
   if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))
@@ -729,7 +730,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
   // Nightpack Ambusher: "if you didn't cast a spell this turn".
-  if (/^you didn't cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true };
+  // Stoic Sphinx: "~ has hexproof as long as you haven't cast a spell this turn" likewise, in a static ability (an
+  // effect's "If you haven't cast a spell this turn, you may cast that card" is Conduit of Worlds' own instruction).
+  if (/^you didn't cast a spell this turn$/.test(text) || (/^you haven't cast a spell this turn$/.test(text) && st.mods.length > 0)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true };
   // Prairie Dog, Wrangler of the Damned: "if you haven't cast a spell from your hand this turn".
   if (/^you haven't cast a spell from your hand this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true, fromHand: true };
   // Fae Offering: "if you've cast both a creature spell and a noncreature spell this turn": one of each.
@@ -823,6 +826,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  // Timely Reinforcements: "if you have less life than an opponent", "if you control fewer creatures than an opponent":
+  // the same as an opponent having more.
+  if ((m = /^you (?:control fewer (lands|creatures)|have (less life|fewer cards in hand)) than an opponent$/.exec(text)))
+    return { kind: "opponentMore", what: (m[1] ?? (m[2] === "less life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  // Feudkiller's Verdict: "if you have more life than an opponent": an opponent has less.
+  if ((m = /^you (?:control more (lands|creatures)|have more (life|cards in hand)) than an opponent$/.exec(text)))
+    return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand", fewer: true };
   // "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's player, strictly
   // more than every other player still in the game (CR 800.4a), you included.
   if ((m = /^that player (?:controls more (lands|creatures)|has more (life|cards in hand)) than each other player$/.exec(text)))

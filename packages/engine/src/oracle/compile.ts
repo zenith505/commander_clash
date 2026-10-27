@@ -1950,6 +1950,14 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Gruul Spellbreaker: "During your turn, you and ~ have hexproof.": you have it in your turn, and so does ~.
+    const youAndSelf = /^During your turn, you and ~ have hexproof\.$/.test(line) && !out.youHave ? parseConditionalStatic("During your turn, ~ has hexproof.") : null;
+    if (youAndSelf) {
+      out.youHave = "hexproof";
+      out.youHaveDuringYourTurn = true;
+      out.statics.push({ ...youAndSelf, text: line });
+      continue;
+    }
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
     if (youHave && !out.youHave) {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");

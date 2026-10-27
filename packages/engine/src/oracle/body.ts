@@ -123,6 +123,8 @@ export interface Ctx {
   eachOne?: boolean;
   /** "Choose an opponent." came before: "that player" is the one chosen. */
   chosenOpponent?: boolean;
+  /** "Flip five coins" whose heads are counted (Ral Zarek): no one calls them (CR 705.2). */
+  uncalledFlips?: boolean;
   /** "Roll two d8 and choose one result" came before: "that result" and "the other result" mean something. */
   chooseResult?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
@@ -776,6 +778,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   if (text.includes("•") && (!reflexiveModes || text.indexOf("•") < reflexiveModes.index)) return null;
   const ctx: Ctx = {
     targets: [],
+    // Ral Zarek: "Flip five coins. ... for each coin that comes up heads": flips no one calls (CR 705.2).
+    ...(/\b[Ff]lip (?:two|three|four|five) coins\b/.test(text) && /\bfor each coin that comes up heads\b/.test(text) ? { uncalledFlips: true } : {}),
     ...(opts.subject ? { subject: true } : {}),
     ...(opts.subjectIt ? { subject: true, subjectIt: true } : {}),
     ...(opts.subjectLeft ? { subjectLeft: true } : {}),
@@ -5824,6 +5828,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // amount is worked out as the targets are chosen, while it's being cast, anyway (TargetSpec.divided.amount).
       const asCast = / as you (?:cast ~|cast this spell|activate this ability)$/.exec(where[2]!);
       const added = effects.slice(before);
+      // "Up to X target creatures ..., where X is the number of Bobbleheads you control as you activate this ability"
+      // (Endurance Bobblehead): how many targets, worked out as they're chosen (CR 601.2c), which is as it's activated.
+      const manyAt = ctx.targets.findIndex((t, k) => k >= targetsBefore && t.manyWhere);
+      if (manyAt >= 0) {
+        const n = parseCount(asCast ? where[2]!.slice(0, asCast.index) : where[2]!, ctx);
+        // X counts the targets only: an X in what they get is worked out as it resolves, not as you activate.
+        if (!n || !boundAtTargeting(n) || (asCast && JSON.stringify(added).includes('"x"'))) return false;
+        const { manyWhere: _, ...t } = ctx.targets[manyAt]!;
+        ctx.targets[manyAt] = { ...t, manyCount: n };
+        if (asCast) return true;
+      }
       const dividedOnly = added.length === 1 && added[0]!.type === "damage" && !!added[0]!.divided && ctx.targets.slice(targetsBefore).some((t) => t.divided?.amount);
       // Otherwise this spell's own amount, counted once as it's cast (Count asCast; rulings on Lifestream's Blessing).
       const castOnce = asCast && !dividedOnly && ctx.spell && /^ as you cast (?:~|this spell)$/.test(asCast[0]);
@@ -7824,6 +7839,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
     // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").
+    if (/^[Cc]hoose an opponent at random$/.test(s)) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
+      effects.push({ type: "choose", choice: "opponent", random: true });
+      ctx.chosenOpponent = true;
+      continue;
+    }
     if (/^[Cc]hoose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
       // The Offerings: a spell's second paragraph starting "Choose an opponent." again, its own choice (rulings on
       // Sylvan Offering: the same opponent or a different one, chosen as it resolves).
@@ -8333,10 +8354,11 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   // "If that spell's mana value is 5 or greater, create three of those tokens instead" (Prismari Pianist), in a cast
   // trigger: the spell's mana value as the ability resolves, or as it last existed on the stack (CR 608.2h).
   // Herald of Ilharg: "If that spell has mana value 5 or greater, ...": the same.
-  const spellMv = ctx.castSpell ? /^If that spell's mana value is (\d+) or greater, (.+)$/.exec(s) ?? /^If that spell has mana value (\d+) or greater, (.+)$/.exec(s) : null;
+  // Eshki, Temur's Roar: "If that spell's power is 4 or greater, ...": the same, its power.
+  const spellMv = ctx.castSpell ? /^If that spell's (mana value|power) is (\d+) or greater, (.+)$/.exec(s) ?? /^If that spell has (mana value) (\d+) or greater, (.+)$/.exec(s) : null;
   if (spellMv) {
-    const amount = parseCount("that spell's mana value", ctx);
-    return amount ? { cond: { kind: "amountNow", amount, min: Number(spellMv[1]) }, not: false, text: spellMv[2]!, noTargets: true } : null;
+    const amount = parseCount(`that spell's ${spellMv[1]}`, ctx);
+    return amount ? { cond: { kind: "amountNow", amount, min: Number(spellMv[2]) }, not: false, text: spellMv[3]!, noTargets: true } : null;
   }
   const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s);
   if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacType[2]!, noTargets: true };
@@ -8857,7 +8879,7 @@ export function usesX(v: unknown): boolean {
     // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
     if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;
-    if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
+    if ((o.many === "x" && !o.manyCount) || o.many === "exactX") return true; // "X target creatures"
     if (o.xRange || (o.total as TargetSpec["total"])?.x || o.kind === "xAtLeast") return true; // "with mana value X or less", "if X is 5 or more"
     return Object.values(o).some(usesX);
   }
@@ -9166,7 +9188,8 @@ function parseYouList(s: string, ctx: Ctx): Effect[] | null {
   if (parts.length < 3) return null;
   const out: Effect[] = [];
   for (const p of parts) {
-    const fx = parseSentence(`You ${p}`, ctx);
+    // "You draw a card, gain 1 life, and put a +1/+1 counter on ~" (Helga, Skittish Seer): "put" reads as an instruction.
+    const fx = parseSentence(`You ${p}`, ctx) ?? (/^put an? [^ ]+ counter on ~$/.test(p) ? parseSentence(capital(p), ctx) : null);
     if (!fx) return null;
     out.push(...fx);
   }

@@ -981,6 +981,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // control this combat." Ties count: an opponent with the same result as yours had the highest result (rulings).
   if (/^If one or more opponents had the highest result, ~ can't attack those players or planeswalkers they control this combat$/.test(s))
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantAttackPlayers", players: "highestRoll", combat: "this" }], duration: "endOfTurn" }];
+  // Raving Dead: "Choose an opponent at random. ~ attacks that player this combat if able": a requirement to attack that
+  // player (CR 508.1d), as encore's; one that can't attack them needn't attack at all.
+  if (/^~ attacks that player this combat if able$/.test(s) && ctx.chosenOpponent) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "mustAttackPlayer", player: "chosen", combat: "this" }], duration: "endOfTurn" }];
   // "That token attacks this combat if able" (Howlsquad Heavy): the same requirement, nothing else gained.
   if ((m = /^(That token|That creature|It) attacks this (turn|combat) if able$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);

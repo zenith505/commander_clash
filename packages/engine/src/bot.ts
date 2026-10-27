@@ -508,6 +508,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Gluntch: ourselves for the first gift we'd get something from (the counters only with a creature), the rest to the
     // opponent with the least power on the battlefield.
+    // "That player or a planeswalker that player controls": the player while they're low on life, else their planeswalker
+    // with the least loyalty, the easiest to finish off.
+    if (pend.kind === "chooseOption" && pend.what === "damageWhom") {
+      const [them, ...pws] = pend.options;
+      const low = player(s, Number(them!.slice(1))).life <= 10;
+      const pw = [...pws].sort((a, b) => (obj(s, a).counters.loyalty ?? 0) - (obj(s, b).counters.loyalty ?? 0))[0];
+      return [{ type: "chooseOption", player: pid, choice: low || pw === undefined ? them! : pw }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
       const r = s.resolving;
       const next = r ? r.body.effects[r.next + 1] : undefined;

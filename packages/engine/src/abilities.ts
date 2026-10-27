@@ -355,8 +355,8 @@ export type Count =
   | { kind: "rollEquals"; value: number }
   /** "If you put +1/+1 counters on five Dragons this way" (Call the Spirit Dragons): the permanents this resolution put counters on. */
   | { kind: "countersPutOnThisWay" }
-  /** "For each flip you won" after "flip a coin until you lose a flip". */
-  | { kind: "flipsWon" }
+  /** "For each flip you won" after "flip a coin until you lose a flip"; `heads`: "for each coin that comes up heads" after uncalled flips (Ral Zarek). */
+  | { kind: "flipsWon"; heads?: true }
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
@@ -794,6 +794,13 @@ export interface TargetSpec {
    */
   /** With `many` "any": "up to one hundred target creatures" (Baldin), no more than this many. */
   manyMax?: number;
+  /**
+   * With `many` "x": "up to X target creatures ..., where X is the number of Bobbleheads you control" (Endurance
+   * Bobblehead): X worked out as the targets are chosen (CR 601.2c), not an announced X. `manyWhere` marks it until
+   * the "where X is" is read.
+   */
+  manyCount?: AmountExpr;
+  manyWhere?: true;
   many?: "any" | "x" | "exactX" | /** "Another target for each time ~ was kicked" (Comet Storm): as many as times kicked, made so as it's cast (gateBody). */ "kicked";
   /**
    * "For each opponent, destroy up to one target artifact that player controls": one "up to one" target for each
@@ -1091,7 +1098,12 @@ export type DamageRecipient =
   /** "The player or planeswalker it's attacking" (Myr Battlesphere): what the source is attacking, or was as it last existed; nothing for a battle. */
   | { ref: "attackedBySelf"; subject?: true }
   /** "That permanent or player" after "Whenever a source you control deals damage to a permanent or player" (Ghyrson Starn): the permanent dealt it (the subject), while it's that permanent, or the player (the event player). */
-  | { ref: "eventRecipient" };
+  | { ref: "eventRecipient" }
+  /**
+   * "That player or a planeswalker that player controls" (Vial Smasher the Fierce, Curse of the Pierced Heart): not
+   * targeted; the controller chooses one as it resolves (rulings), asked only when that player controls a planeswalker.
+   */
+  | { ref: "playerOrPlaneswalker"; who: PlayerRef };
 
 /**
  * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
@@ -1306,7 +1318,7 @@ export type Modification =
   /** "Can't have hexproof or shroud" (Arcane Lighthouse): no layer 6 effect gives them these, whatever its timestamp. */
   | { kind: "cantHaveKeywords"; keywords: string[] }
   /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
-  | { kind: "mustAttackPlayer"; player: PlayerId }
+  | { kind: "mustAttackPlayer"; player: PlayerId | /** "That player" after "choose an opponent" (Raving Dead): bound as it resolves (Effect "continuous"). */ "chosen"; /** "Attacks that player this combat if able": in that combat only, as "attacksIfAble". */ combat?: number | "this" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be the target of spells or abilities your opponents control", "... of black spells or abilities from black sources" (CR 115.4). */
@@ -1632,6 +1644,8 @@ export type StaticCondition =
   | { kind: "opponentDealtDamage"; n: number; /** "If you were dealt 4 or more damage this turn" (Boarded Window): `you`. */ you?: true }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
   | { kind: "attackedWith"; n: number }
+  /** Pack tactics: "if you attacked with creatures with total power 6 or greater this combat": their total power as they were declared as attackers (PlayerState.attackPower; AFR release notes). */
+  | { kind: "attackPower"; n: number }
   /** "If you lost life last turn" (First Response, Paladin of Atonement): during the turn before this one (GameState.lastTurn). */
   | { kind: "lostLifeLastTurn" }
   /** "If you've drawn two or more cards this turn"; `opponent`: "if an opponent drew three or more cards this turn" (Runeflare Trap). */
@@ -2851,7 +2865,7 @@ export type Effect =
    * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
    * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
    */
-  | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number }
+  | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
    * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
@@ -3454,7 +3468,7 @@ export type Effect =
    * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
    */
   | { type: "choosePlayer"; prompt: string }
-  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
+  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "Choose an opponent at random" (Vial Smasher the Fierce): one still in the game, as it resolves. */ random?: true; /** With "opponent": "Choose an opponent." a second time in the same ability (Sylvan Offering): chosen anew, "that player" after it being the new one. */ again?: true; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -5348,6 +5362,8 @@ export interface CompiledCard {
   beginOnBattlefield?: true | { notStarting: true; counter: CounterKind; exileFromHand: true };
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /** "If you would gain life while you have 5 or less life, ..." (Phial of Galadriel): `doubleLifeGain` only while this holds, as the life would be gained. */
+  doubleLifeGainIf?: StaticCondition;
   /** "If an opponent would lose life during your turn, they lose twice that much life instead" (Bloodletter of Aclazotz). */
   opponentsLoseDouble?: true;
   /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
@@ -5391,7 +5407,11 @@ export interface CompiledCard {
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
    * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
   drawTwoInstead?: true | "always";
-  /** "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR 702.178a). */
+  /**
+   * "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR
+   * 702.178a). "If you would draw a card while you have no cards in hand, draw two cards instead" (Phial of Galadriel): as
+   * each draw would happen.
+   */
   drawTwoIf?: StaticCondition;
   /**
    * Abundance: "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your

@@ -125,6 +125,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       giveCitysBlessing(s, ctx.controller, true); // CR 702.131a
       return;
     case "damage": {
+      // "That player or a planeswalker that player controls" (Vial Smasher the Fierce): the controller chooses which as it
+      // resolves (rulings), asked only when there's a planeswalker to choose.
+      if (e.to.ref === "playerOrPlaneswalker") {
+        const sc = (s.resolving!.scratch ??= {});
+        if (sc.damageWhom === undefined) {
+          const pid = players(s, e.to.who, ctx).find((x) => !player(s, x).lost);
+          if (pid === undefined) return;
+          const pws = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Planeswalker"));
+          if (pws.length) {
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "damageWhom", options: [`p${pid}`, ...pws], labels: [player(s, pid).name, ...pws.map((id) => defOf(s, obj(s, id)).name)], prompt: `deal the damage to ${player(s, pid).name} or a planeswalker they control` };
+            return "paused";
+          }
+          sc.damageWhom = `p${pid}`;
+        }
+      }
       const amount = amountNow(s, e.amount, ctx);
       // Price of Progress: each player's own amount ("that player controls", PlayerRef eachOne).
       const perPlayer = typeof e.amount === "object" && JSON.stringify(e.amount).includes('"eachOne"');

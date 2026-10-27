@@ -57,6 +57,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, untilYourNextTurn: true }];
   }
   // Extra turns (CR 500.7): "Take an extra turn after this one", "Target player takes two extra turns after this one".
+  // Ral Zarek: "Take an extra turn after this one for each coin that comes up heads", counted as it resolves.
+  if ((m = /^Take an extra turn after this one for each (.+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx, true);
+    return n ? [{ type: "extraTurn", who: { ref: "you" }, n }] : null;
+  }
   if ((m = /^(?:(.+?) )?(?:take|takes) (an|two|three) extra turns? after this one$/i.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "extraTurn", who, n: m[2] === "an" ? 1 : m[2] === "two" ? 2 : 3 }] : null;
@@ -243,7 +248,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Ff]lip a coin$/.test(s)) return [{ type: "flipCoin" }];
   if (/^[Ff]lip a coin until you lose a flip$/.test(s)) return [{ type: "flipCoin", untilLose: true }];
   // Goblin Traprunner: "flip three coins", then "for each flip you win" counts the wins (CR 705).
-  if ((m = /^[Ff]lip (two|three|four|five) coins$/.exec(s))) return [{ type: "flipCoin", n: num(m[1]!) }];
+  if ((m = /^[Ff]lip (two|three|four|five) coins$/.exec(s))) return [{ type: "flipCoin", n: num(m[1]!), ...(ctx.uncalledFlips ? { uncalled: true as const } : {}) }];
   // Clash (CR 701.30b): see "If you win, ..." in body.ts.
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
   // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards

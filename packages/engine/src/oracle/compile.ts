@@ -957,6 +957,16 @@ export function compile(d: CardDef): CompiledCard {
     // "Each other creature you control enters with a number of additional +1/+1 counters on it equal to ~'s power and as a
     // Mutant in addition to its other types" (Master Biomancer): its power as the creature enters (rulings), and the type
     // whatever that power is.
+    // Bloodspore Thrinax: "Each other creature you control enters with an additional X +1/+1 counters on it, where X is the
+    // number of +1/+1 counters on ~": as each one would enter (CR 614.1c); not creatures entering with it (rulings).
+    const byCounters = new RegExp(`^Each other (creature you control) enters with an additional X ${COUNTER} counters on it, where X is the number of ${COUNTER} counters on ~\\.$`).exec(line);
+    if (byCounters) {
+      const g = parseGroup(`each ${byCounters[1]}`);
+      const per = parseCount(`the number of ${byCounters[3]} counters on ~`, null);
+      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you" || !per || typeof per !== "object") out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byCounters[2]!), n: 1, per, text: line });
+      continue;
+    }
     const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s (toughness|power)(?: and as an? ([A-Z][a-z]+) in addition to its other types)?\\.$`).exec(line);
     if (byToughness) {
       const g = parseGroup(`each ${byToughness[1]}`);
@@ -986,7 +996,7 @@ export function compile(d: CardDef): CompiledCard {
     const socialite = /^As long as (an opponent lost life this turn), (each other .+)$/.exec(line);
     const socialiteIf = socialite ? parseStaticCondition(socialite[1]!, { affects: { kind: "self" }, mods: [], text: line }) : undefined;
     const othersLine = socialite ? `E${socialite[2]!.slice(1)}` : line;
-    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control| for each mana from (?:a Treasure|an artifact source) spent to cast it)?\\.$`).exec(othersLine);
+    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control| for each mana from (?:a Treasure|an artifact source) spent to cast it| for each land that entered the battlefield under your control this turn)?\\.$`).exec(othersLine);
     if (socialite && (!othersExtra || !socialiteIf)) {
       out.unsupported.push(raw);
       continue;
@@ -1004,9 +1014,12 @@ export function compile(d: CardDef): CompiledCard {
         // "For each Angel you already control" (Giada, Font of Hope): a creature type, counted as each one enters.
         // "For each mana from an artifact source spent to cast it" (Coin of Mastery): see perSpentFrom.
         const spentFrom = othersExtra[5] && / for each mana from /.test(othersExtra[5]) ? (/Treasure/.test(othersExtra[5]) ? "treasure" : "artifact") : undefined;
-        const per = othersExtra[5] && !spentFrom ? / for each ([A-Z][a-z]+) you already control$/.exec(othersExtra[5])![1]! : undefined;
-        if (per && !CREATURE_TYPES.has(per)) out.unsupported.push(raw);
-        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), ...(socialiteIf ? { while: socialiteIf } : {}), text: line });
+        // Bioengineered Future: "... for each land that entered the battlefield under your control this turn", counted as
+        // each one would enter, lands from before it was on the battlefield too (rulings).
+        const landsIn = othersExtra[5] && / for each land that entered /.test(othersExtra[5]) ? parseCount("land that entered the battlefield under your control this turn", null, true) : undefined;
+        const per = othersExtra[5] && !spentFrom && !landsIn ? / for each ([A-Z][a-z]+) you already control$/.exec(othersExtra[5])![1]! : undefined;
+        if ((per && !CREATURE_TYPES.has(per)) || landsIn === null) out.unsupported.push(raw);
+        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), ...(landsIn ? { per: landsIn } : {}), ...(socialiteIf ? { while: socialiteIf } : {}), text: line });
       }
       continue;
     }
@@ -2323,6 +2336,16 @@ export function compile(d: CardDef): CompiledCard {
     // "You can't cast creature spells" (Steel Golem), "noncreature spells" (Nikya of the Old Ways): a "can't" that wins
     // over any "can" (CR 101.2); putting creatures onto the battlefield isn't casting them (rulings).
     // "Your opponents can't cast noncreature spells" (Narset Transcendent's emblem): each opponent of its controller.
+    // Gaddock Teeg: "Noncreature spells with mana value 4 or greater can't be cast", "... with {X} in their mana costs ...";
+    // Aether Storm: "Creature spells can't be cast": anyone's.
+    const noOne = /^(Creature|Noncreature) spells( with mana value \d+ or greater| with \{X\} in their mana costs)? can't be cast\.$/.exec(line);
+    if (noOne) {
+      const hasX = noOne[2] === " with {X} in their mana costs";
+      const filter = parseTargetPhrase(`${noOne[1]!.toLowerCase()} spell${noOne[2] && !hasX ? noOne[2] : ""}`);
+      if (filter?.kind !== "spell") out.unsupported.push(raw);
+      else (out.cantBeCast ??= []).push({ filter: { ...filter, text: `${noOne[1]!.toLowerCase()} spell${noOne[2] ?? ""}` }, ...(hasX ? { hasX: true as const } : {}), text: line });
+      continue;
+    }
     const cantCast = /^(You|Your opponents) can't cast (creature|noncreature) spells\.$/.exec(line);
     if (cantCast) {
       const filter = parseTargetPhrase(`${cantCast[2]} spell`);
@@ -2611,9 +2634,13 @@ export function compile(d: CardDef): CompiledCard {
     // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
     if (uncounterable && !/\b(this turn|by)\b/.test(line)) {
-      const words = uncounterable[1]!.trim().toLowerCase();
+      // Taigam, Ojutai Master: "Instant, sorcery, and Dragon spells you control": each that's one of the card types or has
+      // the creature type (TargetSpec.orSubtypes).
+      const mixed = /^((?:instant|sorcery|creature|artifact|enchantment), )+and ([A-Z][a-z]+) $/i.exec(uncounterable[1]!);
+      const words = (mixed ? uncounterable[1]!.replace(/, and [A-Z][a-z]+ $/, "") : uncounterable[1]!).trim().toLowerCase();
       // "Creature and enchantment spells" (Destiny Spinner): each spell that's either.
-      const filter = words ? parseTargetPhrase(`${words.replace(/^([a-z]+) and ([a-z]+)$/, "$1 or $2")} spell`) : { kind: "spell" as const, text: "spell" };
+      const filter0 = words ? parseTargetPhrase(`${words.replace(/^([a-z]+) and ([a-z]+)$/, "$1 or $2").replace(/^([a-z]+), ([a-z]+)$/, "$1 or $2")} spell`) : { kind: "spell" as const, text: "spell" };
+      const filter = mixed && filter0?.kind === "spell" && filter0.types?.length && CREATURE_TYPES.has(mixed[2]!) ? { ...filter0, orSubtypes: [mixed[2]!] } : mixed ? null : filter0;
       if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
       else out.unsupported.push(raw);
       continue;
@@ -2921,7 +2948,9 @@ export function compile(d: CardDef): CompiledCard {
     // activated (CR 602.2b, 601.2f), the source left out.
     const equipLessEach = !equipLessPer && !equipLessIf ? /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each ([^.]+)\.$/.exec(line) : null;
     const lessEach = equipLessEach ? parseCount(equipLessEach[3]!, null, true) : null;
-    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer ?? (lessCond ? equipLessIf : null) ?? (lessEach ? equipLessEach : null);
+    // Leather Armor: "Equip {0}. Activate only once each turn." (CR 602.5b).
+    const equipOnce = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. Activate only once each turn\.$/.exec(line);
+    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipOnce ?? equipLessPer ?? (lessCond ? equipLessIf : null) ?? (lessEach ? equipLessEach : null);
     if (equip && d.subtypes.includes("Equipment")) {
       // CR 702.6a: "[Cost]: Attach this permanent to target creature you control. Activate only as a sorcery."
       out.activated.push({
@@ -2935,6 +2964,7 @@ export function compile(d: CardDef): CompiledCard {
         ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
         ...(lessCond ? { costLessIf: { n: Number(equipLessIf![2]), cond: lessCond } } : {}),
         ...(lessEach ? { costLess: { ...lessEach, times: (lessEach.times ?? 1) * Number(equipLessEach![2]) } } : {}),
+        ...(equipOnce ? { oncePerTurn: true } : {}),
       });
       continue;
     }
@@ -3246,6 +3276,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
       // "When you cast ~ and whenever ~ attacks, destroy up to one target nonland permanent" (Cityscape Leveler).
       /^When you cast ~ and whenever ~ (attacks), (.+)$/.exec(line) ??
+      // "When you cast this spell and when this creature dies, create a 0/1 ... Eldrazi Spawn ..." (Eldrazi Repurposer).
+      /^When you cast ~ and when ~ (dies), (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~|becomes monstrous), (.+)$/.exec(line) ??
@@ -3287,6 +3319,8 @@ export function compile(d: CardDef): CompiledCard {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast ~ and whenever/.test(line)
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
+        : /^When you cast ~ and when ~ dies, /.test(line)
+        ? [`When you cast ~, ${effect}`, `When ~ dies, ${effect}`]
         : /^When you cast/.test(line)
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)

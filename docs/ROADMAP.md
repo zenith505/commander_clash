@@ -1,8 +1,8 @@
 # Roadmap
 
-25,360 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,677 of
-9,979 (86%).
+25,427 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,718 of
+9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -281,12 +281,31 @@ line blocks.
    Foes!, Scrounging Bandar, Malboro, Kothophed, Argent Dais, Propagator Drone, Vampire Nocturnus, Mul Daya
    Channelers, Lluwen, Wartime Protestors, Horned Loch-Whale, Sinkhole Surveyor, Haliya, Realm Seekers, Reality Heist
    and others), taking the easy ones.
-   Next most played: Conqueror's Galleon, Grub, Storied Matriarch,
+   Out after round 177: Muraganda Petroglyphs ("creatures with no abilities"), Ertai's Scorn and Even the Score
+   (colored cost reductions), Skyscribing (forecast), Clever Conjurer ("not named ~" in target legality), Zaffai,
+   Thunder Conductor (an opponent chosen at random), Super-Soldier Serum, Xathrid Demon, Minion of Leshrac and Oath
+   of Lim-Dûl (their other lines), Geralf, the Fleshwright ("each other Zombie that entered this turn": the count
+   leaving out the one that entered), Oketra's Last Mercy and Long Rest ("lands you control don't untap during your
+   next untap step", lands that enter later too), Trench Behemoth and Sizzling Soloist ("attacks during its
+   controller's next combat phase if able"), Brotherhood Outcast (an Aura card returned to the battlefield), Fury Charm
+   (time counters on a suspended card), Exterminate! (replicate by tapping a Dalek), Flaming Gambit (the player
+   redirects the damage to a creature), Drach'Nyen ("the exiled card's power"), Kalamax ("whenever you copy an instant
+   spell"), Extinction Event (odd or even), Fateful Handoff (draw by a target's mana value, then give it away),
+   Reprocess (sacrifice any number of three kinds), Wave of Rats ("if it dealt combat damage to a player this turn"),
+   Darksteel Angel (-1/-1 counters can't be put), Reality Acid, Hammerheim (landwalk), Coalition Victory. Round 177
+   went down from rank 9,240 to about rank 10,060 (Frost Titan, Seasoned Pyromancer, Devil's Play, Mind Funeral,
+   Custodi Lich, Resolute Archangel, Jadelight Spelunker, Smaug, Tatyova, Gaddock Teeg, Aether Storm, Taigam, Lord of
+   the Pit, Biorhythm, Flux, Awaken the Erstwhile, Martha Jones, Phoenix Fleet Airship, Bloodspore Thrinax, Yorvo,
+   Prismari Pianist, Baru, Sokka, Arcbound Tracker, Gold Rush, Tainted Treats and others), taking the easy ones.
+   Next most played after rank 10,060: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke
+   Spirits' Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Dimir Charm, Overabundance,
+   Throatseeker, Voice of Resurgence, Giott, Avalanche of Sector 7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli,
+   Foe-Razer Regent, Donal, Gandalf, White Rider; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in round 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,

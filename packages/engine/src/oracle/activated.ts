@@ -236,6 +236,16 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, less.index);
       found = true;
     }
+    // Baru, Wurmspeaker: "This ability costs {X} less to activate, where X is the greatest power among Wurms you control":
+    // generic mana only, counted as it's activated (CR 602.2b, 601.2f).
+    const lessX = / This ability costs \{X\} less to activate, where X is ([^.]+)\.$/.exec(effectText);
+    if (lessX && !costLess && !/\b(?:it targets|~'s)\b/.test(lessX[1]!)) {
+      const c = parseCount(lessX[1]!, null);
+      if (!c) return "fail";
+      costLess = c;
+      effectText = effectText.slice(0, lessX.index);
+      found = true;
+    }
     // Hylda's Crown of Winter: "This ability costs {1} less to activate during your turn."
     const lessTurn = / This ability costs \{(\d+)\} less to activate during your turn\.$/.exec(effectText);
     if (lessTurn && !costLess && !costLessIf) {

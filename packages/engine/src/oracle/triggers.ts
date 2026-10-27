@@ -55,6 +55,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
   // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
   [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
+  [/^Whenever ~ is dealt noncombat damage, (.+)$/, "selfIsDealtNoncombatDamage"],
   // "Whenever a source deals damage to ~, that source's controller ..." (Phyrexian Obliterator): once for each source
   // that deals it damage at the same time; "that source's controller" is that player (rulings).
   [/^Whenever a source deals damage to ~, (.+)$/, "selfDealtDamageBySource"],
@@ -79,6 +80,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
+  [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
   [/^Whenever you scry or surveil, (.+)$/, "youScryOrSurveil"],
   [/^Whenever you scry, (.+)$/, "youScry"],
   [/^Whenever you surveil, (.+)$/, "youSurveil"],
@@ -135,7 +137,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous", "selfMutates",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfBecomesMonstrous", "selfMutates",
   "selfBecomesUntapped", "selfBecomesCrewed",
 ];
 
@@ -489,6 +491,9 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   if (m[1] === "~") {
     // Bonecrusher Giant: "~ deals 2 damage to that spell's controller": the player who controls it, "that player".
     const text = m[5]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ").replace(m[2] ? /^$/ : /\bthat spell's controller\b/g, "that player");
+    // Frost Titan: "counter that spell or ability unless its controller pays {2}", as ward does (CR 702.21a).
+    const selfTaxed = m[2] && /^counter that spell or ability unless its controller pays (\{\d+\})\.?$/.exec(m[5]!);
+    if (selfTaxed) return { event: "selfBecomesTarget", targeted, body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: selfTaxed[1]! } }], text: `counter that spell or ability unless its controller pays ${selfTaxed[1]}.` } };
     const body = counter ? { targets: [], effects: [{ type: "counterCause" as const }], text: "Counter that spell or ability." } : parseBody(text, { selfIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
     return body ? { event: "selfBecomesTarget", targeted, body } : "fail";
   }
@@ -524,6 +529,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = body0 && spellX ? { ...replaceX(body0, { count: { kind: "castSpellX" } }), text: body0.text } : body0;
     const nth4 = nth[5];
     return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
+  }
+  // "Whenever you cast a spell other than your first spell each turn" (Arcbound Tracker): its second or later this turn,
+  // counting spells cast before this was on the battlefield (rulings).
+  // "Whenever you cast a spell during your turn other than your first spell that turn" (Geralf): only in your own turn.
+  const notFirst = /^Whenever you cast a spell (during your turn )?other than your first spell (?:each|that) turn, (.+)$/.exec(line);
+  if (notFirst) {
+    const body = parseBody(notFirst[2]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" }, notFirst: true, ...(notFirst[1] ? { ownTurn: true as const } : {}) }, body } : "fail";
   }
   // Alania, Divergent Storm: "Whenever you cast a spell, if it's the first instant spell, the first sorcery spell, or the
   // first Otter spell other than ~ you've cast this turn, ...": one trigger if it's the first of any of those kinds (an
@@ -1717,7 +1730,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+!? — (?=(When|Whenever|At)\b)/, ""))
     .replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
-    .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ");
+    .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ")
+    // Resolute Archangel: "if your life total is less than your starting life total, it becomes equal to ...": "it" is
+    // your life total.
+    .replace(/(, if your life total is less than your starting life total), it becomes equal to your starting life total\.$/, "$1, your life total becomes your starting life total.");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
   const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);
@@ -2740,7 +2756,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));

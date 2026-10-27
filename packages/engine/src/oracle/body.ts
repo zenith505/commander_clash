@@ -82,6 +82,8 @@ export interface Ctx {
   costLinked?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
   lastCreated?: boolean;
+  /** The last sentence created one creature token: "put a +1/+1 counter on that creature" (Otterball Antics) means it. */
+  lastCreatedCreature?: boolean;
   /**
    * The last sentence put one card onto the battlefield ("Return target creature card from your graveyard to the
    * battlefield"): "it" and "that creature" are the permanent it became (CR 400.7), kept in `created` like a token.
@@ -666,6 +668,15 @@ const LIM_DULS_VAULT =
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
+  // Increasing Ambition: "Search your library for a card and put that card into your hand. If ~ was cast from a graveyard,
+  // instead search your library for two cards and put those cards into your hand. Then shuffle." One search either way,
+  // then the shuffle: the same as each search followed by its shuffle.
+  const searchInstead = /^Search your library for (an? [^.,]+?) and put that card into your hand\. If ~ was cast from a graveyard, instead search your library for (two [^.,]+?) and put those cards into your hand\. Then shuffle\.$/.exec(text.trim());
+  if (searchInstead) return parseBody(`Search your library for ${searchInstead[1]}, put that card into your hand, then shuffle. If ~ was cast from a graveyard, instead search your library for ${searchInstead[2]}, put those cards into your hand, then shuffle.`, opts);
+  // Increasing Confusion: "Target player mills X cards. If ~ was cast from a graveyard, that player mills twice that many
+  // cards instead": twice X.
+  const millTwice = /^(Target player mills X cards\. If ~ was cast from a graveyard, that player mills) twice that many cards instead\.$/.exec(text.trim());
+  if (millTwice) return parseBody(`${millTwice[1]} twice X cards instead.`, opts);
   const instead = /^(Counter target spell unless its controller pays \{\d+\})\. If (you control [^,.]+), counter that spell unless its controller pays (\{\d+\}) instead\.$/.exec(text.trim());
   if (instead) {
     const base = parseBodyText(`${instead[1]}.`, opts);
@@ -1342,12 +1353,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Until end of turn, target attacking creature gets +1/+1 for each other attacking creature and gains double strike"
   // (Paladin Class): both until end of turn.
   text = text.replace(/(^|\. )[Uu]ntil end of turn, (target [a-z ]*?creature) gets ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gains ([a-z ]+)\./, (_, a, t, pt, per, kw) => `${a}${t.charAt(0).toUpperCase()}${t.slice(1)} gets ${pt} until end of turn for each ${per}. It gains ${kw} until end of turn.`);
+  // Gold Rush: "Until end of turn, up to one target creature gets +2/+2 for each Treasure you control": the same.
+  text = text.replace(/(^|\. )[Uu]ntil end of turn, ((?:up to one )?target [a-z ]*?creature) gets ([+-]\d+\/[+-]\d+) for each ([^.,]+?)\./, (_, a, t, pt, per) => `${a}${capital(t)} gets ${pt} until end of turn for each ${per}.`);
   text = text.replace(/(^|\. )Until end of turn, creatures you control get ([+-]\d+\/[+-]\d+) for each ([^.]+?) and gain ([a-z]+)\./, "$1Creatures you control get $2 until end of turn for each $3. Creatures you control gain $4 until end of turn.");
   // Haldir, Lórien Lieutenant: "Until end of turn, other Elves you control gain vigilance and get +1/+1 for each +1/+1
   // counter on ~": the same.
   text = text.replace(/(^|\. )Until end of turn, (other [A-Z][a-z]+ you control) gain ([a-z]+) and get ([+-]\d+\/[+-]\d+) for each ([^.]+?)\./, (_, a: string, g: string, kw: string, pt: string, per: string) => `${a}${capital(g)} gain ${kw} until end of turn. ${capital(g)} get ${pt} until end of turn for each ${per}.`);
   // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
+  // "Sacrifice a creature other than ~" (Lord of the Pit, Demonic Taskmaster) is "sacrifice another creature".
+  text = text.replace(/\b([Ss]acrifice) an? (creature|permanent) other than ~/g, "$1 another $2");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
   // except it has haste." (Twinflame): a copy of each of them.
   // "Choose up to two target creatures you don't control. For each of those creatures, create a token that's a copy of that
@@ -3999,6 +4014,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // "Destroy target artifact or creature. If its mana value was 4 or less, create a Food token." (Tainted Treats, Raze to
+    // the Ground, Seedship Impact, Extinguish the Light): its mana value as it last existed on the battlefield (rulings,
+    // CR 608.2h), so it's checked just before it's destroyed, and the rest happens after, destroyed or not.
+    const destroyMv = /^[Dd]estroy target (?:artifact|creature|artifact or enchantment|artifact or creature|creature or planeswalker)$/.test(s) ? /^If its mana value was (\d+) or less, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (destroyMv && !/\b(?:it|its|that permanent|that creature)\b/.test(destroyMv[2]!.replace(/"[^"]*"/g, ""))) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy" || ctx.targets[before]!.kind !== "object") return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(destroyMv[1]) }, text: `mana value ${destroyMv[1]} or less` };
+      const then = parseOne(capital(destroyMv[2]!), ctx);
+      if (!then || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
+      si++;
+      continue;
+    }
     // "Destroy target creature. If that creature was green or white, its controller discards a card." (Gloomlance), "If
     // that creature was a Human, ..." (Death's Caress), "If it wasn't attacking, ..." (Prophesied End): the creature as it
     // last existed on the battlefield (CR 608.2h), so it's checked just before it's destroyed, and the rest happens after.
@@ -6378,6 +6408,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: subjPT[2] as "power" | "toughness", ...(subjPT[4] === "less" ? { max: n } : { min: n }) } }, effects: inner });
       continue;
     }
+    // Yorvo, Lord of Garenbrig: "Then if that creature's power is greater than ~'s power, put another +1/+1 counter on ~":
+    // both as the ability resolves, after the first counter, the entering creature as it last existed if it has left
+    // (rulings; CR 608.2h).
+    const subjVsSelf = ctx.subject && !ctx.spell ? /^(?:Then )?[Ii]f that creature's power is greater than ~'s power, put another (\+1\/\+1) counter on ~$/.exec(s) : null;
+    if (subjVsSelf) {
+      const a = parseCount("that creature's power", ctx);
+      const b = parseCount("~'s power", ctx);
+      const inner = parseOne(`Put a ${subjVsSelf[1]} counter on ~`, ctx);
+      if (!a || !b || typeof b !== "object" || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountsCompare", a, atLeast: { ...b, plus: (b.plus ?? 0) + 1 } }, effects: inner });
+      continue;
+    }
     // "Then destroy all other creatures if its power is exactly 20" (Amalia Benavides Aguirre): both bounds.
     const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is (?:${NUM} or (greater|less)|exactly ${NUM})$`).exec(s) : null;
     const leadPT = !ctx.spell && !ctx.subjectIt && !trailPT ? new RegExp(`^If (~'s|its) (power|toughness) is ${NUM} or (greater|less), (.+)$`).exec(s) : null;
@@ -6540,8 +6582,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prevBack = previous.length === 1 && previous[0]!.type === "bounce" && previous[0]!.what.ref === "target" && ctx.targets[previous[0]!.what.index]?.kind === "card" ? previous[0]! : null;
       const toField = /^(?:return|put) (?:that (?:permanent )?card|it)(?: from your graveyard)? (?:to|onto) the battlefield$/i.test(t);
       // "~ deals 2 damage to any target. If you're the monarch, it deals 7 damage instead." (Court of Ire): the same target.
-      const moreDamage = /^(?:it|~) deals (\d+) damage(?: to (?:that creature|that player|that permanent or player|it))?$/i.exec(t);
-      const prevDamage = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
+      // The Destined Black Mage: "~ deals 1 damage to each opponent. If you have a full party, it deals 3 damage to each
+      // opponent instead": the same players.
+      const moreDamage = /^(?:it|~) deals (\d+) damage(?: to (that creature|that player|that permanent or player|it|each opponent))?$/i.exec(t);
+      const prevDamage0 = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
+      const prevDamage = prevDamage0 && (moreDamage?.[2] === "each opponent") === (prevDamage0.to.ref === "eachOpponent") ? prevDamage0 : null;
       if ((moreDamage && !prevDamage) || (unpreventable && !moreDamage)) return null;
       const inner = moreDamage && prevDamage ? [{ ...prevDamage, amount: num(moreDamage[1]!), ...(unpreventable ? { unpreventable: true as const } : {}) }] : those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
@@ -6721,6 +6766,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer(untilXLand[1]!, ctx);
       if (!who) return null;
       effects.push({ type: "revealUntilLandToGraveyard", who, n: { count: { kind: "x" } } });
+      si++;
+      continue;
+    }
+    // Mind Funeral: "Target opponent reveals cards from the top of their library until four land cards are revealed. That
+    // player puts all cards revealed this way into their graveyard.": the same, with four.
+    const untilNLand = /^(Target opponent|Target player) reveals cards from the top of their library until (two|three|four|five) land cards are revealed$/i.exec(s);
+    if (untilNLand && /^That player puts all cards revealed this way into their graveyard\.?$/i.test(sentences[si + 1] ?? "")) {
+      const who = parsePlayer(untilNLand[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealUntilLandToGraveyard", who, n: num(untilNLand[2]!) });
       si++;
       continue;
     }
@@ -7336,6 +7391,13 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   }
   // "If the sacrificed creature was a Hamster, draw X cards" (Minsc & Boo): its creature types as it last existed (CR
   // 608.2h), a changeling's all of them.
+  // "If that spell's mana value is 5 or greater, create three of those tokens instead" (Prismari Pianist), in a cast
+  // trigger: the spell's mana value as the ability resolves, or as it last existed on the stack (CR 608.2h).
+  const spellMv = ctx.castSpell ? /^If that spell's mana value is (\d+) or greater, (.+)$/.exec(s) : null;
+  if (spellMv) {
+    const amount = parseCount("that spell's mana value", ctx);
+    return amount ? { cond: { kind: "amountNow", amount, min: Number(spellMv[1]) }, not: false, text: spellMv[2]!, noTargets: true } : null;
+  }
   const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s);
   if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacType[2]!, noTargets: true };
   for (const h of HOW_CAST) {
@@ -7720,6 +7782,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // token doubler) just made.
     const populated = last?.type === "pick" && last.action === "populate" && last.n === 1 && last.who.ref === "you";
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked || populated;
+    ctx.lastCreatedCreature = last?.type === "createToken" && last.n === 1 && last.token.types.includes("Creature") && !last.attachTo;
     // The creature that player chose is "that creature" (Imperial Edict).
     if (picked && pk.who.ref === "target") ctx.lastPut = true;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
@@ -8126,6 +8189,7 @@ function parseYouList(s: string, ctx: Ctx): Effect[] | null {
 export function addTarget(ctx: Ctx, spec: TargetSpec): number {
   ctx.targets.push(spec);
   ctx.lastCreated = false;
+  ctx.lastCreatedCreature = false;
   ctx.lastPut = false;
   const i = ctx.targets.length - 1;
   if (spec.kind === "object" || spec.kind === "spell") ctx.lastObjectTarget = i;

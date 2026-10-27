@@ -27,7 +27,9 @@ export function parseGraveyardKeyword(
     if (kind === "flashback" && !isSpell) return "fail";
     const parts = m[2]!.split(", ");
     const mana = /^(\{[^}]+\})+$/.test(parts[0]!) ? parts.shift()! : undefined;
-    if (mana && (!parseManaCost(mana).supported || parseManaCost(mana).hasX)) return "fail";
+    // "Flashback {X}{R}{R}{R}" (Devil's Play): X chosen as it's cast from the graveyard, on a card with X in its mana cost
+    // (CR 107.3a, 601.2b).
+    if (mana && (!parseManaCost(mana).supported || (parseManaCost(mana).hasX && !(kind === "flashback" && parseManaCost(d.manaCost).hasX)))) return "fail";
     const costs: AdditionalCost[] = [];
     for (const part of parts) {
       // Escape's "Exile two other cards from your graveyard": other than this card, which is on the stack by then.

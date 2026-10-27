@@ -2,8 +2,8 @@
 // that share their templates.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
-import { blockProblem, characteristics, compileCard, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planCast, planMana, splitSecondOnStack, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { act, bear, card, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
+import { blockProblem, spellCost, characteristics, compileCard, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planCast, planMana, splitSecondOnStack, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { countersBanned, putCounters, putPlayerCounters } from "../src/counters";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -336,5 +336,238 @@ describe("round 180", () => {
       const body = compileCard(d).activated[0]!.body;
       expect(JSON.stringify(body.effects)).toContain('"of":{"ref":"self"}');
     }
+  });
+
+  it("Battle-Scarred Goblin and Plague Wight: about each creature blocking it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, battlescarredGoblin);
+    const w = putOnBattlefield(s0, ap, plagueWight);
+    const b1 = putOnBattlefield(s0, opp, bigBear);
+    const b2 = putOnBattlefield(s0, opp, bigBear);
+    const b3 = putOnBattlefield(s0, opp, bigBear);
+    const s = combat(s0, ap, opp, [g, w], [{ blocker: b1, attacker: g }, { blocker: b2, attacker: g }, { blocker: b3, attacker: w }]);
+    expect([s.objects[b1]!.damage, s.objects[b2]!.damage]).toEqual([1, 1]);
+    expect(pt(s, b3)).toBe("4/4");
+  });
+
+  it("She-Hulk: a Hero that becomes blocked gets a counter for each creature blocking it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const h = putOnBattlefield(s0, ap, shehulkWallbreaker);
+    const b1 = putOnBattlefield(s0, opp, bear());
+    const b2 = putOnBattlefield(s0, opp, bear());
+    const s = combat(s0, ap, opp, [h], [{ blocker: b1, attacker: h }, { blocker: b2, attacker: h }]);
+    expect(counters(s, h)).toBe(2);
+  });
+
+  it("Vengeful Regrowth: the lands come back tapped, with as many Plant Warriors", () => {
+    const { s: s0, ap, ids } = setup([vengefulRegrowth]);
+    const forestCard = card("Forest", "Basic Land — Forest");
+    const l1 = into(s0, ap, forestCard, "graveyard");
+    const l2 = into(s0, ap, forestCard, "graveyard");
+    into(s0, ap, forestCard, "graveyard");
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(l1), tgt(l2), { kind: "none" }])));
+    expect([zone(s, l1), zone(s, l2)]).toEqual(["battlefield", "battlefield"]);
+    expect(s.objects[l1]!.tapped).toBe(true);
+    expect(named(s, ap, "Plant Warrior").length).toBe(2);
+  });
+
+  it("Return Upon the Tide: two Elf Warriors only if it returned an Elf", () => {
+    const { s: s0, ap, ids } = setup([returnUponTheTide, returnUponTheTide]);
+    const e = into(s0, ap, elf, "graveyard");
+    const b = into(s0, ap, bear(), "graveyard");
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(b)])));
+    expect(zone(s, b)).toBe("battlefield");
+    expect(named(s, ap, "Elf Warrior").length).toBe(0);
+    s.players[ap]!.manaPool.B += 5;
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(e)])));
+    expect(zone(s, e)).toBe("battlefield");
+    expect(named(s, ap, "Elf Warrior").length).toBe(2);
+  });
+
+  it("Call a Surprise Witness: back with a flying counter, a Spirit too", () => {
+    const { s: s0, ap, ids } = setup([callASurpriseWitness]);
+    const b = into(s0, ap, bear(), "graveyard");
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(b)])));
+    expect(zone(s, b)).toBe("battlefield");
+    expect(counters(s, b, "flying")).toBe(1);
+    expect(characteristics(s, s.objects[b]!).subtypes).toEqual(expect.arrayContaining(["Bear", "Spirit"]));
+  });
+
+  it("Herald of Ilharg: two counters for each creature spell, and as much damage to each opponent as it has counters for one of mana value 5 or more", () => {
+    const { s: s0, ap, ids, opp } = setup([bear({ cmc: 2 }), bigBear]);
+    const h = putOnBattlefield(s0, ap, heraldOfIlharg);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(counters(s, h)).toBe(2);
+    expect(s.players[opp]!.life).toBe(40);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!)));
+    expect(counters(s, h)).toBe(4);
+    for (const p of s.turnOrder.filter((q) => q !== ap)) expect(s.players[p]!.life).toBe(36);
+    expect(s.players[ap]!.life).toBe(40);
+  });
+
+  it("Panther Habit: damage to the equipped creature becomes +1/+1 counters", () => {
+    const { s: s0, ap, ids } = setup([shock]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const e = putOnBattlefield(s0, ap, pantherHabit);
+    let s = resolveAll(run(s0, planActivate(s0, ap, e, 0, [tgt(b)])));
+    expect(s.objects[e]!.attachedTo).toBe(b);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+    expect(s.objects[b]!.damage).toBe(0);
+    expect(counters(s, b)).toBe(2);
+  });
+
+  it("Sleeper Agent: an opponent gains control of it as it enters", () => {
+    const { s: s0, ap, ids, opp } = setup([sleeperAgent]);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [player(opp)] }));
+    expect(controllerOf(s, s.objects[ids[0]!]!)).toBe(opp);
+  });
+
+  it("Tide Shaper, kicked: the land is an Island while Tide Shaper remains", () => {
+    const { s: s0, ap, ids, opp } = setup([tideShaper, murder]);
+    const land = putOnBattlefield(s0, opp, card("Forest", "Basic Land — Forest"));
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { kicks: [0] })));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(land)] }));
+    expect(characteristics(s, s.objects[land]!).subtypes).toEqual(["Island"]);
+    // An opponent controls an Island now: +1/+1.
+    expect(pt(s, ids[0]!)).toBe("2/2");
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(ids[0]!)])));
+    expect(characteristics(s, s.objects[land]!).subtypes).toEqual(["Forest"]);
+  });
+
+  it("Essence Symbiote: a creature of yours that mutates gets a counter, and you gain 2 life", () => {
+    const { s: s0, ap, ids } = setup([gemrazer]);
+    putOnBattlefield(s0, ap, essenceSymbiote);
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = passAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(b)], undefined, "auto", undefined, { alt: "mutate" })));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "mutate" });
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: "top" }));
+    expect(counters(s, b)).toBe(1);
+    expect(s.players[ap]!.life).toBe(42);
+  });
+
+  it("Faithbound Judge: a judgment counter at your upkeep while it has two or fewer", () => {
+    const { s: s0, ap } = setup([]);
+    const j = putOnBattlefield(s0, ap, faithboundJudge);
+    s0.objects[j]!.counters.judgment = 2;
+    let s = resolveAll(passUntil(s0, "upkeep", ap, 4000));
+    expect(counters(s, j, "judgment")).toBe(3);
+    s = resolveAll(passUntil(passUntil(s, "draw", ap), "upkeep", ap, 4000));
+    expect(counters(s, j, "judgment")).toBe(3);
+  });
+
+  it("Gloom Sower and Vicious Battlerager: the blocking creature's controller loses life", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, gloomSower);
+    const v = putOnBattlefield(s0, ap, viciousBattlerager);
+    const b1 = putOnBattlefield(s0, opp, bear());
+    const b2 = putOnBattlefield(s0, opp, bear());
+    const s = combat(s0, ap, opp, [g, v], [{ blocker: b1, attacker: g }, { blocker: b2, attacker: v }]);
+    expect(s.players[opp]!.life).toBe(40 - 2 - 5);
+    expect(s.players[ap]!.life).toBe(42);
+  });
+
+  it("Assembled Alphas: 3 damage to the creature it blocks and 3 to that creature's controller", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const a = putOnBattlefield(s0, ap, assembledAlphas);
+    const o = putOnBattlefield(s0, opp, bigBear);
+    let s = resolveAll(act(passUntil(s0, "declareAttackers", opp), { type: "declareAttackers", player: opp, attacks: [{ attacker: o, defender: ap }] }));
+    s = passUntil(s, "declareBlockers", opp);
+    s = resolveAll(act(s, { type: "declareBlockers", player: ap, blocks: [{ blocker: a, attacker: o }] }));
+    expect(s.objects[o]!.damage).toBe(3);
+    expect(s.players[opp]!.life).toBe(37);
+  });
+
+  it("Goblin Cadets: an opponent gains control of it when it becomes blocked", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const c = putOnBattlefield(s0, ap, goblinCadets);
+    const b = putOnBattlefield(s0, opp, bear());
+    let s = combat(s0, ap, opp, [c], [{ blocker: b, attacker: c }]);
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [player(opp)] }));
+    expect(controllerOf(s, s.objects[c]!)).toBe(opp);
+  });
+
+  it("Silkwrap: exiles a creature with mana value 3 or less an opponent controls, not a bigger one", () => {
+    const { s: s0, ap, ids, opp } = setup([silkwrap]);
+    const small = putOnBattlefield(s0, opp, bear({ cmc: 2 }));
+    putOnBattlefield(s0, opp, bigBear);
+    putOnBattlefield(s0, ap, bear({ cmc: 2 }));
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    if (s.pending?.kind === "chooseTargets") s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [tgt(small)] }));
+    expect(zone(s, small)).toBe("exile");
+  });
+
+  it("Hawkeye: it deals damage equal to the number of Heroes you control as a Hero enters", () => {
+    const hero = card("Test Hero", "Creature — Human Hero", "{1}{W}", { cmc: 2, power: "2", toughness: "2" });
+    const { s: s0, ap, ids, opp } = setup([hero]);
+    putOnBattlefield(s0, ap, hawkeyeTrickShot);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = resolveAll(act(s, { type: "chooseTargets", player: ap, targets: [player(opp)] }));
+    expect(s.players[opp]!.life).toBe(38);
+  });
+
+  it("Darksteel Angel: no -1/-1 counters on your creatures", () => {
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, darksteelAngel);
+    const b = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    expect(countersBanned(s, s.objects[b]!, "-1/-1")).toBe(true);
+    expect(countersBanned(s, s.objects[b]!, "+1/+1")).toBe(false);
+    expect(countersBanned(s, s.objects[theirs]!, "-1/-1")).toBe(false);
+  });
+
+  it("Relentless X-ATM092: back from your graveyard tapped with a finality counter", () => {
+    const { s: s0, ap } = setup([]);
+    const r = into(s0, ap, relentlessXatm092, "graveyard");
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    const s = resolveAll(run(s0, planActivate(s0, ap, r, 0)));
+    expect(zone(s, r)).toBe("battlefield");
+    expect(s.objects[r]!.tapped).toBe(true);
+    expect(counters(s, r, "finality")).toBe(1);
+  });
+
+  it("Lightning Reaver: damage equal to the charge counters on itself to each opponent", () => {
+    const { s: s0, ap } = setup([]);
+    const r = putOnBattlefield(s0, ap, lightningReaver);
+    s0.objects[r]!.counters.charge = 2;
+    const s = resolveAll(passUntil(s0, "end", ap));
+    for (const p of s.turnOrder.filter((q) => q !== ap)) expect(s.players[p]!.life).toBe(38);
+  });
+
+  it("Dual-Sun Technique: double strike, and a card if the creature has a +1/+1 counter", () => {
+    const { s: s0, ap, ids } = setup([dualsunTechnique, dualsunTechnique]);
+    const a = putOnBattlefield(s0, ap, bear());
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[b]!.counters["+1/+1"] = 1;
+    const hand = s0.players[ap]!.hand.length;
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(a)])));
+    expect(objHasKeyword(s, s.objects[a]!, "Double strike")).toBe(true);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(b)])));
+    expect(s.players[ap]!.hand.length).toBe(hand - 2 + 1);
+  });
+
+  it("Mental Modulation costs {1} less during your turn", () => {
+    const { s, ap, ids, opp } = setup([mentalModulation]);
+    const generic = () => {
+      const c = spellCost(s, ap, s.objects[ids[0]!]!);
+      return c.extra + c.cost.symbols.reduce((n, x) => n + (x.kind === "generic" ? x.amount : 0), 0);
+    };
+    expect(generic()).toBe(0);
+    // Not during another player's turn.
+    s.activePlayer = opp;
+    expect(generic()).toBe(1);
+  });
+
+  it("Ich-Tekik: a counter on it and each Golem when an artifact goes to a graveyard from the battlefield", () => {
+    const { s: s0, ap, ids } = setup([murder]);
+    const ich = putOnBattlefield(s0, ap, ichtekikSalvageSplicer);
+    const golem = putOnBattlefield(s0, ap, card("Test Golem", "Artifact Creature — Golem", "{3}", { cmc: 3, power: "3", toughness: "3" }));
+    const thing = putOnBattlefield(s0, ap, card("Test Thopter", "Artifact Creature — Thopter", "{1}", { cmc: 1, power: "1", toughness: "1" }));
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(thing)])));
+    expect(counters(s, ich)).toBe(1);
+    expect(counters(s, golem)).toBe(1);
   });
 });

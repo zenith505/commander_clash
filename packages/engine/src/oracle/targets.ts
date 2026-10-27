@@ -121,6 +121,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "you") return { ref: "you" };
   if (x === "each opponent") return { ref: "eachOpponent" };
   if (x === "each player") return { ref: "eachPlayer" };
+  // Blightning: "... to target player or planeswalker. That player or that planeswalker's controller discards two cards":
+  // the player it targets, or the planeswalker's controller.
+  if (x === "that player or that planeswalker's controller") {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    return t?.kind === "any" && t.types?.includes("Planeswalker") && !t.types.includes("Creature") ? { ref: "targetOrController", index: i } : null;
+  }
   // "Each opponent who chose silence" (Prisoner's Dilemma): of the words chosen before (Effect eachChooses).
   const chose = /^each (?:opponent|player) who chose ([a-z]+)$/.exec(x);
   if (chose && ctx.chooseWords?.includes(chose[1]!)) return { ref: "choseWord", option: chose[1]! };
@@ -283,6 +290,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
   if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
+  if ((/^each creature blocking ~$/i.test(p.trim()) || (/^each creature blocking it$/i.test(p.trim()) && ctx.selfIt)) && !ctx.spell) return { ref: "inCombatWithSelf", blocking: true };
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
@@ -701,6 +709,8 @@ const PLURAL_TYPES: Record<string, string> = {
   vehicles: "Vehicle",
   // "Destroy all Auras" (Serene Heart): an enchantment subtype (CR 205.3h).
   auras: "Aura",
+  // Witchbane Orb: "destroy all Curses attached to you" (an enchantment subtype too).
+  curses: "Curse",
 };
 
 /** Creature types whose plural is the same word ("all Merfolk", "all Samurai"). */
@@ -1042,6 +1052,12 @@ export function parseTargetPhrase(
   if (blocking) {
     extra.blockingSource = blocking[1] ? "either" : "blocking";
     p = p.slice(0, blocking.index);
+  }
+  // Witchbane Orb: "all Curses attached to you".
+  const toYou = / attached to you$/.exec(p);
+  if (toYou && !opts.target) {
+    extra.attachedToYou = true;
+    p = p.slice(0, toYou.index);
   }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);

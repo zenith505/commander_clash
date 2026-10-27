@@ -1418,9 +1418,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "blockableOnlyBy":
       c.blockableOnlyBy = [...(c.blockableOnlyBy ?? []), { filters: m.filters, text: m.text }];
       return;
-    case "cantBlockCreatures":
-      c.cantBlockCreatures.push(m.filter);
+    case "cantBlockCreatures": {
+      // "Can't block creatures you control" (Spectral Grasp): the effect's controller's creatures.
+      const { controller: who, ...rest } = m.filter;
+      c.cantBlockCreatures.push(who === "you" ? { ...rest, controlledBy: controllerOfInst(e, chars) } : m.filter);
       return;
+    }
     case "maxOneBlocker":
       c.maxOneBlocker = true;
       return;

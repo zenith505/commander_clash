@@ -56,6 +56,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
   [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
   [/^Whenever ~ is dealt noncombat damage, (.+)$/, "selfIsDealtNoncombatDamage"],
+  [/^Whenever ~ is dealt combat damage, (.+)$/, "selfIsDealtCombatDamage"],
   // "Whenever a source deals damage to ~, that source's controller ..." (Phyrexian Obliterator): once for each source
   // that deals it damage at the same time; "that source's controller" is that player (rulings).
   [/^Whenever a source deals damage to ~, (.+)$/, "selfDealtDamageBySource"],
@@ -138,8 +139,8 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfBecomesMonstrous", "selfMutates",
-  "selfBecomesUntapped", "selfBecomesCrewed",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfMutates",
+  "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
 ];
 
 /** "Each other opponent" after "deals combat damage to an opponent": each opponent but that player (see parsePlayer). */
@@ -443,6 +444,14 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(other[3]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
     if (!body) return "fail";
     return { event: blocks ? "creatureBlocks" : "creatureBecomesBlocked", body, subjectFilter: { ...filter, ...(blocks ? {} : { controller: "you" as const }), text: blocks ? other[2]! : `${other[2]} you control` } };
+  }
+  // "Whenever ~ crews a Vehicle, that Vehicle gains haste until end of turn" (Speedway Fanatic): it crews one when it's
+  // tapped to pay its crew cost (CR 702.122d), "that Vehicle" the one crewed, once for each crew ability.
+  const crews = /^Whenever ~ crews a Vehicle, (.+)$/.exec(line);
+  if (crews) {
+    if (/\b(?:it|its)\b/.test(crews[1]!)) return "fail";
+    const body = parseBody(crews[1]!.replace(/\bthat Vehicle\b/g, "it"), { subjectIt: true });
+    return body ? { event: "selfCrewsVehicle", body: { ...body, text: crews[1]! } } : "fail";
   }
   for (const [re, event] of BLOCK_TRIGGERS) {
     const m = re.exec(line);
@@ -1470,10 +1479,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (m[1] && m[2]) return "fail";
     batch = { what: "created", whose: "you", ...(m[1] ? { filter: { kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature token" } } : {}), ...(m[2] ? { first: true as const } : {}) };
     rest = m[3]!;
-  } else if ((m = /^Whenever (you|one or more players) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (you|one or more players|a player) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[2]);
-    if (filter === null) return "fail";
-    batch = { what: "discards", ...(m[1] === "you" ? { whose: "you" as const } : {}), ...(filter ? { filter } : {}), ...(m[3] ? { first: true as const } : {}) };
+    if (filter === null || (m[1] === "a player" && m[3])) return "fail";
+    // Tinybones, Pocket Nuisance: "Whenever a player discards one or more cards": once for each player who discarded in the
+    // event (CR 603.2c).
+    batch = { what: "discards", ...(m[1] === "you" ? { whose: "you" as const } : {}), ...(m[1] === "a player" ? { eachPlayer: true as const } : {}), ...(filter ? { filter } : {}), ...(m[3] ? { first: true as const } : {}) };
     rest = m[4]!;
   } else if ((m = /^Whenever ~ and\/or one or more other (.+?) enter, (.+)$/.exec(line))) {
     // "Whenever ~ and/or one or more other Vampires you control enter" (Anje): it or any of the others (CR 603.2c).
@@ -2592,6 +2603,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(anywhere[1]!.replace(/^its owner shuffles their graveyard into their library/, "shuffle your graveyard into your library"), { selfCard: true });
     return body ? { event: "selfToGraveyardAnywhere", body } : "fail";
   }
+  // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the same, a
+  // card goes only to its owner's graveyard (CR 400.3).
+  const fromLibrary = /^When ~ is put into your graveyard from your library, (.+)$/.exec(line);
+  if (fromLibrary) {
+    const body = parseBody(fromLibrary[1]!, { selfCard: true });
+    return body ? { event: "selfToGraveyardFromLibrary", body } : "fail";
+  }
   // "When you cycle ~" (CR 702.29c): "it" is the card, wherever it went.
   const cycled = /^When you cycle ~, (.+)$/.exec(line);
   if (cycled) {
@@ -2850,7 +2868,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));

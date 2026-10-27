@@ -685,12 +685,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "... unless you sacrifice two Swamps" (Mold Demon): both, or it's sacrificed (with fewer, they can't be).
   // Cosmic Larva: "... unless you sacrifice two lands" likewise.
   // Demonlord of Ashmouth: "exile it unless you sacrifice another creature": exiled instead of sacrificed.
-  if ((m = /^([Ss]acrifice|[Ee]xile) (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s|two lands)$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+  // Apocalypse Demon: "tap ~ unless you sacrifice another creature": tapped instead.
+  if ((m = /^([Ss]acrifice|[Ee]xile|[Tt]ap) (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s|two lands)$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const two = /^two /.test(m[3]!);
     const filter = pickFilter(two ? singular(m[3]!.slice(4)) : m[3]!.replace(/^(?:an?|another) /, ""));
     if (!filter || / or |,/.test(m[3]!)) return null;
-    const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : { type: "exile", what: { ref: "self" } };
-    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: two ? 2 : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~` }];
+    const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: two ? 2 : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
   }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
   if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);

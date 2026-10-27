@@ -1339,6 +1339,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
+  cycled?: Record<number, number>;
   /**
    * The creatures that saddled each Mount this turn (CR 702.171c: tapped to pay its saddle cost), keyed by the Mount as
    * `id@zoneChanges`, each creature as `id@zoneChanges` (The Gitrog, Ravenous Ride: "a creature that saddled it this turn").

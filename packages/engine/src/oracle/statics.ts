@@ -1035,6 +1035,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Manor Gargoyle: "~ has indestructible as long as it has defender": its keywords as the layers so far left them, so
   // an effect that takes defender away comes first (CR 613.8a).
   if ((m = /^it has (defender|flying)$/.exec(text)) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
+  // Triton Wavebreaker: "As long as ~ is a creature, it has prowess": not while it's a bestowed Aura (CR 702.103b), its
+  // card types as layer 4 left them (CR 613.1d).
+  if (/^~ is a creature$/.test(text) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", types: ["Creature"], text: "creature" } };
   // Mistform Wall: "~ has defender as long as it's a Wall": its creature types as layer 4 left them (CR 613.1d, 613.1f).
   if ((m = /^it's an? ([A-Z][a-z]+)$/.exec(text)) && st.affects.kind === "self" && CREATURE_TYPES.has(m[1]!))
     return { kind: "selfIs", filter: { kind: "object", subtypes: [m[1]!], text: m[1]! } };
@@ -1401,6 +1404,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = /^are ([A-Z][a-z]+) artifacts in addition to their other types(?:,? and ((?:has|have) .+))?$/.exec(rest)) && subtypeSet(m[1]!) === "Artifact") {
     const more = m[2] ? parseStaticMods(m[2]) : [];
     return more ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [m[1]!] }, ...more] : null;
+  }
+  // Nature's Revolt: "All lands are 2/2 creatures that are still lands", Living Lands: "All Forests are 1/1 creatures
+  // ...": creatures in addition to their other types (CR 205.1b), base power and toughness in layer 7b.
+  // Kormus Bell: "1/1 black creatures" (the color in layer 5); Ambush Commander: "1/1 green Elf creatures" (the creature
+  // type with the card type, layer 4).
+  if ((m = /^are (\d+)\/(\d+) (?:(white|blue|black|red|green) )?(?:([A-Z][a-z]+) )?creatures that are still lands$/.exec(rest))) {
+    if (m[4] && !CREATURE_TYPES.has(m[4])) return null;
+    return [{ kind: "addTypes", types: ["Creature"], subtypes: m[4] ? [m[4]] : [] }, ...(m[3] ? [{ kind: "setColors" as const, colors: [COLOR_WORDS[m[3]]!] }] : []), { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }];
   }
   // Bello, Bard of the Brambles: "is a 4/4 Elemental creature in addition to its other types and has indestructible, haste,
   // and "..."": the card type and creature type in layer 4, the base power and toughness in 7b, the abilities in 6
@@ -1960,16 +1971,19 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Mycosynth Lattice: "All permanents are artifacts in addition to their other types" (layer 4), "All cards that aren't on
   // the battlefield, spells, and permanents are colorless" (layer 5, everywhere: offFieldAll); Thran Lens: "All
   // permanents are colorless".
-  if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
-  // Living Lands: "All Forests are 1/1 creatures that are still lands", Kormus Bell: "All Swamps are 1/1 black creatures
-  // that are still lands", Nature's Revolt: "All lands are 2/2 creatures that are still lands": creatures in addition to
-  // their types (layer 4, CR 205.1b), with that base power and toughness (7b) and that color instead of theirs (5, CR 105.3).
-  const allLands = /^All (lands|Plains|Islands|Swamps|Mountains|Forests) are (\d+\/\d+ (?:(?:white|blue|black|red|green) )?creatures that are still lands)$/.exec(text);
-  if (allLands) {
-    const affects = parseAffected(`All ${allLands[1]}`);
-    const mods = parseBecomes(allLands[2]!);
-    return affects?.kind === "filter" && mods ? { affects, mods, text: line } : null;
+  // Nature's Revolt: "All lands are 2/2 creatures that are still lands"; Living Lands: "All Forests are 1/1 creatures that
+  // are still lands": creatures in addition to their other types (layer 4, CR 205.1b), base power and toughness in 7b,
+  // the same set of permanents for both (CR 613.6).
+  // Kormus Bell: "All Swamps are 1/1 black creatures ..."; Ambush Commander: "Forests you control are 1/1 green Elf
+  // creatures ...".
+  const landsAre = /^(?:All (lands|Plains|Islands|Swamps|Mountains|Forests)|(Plains|Islands|Swamps|Mountains|Forests) you control) (are \d+\/\d+ (?:[a-z]+ )?(?:[A-Z][a-z]+ )?creatures that are still lands)$/.exec(text);
+  if (landsAre) {
+    const mods = parseStaticMods(landsAre[3]!);
+    const which = landsAre[1] ?? landsAre[2]!;
+    const sub = which === "lands" ? undefined : which === "Plains" ? "Plains" : which.slice(0, -1);
+    return mods ? { affects: { kind: "filter", types: ["Land"], ...(landsAre[2] ? { controller: "you" as const } : {}), ...(sub ? { spec: { kind: "object", types: ["Land"], subtypes: [sub], text: sub } } : {}) }, mods, text: line } : null;
   }
+  if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
   // Darkest Hour: "All creatures are black": that color instead of their others, in layer 5 (CR 105.3, 613.1e).
   const allColor = /^All creatures are (white|blue|black|red|green)$/.exec(text);
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };

@@ -205,9 +205,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return head ? { ...head, manaAbility: true, text: p } : null;
   }
   // "Spells with flash or flying" (Errant and Giada, as cards): a card with either keyword.
-  const twoKw = /^(.*?card) with ([a-z]+) or ([a-z]+)$/.exec(p);
+  // "A creature card with deathtouch, hexproof, reach, or trample" (Mwonvuli Beast Tracker): any one of them, printed on
+  // the card (rulings).
+  const manyKw = /^(.*?card) with ((?:[a-z]+, )+)or ([a-z]+)$/.exec(p);
+  const twoKw = manyKw ? [manyKw[0], manyKw[1], ...manyKw[2]!.split(", ").filter(Boolean), manyKw[3]] : /^(.*?card) with ([a-z]+) or ([a-z]+)$/.exec(p);
   if (twoKw) {
-    const subs = [twoKw[2]!, twoKw[3]!].map((k) => parseSearchFilter(`${twoKw[1]} with ${k}`));
+    const subs = twoKw.slice(2).map((k) => parseSearchFilter(`${twoKw[1]} with ${k}`));
     if (subs.some((x) => !x?.keywords?.length)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p };
   }

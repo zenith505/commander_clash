@@ -819,6 +819,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "discardedThisTurn":
       return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you));
     case "opponentLostLife":
+      if (cond.damaged) return (s.damagedThisTurn ?? []).some((p) => p !== you);
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);

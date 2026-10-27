@@ -38,6 +38,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
     // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
     if (["destroy", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
+    // "Destroy target blocking creature at end of combat" (Silent Assassin): later, but aimed at an opponent's creature.
+    if (e.type === "delayed" && e.when === "endOfCombat" && e.of?.ref === "target" && e.effects.length === 1 && e.effects[0]!.type === "destroy") mark(e.of.index, e.of.n);
     // A suspected creature can't block (CR 701.60c): aimed at opponents unless the card says "you control".
     if (e.type === "suspect" && !e.no && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);

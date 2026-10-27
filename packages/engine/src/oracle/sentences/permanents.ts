@@ -1135,7 +1135,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what ? [{ type: "suspect", what, no: true }] : null;
   }
   // Detain (CR 701.35a): "until your next turn, that permanent can't attack or block and its activated abilities can't be activated".
-  if ((m = /^Detain (target .+)$/i.exec(s))) {
+  // Lyev Decree: "Detain up to two target creatures your opponents control": each of them. Lavinia of the Tenth: "detain each
+  // nonland permanent your opponents control with mana value 4 or less".
+  if ((m = /^Detain (each .+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantActivate" }], duration: "yourNextTurn" }] : null;
+  }
+  if ((m = /^Detain ((?:up to (?:one|two|three) )?target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantActivate" }], duration: "yourNextTurn" }] : null;
   }

@@ -782,10 +782,11 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.60a; each instance triggers separately (702.60b).
       out.triggers.push({ event: "selfCast", body: rippleBody(Number(m[1])) });
     }
-    else if ((m = /^affinity for ((?:artifact )?\w+)$/i.exec(p))) {
+    else if ((m = /^affinity for ((?:artifact |snow )?\w+)$/i.exec(p))) {
       // CR 702.41a: "This spell costs {1} less to cast for each [text] you control." "Affinity for artifact creatures" (Urza,
-      // Chief Artificer): each artifact creature.
-      const spec = parseTargetPhrase(singular(m[1]!));
+      // Chief Artificer): each artifact creature. Razor Golem: "Affinity for Plains"; Icebreaker Kraken: "Affinity for snow
+      // lands".
+      const spec = parseTargetPhrase(m[1] === "Plains" ? "Plains" : m[1]!.split(" ").map(singular).join(" "));
       if (spec?.kind !== "object") return null;
       out.affinity.push({ ...spec, controller: "you", text: `${m[1]} you control` });
     }

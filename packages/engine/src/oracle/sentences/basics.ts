@@ -272,6 +272,20 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx }];
   }
+  // Rhystic Deluge: "Tap target creature unless its controller pays {1}", Excise: "Exile target attacking creature unless its
+  // controller pays {X}", Plague Fiend: "destroy that creature unless its controller pays {2}" (the creature it dealt combat
+  // damage to): that creature's controller decides as it resolves (CR 608.2d), as it last existed if it has left.
+  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile) (target (?:attacking )?creature|that creature) unless its controller (pays (?:\{[^}]+\})+)$/.exec(s))) {
+    const target = m[2] !== "that creature";
+    if (!target && !ctx.subjectIt) return null;
+    const before = ctx.targets.length;
+    const fx = parseSentence(`${capital(m[1]!)} ${m[2]}`, ctx);
+    const options = parsePunisherOptions(m[3]!, ctx);
+    if (!fx || fx.length !== 1 || !options || ctx.targets.length !== before + (target ? 1 : 0)) return null;
+    const what = "what" in fx[0]! ? fx[0]!.what : undefined;
+    if (!what || what.ref !== (target ? "target" : "subject")) return null;
+    return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx }];
+  }
   // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
   // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).
   if ((m = /^(.+?) unless any player (pays (?:\{[^}]+\})+)$/.exec(s)) && /\bgets? an additional [+-]\d+\/[+-]\d+ until end of turn$/.test(m[1]!)) {
@@ -470,7 +484,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const sac = /^(Sacrifice|(?:Its|That creature's) controller sacrifices) (it|that creature|that token|the token|them|those creatures|those tokens)$/i.exec(m[1]!);
     const sacWhat = sac && withSelfIt(() => parseObject(sac[2]!, ctx));
     const inner: Effect[] | null = sac ? (sacWhat ? [{ type: "sacrifice", what: sacWhat, ...(/controller/.test(sac[1]!) ? { byController: true as const } : {}) }] : null) : withSelfIt(() => parseSentence(m![1]!.replace(/^./, (c) => c.toUpperCase()), ctx));
-    if (!inner || ctx.targets.length !== before) return null;
+    // Silent Assassin: "{3}{B}: Destroy target blocking creature at end of combat": the target chosen now, destroyed by the
+    // delayed trigger (CR 603.7); made during the end of combat step, it waits for the next one (rulings).
+    const ownTarget = inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before });
+    if (!inner || (ctx.targets.length !== before && !ownTarget)) return null;
     const refs = new Set<string>();
     const whats = new Set<string>();
     let players = true;

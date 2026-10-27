@@ -1008,6 +1008,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "eachMayCounter":
     case "chooseOwnCommander":
     case "commanderToHand":
+    case "commandersToHand":
     case "commanderToBattlefield":
     case "toCommandZone":
     case "suspendCard":

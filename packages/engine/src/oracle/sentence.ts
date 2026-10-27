@@ -512,14 +512,16 @@ export function parseBecomes(text: string): Modification[] | null {
   // "... a black Demon in addition to its other colors and types" (Possessed Goat): it keeps its colors too (CR 105.3).
   let addition = false;
   let addColors = false;
-  if ((m = /^(.+?) in addition to its other (types|colors and types)$/i.exec(rest)) && !still) {
+  // Tangletrove Kelp: "other Clues you control become 6/6 Plant creatures in addition to their other types", each one.
+  if ((m = /^(.+?) in addition to (?:its|their) other (types|colors and types)$/i.exec(rest)) && !still) {
     rest = m[1]!;
     addition = true;
     addColors = m[2] !== "types";
   }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
   // Sparkshaper Visionary: "3/3 blue Bird creatures with flying, ...", one color too.
-  if ((m = /^(\d+\/\d+ (?:(?:white|blue|black|red|green) )?(?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
+  // Vihaan, Goldwaker: "3/3 Construct Assassin artifact creatures", an artifact creature each.
+  if ((m = /^(\d+\/\d+ (?:(?:white|blue|black|red|green) )?(?:[A-Z]\w* )*(?:artifact )?creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
   // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): new card types replace the old ones (CR 205.1a),

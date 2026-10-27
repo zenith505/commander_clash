@@ -1041,8 +1041,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${src}'s evolve does nothing.`);
         return;
       }
-      putCounters(s, o, "+1/+1", 1);
+      // It evolves only if one or more counters were put on it (CR 702.100d; rulings on Watchful Radstag: once, however many).
+      if (putCounters(s, o, "+1/+1", 1) <= 0) return;
       log(s, `${characteristics(s, o).name} evolves.`);
+      fireEvent(s, { type: "evolved", id: o.id });
       return;
     }
     case "explore":
@@ -1576,8 +1578,8 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
   const sc = (s.resolving!.scratch ??= {});
   // The permanent has explored once this is done, whatever could be done of it (CR 701.44b): "whenever a creature you
   // control explores" (Wildgrowth Walker) triggers.
-  const explored = () => {
-    if (self) fireEvent(s, { type: "explored", id: self.id, controller: self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller });
+  const explored = (revealed?: "land" | "nonland") => {
+    if (self) fireEvent(s, { type: "explored", id: self.id, controller: self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller, ...(revealed ? { revealed } : {}) });
   };
   if (sc.explored === undefined) {
     const top = p.library[0];
@@ -1585,7 +1587,7 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
     if (top && isType(defOf(s, obj(s, top)), "Land")) {
       log(s, `${name} explores: ${p.name} reveals ${defOf(s, obj(s, top)).name} and puts it into their hand.`);
       moveObject(s, top, "hand");
-      explored();
+      explored("land");
       return;
     }
     log(s, `${name} explores${top ? `: ${p.name} reveals ${defOf(s, obj(s, top)).name}` : ""}.`);
@@ -1601,5 +1603,5 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
   if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
   // Done: "it explores, then it explores again" (Jadelight Ranger) starts over, revealing the same card if it stayed.
   sc.explored = sc.may = undefined;
-  explored();
+  explored("nonland");
 }

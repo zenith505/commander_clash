@@ -527,6 +527,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = stackSpec(m[2]!);
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one ${spec.text}` } : spec), ...(unless ? { unless } : {}) }];
   }
+  // Nimble Obstructionist: "Counter target activated or triggered ability you don't control" (no teammates here: an
+  // opponent's). Green Slime: "... from an artifact or enchantment source" (its source as it is, or as it last existed).
+  // Then "If a permanent's ability is countered this way, destroy that permanent" (Green Slime), "... activated abilities
+  // of that permanent can't be activated this turn" (Trickbind), joined to it by body.ts.
+  if ((m = /^Counter target (activated or triggered ability|activated ability|triggered ability)(?: (you don't control)| from an? (artifact|enchantment|creature|land)(?: or (artifact|enchantment|creature|land))? source)?(?:, and if a permanent's ability is countered this way, (destroy that permanent|activated abilities of that permanent can't be activated this turn))?$/i.exec(s)) && (m[2] || m[3] || m[5])) {
+    const from = [m[3], m[4]].filter((x): x is string => !!x).map((x) => x[0]!.toUpperCase() + x.slice(1));
+    const spec: TargetSpec = { ...stackSpec(m[1]!), ...(m[2] ? { controller: "opponent" as const } : {}), ...(from.length ? { abilityFrom: { types: from } } : {}), text: `target ${m[1]!.toLowerCase()}${m[2] ? " you don't control" : from.length ? ` from an ${from.join(" or ").toLowerCase()} source` : ""}` };
+    return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(m[5] ? { thenSource: m[5] === "destroy that permanent" ? ("destroy" as const) : ("cantActivate" as const) } : {}) }];
+  }
   // Verdant Command: "Counter target loyalty ability of a planeswalker": an activated ability with a loyalty symbol in
   // its cost (CR 606.3), on the stack.
   if (/^Counter target loyalty ability of a planeswalker$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { ...stackSpec("activated ability"), loyaltyOnly: true, text: "target loyalty ability of a planeswalker" }) }];

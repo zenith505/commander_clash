@@ -251,6 +251,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ff]lip (two|three|four|five) coins$/.exec(s))) return [{ type: "flipCoin", n: num(m[1]!), ...(ctx.uncalledFlips ? { uncalled: true as const } : {}) }];
   // Clash (CR 701.30b): see "If you win, ..." in body.ts.
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
+  // Marvo, Deep Operative: "Whenever ~ attacks, clash with defending player": that opponent (CR 701.30b).
+  if (/^Clash with defending player$/i.test(s) && ctx.defending) return [{ type: "clash", with: { ref: "eventPlayer" } }];
   // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards
   // in your hand", 706.2); "plus an additional six-sided die for each mana from Treasures spent to activate this
   // ability" (Mr. House).

@@ -338,6 +338,8 @@ export interface GameObject {
   damagedBy?: ObjectId[];
   /** It was dealt damage this turn (forgotten in the cleanup step, CR 514.2, and when it leaves the battlefield). */
   wasDealtDamage?: true;
+  /** It has dealt damage since it became this object (Karakyk Guardian: "as long as it hasn't dealt damage yet"). */
+  hasDealtDamage?: true;
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
   /** "It can't be regenerated this turn": the turn its regeneration shields don't apply (CR 701.19c). */
@@ -416,6 +418,9 @@ export interface GameObject {
   attackedTurns?: number[];
   /** The turn it was last declared as a blocker (CR 509.1), as this object (CR 400.7): "creature that blocked this turn". */
   blockedTurn?: number;
+  /** The last combat it was declared as an attacker or blocker in (GameState.combatsThisTurn), as this object (CR 400.7):
+   *  "if ~ attacked or blocked this combat" (Kjeldoran Home Guard). */
+  declaredInCombat?: { turn: number; combat: number };
   /** The turn it last became blocked (CR 509.1h), as this object (CR 400.7): "if it was blocked this turn" (Fyndhorn Druid). */
   becameBlockedTurn?: number;
   attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
@@ -1557,7 +1562,7 @@ export interface GameState {
   /** High Tide's "until end of turn, whenever a player taps an Island for mana ...": `controller` is "you", `source` the card's name. */
   manaTriggersThisTurn?: { controller: PlayerId; source: string; trigger: ManaTrigger }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
-  cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
+  cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId; /** Not this object, while it's the same one (CR 400.7). */ except?: { id: string; zc: number } }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
   cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId; /** Not this object (Intimidation Bolt's target), while it's the same one (CR 400.7). */ except?: { id: string; zc: number } }[];
   /** "Creatures can't be blocked this turn": matching creatures can't be blocked, also ones that arrive later. */
@@ -1712,6 +1717,8 @@ export interface GameState {
   descendedThisTurn?: PlayerId[];
   /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
   damagedThisTurn?: PlayerId[];
+  /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): the turn it applies in (CR 614.1a). */
+  exileDyingTurn?: number;
   /** How much damage each player was dealt this turn (Spinerock Knoll). */
   damageThisTurn?: Record<number, number>;
   /** What the Traps' "this turn" conditions look back at (StaticCondition opponentSearched and the rest); cleared each turn. */
@@ -1889,6 +1896,8 @@ export interface TurnRule {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** A "whenever you clash" trigger: whether that player won that clash ("If you won, ...", CR 701.30d). */
+  wonClash?: boolean;
   /** "One or more opponents lose life": the life loss event it triggered on (lifeLost's batch). */
   lifeBatch?: number;
   /** "One or more opponents each lose exactly 1 life" (Ob Nixilis): what each of them lost in that event, added up as it's lost. */
@@ -2081,6 +2090,10 @@ export interface Resolving {
   amassed?: { id: ObjectId; zc: number };
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   wonClash?: boolean;
+  /** A draw of this resolution was replaced (dredge, Alhammarret's Archive): Sindbad's "reveal it" then does nothing (rulings). */
+  drawReplaced?: true;
+  /** The opponent of its controller's last clash ("that player", CR 701.30b). */
+  clashOpp?: PlayerId;
   /** For an ability that asks: how many times this ability of its source has resolved this turn, this time included (SpellCondition "resolvedNth"). */
   nth?: number;
   /** Its last coin flip (CR 705.2): won or lost, and how many were won ("flip a coin until you lose a flip"). */
@@ -2142,6 +2155,8 @@ export interface Resolving {
     mayStep?: number; // how many of its instructions are done
     /** "repeatIf" (Grist): how many of this pass's instructions are done. */
     repeatStep?: number;
+    /** Effect "repeatIf": the scratch keys there before its first pass, kept between passes. */
+    repeatKeep?: string[];
     /** "revealHandOrTop" (Eladamri): the card picked, or "top" for the top card of the library. */
     revealPick?: string;
     /** "exileHandOrPermanent" (Nicol Bolas, Dragon-God): the players still to choose, and the cards and permanents chosen. */

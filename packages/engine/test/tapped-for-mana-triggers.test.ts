@@ -44,8 +44,8 @@ describe("tapped-for-mana triggers: parse", () => {
     expect(compileCard(manabarbs).triggers).toMatchObject([{ event: "tappedForMana", manaTap: { by: "any", filter: { types: ["Land"] } } }]);
     expect(compileCard(flare).triggers).toEqual([]);
     expect(compileCard(flare).manaTriggers).toHaveLength(1);
-    // An intervening "if" about whose turn it is isn't read yet.
-    expect(isFullySupported(glory)).toBe(false);
+    // An intervening "if" about whose turn it is (round 185; its behavior is tested in round185.test.ts).
+    expect(isFullySupported(glory)).toBe(true);
   });
 });
 

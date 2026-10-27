@@ -339,23 +339,24 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] === " transformed" ? { transformed: true as const } : {}), ...(m[2] === " tapped" ? { tapped: true as const } : {}), ...(m[4] ? { counter: "+1/+1" as const } : {}) }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
-  if ((m = /^Investigate( twice| X times| (?:three|four|five) times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] === " twice" ? 2 : m[1] ? num(m[1].trim().split(" ")[0]!) : 1, token: PREDEFINED_TOKENS.Clue! }];
+  // "Investigate an additional time" (Erdwal Illuminator): once more.
+  if ((m = /^Investigate( twice| X times| (?:three|four|five) times| an additional time)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] === " twice" ? 2 : m[1] && m[1] !== " an additional time" ? num(m[1].trim().split(" ")[0]!) : 1, token: PREDEFINED_TOKENS.Clue!, investigate: true }];
   // "Investigate once for each opponent who has more cards in hand than you" (Wojek Investigator): counted as it resolves.
   if ((m = /^Investigate (?:once )?for each (.+)$/i.exec(s))) {
     const n = parseCount(m[1]!, ctx, true);
-    return n ? [{ type: "createToken", who: { ref: "you" }, n, token: PREDEFINED_TOKENS.Clue! }] : null;
+    return n ? [{ type: "createToken", who: { ref: "you" }, n, token: PREDEFINED_TOKENS.Clue!, investigate: true }] : null;
   }
   // "Destroy target creature or planeswalker. Its controller investigates." (Fateful Absence): the player named, as in
   // "Its controller creates a ..." (the destroyed permanent's last controller, CR 608.2h).
   if ((m = /^(.+?) investigates$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    return who ? [{ type: "createToken", who, n: 1, token: PREDEFINED_TOKENS.Clue! }] : null;
+    return who ? [{ type: "createToken", who, n: 1, token: PREDEFINED_TOKENS.Clue!, investigate: true }] : null;
   }
   // "That player investigates for each nontoken creature exiled this way" (Declaration in Stone).
   if ((m = /^(.+?) investigates for each (.+)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     const n = parseCount(m[2]!, ctx, true);
-    return who && n ? [{ type: "createToken", who, n, token: PREDEFINED_TOKENS.Clue! }] : null;
+    return who && n ? [{ type: "createToken", who, n, token: PREDEFINED_TOKENS.Clue!, investigate: true }] : null;
   }
   // Explore (CR 701.44)
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];

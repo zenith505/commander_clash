@@ -3170,7 +3170,11 @@ export function compile(d: CardDef): CompiledCard {
     // Phyrexian Boon: "Enchanted creature gets +2/+1 as long as it's black. Otherwise, it gets -1/-2."; Clutch of Undeath
     // ("as long as it's a Zombie"), Nyx Infusion ("as long as it's an enchantment"): one bonus while the enchanted creature
     // is that, the other while it isn't, each checked continuously (CR 611.3a).
-    const boon = /^Enchanted creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it gets ([+-]\d+\/[+-]\d+)\.$/.exec(line);
+    // Relic Axe: "Equipped creature gets +1/+1. If it's a Warrior, it gets +2/+1 instead." is the same, for Equipment.
+    const insteadIf = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+)\. If it's (an? [A-Z][a-z]+), it gets ([+-]\d+\/[+-]\d+) instead\.$/.exec(line);
+    const boonLine = insteadIf ? `${insteadIf[1]} creature gets ${insteadIf[4]} as long as it's ${insteadIf[3]}. Otherwise, it gets ${insteadIf[2]}.` : line;
+    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it gets ([+-]\d+\/[+-]\d+)\.$/.exec(boonLine);
+    if (boon) boon.splice(1, 1);
     if (boon) {
       const w = boon[2]!;
       const yes: TargetSpec | null = COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[w]!], text: `${w} creature` }
@@ -3179,7 +3183,8 @@ export function compile(d: CardDef): CompiledCard {
       const no: TargetSpec | null = !yes ? null : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], notColors: [COLOR_WORDS[w]!], text: `non${w} creature` }
         : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], notTypes: [capital(w.slice(3))], text: `non${w.slice(3)} creature` }
         : { kind: "object", types: ["Creature"], notSubtypes: [w.replace(/^an? /, "")], text: `non-${w.replace(/^an? /, "")} creature` };
-      const [a, b] = [parseStatic(`Enchanted creature gets ${boon[1]}.`), parseStatic(`Enchanted creature gets ${boon[3]}.`)];
+      const who = /^Equipped /.test(boonLine) ? "Equipped" : "Enchanted";
+      const [a, b] = [parseStatic(`${who} creature gets ${boon[1]}.`), parseStatic(`${who} creature gets ${boon[3]}.`)];
       if (yes && no && a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
         out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "attachedIs", filter: no }, text: line });
         continue;

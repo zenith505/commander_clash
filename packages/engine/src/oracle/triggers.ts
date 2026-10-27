@@ -556,6 +556,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
   // "With power 4, 5, or 6" (Sarkhan's Unsealing) the same way as Kozilek's Unsealing's mana values.
+  // Hallar, the Firefletcher: "Whenever you cast a spell, if that spell was kicked, ...": how it was cast can't change
+  // (CR 603.4), the same as "Whenever you cast a kicked spell".
+  line = line.replace(/^Whenever you cast a spell, if that spell was kicked, /, "Whenever you cast a kicked spell, ");
   const m = CAST_TRIGGER.exec(line.replace(/ with (mana value|power) (\d+), (\d+), or (\d+),/, (all, key: string, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with ${key} ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");

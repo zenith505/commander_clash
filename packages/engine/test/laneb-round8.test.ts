@@ -515,3 +515,143 @@ describe("Cast triggers (kicked spells, three kinds, two colors), kicked permane
     expect(s.battlefield.some((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap && characteristics(s, s.objects[id]!).subtypes.includes("Clue"))).toBe(true);
   });
 });
+
+const hallarTheFirefletcher = card("Hallar, the Firefletcher", "Legendary Creature — Elf Archer", "{1}{R}{G}", { cmc: 3, power: "3", toughness: "3", keywords: ["Trample"], colors: ["G","R"], oracleText: "Trample\nWhenever you cast a spell, if that spell was kicked, put a +1/+1 counter on Hallar, then Hallar deals damage equal to the number of +1/+1 counters on it to each opponent." });
+const toolcraftExemplar = card("Toolcraft Exemplar", "Creature — Dwarf Artificer", "{W}", { cmc: 1, power: "1", toughness: "1", oracleText: "At the beginning of combat on your turn, if you control an artifact, this creature gets +2/+1 until end of turn. If you control three or more artifacts, it also gains first strike until end of turn." });
+const relicAxe = card("Relic Axe", "Artifact — Equipment", "{2}", { cmc: 2, keywords: ["Equip"], oracleText: "When this Equipment enters, attach it to target creature you control.\nEquipped creature gets +1/+1. If it's a Warrior, it gets +2/+1 instead.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)" });
+const gloomSower = card("Gloom Sower", "Creature — Horror", "{5}{B}{B}", { cmc: 7, power: "8", toughness: "6", oracleText: "Whenever this creature becomes blocked by a creature, that creature's controller loses 2 life and you gain 2 life." });
+const elvenWarhounds = card("Elven Warhounds", "Creature — Dog", "{3}{G}", { cmc: 4, power: "2", toughness: "2", oracleText: "Whenever this creature becomes blocked by a creature, put that creature on top of its owner's library." });
+const painwrackerOni = card("Painwracker Oni", "Creature — Demon Spirit", "{3}{B}{B}", { cmc: 5, power: "5", toughness: "4", keywords: ["Fear"], oracleText: "Fear (This creature can't be blocked except by artifact creatures and/or black creatures.)\nAt the beginning of your upkeep, sacrifice a creature if you don't control an Ogre." });
+const secondChance = card("Second Chance", "Enchantment", "{2}{U}", { cmc: 3, oracleText: "At the beginning of your upkeep, if you have 5 or less life, sacrifice this enchantment and take an extra turn after this one." });
+const sphinxSovereign = card("Sphinx Sovereign", "Artifact Creature — Sphinx", "{4}{W}{U}{U}{B}", { cmc: 8, power: "6", toughness: "6", keywords: ["Flying"], colors: ["B","U","W"], oracleText: "Flying\nAt the beginning of your end step, you gain 3 life if this creature is untapped. Otherwise, each opponent loses 3 life." });
+const testRelic = () => card("Test Relic", "Artifact", "{1}", { cmc: 1, oracleText: "" });
+
+/** Attackers declared, the game paused on the defending player's blocks. */
+const toBlocks = (s: GameState, ap: PlayerId, attacks: { attacker: string; defender: PlayerId }[]) => {
+  s = passUntil(s, "declareAttackers", ap);
+  s = act(s, { type: "declareAttackers", player: ap, attacks });
+  for (let i = 0; i < 40 && s.pending?.kind !== "declareBlockers"; i++) {
+    if (s.pending) break;
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+/** Blocks declared by `opp`; every other defending player declares none. */
+const block = (s: GameState, opp: PlayerId, blocks: { blocker: string; attacker: string }[]) => {
+  s = act(s, { type: "declareBlockers", player: opp, blocks });
+  for (let i = 0; i < 10 && s.pending?.kind === "declareBlockers"; i++) s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+  return s;
+};
+
+describe("Kicked-spell damage, artifact counts, Warrior equipment, block triggers, upkeep sacrifices, tapped or untapped", () => {
+  it("are fully supported", () => supported(hallarTheFirefletcher, toolcraftExemplar, relicAxe, gloomSower, elvenWarhounds, painwrackerOni, secondChance, sphinxSovereign));
+
+  it("Hallar: a kicked spell puts a +1/+1 counter on it, then it deals that many damage to each opponent", () => {
+    const kicky = card("Test Kicker", "Sorcery", "{R}", { cmc: 1, oracleText: "Kicker {1}\nYou gain 1 life." });
+    for (const kick of [true, false]) {
+      let { s, ap, ids } = setup([kicky]);
+      const h = putOnBattlefield(s, ap, hallarTheFirefletcher);
+      s.objects[h]!.counters["+1/+1"] = 1;
+      invalidateCharacteristics(s);
+      s = settle(run(s, planCast(s, ap, ids[0]!, [], undefined, "auto", undefined, { kicks: kick ? [0] : [] })));
+      expect(s.objects[h]!.counters["+1/+1"], `kicked ${kick}`).toBe(kick ? 2 : 1);
+      for (const p of s.turnOrder) if (p !== ap) expect(life(s, p), `kicked ${kick}`).toBe(kick ? 38 : 40);
+    }
+  });
+
+  it("Toolcraft Exemplar gets +2/+1 with an artifact, and first strike too with three", () => {
+    for (const n of [0, 1, 3]) {
+      let { s, ap } = setup([]);
+      const t = putOnBattlefield(s, ap, toolcraftExemplar);
+      for (let i = 0; i < n; i++) putOnBattlefield(s, ap, testRelic());
+      s = settle(passUntil(s, "beginCombat", ap));
+      expect(pt(s, t), `${n} artifacts`).toBe(n ? "3/2" : "1/1");
+      expect(has(s, t, "First strike"), `${n} artifacts`).toBe(n === 3);
+    }
+  });
+
+  it("Relic Axe attaches as it enters: +1/+1, or +2/+1 on a Warrior", () => {
+    const warrior = creature("Test Warrior", "Creature — Human Warrior", "{R}", 1, 1);
+    for (const def of [greenBear(), warrior]) {
+      let { s, ap, ids } = setup([relicAxe]);
+      const c = putOnBattlefield(s, ap, def);
+      s = run(s, planCast(s, ap, ids[0]!, []));
+      s = settle(s, { targets: [tgt(c)] });
+      expect(s.objects[ids[0]!]!.attachedTo).toBe(c);
+      expect(pt(s, c), def.name).toBe(def === warrior ? "3/2" : "3/3");
+    }
+  });
+
+  it("Gloom Sower: the blocking creature's controller loses 2 life and you gain 2", () => {
+    let { s, ap, opp } = setup([]);
+    const g = putOnBattlefield(s, ap, gloomSower);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    s = block(toBlocks(s, ap, [{ attacker: g, defender: opp }]), opp, [{ blocker: bear, attacker: g }]);
+    s = settle(s);
+    expect(life(s, opp)).toBe(38);
+    expect(life(s, ap)).toBe(42);
+  });
+
+  it("Elven Warhounds puts the creature blocking it on top of its owner's library", () => {
+    let { s, ap, opp } = setup([]);
+    const w = putOnBattlefield(s, ap, elvenWarhounds);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    s = block(toBlocks(s, ap, [{ attacker: w, defender: opp }]), opp, [{ blocker: bear, attacker: w }]);
+    s = settle(s);
+    expect(zone(s, bear)).toBe("library");
+    const lib = s.players[opp]!.library;
+    expect(s.cards[s.objects[lib[0]!]!.cardId]!.name).toBe("Green Bear");
+  });
+
+  it("Painwracker Oni: you sacrifice a creature at your upkeep unless you control an Ogre", () => {
+    for (const ogre of [false, true]) {
+      let { s, ap } = setup([]);
+      const o = putOnBattlefield(s, ap, painwrackerOni);
+      const other = putOnBattlefield(s, ap, ogre ? redOgre() : greenBear());
+      s = toUpkeep(passUntil(s, "main1", next(s, ap)), ap, { pick: [other] });
+      expect(zone(s, other), `ogre ${ogre}`).toBe(ogre ? "battlefield" : "graveyard");
+      expect(zone(s, o)).toBe("battlefield");
+    }
+  });
+
+  it("Second Chance: at 5 or less life you sacrifice it and take an extra turn", () => {
+    for (const at of [6, 5]) {
+      let { s, ap } = setup([]);
+      const c = putOnBattlefield(s, ap, secondChance);
+      s.players[ap]!.life = at;
+      s = toUpkeep(passUntil(s, "main1", next(s, ap)), ap);
+      expect(zone(s, c), `life ${at}`).toBe(at === 5 ? "graveyard" : "battlefield");
+      expect(s.extraTurns?.length ?? 0, `life ${at}`).toBe(at === 5 ? 1 : 0);
+      if (at === 5) {
+        s = passUntil(s, "upkeep");
+        expect(s.activePlayer).toBe(ap);
+      }
+    }
+  });
+
+  it("Sphinx Sovereign: 3 life if it's untapped at your end step, otherwise each opponent loses 3", () => {
+    for (const tapped of [false, true]) {
+      let { s, ap } = setup([]);
+      const x = putOnBattlefield(s, ap, sphinxSovereign);
+      s.objects[x]!.tapped = tapped;
+      s = settle(passUntil(s, "end", ap));
+      expect(life(s, ap), `tapped ${tapped}`).toBe(tapped ? 40 : 43);
+      for (const p of s.turnOrder) if (p !== ap) expect(life(s, p), `tapped ${tapped}`).toBe(tapped ? 37 : 40);
+    }
+  });
+
+  it("Sphinx Sovereign gone before its ability resolves: tapped or untapped as it last was (rulings)", () => {
+    const murder = card("Test Murder", "Instant", "{B}", { cmc: 1, oracleText: "Destroy target creature." });
+    let { s, ap, ids } = setup([murder]);
+    putOnBattlefield(s, ap, swamp);
+    const x = putOnBattlefield(s, ap, sphinxSovereign);
+    s.objects[x]!.tapped = true;
+    s = passUntil(s, "end", ap);
+    expect(s.stack.length + s.triggerQueue.length).toBeGreaterThan(0);
+    s = run(s, planCast(s, ap, ids[0]!, [tgt(x)]));
+    s = settle(s);
+    expect(zone(s, x)).toBe("graveyard");
+    expect(life(s, ap)).toBe(40);
+    for (const p of s.turnOrder) if (p !== ap) expect(life(s, p)).toBe(37);
+  });
+});

@@ -894,7 +894,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^All creatures get -\d+\/-\d+ until end of turn\. )Creatures that are (white|blue|black|red|green) and\/or (white|blue|black|red|green) get an additional (-\d+\/-\d+) until end of turn\.$/, (_, a: string, c1: string, c2: string, pt: string) => `${a}${capital(c1)} or ${c2} creatures get ${pt} until end of turn.`);
   // Lightning Reaver: "~ deals damage equal to the number of charge counters on it to each opponent": X, counted once as
   // it resolves, to each of them.
-  text = text.replace(/^~ deals damage equal to (the number of [a-z+/0-9-]+ counters on (?:it|~)) to each opponent\.$/, "~ deals X damage to each opponent, where X is $1.");
+  // Hallar, the Firefletcher: "put a +1/+1 counter on ~, then ~ deals damage equal to the number of +1/+1 counters on it to
+  // each opponent": counted after the counter is put on it.
+  text = text.replace(/^((?:[Pp]ut an? [+-]1\/[+-]1 counter on ~, then )?)~ deals damage equal to (the number of [a-z+/0-9-]+ counters on (?:it|~)) to each opponent\.$/, "$1~ deals X damage to each opponent, where X is $2.");
   // Lord of Tresserhorn: "you lose 2 life, you sacrifice two creatures, and target opponent draws two cards": three
   // instructions, in order (it may be one of the creatures sacrificed, rulings).
   text = text.replace(/^([Yy]ou lose \d+ life), you (sacrifice (?:two|three) creatures), and (target opponent draws (?:two|three) cards)\.$/, (_, a: string, b: string, c: string) => `${a}. ${capital(b)}. ${capital(c)}.`);
@@ -902,6 +904,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Rr]eturn target (?:nonland )?permanent to its owner's hand), then that player discards a card\.$/, "$1, then its owner discards a card.");
   // Hold for Questioning: "tap enchanted permanent and investigate": two instructions.
   text = text.replace(/^([Tt]ap enchanted (?:permanent|creature)) and investigate\.$/, "$1. Investigate.");
+  // Toolcraft Exemplar: "~ gets +2/+1 until end of turn. If you control three or more artifacts, it also gains first
+  // strike until end of turn": ~ again, checked as it resolves.
+  text = text.replace(/^(~ gets [+-]\d+\/[+-]\d+ until end of turn\. If you control [^,.]+, )it also (gains [a-z ]+ until end of turn\.)$/, "$1~ $2");
+  // Painwracker Oni: "sacrifice a creature if you don't control an Ogre": checked as it resolves (CR 608.2c), the same as
+  // "unless you control an Ogre".
+  text = text.replace(/^([Ss]acrifice an? [a-z]+) if you don't control (an? [A-Z][a-z]+)\.$/, "$1 unless you control $2.");
+  // Second Chance: "sacrifice ~ and take an extra turn after this one": two instructions.
+  text = text.replace(/^([Ss]acrifice ~) and (take an extra turn after this one)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
+  // (CR 608.2c), not an intervening "if".
+  text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
   // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
   // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
   text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
@@ -6033,7 +6046,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // choice": whether a creature died, not whether a card was drawn (rulings).
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard");
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -6734,7 +6747,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
-    const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // Sphinx Sovereign: "If ~ is untapped, ...": ~ itself, as it resolves or as it last existed (rulings).
+    const selfTapped = !!ifState && /^~ is (?:un)?tapped$/.test(ifState[1]!);
+    const stateCond = ifState && (selfTapped || !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;

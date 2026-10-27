@@ -1025,7 +1025,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // CR 506.5: "attacking alone" means it's attacking and no other creature is.
       if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
-      if (cond.is === "tapped" || cond.is === "untapped") return src.tapped === (cond.is === "tapped");
+      // Sphinx Sovereign gone before its ability resolves: tapped or untapped as it last existed (rulings, CR 608.2h).
+      if (cond.is === "tapped" || cond.is === "untapped") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return (lk && lk.zc === sourceZc ? !!lk.tapped : src.tapped) === (cond.is === "tapped");
+      }
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b

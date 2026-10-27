@@ -744,8 +744,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   // "If there are cards exiled with ~" (Valakut Exploration): the cards this object's linked exile took (CR 607.2a).
   if (/^(?:there are cards|a card is) exiled with (?:~|it)$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
-  // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's.
-  if (/^it(?: isn't that player's|'s not their| isn't their) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
+  // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's. "Whenever a player taps
+  // a land for mana, if it's not that player's turn" (Price of Glory): the player who tapped it.
+  if (/^it(?: isn't that player's|'s not their| isn't their|'s not that player's) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   if (/^it's an extra turn$/.test(text)) return { kind: "extraTurn" };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"
@@ -997,6 +998,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled$/.test(text)) return { kind: "destroyedByOpponent" };
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
+  if (/^you put a counter on a creature this turn$/.test(text)) return { kind: "youPutCounterOnCreature" };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent cast ${NUM} or more spells this turn$`).exec(text))) return { kind: "opponentCastCount", n: num(m[1]!) };
   if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: or (white|blue|black|red|green))? spell this turn$/.exec(text)))

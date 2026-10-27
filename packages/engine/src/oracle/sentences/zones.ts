@@ -115,6 +115,23 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^[Yy]ou may cast your commander from the command zone without paying its mana cost$/.test(s)) return [{ type: "castCommanderFree" }];
   // Hellkite Courser: "you may put a commander you own from the command zone onto the battlefield" (not cast, so no tax).
   if (/^[Pp]ut a commander you own from the command zone onto the battlefield$/.test(s)) return [{ type: "commanderToBattlefield" }];
+  // "Put there from the battlefield this turn" (GameObject.fromBattlefieldTurn): Faith's Reward's "return to the
+  // battlefield all permanent cards in your graveyard ...", Gerrard's Hourglass Pendant's "return to the battlefield tapped
+  // all ...", Second Sunrise's "each player returns to the battlefield all ... in their graveyard ...", Gleancrawler's
+  // "return to your hand all creature cards ...", Twilight Shepherd's "all cards", Thrilling Encore's "put onto the
+  // battlefield under your control all creature cards in all graveyards ...": which cards, worked out as it resolves; the
+  // cards enter at the same time (CR 608.2f; rulings on Faith's Reward: an Aura can't enchant one entering with it).
+  if ((m = /^([Rr]eturn to the battlefield( tapped)?|[Ee]ach player returns to the battlefield|[Rr]eturn to your hand|Put onto the battlefield under your control) all (?:(.+?) )?cards in (your|their|all) graveyards? that were put there from the battlefield this turn$/.exec(s))) {
+    const [, how, tapped, what, whose] = m;
+    const each = /^[Ee]ach player/.test(how!);
+    const encore = /^Put onto/.test(how!);
+    if ((whose === "their") !== each || (whose === "all") !== encore || (whose === "all" ? "graveyards" : "graveyard") !== /graveyards? that/.exec(s)![0].slice(0, -5)) return null;
+    // "Artifact, creature, enchantment, and land cards": a card of any of those types.
+    const words = what ? what.replace(/(,?) and /g, "$1 or ").split(/\s+/).map(singularWord).join(" ") : "";
+    const spec = parseTargetPhrase(`${words ? `${words} ` : ""}card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: each || encore ? "eachPlayer" : "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${what ? `${what} ` : ""}card that was put there from the battlefield this turn` }, ...(tapped ? { tapped: true } : {}), ...(each ? { owners: true as const } : {}), ...(/hand$/.test(how!) ? { toHand: true as const } : {}) }];
+  }
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);

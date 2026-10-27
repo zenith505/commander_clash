@@ -1,6 +1,6 @@
 import type { CounterKind, ManaAbility, ManaProduce, ManaSpend, ManaTrigger, TargetSpec } from "../abilities";
 import type { Color, ManaType } from "../types";
-import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } from "./words";
+import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular, keywordOf } from "./words";
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseCount } from "./counts";
@@ -409,6 +409,8 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
     let x: RegExpExecArray | null;
     // "Cast a spell of the chosen type" (Eclipsed Realms): any spell with that creature type (CR 205.3m).
     if (/^cast (?:a spell|spells) of the chosen type$/.test(part) && !only.spells) only.spells = { kind: "spell", chosen: "type", text: "spells of the chosen type" };
+    // Corrupted Crossroads: "cast a spell with devoid": that keyword on the spell (rulings: not just any colorless spell).
+    else if ((x = /^cast (?:a spell|spells) with (devoid)$/.exec(part)) && !only.spells) only.spells = { kind: "spell", keywords: [keywordOf(x[1]!)!], text: `spells with ${x[1]}` };
     else if ((x = /^cast (?:an? )?(.+? spells? of the chosen type|.+?) spells?$/.exec(part) ?? /^cast (?:an? )?(.+? spells? of the chosen type)$/.exec(part)) && !only.spells) {
       const spec = spellFilter(x[1]!);
       if (!spec) return null;

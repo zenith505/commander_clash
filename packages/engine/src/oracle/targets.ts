@@ -281,6 +281,14 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
   if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
+  // Plague Wight: "Whenever ~ becomes blocked, each creature blocking it gets -1/-1 until end of turn"; Trailblazer's
+  // Torch: "Whenever equipped creature becomes blocked, it deals 2 damage to each creature blocking it": the creatures
+  // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).
+  const blockingIt = !ctx.spell ? /^each creature blocking (~|it|that creature)$/i.exec(p.trim()) : null;
+  if (blockingIt) {
+    if (blockingIt[1] === "~" || (blockingIt[1] === "it" && ctx.selfIt && !ctx.subject && !ctx.subjectIt)) return { ref: "blockingIt" };
+    return ctx.subject || ctx.subjectIt ? { ref: "blockingIt", subject: true } : null;
+  }
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
@@ -1244,6 +1252,11 @@ export function parseTargetPhrase(
     // cycling too (CR 702.29e; the card data lists "Cycling" with it).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
+  } else if ((m = / with modular( you control)?$/.exec(p))) {
+    // Arcbound Overseer: "each creature you control with modular": modular as the card data lists it (CR 702.43a), on
+    // the battlefield's characteristics (lost with all abilities, layer 6).
+    extra.keywords = ["Modular"];
+    p = p.slice(0, m.index) + (m[1] ?? "");
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");

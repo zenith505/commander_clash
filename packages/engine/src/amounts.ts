@@ -288,6 +288,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "putThisWay":
+      return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
+    case "blockingIt":
+      return ctx.objects?.({ ref: c.subject ? "subject" : "self" })[0]?.blockedBy?.length ?? 0;
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
@@ -791,6 +795,10 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "putThisWay":
+      return "#put onto the battlefield";
+    case "blockingIt":
+      return "#creatures blocking it";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "milledManaValue":

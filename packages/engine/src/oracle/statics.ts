@@ -417,6 +417,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity), "During turns other than yours, ~ costs {3} more to
   // cast" (Hurkyl's Final Meditation): checked as it's cast (CR 601.2f); a colored reduction takes off that colored mana.
+  // Mental Modulation: "~ costs {1} less to cast during your turn": the same.
+  const trailing = /^~ costs ((?:\{\d+\})?(?:\{[WUBRG]\})*) (less|more) to cast during (your turn|turns other than yours)$/.exec(text);
+  if (trailing) text = `During ${trailing[3]}, ~ costs ${trailing[1]} ${trailing[2]} to cast`;
   if ((m = /^During (your turn|turns other than yours), ~ costs ((?:\{\d+\})?(?:\{[WUBRG]\})*) (less|more) to cast$/.exec(text)) && m[2]) {
     const n = Number(/\{(\d+)\}/.exec(m[2])?.[1] ?? 0);
     const colored = [...m[2].matchAll(/\{([WUBRG])\}/g)].map((x) => x[1] as Color);
@@ -1153,6 +1156,14 @@ export function parseAffected(subject: string): Affects | null {
     const first: TargetSpec = either[2] === "snow" ? { kind: "object", supertypes: ["Snow"], text: "snow creature" } : { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` };
     const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
+  }
+  // Cid, Timeless Artificer: "Artifact creatures and Heroes you control": creatures that are artifacts or Heroes, an artifact
+  // Hero once.
+  const artifactOr = /^Artifact creatures and ([A-Z][a-z]+) you control$/.exec(x);
+  if (artifactOr && CREATURE_TYPES.has(singular(artifactOr[1]!))) {
+    const sub = singular(artifactOr[1]!);
+    const anyOf: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact creature" }, { kind: "object", subtypes: [sub], text: `${sub} creature` }];
+    return { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", anyOf, text: `artifact creature or ${sub}` } };
   }
   // Serpent of Yawning Depths: "Krakens, Leviathans, Octopuses, and Serpents you control": creatures of any of those types.
   const typeList = /^((?:[A-Z][a-z]+, )+and [A-Z][a-z]+) you control$/.exec(x);
@@ -1900,6 +1911,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Anti-Venom, Horrifying Healer: "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on
   // ~": that damage's amount, so also when it can't be prevented (then it's dealt too, CR 615.12).
   if (text === "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on ~") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
+  // Panther Habit: "If equipped creature would be dealt damage, prevent that damage and put that many +1/+1 counters on
+  // it": the same for the creature it's attached to.
+  if (/^If (?:equipped|enchanted) creature would be dealt damage, prevent that damage and put that many \+1\/\+1 counters on it$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
   // Phyrexian Vindicator: "If damage would be dealt to ~, prevent that damage. When damage is prevented this way, ~ deals
   // that much damage to any other target." The prevention's reflexive trigger (CR 603.12), once for each damage event.
   if (/^If damage would be dealt to ~, prevent that damage\. When damage is prevented this way, ~ deals that much damage to any other target$/.test(text)) {

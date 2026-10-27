@@ -370,6 +370,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const oneSac = extra.filter((c) => c.kind === "sacrifice");
   if (oneSac.length === 1 && oneSac[0]!.kind === "sacrifice" && oneSac[0]!.n === 1 && oneSac[0]!.filter.types?.length === 1 && oneSac[0]!.filter.types[0] === "Creature")
     effectText = effectText.replace(/^Draw X cards, where X is that creature's power\.$/, "Draw cards equal to the sacrificed creature's power.");
+  // Slogurk, the Overslime: "Remove three +1/+1 counters from ~: Return it to its owner's hand": "it" is ~, the only
+  // object the ability names.
+  if (/^Remove \w+ [^,:]*counters? from ~$/.test(costs)) effectText = effectText.replace(/^Return it to its owner's hand\.$/, "Return ~ to its owner's hand.");
   const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   if (uncopyable) body.uncopyable = true;

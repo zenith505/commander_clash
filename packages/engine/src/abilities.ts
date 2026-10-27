@@ -145,6 +145,10 @@ export type Count =
   | { kind: "cardsExiledThisWay"; filter?: TargetSpec }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
+  /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
+  | { kind: "putThisWay" }
+  /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
+  | { kind: "blockingIt"; subject?: true }
   /** "For each card returned to your hand this way" (Paradoxical Outcome): the cards it returned that you own, still in your hand (a token isn't a card; another player's goes to their hand). */
   | { kind: "returnedToYourHand" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
@@ -953,6 +957,8 @@ export type ObjRef =
   | { ref: "diedDamagedBySelf" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
   | { ref: "inCombatWithSelf" }
+  /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
+  | { ref: "blockingIt"; subject?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
@@ -5479,6 +5485,8 @@ export interface CompiledCard {
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
+  /** Samut, Tyrant of Naktamun: "Instant and sorcery spells you control have split second" (CR 702.61a): spells of its controller's on the stack that match. */
+  spellsHaveSplitSecond?: TargetSpec[];
   /**
    * "~ (saddles Mounts and) crews Vehicles as though its power were 2 greater" (`n`), "... using its toughness rather
    * than its power" (`toughness`): what it counts for when it's tapped to pay a crew or saddle cost (CR 702.122a,

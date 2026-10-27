@@ -44,9 +44,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Timberpack Wolf: "for each other creature you control named ~", Cleric of the Forward Order: "for each creature you
   // control named ~": the same count.
-  if (each && (m = /^((?:other )?)creature you control named ~$/.exec(p))) return parseCount(`the number of ${m[1]}creatures you control named ~`, ctx);
+  // She-Hulk, Wallbreaker: "Whenever a Hero you control becomes blocked, put a +1/+1 counter on that Hero for each creature
+  // blocking it": the trigger's attacker's blockers as it resolves, like rampage's (CR 702.23b).
+  if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
+  // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
+  // battlefield named ~", any player's.
+  if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);
   // Hare Apparent: "the number of other creatures you control named ~": with the source's name (CR 201.5), as it is now.
-  if ((m = /^(the number of (?:other )?(?:creatures|permanents) you control) named ~$/.exec(p))) {
+  if ((m = /^(the number of (?:other )?(?:creatures|permanents) (?:you control|on the battlefield)) named ~$/.exec(p))) {
     const c = parseCount(m[1]!, ctx);
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };

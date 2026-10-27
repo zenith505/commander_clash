@@ -2238,6 +2238,15 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveStorm ??= []).push({ filter: f, text: line });
       continue;
     }
+    // Samut, Tyrant of Naktamun: "Instant and sorcery spells you control have split second" (CR 702.61a), while they're on
+    // the stack under its controller's control.
+    const giveSplit = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you control have split second\.$/.exec(line);
+    if (giveSplit) {
+      const f = parseTargetPhrase(`${giveSplit[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveSplitSecond ??= []).push(f);
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;

@@ -1227,8 +1227,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^Search your library for a card, put that card into your hand, discard a card at random, then shuffle\.$/, "Search your library for a card, put that card into your hand, then shuffle. Discard a card at random.");
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
   // (Ajani Steadfast), "put a +1/+1 counter on each creature you control and a loyalty counter on each planeswalker you
-  // control" (Brokers Ascendancy, in a trigger): two kinds of counters on two groups, one after the other.
-  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
+  // control" (Brokers Ascendancy, in a trigger): two kinds of counters on two groups, one after the other. Ich-Tekik,
+  // Salvage Splicer: "put a +1/+1 counter on ~ and a +1/+1 counter on each Golem you control", the same.
+  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three|five) ([^.]*?counters?) on (~|each [^.]+?) and (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
   // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
@@ -2065,6 +2066,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mill = parseOne("Target player mills X cards", ctx);
       if (!mill || ctx.targets.length !== before + 1) return null;
       effects.push({ type: "shuffleZones", who: { ref: "you" }, graveyard: true, countThisWay: true }, ...replaceX(mill, { count: { kind: "movedLinkedThisWay" } }));
+      si++;
+      continue;
+    }
+    // Vengeful Regrowth: "Return up to three target land cards from your graveyard to the battlefield tapped. Create that
+    // many 4/2 green Plant Warrior creature tokens with reach": as many as it returned (rulings).
+    if (/^Return up to (?:two|three|four|five) target [a-z]+ cards from your graveyard to the battlefield(?: tapped)?$/.test(s) && !effects.length && /^Create that many /.test(thatManyNext(sentences, si))) {
+      const before = ctx.targets.length;
+      const put = parseOne(s, ctx);
+      const after = ctx.targets.length;
+      const next = put && parseOne(thatManyNext(sentences, si).replace(/\bthat many\b/, "X"), ctx);
+      if (put?.length !== 1 || put[0]!.type !== "putOntoBattlefield" || put[0]!.what.ref !== "target" || after <= before || !next || ctx.targets.length !== after) return null;
+      effects.push(...put, ...replaceX(next, { count: { kind: "putThisWay" } }));
       si++;
       continue;
     }
@@ -4392,7 +4405,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // legendary, draw a card." The target as it is as this resolves (CR 608.2c); the instruction needn't be about it.
     // Revelation of Power: "If it has a counter on it, it also gains flying and lifelink until end of turn": a counter of
     // any kind, as this resolves.
-    const ifLegendary = /^If (?:it's|that creature is|that permanent is) legendary, (.+)$/.exec(s) ?? /^If it has a counter on it, (.+)$/.exec(s);
+    // Dual-Sun Technique: "If it has a +1/+1 counter on it, draw a card": that kind.
+    const hasCounter = /^If it has an? (\+1\/\+1 )?counter on it, (.+)$/.exec(s);
+    const ifLegendary = /^If (?:it's|that creature is|that permanent is) legendary, (.+)$/.exec(s) ?? (hasCounter ? [hasCounter[0], hasCounter[2]!] : null);
     if (ifLegendary) {
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
@@ -4401,8 +4416,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Gimli's Fury: "If it's legendary, it also gains trample until end of turn."
       const fx = parseOne(capital(ifLegendary[1]!.replace(/^it also /, "it ")), ctx);
       if (!fx || ctx.targets.length !== i + 1 || fx.some((e) => pauses(e))) return null;
-      const anyCounter = /^If it has a counter/.test(s);
-      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: anyCounter ? { kind: "object", types: [], notTypes: [], notColors: [], counter: ANY_COUNTER, text: "with a counter on it" } : { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary" } }, effects: fx });
+      const anyCounter = !!hasCounter;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: anyCounter ? { kind: "object", types: [], notTypes: [], notColors: [], counter: hasCounter[1] ? "+1/+1" : ANY_COUNTER, text: `with a ${hasCounter[1] ?? ""}counter on it` } : { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary" } }, effects: fx });
       continue;
     }
     // Forge of Heroes: "Choose target commander that entered this turn. Put a +1/+1 counter on it if it's a creature and a
@@ -5964,6 +5979,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
+    // Return Upon the Tide: "Return target creature card from your graveyard to the battlefield. If it's an Elf, create two
+    // 1/1 green Elf Warrior creature tokens": about the permanent it returned as, once it's on the battlefield (rulings).
+    const returnedIs = /^If it's an? ([A-Z][a-z]+), (.+)$/.exec(s);
+    if (returnedIs && CREATURE_TYPES.has(returnedIs[1]!)) {
+      const last = effects[effects.length - 1];
+      const inner = parseOne(capital(returnedIs[2]!), ctx);
+      if (last?.type !== "putOntoBattlefield" || last.what.ref !== "target" || last.what.n || !ctx.spell || !inner || /\b(?:it|its|that)\b/.test(returnedIs[2]!)) return null;
+      effects.push({ type: "if", cond: { kind: "putThisWayIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [returnedIs[1]!], text: returnedIs[1]! } }, effects: inner });
+      continue;
+    }
     // Hazel of the Rootbloom: "create a token that's a copy of target token you control. If that token is a Squirrel, instead
     // create two tokens that are copies of it": the target as it is when this resolves.
     const insteadTwo = /^If that token is an? ([A-Z][a-z]+), instead create (two|three) tokens that are copies of it$/.exec(s);
@@ -6472,6 +6497,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (/^Each of them/.test(s)) return null;
       if (prev?.type === "returnDiedThisWay" && mods && !prev.alsoMods) {
         prev.alsoMods = mods;
+        continue;
+      }
+      // Call a Surprise Witness: "Return target creature card ... to the battlefield. Put a flying counter on it. It's a
+      // Spirit in addition to its other types": the same permanent, from then on (CR 611.2c).
+      const put = effects[effects.length - 2];
+      if (prev?.type === "counters" && prev.what.ref === "created" && put?.type === "putOntoBattlefield" && put.what.ref === "target" && !put.what.n && mods && !put.alsoMods && /^It/.test(s)) {
+        put.alsoMods = mods;
         continue;
       }
       // Ever After: "Return up to two target creature cards ... Each of those creatures is a black Zombie ...": each of them.
@@ -8209,6 +8241,9 @@ function attempt<T>(ctx: Ctx, f: () => T | null): T | null {
 }
 
 /** Replace every X in these effects with what the text defines it as. */
+/** The sentence after `si`, without its period. */
+const thatManyNext = (sentences: string[], si: number) => sentences[si + 1]?.replace(/\.$/, "") ?? "";
+
 export function replaceX<T>(v: T, def: AmountExpr): T {
   if (Array.isArray(v)) return v.map((x) => replaceX(x, def)) as T;
   if (v && typeof v === "object") {

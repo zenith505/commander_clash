@@ -5,7 +5,7 @@ import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular }
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
-import { parseChanges, parseSentence } from "../sentence";
+import { parseBecomes, parseChanges, parseSentence } from "../sentence";
 import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
@@ -286,6 +286,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const of = ctx.lastObjectTarget !== undefined ? ({ ref: "target", index: ctx.lastObjectTarget } as const) : null;
     return of && !ctx.spell ? [{ type: "delayed", when: "dies", of, effects: [{ type: "flip", what: { ref: "self" } }], text: "flip ~", thisTurn: true }] : null;
   }
+  // Kjeldoran Elite Guard, Heart Wolf: "{T}: Target creature gets +2/+2 until end of turn. When that creature leaves the
+  // battlefield this turn, sacrifice ~." A delayed trigger about the creature it targeted (CR 603.7c, 400.7), for the rest
+  // of this turn, whatever zone it goes to; ~ is this ability's source as it is now (a new object after a zone change).
+  if (/^When (?:that|the) creature leaves the battlefield this turn, sacrifice ~$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.spell && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "leaves", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "sacrifice", what: { ref: "self" } }], text: "sacrifice ~", thisTurn: true }];
   // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
@@ -1119,6 +1124,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^((?:up to one )?target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
+    return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // Cyclopean Giant: "target land becomes a Swamp"; Alchor's Tomb: "Target permanent you control becomes the color of your
+  // choice"; Prismatic Lace: "... the color or colors of your choice". With no duration, for as long as it stays on the
+  // battlefield (CR 611.2a, 400.7): a land loses its other land types and the abilities from its rules text (CR 305.7), a
+  // permanent's new colors replace its old ones (CR 105.3).
+  // Dream Coat: "{0}: Enchanted creature becomes the color or colors of your choice": the creature it enchants as the
+  // ability resolves (CR 611.2c), for as long as it's on the battlefield, attached or not (rulings: it doesn't wear off).
+  if ((m = /^((?:up to one )?[Tt]arget (?:land|permanent|creature)(?: you control)?|Enchanted creature) becomes (an? (?:Plains|Island|Swamp|Mountain|Forest)|the chosen (?:color|colors|basic land type))$/.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^Enchanted/, "enchanted"), ctx);
+    const mods = (what?.ref === "target" && !what.n) || (m[1] === "Enchanted creature" && !ctx.spell) ? parseBecomes(m[2]!) : null;
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
   // Depthshaker Titan: "Any number of target noncreature artifacts you control become 3/3 artifact creatures": each of

@@ -1179,6 +1179,8 @@ export interface ContinuousEffect {
   whileControlled?: { id: ObjectId; zc: number; controller?: PlayerId };
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
+  /** "You may pay {W} to end this effect" (a Licid): `controller` may pay `cost` any time they have priority (CR 116.2c). */
+  endable?: { cost: string };
   affected: ObjectId[];
   /**
    * Keywords it doesn't give some of `affected`: they couldn't have them as it was created (an Archetype's "can't have or
@@ -1856,6 +1858,8 @@ export interface Chosen {
   number?: number;
   /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */
   types?: string[];
+  /** "The color or colors of your choice" (Prismatic Lace): one or more colors. */
+  colors?: Color[];
   /** "Each player chooses a color" (Selective Obliteration): each player's color. */
   colorsBy?: Record<number, Color>;
   /** Gluntch: the players chosen by Effect "choosePlayer", in the order chosen. */
@@ -2390,6 +2394,8 @@ export type Action =
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
   /** Pay a locked door's mana cost to unlock it: a special action (CR 116.2m, 709.5e). `door`: 0 left, 1 right. */
   | { type: "unlockDoor"; player: PlayerId; objectId: ObjectId; door: number }
+  /** Pay to end an effect on this permanent that says "you may pay ... to end this effect" (a Licid; CR 116.2c). */
+  | { type: "endEffect"; player: PlayerId; objectId: ObjectId }
   /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */
   | { type: "foretell"; player: PlayerId; objectId: ObjectId }
   /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */

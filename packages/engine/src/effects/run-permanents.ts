@@ -1,5 +1,5 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { abilitiesOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, enchantOf, basePowerNow, cardIdOf, defOf, roomOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { turnFaceUpByEffect, attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, setUnlocked, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { nextRandom } from "../rng";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -1266,6 +1266,32 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       attachTo(s, me, host, e.asCreature);
       return;
     }
+    case "becomeLicid": {
+      // A Licid (CR 116.2c): the effect lasts until its controller pays to end it, or the Licid leaves the battlefield.
+      // It stops being every other card type and its creature types with them (CR 205.1a; rulings). Its ability does
+      // nothing to a Licid that left and came back (CR 400.7); an illegal target already countered it (CR 608.2b).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const t = ctx.targets[0];
+      const host = t?.kind === "object" && ctx.legal[0] ? s.objects[t.id] : undefined;
+      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !host) return;
+      const index = compileCard(defOf(s, me)).activated.findIndex((ab) => ab.body.effects.some((x) => x.type === "becomeLicid"));
+      s.effects.push({
+        id: `e${s.nextId++}`,
+        timestamp: s.nextTimestamp++,
+        controller: ctx.controller,
+        sourceName: src,
+        sourceId: me.id,
+        duration: "game",
+        affected: [me.id],
+        mods: [{ kind: "setTypes", types: ["Enchantment"], subtypes: ["Aura"] }, ...(index >= 0 ? [{ kind: "loseActivated" as const, index }] : []), { kind: "enchantCreature" }],
+        endable: { cost: e.endCost },
+      });
+      invalidateCharacteristics(s);
+      log(s, `${src} loses that ability and becomes an Aura enchantment with enchant creature (${player(s, ctx.controller).name} may pay ${e.endCost} to end this).`);
+      // "Attach it to target creature" (CR 701.3a): not to itself (CR 303.4d), which the state-based actions then deal with.
+      attachTo(s, me, host);
+      return;
+    }
     case "attachAny": {
       // Ardenn: the Auras and Equipment are chosen as it resolves, and attached at once (rulings), each only if it could
       // be attached to the target (CR 701.3a-b). Nothing happens with an illegal target (CR 608.2b).
@@ -1510,7 +1536,7 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   const meChars = characteristics(s, me);
   const aura = meChars.subtypes.includes("Aura");
   if (!aura && !meChars.subtypes.includes("Equipment")) return false;
-  const enchant = compileCard(defOf(s, me)).enchant;
+  const enchant = enchantOf(s, me);
   // "Enchant creature you control" is about the Aura's controller.
   const who = controllerOf(s, me);
   if (typeof host === "number") {

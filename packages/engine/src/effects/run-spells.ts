@@ -141,6 +141,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
+      if (e.when === "leaves" && e.of && e.thisTurn) {
+        // "When that creature leaves the battlefield this turn, sacrifice ~" (Kjeldoran Elite Guard): about that permanent as
+        // it is now (CR 603.7c, 400.7), whatever zone it goes to (CR 603.6c); its instructions about this ability's source.
+        const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        for (const o of objects(s, e.of, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          addDelayed(s, "leaves", ctx.controller, o, body, src ? cardIdOf(src) : cardIdOf(o));
+          Object.assign(s.delayed![s.delayed!.length - 1]!, { to: ["graveyard", "exile", "hand", "library", "command"], thisTurn: s.turn, ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
+        }
+        return;
+      }
       if (e.when === "lostControl") {
         // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
         for (const o of objects(s, e.of!, ctx)) {

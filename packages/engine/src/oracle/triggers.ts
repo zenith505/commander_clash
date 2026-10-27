@@ -1867,6 +1867,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
     .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ")
+    // Risona, Asari Commander: "Whenever combat damage is dealt to you": only creatures deal combat damage (CR 510.1), once
+    // for each combat damage step; "if it doesn't have an indestructible counter on it" after "Whenever ~ deals ...": ~.
+    .replace(/^Whenever combat damage is dealt to you, /, "Whenever one or more creatures deal combat damage to you, ")
+    .replace(/^(Whenever ~ deals combat damage to a player), if it doesn't have an? ([a-z]+) counter on it, /, "$1, if ~ doesn't have an $2 counter on it, ")
+    // Long Feng, Grand Secretariat: "Whenever another creature you control or a land you control is put into a graveyard
+    // from the battlefield": one event for each permanent that's either (a land creature triggers it once).
+    .replace(/^Whenever another creature you control or a land you control is put into a graveyard from the battlefield, /, "Whenever another creature or land you control is put into a graveyard from the battlefield, ")
     // Resolute Archangel: "if your life total is less than your starting life total, it becomes equal to ...": "it" is
     // your life total.
     .replace(/(, if your life total is less than your starting life total), it becomes equal to your starting life total\.$/, "$1, your life total becomes your starting life total.");
@@ -2535,7 +2542,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // once for each permanent they're put on at the same time (rulings on Hapatra).
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
-  const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
+  // Axgard Artisan: "Whenever one or more +1/+1 counters are put on ~ for the first time each turn": that kind.
+  const firstTime = !youPut && /^Whenever one or more (?:\+1\/\+1 )?counters are put on ~ for the first time each turn, /.test(line);
   const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
@@ -2571,6 +2579,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const filter = parseTargetPhrase(mutates[1]!);
     const body = filter && filter.kind === "object" && parseBody(mutates[2]!, { subjectIt: true });
     return filter && body ? { event: "permanentMutates", tappedFilter: filter, body } : "fail";
+  }
+  // Wildgrowth Walker: "Whenever a creature you control explores, ..." (CR 701.44b), that creature the subject.
+  const explores = /^Whenever a creature you control explores, (.+)$/.exec(line);
+  if (explores) {
+    const body = parseBody(explores[1]!, { subjectIt: true });
+    return body ? { event: "creatureYouControlExplores", body } : "fail";
   }
   const block = parseBlockTrigger(line);
   if (block) return block;

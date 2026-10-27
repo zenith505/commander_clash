@@ -360,6 +360,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.moved) return o && o.zone === "graveyard" && ctx.sourceZc !== undefined && ((o.zoneChanges ?? 0) === ctx.sourceZc || (o.zoneChanges ?? 0) === ctx.sourceZc + 1) && (!ref.yours || o.owner === ctx.controller) ? [o] : [];
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
     // A merged permanent's other cards too, for an ability triggered by its leaving (CR 730.3c).
+    // "Exile ~ from your graveyard" (Skyfisher Spider): that card only, there.
+    if (ref.yours) return o && o.zone === "graveyard" && o.owner === ctx.controller && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : []), ...foundWith(s, ctx.lki, ctx.sourceId)];
   }
   if (ref.ref === "milled") return (s.resolving?.milled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
@@ -648,6 +650,9 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       // subject is the card where it went, and the trigger carries who controlled it.
       const lk = s.lastKnown?.[o.id];
       if (lk && lk.zc === ctx.subject!.zc) return [lk.controller];
+      // "When that creature dies this turn, its controller gets a poison counter" (Virulent Wound): a delayed trigger
+      // about the card in the graveyard, its controller as it last existed on the battlefield, one zone change earlier.
+      if (lk && o.zone !== "battlefield" && lk.zc === ctx.subject!.zc - 1 && !ctx.lki) return player(s, lk.controller).lost ? [] : [lk.controller];
       return ctx.lki?.controller !== undefined && !player(s, ctx.lki.controller).lost ? [ctx.lki.controller] : [];
     }
     case "subjectOwner": {

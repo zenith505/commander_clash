@@ -2525,7 +2525,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone !== "battlefield" || !stamped(o)) continue;
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at || e.hold ? "" : " and returns it"}.`);
+          // As it last existed, for "if a Pirate was exiled this way" (Siren's Ruse, CR 608.2h).
+          const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
           moveObject(s, o.id, "exile");
+          if (s.objects[o.id]?.zone === "exile") (s.resolving!.exiled ??= []).push(before);
           // A merged permanent comes back as all of its cards (CR 730.3c).
           for (const l of newObjects(o)) {
             const c = s.objects[l.id];

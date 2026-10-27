@@ -71,7 +71,9 @@ export const isFixed = (a: Amount): a is number => typeof a === "number";
 /** The value of `a` right now. */
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
-  const v0 = Math.floor(evalCount(s, a.count, ctx) / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
+  const c = evalCount(s, a.count, ctx);
+  // Two to the power of it (Mathemagics); past 1024 the number can't matter, it's more than all the cards in the game.
+  const v0 = a.pow2 ? 2 ** Math.min(Math.max(0, c), 10) : Math.floor(c / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
   const n = a.signed ? v : Math.max(0, a.half ? (a.third ? (a.half === "up" ? Math.ceil(v / 3) : Math.floor(v / 3)) : halve(v, a.half)) : v);
   return a.negate ? -n : n;
@@ -368,6 +370,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
     case "typeToYourGraveyardThisTurn":
       return s.turnLog?.permanentTypesToYard?.[ctx.controller]?.includes(c.type) ? 1 : 0;
+    case "artifactsToGraveyardThisTurn":
+      return s.turnLog?.artifactsToYard ?? 0;
     case "creaturesToYourGraveyard":
       return (s.turnLog?.creaturesToYard ?? []).filter((d) => d.owner === ctx.controller && !(c.nontoken && d.token)).length;
     case "diedThisTurn":
@@ -777,7 +781,7 @@ export function partySize(s: GameState, pid: PlayerId, view: (o: GameObject) => 
 /** For display: "X", "the number of creatures you control", "2". */
 export function describeAmount(a: Amount): string {
   if (typeof a === "number") return String(a);
-  const base = a.per ? `${describeCount(a.count)} / ${a.per}, rounded down` : describeCount(a.count);
+  const base = a.pow2 ? `2^${describeCount(a.count)}` : a.per ? `${describeCount(a.count)} / ${a.per}, rounded down` : describeCount(a.count);
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
@@ -909,6 +913,8 @@ function describeCount(c: Count): string {
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":
       return `an ${c.type.toLowerCase()} put into your graveyard from the battlefield this turn`;
+    case "artifactsToGraveyardThisTurn":
+      return "#artifacts put into graveyards from the battlefield this turn";
     case "creaturesToYourGraveyard":
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":

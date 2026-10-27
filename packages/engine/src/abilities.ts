@@ -90,6 +90,8 @@ export interface AmountExpr {
   signed?: true;
   /** "If X is 6 or more, ... twice X damage ... instead" (Shatterskull Smashing): twice as much when the X announced is this or more. */
   twiceIfX?: number;
+  /** "Draws 2ˣ cards" (Mathemagics): two to the power of the count, at most 1024 (more than all the cards in the game). */
+  pow2?: true;
 }
 
 /** What an amount counts. */
@@ -368,6 +370,8 @@ export type Count =
   | { kind: "creaturesLeftThisTurn" }
   /** "For each (nontoken) creature put into your graveyard from the battlefield this turn" (Caller of the Claw): its owner's graveyard, whoever controlled it. */
   | { kind: "creaturesToYourGraveyard"; nontoken?: true }
+  /** "The number of artifacts that were put into graveyards from the battlefield this turn" (Structural Assault): anyone's, tokens too. */
+  | { kind: "artifactsToGraveyardThisTurn" }
   /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
   | { kind: "typeToYourGraveyardThisTurn"; type: string }
   | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
@@ -1736,7 +1740,7 @@ export type StaticCondition =
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
-  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true }
+  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number }
   /** "There are five colors among permanents you control" (CR 105.2). */
   | { kind: "colorsAmong"; n: number }
   /** "You've gained 5 or more life this turn": in total. */
@@ -2740,7 +2744,7 @@ export type Effect =
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
    */
   /** `drain`: "Each opponent loses X life and you gain X life, where X is that card's mana value" (Twilight Prophet). */
-  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
+  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true }; /** Duskmantle Seer: each player reveals their own top card, loses life equal to its mana value, then puts it into their hand. */ each?: true }
   /**
    * Keen Duelist, Parker Luck: two players each reveal the top card of their library, each loses life equal to the mana
    * value of the card the other revealed, then each puts the card they revealed into their hand.
@@ -3602,6 +3606,8 @@ export type SpellCondition =
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "Destroy target creature if no other creature has greater power" (Getaway Glamer): that creature as it is now, still a legal target, against every other creature on the battlefield. */
+  | { kind: "targetGreatestPower"; index: number }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
   | { kind: "damagedThisWayIs"; filter: TargetSpec }
   /** "If a player is dealt damage this way, scry 1" (Play with Fire): damage this resolution dealt to a player. */
@@ -3758,6 +3764,8 @@ export type TriggerEvent =
   | "selfMutates"
   /** "Whenever a creature you control mutates" (Essence Symbiote): one matching `tappedFilter`, the subject (CR 702.140d). */
   | "permanentMutates"
+  /** "Whenever a creature you control explores" (Wildgrowth Walker): once the exploring is done (CR 701.44b), the explorer the subject. */
+  | "creatureYouControlExplores"
   /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
   | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
@@ -5240,6 +5248,8 @@ export interface CompiledCard {
    * permission to cast as though with flash (rulings), and not while something resolves (cascade).
    */
   opponentsSorceryTiming?: true;
+  /** "Players can cast spells only during their own turns" (Dosan the Falling Leaf). */
+  castOnlyOwnTurn?: true;
   /** "No more than one creature can attack each combat." / "... block ..." (Silent Arbiter; CR 508.1c, 509.1b): for everyone. */
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
   combatLimit?: { attack?: number; block?: number; attackYou?: number; /** "No more than one creature can attack ~ each combat" (The Eternal Wanderer). */ attackSelf?: number; /** "As long as ~ is tapped, no more than one creature can attack you each combat" (Mirri, Weatherlight Duelist). */ attackYouIfTapped?: number };
@@ -5342,6 +5352,8 @@ export interface CompiledCard {
   opponentsLoseDouble?: true;
   /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
   opponentsDrawOnce?: true;
+  /** "Each player can't draw more than one card each turn" (Spirit of the Labyrinth). */
+  playersDrawOnce?: true;
   /**
    * Notion Thief: "If an opponent would draw a card except the first one they draw in each of their draw steps, instead
    * that player skips that draw and you draw a card" (a replacement effect, CR 614.1a, 614.10).

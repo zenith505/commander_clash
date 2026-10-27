@@ -257,6 +257,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCard && /^(?:[Ss]huffle (?:it|~) into its owner's library|[Ii]ts owner shuffles (?:it|~) into their library)$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
   // Kogla and Yidaro: "{2}{R}{G}, Discard this card: ... Shuffle this card into your library from your graveyard": the
   // card discarded to pay for it, while it's still there (CR 400.7).
+  // Skyfisher Spider: "When ~ dies, ... exile ~ from your graveyard": the card it became, only from your own graveyard.
+  if (ctx.selfCard && !ctx.discardedSelf && /^[Ee]xile ~ from your graveyard$/.test(s)) return [{ type: "exile", what: { ref: "selfCard", yours: true } }];
   if (ctx.discardedSelf && /^[Ss]huffle ~ into your library from your graveyard$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard", moved: true, yours: true } }];
   // "When ~ dies, put it on top of its owner's library" (Dark Revenant): the card in the graveyard, if it's still there.
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
@@ -1238,9 +1240,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
   }
-  if ((m = /^(.+?) sacrifices? a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
+  // Blot Out: "Target opponent exiles a creature or planeswalker they control with the greatest mana value among creatures
+  // and planeswalkers they control": that player chooses among those tied.
+  if ((m = /^(.+?) (sacrifices?|exiles?) a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: "sacrifice", greatest: "manaValue" }] : null;
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: /^sac/i.test(m[2]!) ? "sacrifice" : "exile", greatest: "manaValue" }] : null;
   }
   // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
   // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before

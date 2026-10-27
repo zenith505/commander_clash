@@ -68,8 +68,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^The player whose turn it is may end the turn$/.test(s)) return [{ type: "eachMay", who: { ref: "activePlayer" }, effects: [{ type: "endTurn" }], text: "end the turn" }];
   // Soothsaying: "Shuffle your library."
   if (/^Shuffle your library$/.test(s)) return [{ type: "shuffle", who: { ref: "you" } }];
-  // Boggart Forager, Soldier of Fortune: "Target player shuffles their library."
-  if (/^Target player shuffles their library$/.test(s)) {
+  // Boggart Forager, Soldier of Fortune: "Target player shuffles their library." Lantern of Insight: "Target player
+  // shuffles." (a library, CR 701.24a).
+  if (/^Target player shuffles(?: their library)?$/.test(s)) {
     const who = parsePlayer("target player", ctx);
     return who ? [{ type: "shuffle", who }] : null;
   }

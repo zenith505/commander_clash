@@ -61,6 +61,11 @@ export function compileCard(card: CardDef): CompiledCard {
   // A meld card's ability melds it with its counterpart into their combined back face (CR 701.42a): only if what that
   // puts onto the battlefield is supported.
   if (d.meld && !isMeldResult(d) && /\bmeld them into\b/.test(d.oracleText) && !meldResultSupported(d.meld.result)) out.unsupported.push(`(${d.meld.result}, the permanent it melds into)`);
+  // Warping Wurm: "Whenever ~ phases in" and an upkeep trigger that phases it out go on the stack together, in the order
+  // its controller chooses (CR 603.3b); the engine has no such choice, and the wrong order loses the counter.
+  const phasesIn = out.triggers.find((t) => t.event === "selfPhasesIn");
+  if (phasesIn && out.triggers.some((t) => t.event === "yourUpkeep" && allEffects(t.body.effects).some((e) => e.type === "phaseOut" && e.what.ref === "self")))
+    out.unsupported.push(`${phasesIn.body.text} (ordering it with the upkeep trigger)`);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;

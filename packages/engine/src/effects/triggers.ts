@@ -185,6 +185,8 @@ export type TriggerSourceEvent =
   | { type: "playerCountersPut"; player: PlayerId; counter: string; amount: number; by: PlayerId }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
   | { type: "becameMonstrous"; id: ObjectId; x: number }
+  /** These permanents phased in or are about to phase out (looking back in time, CR 603.10b). */
+  | { type: "phases"; ids: ObjectId[]; how: "in" | "out" }
   /** A crew ability of this Vehicle resolved (CR 702.122e). */
   | { type: "crewed"; id: ObjectId }
   | { type: "crews"; id: ObjectId; vehicle: ObjectId }
@@ -850,7 +852,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       if (o.blocking) {
         // Blocking several creatures, "blocks" still triggers once; "blocks a creature" once for each (CR 509.3a-b).
-        add(o, you, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
+        // "Blocks one or more black creatures" (Rashka the Slayer): once, if any of them is one.
+        const anyBlocked = (t: TriggeredAbility) => !t.blockFilter || o.blocking!.some((a) => !!s.objects[a] && objectMatches(s, t.blockFilter!, s.objects[a]!, you, false));
+        add(o, you, (e, t) => (e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks") && anyBlocked(t));
         addHosted(o, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
         for (const a of o.blocking) {
           const at = s.objects[a];
@@ -872,7 +876,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (o.attacking !== undefined && o.blockedBy?.length) {
         // "Defending player" (afflict) is the player it's attacking.
         // "Whenever ~ or equipped creature becomes blocked" (Simian Sling): about ~ itself here, the subject.
-        add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        const anyBlocker = (t: TriggeredAbility) => !t.blockFilter || o.blockedBy!.some((b) => !!s.objects[b] && objectMatches(s, t.blockFilter!, s.objects[b]!, you, false));
+        add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && anyBlocker(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
         const bearer = isRingBearer(s, o);
@@ -952,7 +957,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         printedMatches(t.cast.orPlaysLand, defOf(s, land)) &&
         (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
         (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
-      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
+      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "finalChapterResolved") {
     for (const id of s.battlefield) {
@@ -1155,6 +1160,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = s.objects[ev.id];
     const vehicle = s.objects[ev.vehicle];
     if (o?.zone === "battlefield" && vehicle) add(o, controllerOf(s, o), (e) => e === "selfCrewsVehicle", undefined, undefined, vehicle);
+  } else if (ev.type === "phases") {
+    for (const id of ev.ids) {
+      const o = obj(s, id);
+      add(o, controllerOf(s, o), (e) => e === (ev.how === "in" ? "selfPhasesIn" : "selfPhasesOut"));
+    }
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
@@ -2097,14 +2107,27 @@ export function checkLostControl(s: GameState) {
 
 export function checkStateTriggers(s: GameState) {
   checkLostControl(s);
+  checkStateConditions(s);
+}
+
+/**
+ * The state triggers whose state is true now (CR 603.8). Checked continuously: also between the instructions of a
+ * resolving spell or ability, as "even if only for a brief moment" (rulings on Emperor Crocodile, Veiled Crocodile).
+ */
+export function checkStateConditions(s: GameState) {
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const triggers = abilitiesOf(s, o).triggers;
     triggers.forEach((t, index) => {
       if (t.event !== "state" || !t.state || (t.activeIf && !staticConditionNow(s, t.activeIf, id, controllerOf(s, o)))) return;
-      const waiting = s.triggerQueue.some((q) => q.sourceId === id && q.index === index) || s.stack.some((x) => x.sourceId === id && x.stateIndex === index && x.sourceZc === (o.zoneChanges ?? 0));
+      // Not again until it has resolved (CR 603.8): one waiting, on the stack, or resolving now.
+      const mine = (x: StackItem) => x.sourceId === id && x.stateIndex === index && x.sourceZc === (o.zoneChanges ?? 0);
+      const waiting = s.triggerQueue.some((q) => q.sourceId === id && q.index === index) || s.stack.some(mine) || (!!s.resolving && mine(s.resolving.item));
       if (waiting || !staticConditionNow(s, t.state, id, controllerOf(s, o))) return;
-      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0 });
+      // "When an opponent has 10 or less life, if ~ is an enchantment" (Lurking Jackals): an intervening if, checked as it
+      // triggers and again as it resolves (CR 603.4); once it's false, the state doesn't trigger it again.
+      if (t.ifCond && !staticConditionNow(s, t.ifCond, id, controllerOf(s, o))) return;
+      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0, ...(t.ifCond ? { ifCond: t.ifCond } : {}) });
     });
   }
 }

@@ -3,7 +3,7 @@ import { COUNTER, differenceInHand, keywordOf, NUM, X, num, parseSpentReq, singu
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { ANY_COUNTER } from "../abilities";
-import { HISTORIC, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { HISTORIC, parseGroup, parseKeywordList, parseTargetPhrase, pickFilter } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
@@ -54,6 +54,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ deals damage to a player, (.+)$/, "selfDealsDamageToPlayer"],
   [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
   // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
+  [/^Whenever ~ phases in, (.+)$/, "selfPhasesIn"],
+  [/^Whenever ~ phases out, (.+)$/, "selfPhasesOut"],
   [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
   [/^Whenever ~ is dealt noncombat damage, (.+)$/, "selfIsDealtNoncombatDamage"],
   [/^Whenever ~ is dealt combat damage, (.+)$/, "selfIsDealtCombatDamage"],
@@ -139,7 +141,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfMutates",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfMutates", "selfPhasesIn", "selfPhasesOut",
   "selfBecomesUntapped", "selfBecomesCrewed", "selfCrewsVehicle",
 ];
 
@@ -454,6 +456,19 @@ function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null 
 }
 
 function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Serra Inquisitors: "Whenever ~ blocks or becomes blocked by one or more black creatures", Dwarven Soldier: "... by one
+  // or more Orcs", Rashka the Slayer: "Whenever ~ blocks one or more black creatures": once per combat, however many of
+  // them there are (rulings on Amphibious Kavu and Rashka); "blue and/or black" is either color (CR 105.2).
+  const oneOrMore = /^Whenever ~ (blocks or becomes blocked by|blocks|becomes blocked by) one or more (.+?), (.+)$/.exec(line);
+  if (oneOrMore) {
+    const phrase = oneOrMore[2]!.replace(/ and\/or /g, " or ");
+    const filter = /s$/.test(phrase) ? pickFilter(phrase.replace(/s$/, "")) : null;
+    if (!filter || filter.kind !== "object" || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
+    const body = parseBody(oneOrMore[3]!, { selfIt: true });
+    if (!body) return "fail";
+    const event: TriggerEvent = oneOrMore[1] === "blocks" ? "selfBlocks" : oneOrMore[1] === "becomes blocked by" ? "selfBecomesBlocked" : "selfBlocksOrBecomesBlocked";
+    return { event, body, blockFilter: { ...filter, text: oneOrMore[2]! } };
+  }
   // "Whenever a creature blocks" (anyone's), "Whenever a Rat you control becomes blocked": "it" and "that creature" are
   // that creature, once for each (CR 509.3a, 509.3c).
   // "Whenever a creature you control blocks" (Noble Stand), "... with defender blocks" (Perimeter Captain): yours only.
@@ -1848,6 +1863,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Zhang Liao: "Whenever ~ deals damage to an opponent, that opponent discards a card": the player dealt it.
   const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+!? — (?=(When|Whenever|At)\b)/, ""))
     .replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ")
+    // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
+    .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
     .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ")
     // Resolute Archangel: "if your life total is less than your starting life total, it becomes equal to ...": "it" is
@@ -2344,8 +2361,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When this token enters, if it's a creature, ..." (Mythos of Illuna's token): its card type as it triggers and
   // resolves (CR 603.4, rulings).
   // "When an opponent casts a creature spell, if ~ is an enchantment, it becomes a 2/2 Soldier creature" (Opal Caryatid,
-  // the Hidden and Veiled cycles): ~'s type, whatever the event (rulings: nothing happens if it's no longer one).
-  const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : intervening && /^it becomes /.test(intervening[3]!) ? /^~ is an? (creature|enchantment)$/.exec(intervening[2]!) : null;
+  // the Hidden and Veiled cycles): ~'s type, whatever the event (rulings: nothing happens if it's no longer one). Opal
+  // Guardian: "if ~ is an enchantment, ~ becomes ...".
+  const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : intervening && /^(?:it|~) becomes /.test(intervening[3]!) ? /^~ is an? (creature|enchantment)$/.exec(intervening[2]!) : null;
   const typeCond: StaticCondition | null = typeIf && { kind: "selfIs", filter: { kind: "object", types: [(typeIf[1]!.charAt(0).toUpperCase() + typeIf[1]!.slice(1)) as "Creature"], text: typeIf[1]! } };
   // "Whenever a nontoken creature you control enters, if it doesn't have the same name as another creature you control
   // or a creature card in your graveyard" (Guardian Project): about the creature that entered.
@@ -2714,7 +2732,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(many[3]!.replace(/\b(\d{1,3}),(\d{3})\b/g, "$1$2"), { selfIt: true });
     return body ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min: Number(many[1]!.replace(/,/g, "")) }, body } : "fail";
   }
-  const st = new RegExp(`^When (you control no .+?|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
+  // Lurking Jackals: "When an opponent has 10 or less life", Opal Avenger: "When you have 10 or less life", Veiled
+  // Crocodile: "When a player has no cards in hand", Hidden Predators: "When an opponent controls a creature with power 4
+  // or greater", Endangered Armodon: "When you control a creature with toughness 2 or less", Goblins of the Flarg: "When
+  // you control a Dwarf".
+  const st = new RegExp(`^When (you control no .+?|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
@@ -2782,6 +2804,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (playType) {
     const t = parseTrigger(`Whenever you play a land, ${playType[2]}`);
     return !t || t === "fail" || t.event !== "youPlayLand" || t.subjectFilter ? "fail" : { ...t, subjectFilter: { kind: "object", types: ["Land"], subtypes: [playType[1]!], text: playType[1]! } };
+  }
+  // Hidden Herd: "When an opponent plays a nonbasic land" (CR 305.1): playing one, not one put onto the battlefield
+  // (rulings).
+  const oppPlays = /^When(?:ever)? an opponent plays a nonbasic land, (.+)$/.exec(line);
+  if (oppPlays) {
+    const t = parseTrigger(`Whenever an opponent plays a land, ${oppPlays[1]}`);
+    return !t || t === "fail" || t.event !== "opponentPlaysLand" || t.subjectFilter ? "fail" : { ...t, subjectFilter: { kind: "object", types: ["Land"], notSupertypes: ["Basic"], text: "nonbasic land" } };
   }
   // "When ~ enters untapped, ..." (Mystic Sanctuary): entering untapped is part of the trigger event.
   const untapped = /^When(?:ever)? ~ enters untapped, (.+)$/.exec(line);

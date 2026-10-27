@@ -5,6 +5,7 @@ import { clearCombat, log, nameOf, obj, removeFromCombat } from "./game";
 import { controllerOf, invalidateCharacteristics } from "./layers";
 import { pairedWith } from "./cards";
 import type { GameState, ObjectId, PlayerId } from "./types";
+import { fireEvent } from "./effects";
 
 /**
  * These permanents phase out, all at once (CR 702.26b), and with them whatever is attached to them, indirectly
@@ -23,6 +24,8 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
       }
   }
   const all = [...direct.filter((id) => !indirect.has(id)), ...indirect];
+  // "Whenever ~ phases out" looks back in time (CR 603.10b): it triggers as it is now, on the battlefield.
+  fireEvent(s, { type: "phases", ids: all, how: "out" });
   // Who controls each, before any of them stops existing.
   const by = new Map(all.map((id) => [id, controllerOf(s, obj(s, id))]));
   for (const id of all) {
@@ -75,6 +78,7 @@ export function phaseIn(s: GameState, ids: ObjectId[]) {
   }
   log(s, `${all.map((id) => nameOf(s, id)).join(", ")} phase${all.length === 1 ? "s" : ""} in.`);
   invalidateCharacteristics(s);
+  fireEvent(s, { type: "phases", ids: all, how: "in" });
 }
 
 /**

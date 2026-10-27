@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import { creatureCardAbove } from "./graveyard";
-import type { AbilityBody, Affects, Amount, DamageMod, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
+import type { AbilityBody, Affects, Amount, DamageMod, Modification, MostStat, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
@@ -571,6 +571,19 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
   }
 }
 
+/**
+ * The one player in the game with the most life, cards in hand, or permanents matching a filter (`count` counts those),
+ * or none when two or more are tied for the most.
+ */
+export function uniqueMostPlayer(s: GameState, stat: MostStat, count: (p: PlayerId, filter: TargetSpec) => number): PlayerId | undefined {
+  const alive = s.turnOrder.filter((p) => !s.players[p]!.lost);
+  const n = (p: PlayerId) => (stat.what === "life" ? s.players[p]!.life : stat.what === "hand" ? s.players[p]!.hand.length : count(p, stat.filter));
+  const each = alive.map((p) => [p, n(p)] as const);
+  const most = Math.max(...each.map(([, v]) => v));
+  const top = each.filter(([, v]) => v === most);
+  return top.length === 1 ? top[0]![0] : undefined;
+}
+
 function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId, subjectZc?: number): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
@@ -952,6 +965,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
     case "playedLandThisTurn":
       return (s.players[you]?.landsPlayedThisTurn ?? 0) > 0;
+    case "opponentOwnsExiled":
+      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && s.players[p]!.exile.length > 0);
+    case "uniqueMost":
+      return uniqueMostPlayer(s, cond.stat, (p, f) => [...chars].filter(([id, c]) => c.controller === p && objectMatches(s, f, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))).length) !== undefined;
     case "someHandAtMost":
       return s.players.some((p) => !p.lost && (!cond.opponent || p.id !== you) && p.hand.length <= cond.n);
     case "totalPower": {

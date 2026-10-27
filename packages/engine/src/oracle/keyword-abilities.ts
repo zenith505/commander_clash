@@ -22,6 +22,15 @@ export function parseGraveyardKeyword(
 ): { fromGraveyard: CastFromGraveyard } | { fromExile: true; fromGraveyard?: CastFromGraveyard } | { buyback: string; costs?: AdditionalCost[]; text?: string } | { rebound: true } | { escapesWith: number } | { unearth: ActivatedAbility } | "fail" | null {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   let m: RegExpExecArray | null;
+  // The Visions cycle: "Flashback {8}{W}{W}. This spell costs {X} less to cast this way, where X is ...": less generic
+  // mana only when it's cast with its own flashback, counted as the cost is determined (CR 601.2f, 118.7a).
+  if ((m = /^(Flashback \{[^.]+?)\. ~ costs \{X\} less to cast this way, where X is (.+?)\.?$/.exec(line))) {
+    const r = parseGraveyardKeyword(m[1]!, d);
+    const less = parseCount(m[2]!, null);
+    const way = r && r !== "fail" && "fromGraveyard" in r ? r.fromGraveyard : undefined;
+    if (way?.kind !== "flashback" || !less || !("count" in less)) return "fail";
+    return { fromGraveyard: { ...way, less } };
+  }
   if ((m = /^(Flashback|Escape)(?: |—)(.+?)\.?$/.exec(line))) {
     const kind = m[1] === "Flashback" ? "flashback" : "escape";
     if (kind === "flashback" && !isSpell) return "fail";

@@ -1476,6 +1476,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = obj(s, id);
         if (controllerOf(s, w) === hurt) add(w, hurt, (e) => e === "opponentSourceDamagesYouOrYours", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
       }
+    // Hooded Blightfang: a creature its controller controls dealing damage to a planeswalker (or a player), with deathtouch
+    // as it deals it (rulings); the subject is the creature or the planeswalker.
+    const dealer = s.objects[ev.source];
+    const toWalker = !!hit && hit.zone === "battlefield" && objIsType(s, hit, "Planeswalker");
+    if (dealer?.zone === "battlefield" && objIsType(s, dealer, "Creature") && controllerOf(s, dealer) === ev.by && (toWalker || ev.player !== undefined))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) !== ev.by) continue;
+        const fits = (t: TriggeredAbility, dealt: boolean) => !!t.damageTo && !!t.damageTo.subjectDealt === dealt && (toWalker || t.damageTo.what === "playerOrPlaneswalker") && (t.damageTo.self ? w.id === dealer.id : objectMatches(s, t.dealer!.filter, dealer, ev.by, false));
+        add(w, ev.by, (e, t) => e === "yourCreatureDealsDamage" && fits(t, false), undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
+        if (toWalker) add(w, ev.by, (e, t) => e === "yourCreatureDealsDamage" && fits(t, true), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
+      }
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== ev.by) continue;
@@ -2192,9 +2204,14 @@ function amassedPowerNow(s: GameState, a: { id: ObjectId; zc: number }): number 
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}) });
+  // Clement: "with lesser mana value" than a subject still on the battlefield: its mana value now (CR 202.3).
+  const subj = t.subject && s.objects[t.subject.id];
+  const lki = t.lki?.manaValue === undefined && subj?.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? { ...t.lki, manaValue: evalAmount(s, { count: { kind: "manaValue", of: { ref: "subject" } } }, { controller: t.controller, objects: (r) => (r.ref === "subject" ? [subj] : []) }) } : t.lki;
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(lki ? { lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
+  // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
+  if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {

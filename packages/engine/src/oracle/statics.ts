@@ -148,10 +148,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // The Masamune: "As long as equipped creature is attacking, it has first strike and must be blocked if able": while it's
   // an attacking creature (CR 506.4, 611.3a).
-  if ((m = /^As long as (enchanted|equipped) creature is attacking, it (gets|has) (.+)$/.exec(text))) {
-    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+  // Security Bypass: "As long as enchanted creature is attacking alone, it can't be blocked": attacking with no other
+  // creature attacking (CR 506.5).
+  if ((m = /^As long as (enchanted|equipped) creature is attacking( alone)?, it (gets|has|can't be blocked)(.*)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[3]}${m[4]}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
-    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } } };
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: m[2] ? "attackingAlone" : "attacking", text: m[2] ? "creature attacking alone" : "attacking creature" } } };
   }
   // Sword of the Paruns: "As long as equipped creature is tapped, tapped creatures you control get +2/+0": while the
   // creature it's attached to is tapped (or untapped), the rest applies; unattached, neither does.

@@ -2696,6 +2696,12 @@ export function compile(d: CardDef): CompiledCard {
       out.damageToYouMillsTwice = true;
       continue;
     }
+    // Nine Lives (CR 615.5, 615.12): see staticRules in damage.ts.
+    const nine = /^If a source would deal damage to you, prevent that damage and put an? ([a-z]+) counter on ~\.$/.exec(line);
+    if (nine) {
+      out.preventToYouCounter = nine[1]!;
+      continue;
+    }
     // The Wanderer (CR 615.1): see staticRules in damage.ts.
     const toYou = /^Prevent all (combat |noncombat )?damage that would be dealt to you( and other permanents you control)?\.$/.exec(line);
     if (toYou) {

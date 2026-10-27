@@ -859,8 +859,17 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const ifCast = /^if you cast it, /.exec(bodyText);
   if (ifCast && filter.controller !== "you") return "fail";
   if (ifCast) bodyText = bodyText.slice(ifCast[0].length);
-  const body = parseBody(bodyText, { subjectIt: true });
+  // Clement, the Worrywort: "return up to one target creature you control with lesser mana value": less than the entering
+  // permanent's, as the target is chosen (TargetSpec.bound, settled in triggerBody).
+  const lesser = / with lesser mana value\b/.test(bodyText);
+  if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "");
+  let body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
+  if (lesser) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "object" || t.bound || t.manaValue) return "fail";
+    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+  }
   const kind = m[1]!.toLowerCase();
   return {
     event: "permanentEnters",
@@ -974,8 +983,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (hadKw) bodyText = hadKw[3]!;
   // "Return to your hand target artifact card in your graveyard with lesser mana value" (Scrap Trawler, Orah, Havi): less
   // than the one that died, as it last existed (rulings on Scrap Trawler); fixed as the target is chosen (TargetSpec.bound).
-  const lesser = !attached && / with lesser mana value\b/.test(bodyText);
-  if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
+  // Colfenor, the Last Yew: "with lesser toughness": the same, as the creature last existed on the battlefield (rulings).
+  const lesserKey = attached ? undefined : / with lesser (mana value|toughness)\b/.exec(bodyText)?.[1];
+  const lesser = lesserKey !== undefined;
+  if (lesser) bodyText = bodyText.replace(/ with lesser (?:mana value|toughness)\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
   // Mimic Vat: "you may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (CR
   // 607.2a). The card is exiled linked to ~; if it has left the graveyard, nothing happens and the other card stays (rulings).
   const imprint = !attached && /^you may exile that card\. If you do, return each other card exiled with ~ to its owner's graveyard\.?$/.test(bodyText);
@@ -989,8 +1000,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   if (lesser) {
     const [t, ...more] = body.targets;
-    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue) return "fail";
-    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue || t.toughness) return "fail";
+    const key = lesserKey === "toughness" ? ("toughness" as const) : ("manaValue" as const);
+    // "Return up to one other target creature card" after "~ or another creature ... dies": other than the one that died.
+    const { notSource, ...rest } = t;
+    if (notSource && m?.[1] !== "~ or another") return "fail";
+    body = { ...body, targets: [{ ...rest, ...(notSource ? { notSubject: true as const } : {}), bound: { key, at: "most", amount: { count: { kind: key, of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser ${lesserKey}` }] };
   }
   if (attached) {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
@@ -1053,6 +1068,22 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(toEnch[1]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toEnchanted: true };
+  }
+  // Hooded Blightfang: "Whenever a creature you control with deathtouch deals damage to a planeswalker, destroy that
+  // planeswalker"; Vraska, Swarm's Eminence: "... to a player or planeswalker, put a +1/+1 counter on that creature"; her
+  // Assassin: "Whenever ~ deals damage to a planeswalker, destroy that planeswalker". Once for each recipient (CR 603.2c);
+  // the creature has to have deathtouch as it deals the damage (rulings).
+  const dealsTo = /^Whenever (~|a creature you control(?: with (deathtouch))?) deals damage to a (planeswalker|player or planeswalker), (.+)$/.exec(line);
+  if (dealsTo) {
+    const what = dealsTo[3] === "planeswalker" ? "planeswalker" : "playerOrPlaneswalker";
+    const dealt = /\bthat planeswalker\b/.test(dealsTo[4]!);
+    if ((dealt && (what !== "planeswalker" || /\bthat creature\b/.test(dealsTo[4]!))) || /\b(?:that player|that much|that many|X)\b/.test(dealsTo[4]!)) return "fail";
+    const body = parseBody(dealsTo[4]!.replace(/\bthat planeswalker\b/g, "it"), { subjectIt: true });
+    if (!body) return "fail";
+    const self = dealsTo[1] === "~";
+    const filter = parseTargetPhrase(dealsTo[1]!.replace(/^a /, "").replace(/ you control/, "").replace(/^~$/, "creature"));
+    if (filter?.kind !== "object") return "fail";
+    return { event: "yourCreatureDealsDamage", dealer: { filter: { ...filter, text: dealsTo[1]!.replace(/^a /, "") } }, damageTo: { what, ...(self ? { self: true as const } : {}), ...(dealt ? { subjectDealt: true as const } : {}) }, body };
   }
   // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
   // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.
@@ -2827,10 +2858,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When you control seven or more Thrulls, sacrifice ~" (Endrek Sahr).
   // The Millennium Calendar: "When there are 1,000 or more time counters on ~, sacrifice it and each opponent loses 1,000
   // life": "1,000" is a number.
-  const many = /^When there are (\d{1,3}(?:,\d{3})*) or more ([a-z]+) counters on ~, (.+)$/.exec(line);
+  // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life."
+  const many = new RegExp(`^When there are (\\d{1,3}(?:,\\d{3})*|${NUM.replace(/^\(/, "(?:")}) or more ([a-z]+) counters on ~, (.+)$`).exec(line);
   if (many) {
     const body = parseBody(many[3]!.replace(/\b(\d{1,3}),(\d{3})\b/g, "$1$2"), { selfIt: true });
-    return body ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min: Number(many[1]!.replace(/,/g, "")) }, body } : "fail";
+    const min = /^[\d,]+$/.test(many[1]!) ? Number(many[1]!.replace(/,/g, "")) : num(many[1]!);
+    return body && Number.isInteger(min) && min > 0 ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min }, body } : "fail";
   }
   // Lurking Jackals: "When an opponent has 10 or less life", Opal Avenger: "When you have 10 or less life", Veiled
   // Crocodile: "When a player has no cards in hand", Hidden Predators: "When an opponent controls a creature with power 4

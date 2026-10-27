@@ -114,6 +114,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
+  // Security Bypass: "attacking alone": attacking with no other creature attacking (CR 506.5).
+  if (spec.combat === "attackingAlone" && (o.attacking === undefined || s.battlefield.some((id) => id !== o.id && s.objects[id]!.attacking !== undefined))) return false;
   // Soul Snare: "attacking you or a planeswalker you control": a planeswalker that's still there and still yours (rulings).
   if (spec.combat === "attackingYouOrYourPlaneswalker" && !attacksYouOrYourPlaneswalker(s, o, controller)) return false;
   if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
@@ -484,6 +486,7 @@ export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId 
 
 export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, controller: PlayerId, src?: SourceQuality): boolean {
   if (t.kind === "none") return false;
+  if (spec.notId !== undefined && t.kind === "object" && t.id === spec.notId) return false;
   if (t.kind === "player") {
     const p = s.players[t.id];
     if (!p || p.lost) return false;
@@ -684,7 +687,7 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   // tapped this way" (Teferi Akosa of Zhalfir): the number tapped, fixed before the reflexive trigger's targets are chosen.
   const tappedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "tappedThisWay";
   // "With lesser mana value" in a dies trigger (Scrap Trawler): the one that died, as it last existed (ctx.lki).
-  const subjectBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "subject";
+  const subjectBound = (t: TargetSpec) => (t.bound?.amount.count.kind === "manaValue" || t.bound?.amount.count.kind === "toughness") && t.bound.amount.count.of.ref === "subject";
   // Grishnákh, Brash Instigator: "with power less than or equal to the amassed Army's power", as the target is chosen.
   const amassedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "power" && t.bound.amount.count.of.ref === "amassed";
   const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t) || amassedBound(t);
@@ -706,8 +709,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     if (subjectBound(t)) {
       // Lesser than 0 is nothing (rulings: a mana value can't be less than 0).
       const { bound, ...rest } = t;
-      const n = (ctx.lki?.manaValue ?? 0) + (bound!.amount.plus ?? 0);
-      t = { ...rest, manaValue: { ...rest.manaValue, max: rest.manaValue?.max === undefined ? n : Math.min(rest.manaValue.max, n) }, text: rest.text.replace(/ with lesser mana value$/, ` with mana value ${n < 0 ? "less than 0" : `${n} or less`}`) };
+      const key = bound!.key === "toughness" ? "toughness" : "manaValue";
+      const n = (ctx.lki?.[key] ?? 0) + (bound!.amount.plus ?? 0);
+      const word = key === "toughness" ? "toughness" : "mana value";
+      t = { ...rest, [key]: { ...rest[key], max: rest[key]?.max === undefined ? n : Math.min(rest[key]!.max!, n) }, text: rest.text.replace(/ with lesser (?:mana value|toughness)$/, ` with ${word} ${n < 0 && key === "manaValue" ? "less than 0" : `${n} or less`}`) };
     }
     if (tappedBound(t) && ctx.tapped !== undefined) {
       const { bound, ...rest } = t;

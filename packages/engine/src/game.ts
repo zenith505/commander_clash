@@ -4568,6 +4568,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
+  if (way?.less !== undefined && wayMana !== undefined) less += Math.max(0, evalAmount(s, way.less, { controller: pid, sourceId: o.id }));
   for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
   // Emerge (CR 702.119a): the total cost is reduced by the sacrificed creature's mana value, in generic mana only. It's
   // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).

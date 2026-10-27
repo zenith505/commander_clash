@@ -1123,6 +1123,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }];
   }
+  // Flummoxed Cyclops: "~ can't block this combat": until the combat ends (CR 500.5a: "until end of combat").
+  if (/^~ can't block this combat$/.test(s)) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantBlock" }], duration: "endOfCombat" }];
   // Neyith of the Dire Hunt: "That creature must be blocked this combat if able": in the combat going on only.
   if ((m = /^(That creature|It|Target creature) must be blocked this combat if able$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);

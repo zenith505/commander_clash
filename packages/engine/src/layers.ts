@@ -170,6 +170,8 @@ export interface Characteristics {
   maxOneBlocker: boolean;
   /** "Its activated abilities can't be activated": "all" (mana abilities too, CR 605.1a), "nonMana", or false. */
   cantActivate: false | "all" | "nonMana";
+  /** "Its activated abilities with {T} in their costs can't be activated" (Serra Bestiary), mana abilities too (rulings). */
+  cantActivateTap: boolean;
   /** "Can't be blocked except by three or more creatures": the most such an ability asks for, 0 if none (CR 509.1b). */
   minBlockers: number;
   /**
@@ -202,6 +204,8 @@ export interface Characteristics {
   cantBeBlockedByGreaterPower: boolean;
   /** Spitfire Handler: it can't block an attacker with greater power than its own (CR 509.1b). */
   cantBlockGreaterPower: boolean;
+  /** Ironclaw Curse: it can't block an attacker whose power is at least its own toughness (CR 509.1b). */
+  cantBlockPowerAtLeastToughness: boolean;
   cantAttackAlone: boolean;
   onlyAttacksAlone: boolean;
   cantBlockAlone: boolean;
@@ -313,11 +317,13 @@ function printed(s: GameState, o: GameObject): Characteristics {
     minBlockers: 0,
     goadedBy: [],
     cantActivate: false,
+    cantActivateTap: false,
     attackUnless: [],
     cantBeBlockedByLesserPower: false,
     cantBeBlockedByLesserPowerThan: [],
     cantBeBlockedByGreaterPower: false,
     cantBlockGreaterPower: false,
+    cantBlockPowerAtLeastToughness: false,
     cantAttackAlone: false,
     onlyAttacksAlone: false,
     cantBlockAlone: false,
@@ -824,7 +830,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // another blue spell this turn" leaves out ~ itself, cast this turn (rulings).
       const ownSpell = item?.kind === "spell" && !item.copy && item.objectId === sourceId;
       const ownTrigger = item?.kind === "ability" && item.sourceId === sourceId && src.zone === "battlefield" && !!src.wasCast && src.enteredTurn === s.turn;
-      const itself = !!item && item.controller === you && (ownSpell || ownTrigger) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId));
+      // Hotheaded Giant: a permanent spell enters without a resolving item; it counts itself only if it was cast (rulings).
+      const entering = !!cond.entering && !!src.wasCast && mine.some((c) => c.card === defOf(s, src).oracleId);
+      const itself = entering || (!!item && item.controller === you && (ownSpell || ownTrigger) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
       return mine.length - (itself ? 1 : 0) > 0;
     }
     case "creatureDied":
@@ -1494,7 +1502,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.maxOneBlocker = true;
       return;
     case "cantActivate":
-      if (c.cantActivate !== "all") c.cantActivate = m.exceptMana ? "nonMana" : "all";
+      if (m.tapCost) c.cantActivateTap = true;
+      else if (c.cantActivate !== "all") c.cantActivate = m.exceptMana ? "nonMana" : "all";
       return;
     case "goad": {
       const by = controllerOfInst(e, chars);
@@ -1539,6 +1548,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     }
     case "cantBeBlockedByGreaterPower":
     case "cantBlockGreaterPower":
+    case "cantBlockPowerAtLeastToughness":
     case "cantAttackAlone":
     case "onlyAttacksAlone":
     case "cantBlockAlone":

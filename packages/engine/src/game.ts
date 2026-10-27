@@ -1001,6 +1001,7 @@ export function moveObject(
   o.attackingPermanent = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
+  o.becameBlockedTurn = undefined; // after the dies snapshot: Fyndhorn Druid looks back at it (CR 603.10a)
   o.band = undefined;
   o.timestamp = s.nextTimestamp++; // CR 613.7d
   o.attachedTo = to === "battlefield" ? opts.attachTo : undefined;
@@ -6363,6 +6364,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
+  // Stabilizer: "Players can't cycle cards" (typecycling too, CR 702.29f).
+  if (ab.cycling) {
+    const ban = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noCycling);
+    if (ban) return `${characteristics(s, obj(s, ban)).name}: players can't cycle cards`;
+  }
   if (ab.zone === "hand") {
     // Cycling works only while the card is in your hand (CR 702.29a); commander ninjutsu from the command zone too (CR 702.49d).
     if (!(o.zone === "hand" || (o.zone === "command" && ab.orCommand)) || o.owner !== pid) return `${ab.text} works only from your hand${ab.orCommand ? " or the command zone" : ""}`;
@@ -6374,6 +6380,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
+  else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
   if (banned) return banned;
   // Solemnity: a cost that puts counters on an artifact, creature, enchantment or land can't be paid (rulings).
@@ -8705,6 +8712,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (bl.blocking ??= []).push(at.id);
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
+    at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
   if (p.id !== chooser.id && !blocks.length) log(s, `${chooser.name} chose no blocks for ${p.name}.`);
@@ -8717,6 +8725,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
       if (m.band !== band || bl.blocking!.includes(m.id)) continue;
       bl.blocking!.push(m.id);
       (m.blockedBy ??= []).push(bl.id);
+      m.becameBlockedTurn = s.turn;
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }
@@ -8859,6 +8868,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   }
   if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it`; // CR 701.54c, 509.1b
   if (b.cantBlockGreaterPower && a.power > b.power) return `${b.name} can't block creatures with greater power`; // CR 509.1b
+  if (b.cantBlockPowerAtLeastToughness && a.power >= b.toughness) return `${b.name} can't block creatures with power equal to or greater than its toughness`; // CR 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b

@@ -1,7 +1,7 @@
 // Lane B, round 6: the least played cards first, working up the popularity list (`npm run popular -- --least`).
 
 import { describe, expect, it } from "vitest";
-import { act, card, forest, island, mountain, passUntil, plainsCard, pt, putOnBattlefield, setup, swamp } from "./helpers";
+import { act, addEffect, card, forest, island, mountain, passUntil, plainsCard, pt, putOnBattlefield, setup, swamp } from "./helpers";
 import { blockProblem, botActions, characteristics, compileCard, harmfulTargets, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planCast, planMana, planTurnFaceUp, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { potentialAttackers } from "../src/game";
 
@@ -424,7 +424,7 @@ describe("Attached permanents: Equipment destroyed with the creature, Auras retu
 const salve = card("Test Salve", "Instant", "{W}", { cmc: 1, oracleText: "You gain 1 life." });
 const murder = card("Test Murder", "Instant", "{B}", { cmc: 1, oracleText: "Destroy target creature." });
 const shock = card("Test Shock", "Instant", "{R}", { cmc: 1, oracleText: "Test Shock deals 2 damage to any target." });
-const testArtifact = (name = "Test Relic", manaCost = "{3}") => card(name, "Artifact", manaCost, { cmc: parseManaCost(manaCost).generic, oracleText: "{T}: You gain 1 life." });
+const testArtifact = (name = "Test Relic", manaCost = "{3}") => card(name, "Artifact", manaCost, { cmc: Number(manaCost.replace(/\D/g, "")), oracleText: "{T}: You gain 1 life." });
 /** Pass priority until `pid` has it (the stack and step unchanged, as someone else still has to pass). */
 const priorityTo = (s: GameState, pid: PlayerId) => {
   for (let i = 0; i < 8 && waitingOn(s) !== pid; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
@@ -688,6 +688,301 @@ describe("Riders about the target, the cards moved, and who controlled it", () =
       const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken);
       expect(tokens.length).toBe(big ? 1 : 0);
       if (big) expect(characteristics(s, s.objects[tokens[0]!]!).subtypes).toEqual(expect.arrayContaining(["Zombie", "Berserker"]));
+    }
+  });
+});
+
+describe("Exiling a card from a graveyard if you do; Clues; draws if you control a type", () => {
+  it("are fully supported", () => supported(bonecladNecromancer, carrionImp, marduWoeReaper, sance, carnageInterpreter, confirmSuspicions, unagisSpray, revelationOfPower));
+
+  it("Boneclad Necromancer: exiling a creature card makes a Zombie; declining makes none", () => {
+    for (const yes of [true, false]) {
+      let { s, ap, opp, ids } = setup([bonecladNecromancer]);
+      const c = into(s, opp, greenBear(), "graveyard");
+      s = run(s, planCast(s, ap, ids[0]!));
+      s = settle(s, { yes, targets: [tgt(c)] });
+      expect(zone(s, c)).toBe(yes ? "exile" : "graveyard");
+      expect(s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Zombie")).length).toBe(yes ? 1 : 0);
+    }
+  });
+
+  it("Carrion Imp gains 2 life if it exiles the card, none if you decline; Mardu Woe-Reaper the same for a Warrior", () => {
+    for (const yes of [true, false]) {
+      let { s, ap, ids } = setup([carrionImp, marduWoeReaper]);
+      const c = into(s, ap, greenBear(), "graveyard");
+      s = run(s, planCast(s, ap, ids[0]!));
+      s = settle(s, { yes, targets: [tgt(c)] });
+      expect(zone(s, c)).toBe(yes ? "exile" : "graveyard");
+      expect(life(s, ap)).toBe(40 + (yes ? 2 : 0));
+      if (!yes) continue;
+      const c2 = into(s, ap, greenBear(), "graveyard");
+      s = run(s, planCast(s, ap, ids[1]!));
+      s = settle(s, { yes, targets: [tgt(c2)] });
+      expect(zone(s, c2)).toBe("exile");
+      expect(life(s, ap)).toBe(43);
+    }
+  });
+
+  it("Séance: at each upkeep you may exile a creature card from your graveyard for a Spirit token copy, exiled at the end step", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, sance);
+    const c = into(s, ap, creature("Test Ogre", "Creature — Ogre", "{2}{R}", 3, 3), "graveyard");
+    const o = next(s, ap);
+    s = passUntil(s, "upkeep", o);
+    s = settle(s, { yes: true, targets: [tgt(c)] });
+    expect(zone(s, c)).toBe("exile");
+    const copy = s.battlefield.find((id) => s.objects[id]!.isToken)!;
+    expect(copy).toBeDefined();
+    expect(characteristics(s, s.objects[copy]!).subtypes).toEqual(expect.arrayContaining(["Ogre", "Spirit"]));
+    s = settle(passUntil(s, "end", o));
+    expect(s.battlefield.includes(copy)).toBe(false);
+  });
+
+  it("Carnage Interpreter discards your hand and investigates four times; Confirm Suspicions counters and investigates three times", () => {
+    let { s, ap, opp, ids } = setup([carnageInterpreter]);
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.players[ap]!.hand.length).toBe(0);
+    const clues = (pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && characteristics(s, s.objects[id]!).subtypes.includes("Clue")).length;
+    expect(clues(ap)).toBe(4);
+    const cs = into(s, opp, confirmSuspicions);
+    for (const l of [island, island, island, island, island]) putOnBattlefield(s, opp, l);
+    const sh = into(s, ap, shock);
+    s = run(s, planCast(s, ap, sh, [player(opp)]));
+    s = priorityTo(s, opp);
+    s = settle(run(s, planCast(s, opp, cs, [topSpell(s)])));
+    expect(zone(s, sh)).toBe("graveyard");
+    expect(clues(opp)).toBe(3);
+  });
+
+  it("Unagi's Spray draws a card only if you control one of the listed types", () => {
+    for (const otter of [true, false]) {
+      let { s, ap, opp, ids } = setup([unagisSpray]);
+      if (otter) putOnBattlefield(s, ap, creature("Test Otter", "Creature — Otter", "{U}", 1, 1));
+      const b = putOnBattlefield(s, opp, greenBear());
+      const hand0 = s.players[ap]!.hand.length;
+      s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+      expect(pt(s, b)).toBe("-2/2");
+      expect(s.players[ap]!.hand.length).toBe(hand0 - 1 + (otter ? 1 : 0));
+    }
+  });
+
+  it("Revelation of Power: flying and lifelink too if the creature has a counter of any kind", () => {
+    for (const counter of [true, false]) {
+      let { s, ap, ids } = setup([revelationOfPower]);
+      const b = putOnBattlefield(s, ap, greenBear());
+      if (counter) s.objects[b]!.counters["stun"] = 1;
+      invalidateCharacteristics(s);
+      s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+      expect(pt(s, b)).toBe("4/4");
+      expect(has(s, b, "Flying")).toBe(counter);
+      expect(has(s, b, "Lifelink")).toBe(counter);
+    }
+  });
+});
+
+describe("Oil counters on permanents you control", () => {
+  it("are fully supported", () => supported(oilGorgerTroll, cinderslashRavager, kuldothaCackler, urabrasksAnointer));
+
+  it("Oil-Gorger Troll gains 3 life, then draws only if you control a permanent with an oil counter", () => {
+    for (const oil of [true, false]) {
+      let { s, ap, ids } = setup([oilGorgerTroll]);
+      if (oil) oiled(s, ap);
+      const hand0 = s.players[ap]!.hand.length;
+      s = settle(run(s, planCast(s, ap, ids[0]!)));
+      expect(life(s, ap)).toBe(43);
+      expect(s.players[ap]!.hand.length).toBe(hand0 - 1 + (oil ? 1 : 0));
+    }
+  });
+
+  it("Cinderslash Ravager costs {1} less for each permanent with oil counters, and deals 1 to each opposing creature", () => {
+    for (const oil of [2, 0]) {
+      let { s, ap, opp, ids } = setup([cinderslashRavager]);
+      // Four lands left: {R}{G} and two more.
+      const left = { Mountain: 2, Forest: 2 } as Record<string, number>;
+      for (const id of s.battlefield) if (s.objects[id]!.controller === ap && types(s, id).includes("Land")) {
+        const t = characteristics(s, s.objects[id]!).subtypes[0]!;
+        if ((left[t] ?? 0) > 0) left[t]!--;
+        else s.objects[id]!.tapped = true;
+      }
+      for (let i = 0; i < oil; i++) oiled(s, ap);
+      const theirs = putOnBattlefield(s, opp, creature("Test Wisp", "Creature — Spirit", "{W}", 1, 1));
+      const plan = planCast(s, ap, ids[0]!);
+      if (!oil) {
+        expect(plan).toBeNull();
+        continue;
+      }
+      s = settle(run(s, plan));
+      expect(zone(s, ids[0]!)).toBe("battlefield");
+      expect(zone(s, theirs)).toBe("graveyard");
+    }
+  });
+
+  it("Kuldotha Cackler gets +X/+0 attacking; Urabrask's Anointer deals X damage", () => {
+    let { s, ap, opp, ids } = setup([urabrasksAnointer]);
+    oiled(s, ap, 2);
+    oiled(s, ap, 1);
+    const k = putOnBattlefield(s, ap, kuldothaCackler);
+    const b = putOnBattlefield(s, opp, creature("Test Giant", "Creature — Giant", "{4}", 5, 5));
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s, { targets: [tgt(b)] });
+    expect(s.objects[b]!.damage).toBe(2);
+    s = toBlocks(s, ap, [{ attacker: k, defender: opp }]);
+    expect(pt(s, k)).toBe("4/3");
+  });
+});
+
+describe("Who can block, and attacking creatures of a type", () => {
+  it("are fully supported", () => supported(pyrophobia, goblinLocksmith, heroOfOxidRidge, seismicElemental, mournwillow, blaringCaptain, bloodAgeGeneral));
+
+  it("Pyrophobia: Cowards can't block this turn, other creatures can", () => {
+    let { s, ap, opp, ids } = setup([pyrophobia]);
+    const b = putOnBattlefield(s, opp, greenBear());
+    const coward = putOnBattlefield(s, opp, creature("Test Coward", "Creature — Goblin Coward", "{R}", 1, 1));
+    const other = putOnBattlefield(s, opp, greenBear());
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+    const a = putOnBattlefield(s, ap, greenBear());
+    s = toBlocks(s, ap, [{ attacker: a, defender: opp }]);
+    expect(blockProblem(s, s.objects[coward]!, s.objects[a]!)).not.toBeNull();
+    expect(blockProblem(s, s.objects[other]!, s.objects[a]!)).toBeNull();
+  });
+
+  it("Goblin Locksmith: creatures with defender can't block once it attacks", () => {
+    let { s, ap, opp } = setup([]);
+    const g = putOnBattlefield(s, ap, goblinLocksmith);
+    const wall = putOnBattlefield(s, opp, creature("Test Wall", "Creature — Wall", "{1}", 0, 4, { keywords: ["Defender"], oracleText: "Defender" }));
+    const b = putOnBattlefield(s, opp, greenBear());
+    s = toBlocks(s, ap, [{ attacker: g, defender: opp }]);
+    expect(blockProblem(s, s.objects[wall]!, s.objects[g]!)).not.toBeNull();
+    expect(blockProblem(s, s.objects[b]!, s.objects[g]!)).toBeNull();
+  });
+
+  it("Seismic Elemental: creatures without flying can't block this turn", () => {
+    let { s, ap, opp, ids } = setup([seismicElemental]);
+    const bird = putOnBattlefield(s, opp, blueBird());
+    const b = putOnBattlefield(s, opp, greenBear());
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    const a = putOnBattlefield(s, ap, greenBear());
+    s = toBlocks(s, ap, [{ attacker: a, defender: opp }]);
+    expect(blockProblem(s, s.objects[b]!, s.objects[a]!)).not.toBeNull();
+    expect(blockProblem(s, s.objects[bird]!, s.objects[a]!)).toBeNull();
+  });
+
+  it("Blaring Captain: attacking Warriors get +1/+1, not other attackers; Blood Age General pumps attacking Spirits", () => {
+    let { s, ap, opp } = setup([]);
+    const c = putOnBattlefield(s, ap, blaringCaptain);
+    const w = putOnBattlefield(s, ap, creature("Test Warrior", "Creature — Human Warrior", "{R}", 1, 1));
+    const sp = putOnBattlefield(s, ap, creature("Test Spirit", "Creature — Spirit", "{W}", 1, 1));
+    const home = putOnBattlefield(s, ap, creature("Test Warrior", "Creature — Human Warrior", "{R}", 1, 1));
+    const gen = putOnBattlefield(s, ap, bloodAgeGeneral);
+    s = toBlocks(s, ap, [{ attacker: c, defender: opp }, { attacker: w, defender: opp }, { attacker: sp, defender: opp }]);
+    expect([pt(s, c), pt(s, w), pt(s, sp), pt(s, home)]).toEqual(["3/3", "2/2", "1/1", "1/1"]);
+    s = block(s, opp, []);
+    s = settle(run(s, planActivate(s, ap, gen, 0)));
+    expect([pt(s, sp), pt(s, gen)]).toEqual(["2/1", "2/2"]);
+  });
+});
+
+describe("The Defeat cycle: a Jace spell, a Gideon creature", () => {
+  it("are fully supported", () => supported(jacesDefeat, gideonsDefeat));
+
+  it("Jace's Defeat counters a blue spell, and scries 2 only for a Jace planeswalker spell", () => {
+    for (const jace of [true, false]) {
+      let { s, ap, opp } = setup([]);
+      const spell = into(s, ap, jace ? card("Test Jace", "Legendary Planeswalker — Jace", "{1}{U}", { cmc: 2, loyalty: "3", oracleText: "+1: Draw a card." }) : creature("Test Drake", "Creature — Drake", "{1}{U}", 2, 2));
+      const jd = into(s, opp, jacesDefeat);
+      for (const l of [island, island]) putOnBattlefield(s, opp, l);
+      s = run(s, planCast(s, ap, spell));
+      s = priorityTo(s, opp);
+      s = run(s, planCast(s, opp, jd, [topSpell(s)]));
+      for (let i = 0; i < 10 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(zone(s, spell)).toBe("graveyard");
+      expect(s.pending?.kind === "arrangeTop" && s.pending.player === opp).toBe(jace);
+    }
+  });
+
+  it("Gideon's Defeat exiles a white attacker, with 5 life if it was a Gideon planeswalker", () => {
+    for (const gideon of [true, false]) {
+      let { s, ap, opp } = setup([]);
+      const a = putOnBattlefield(s, ap, gideon ? card("Test Gideon", "Legendary Planeswalker — Gideon", "{2}{W}", { cmc: 3, loyalty: "3", oracleText: "+1: You gain 1 life." }) : creature("Test Knight", "Creature — Human Knight", "{1}{W}", 2, 2));
+      // A planeswalker that's become a creature (as the Gideons' own abilities do).
+      if (gideon) s.objects[a]!.counters["loyalty"] = 3;
+      if (gideon) addEffect(s, ap, [a], [{ kind: "addTypes", types: ["Creature"], subtypes: ["Human", "Soldier"] }, { kind: "setPT", power: 4, toughness: 4 }]);
+      const gd = into(s, opp, gideonsDefeat);
+      putOnBattlefield(s, opp, plainsCard);
+      s = passUntil(s, "declareAttackers", ap);
+      s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
+      s = priorityTo(s, opp);
+      const life0 = life(s, opp);
+      s = settle(run(s, planCast(s, opp, gd, [tgt(a)])));
+      expect(zone(s, a)).toBe("exile");
+      expect(life(s, opp)).toBe(life0 + (gideon ? 5 : 0));
+    }
+  });
+});
+
+describe("Untapping, counters at upkeep, and a kicked rider", () => {
+  it("are fully supported", () => supported(steelDromedary, aliriosEnraptured, heartmender, heroicCharge));
+
+  it("Steel Dromedary doesn't untap while it has a +1/+1 counter", () => {
+    let { s, ap } = setup([]);
+    const d = putOnBattlefield(s, ap, steelDromedary);
+    s.objects[d]!.tapped = true;
+    s.objects[d]!.counters["+1/+1"] = 1;
+    // Its beginning-of-combat move: declined.
+    const pass = (step: "upkeep", pid: PlayerId) => {
+      for (let i = 0; i < 4000 && !(s.step === step && s.activePlayer === pid); i++) {
+        if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: s.pending.player, targets: [tgt(d)] } as Action);
+        else if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: s.pending.player, yes: false });
+        else if (s.pending?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: s.pending.player, attacks: [] });
+        else if (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+        else if (s.pending?.kind === "discardToHandSize") s = act(s, { type: "discard", player: s.pending.player, objectIds: s.players[s.pending.player]!.hand.slice(0, s.pending.count) });
+        else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      }
+    };
+    pass("upkeep", ap);
+    expect(s.objects[d]!.tapped).toBe(true);
+    s.objects[d]!.counters["+1/+1"] = 0;
+    s.objects[d]!.tapped = true;
+    pass("upkeep", next(s, ap));
+    pass("upkeep", ap);
+    expect(s.objects[d]!.tapped).toBe(false);
+  });
+
+  it("Alirios enters tapped with a Reflection, and doesn't untap while you control a Reflection", () => {
+    let { s, ap, ids } = setup([aliriosEnraptured]);
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    const refl = s.battlefield.find((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Reflection"))!;
+    expect(pt(s, refl)).toBe("3/2");
+    expect(s.objects[ids[0]!]!.tapped).toBe(true);
+    s = passUntil(s, "upkeep", ap);
+    expect(s.objects[ids[0]!]!.tapped).toBe(true);
+    s.battlefield.splice(s.battlefield.indexOf(refl), 1);
+    delete s.objects[refl];
+    invalidateCharacteristics(s);
+    s = passUntil(s, "upkeep", next(s, ap));
+    s = passUntil(s, "upkeep", ap);
+    expect(s.objects[ids[0]!]!.tapped).toBe(false);
+  });
+
+  it("Heartmender removes a -1/-1 counter from each creature you control at your upkeep", () => {
+    let { s, ap, opp } = setup([]);
+    const h = putOnBattlefield(s, ap, heartmender);
+    const b = putOnBattlefield(s, ap, creature("Test Ogre", "Creature — Ogre", "{2}{R}", 3, 3));
+    const theirs = putOnBattlefield(s, opp, greenBear());
+    for (const id of [h, b, theirs]) s.objects[id]!.counters["-1/-1"] = 1;
+    s.objects[b]!.counters["-1/-1"] = 2;
+    invalidateCharacteristics(s);
+    s = toUpkeep(s, ap);
+    expect([h, b, theirs].map((id) => s.objects[id]!.counters["-1/-1"] ?? 0)).toEqual([0, 1, 1]);
+  });
+
+  it("Heroic Charge: +2/+1 to your creatures, and trample too if kicked", () => {
+    for (const kicked of [true, false]) {
+      let { s, ap, ids } = setup([heroicCharge]);
+      const b = putOnBattlefield(s, ap, greenBear());
+      s = settle(run(s, planCast(s, ap, ids[0]!, [], undefined, "auto", undefined, kicked ? { kicks: [0] } : {})));
+      expect(pt(s, b)).toBe("4/3");
+      expect(has(s, b, "Trample")).toBe(kicked);
     }
   });
 });

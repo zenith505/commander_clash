@@ -16,6 +16,7 @@ import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
 import { createEmblem } from "../emblems";
 import { addDelayed } from "./run-spells";
+import { setDayNight } from "../daynight";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 /**
@@ -458,6 +459,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return ringTempts(s, ctx, src);
     case "becomeMonarch":
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
+      return;
+    case "becomeDayNight":
+      setDayNight(s, e.v);
       return;
     case "extraLandThisTurn": {
       // Only this turn; on another player's turn it lets them play none (rulings on Explore).

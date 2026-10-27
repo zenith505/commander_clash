@@ -179,6 +179,16 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // "Target player untaps all basic lands they control" (Early Harvest): the same as "untap all basic lands target player
+  // controls"; who untaps them changes nothing (CR 701.26b).
+  const untapsAll = /^Target player untaps all ([a-z ]+?lands) they control$/.exec(s);
+  if (untapsAll) return parseSentence(`Untap all ${untapsAll[1]} target player controls`, ctx);
+  // "Target opponent exiles a creature they control and their graveyard" (Strategic Betrayal): the creature first, then the
+  // graveyard.
+  if (/^Target opponent exiles a creature they control and their graveyard$/.test(s)) {
+    const pick = parseSentence("Target opponent exiles a creature they control", ctx);
+    return pick?.length === 1 && pick[0]!.type === "pick" ? [...pick, { type: "exileGraveyard", who: pick[0]!.who }] : null;
+  }
   // "Copy that spell, and you may choose new targets for the copy" (Krark, the Thumbless): the same as two sentences.
   const copyNew = /^([Cc]opy (?:that spell|it)), and you may choose new targets for the copy$/.exec(s);
   if (copyNew) {
@@ -203,6 +213,12 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (untapGoad) {
     const untap = parseSentence(`Untap ${untapGoad[1]}`, ctx);
     const goad = untap && parseSentence(`Goad ${untapGoad[1]}`, ctx);
+    return untap && goad ? [...untap, ...goad] : null;
+  }
+  // Besmirch: "Untap and goad that creature": untapped, then goaded (CR 701.15a).
+  if (/^Untap and goad (?:that creature|it)$/.test(s)) {
+    const untap = parseSentence("Untap that creature", ctx);
+    const goad = untap && parseSentence("Goad it", ctx);
     return untap && goad ? [...untap, ...goad] : null;
   }
   const controlled = /^(.+?) for as long as you control ~$/.exec(s);
@@ -283,6 +299,10 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // "When that creature dies this turn, you draw a card" (A Good Day to Die): a delayed trigger (sentences/permanents.ts),
   // not a draw with a long subject.
   if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
+  // "Target creature gets +3/+0 until end of turn. When it dies this turn, manifest dread." (Turn Inside Out): "it" is
+  // that target creature.
+  if (/^When it dies this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)
+    return parsePermanentsSentence(s.replace(/^When it dies/, "When that creature dies"), ctx) ?? null;
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;

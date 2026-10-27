@@ -977,8 +977,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   if (enteredIf) line = `${enteredIf[1]}, ${enteredIf[2]}`;
   // "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix, Guided by Fate): this
   // creature, enchanted or not, or another that matches; each one that deals the damage triggers it once.
-  const orSelf = /^Whenever ~ or (an? .+? you control deals combat damage to .+)$/.exec(line);
-  if (orSelf) line = `Whenever ${orSelf[1]}`;
+  // "Whenever ~ or another nontoken Spirit you control ... deals combat damage to a player" (Millicent): the same, ~
+  // whatever it is and each other one that matches.
+  const orSelf = /^Whenever ~ or (an? .+? you control deals combat damage to .+)$/.exec(line) ?? /^Whenever ~ or another (.+? you control deals combat damage to .+)$/.exec(line);
+  if (orSelf) line = `Whenever ${/^an? /.test(orSelf[1]!) ? "" : "a "}${orSelf[1]}`;
   const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(withKw ? `${withKw[1]} ${withKw[2]} you control ${withKw[3]}` : line);
   if (orSelf && (!m || withKw || /\b(it|its|that creature)\b/i.test(m[4]!))) return "fail";
   if (!m) return null;
@@ -1251,7 +1253,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with \+1\/\+1 counters on them|with power \d+ or greater) deal /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with \+1\/\+1 counters on them|with power \d+ or greater|that entered this turn) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
@@ -2165,7 +2167,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
     if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
     // A milled-cards batch (Infesting Radroach) is watched from graveyards too (see the batch event in effects/triggers.ts).
-    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "batch" && t.batch?.milled && t.batch.each)) || t.host) return "fail";
+    // Centaur Vinecrasher: "Whenever a land card is put into a graveyard from anywhere": also watched from graveyards, even
+    // by a card put there in the same event (rulings).
+    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose)) && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
     // Sword of the Meek: "..., then attach it to that creature": it returns even if it can't be attached (rulings).
     const attach = / attached to that creature$|, then attach it to that creature$/.test(yard[2]!);

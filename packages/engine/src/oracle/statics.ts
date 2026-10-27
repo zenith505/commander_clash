@@ -784,6 +784,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you(?: (didn't lose)| lost|'ve lost) life this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, ...(m[1] ? { max: 0 } : { min: 1 }) };
   // "If you gained and lost life this turn" (Lunar Convocation): both, whatever the net change (rulings).
   if (/^you gained and lost life this turn$/.test(text)) return { kind: "allOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
+  // "If you gained or lost life this turn" (Starlit Soothsayer): either one.
+  if (/^you gained or lost life this turn$/.test(text)) return { kind: "anyOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
   // "If you created a token this turn" (Bennie Bracks, Zoologist).
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you sacrificed a Food this turn" (Elanor Gardner).

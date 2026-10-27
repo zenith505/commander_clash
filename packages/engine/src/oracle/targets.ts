@@ -106,8 +106,10 @@ export function pickFilter(phrase: string): TargetSpec | null {
   const words = phrase.trim().replace(/ you control$/i, "").slice(0, owned ? -owned.length : undefined).split(" ");
   // "a Plains" is already singular; "two creatures" isn't.
   const asIs = words.join(" ") + owned;
-  // "creatures with decayed": the noun before "with" is the plural one.
-  const head = words.indexOf("with") > 0 ? words.indexOf("with") - 1 : words.length - 1;
+  // "creatures with decayed": the noun before "with" is the plural one. "Creatures that each have toughness greater than
+  // their power" (Catapult Fodder): before "that".
+  const cut = words.findIndex((w, i) => i > 0 && (w === "with" || w === "that"));
+  const head = cut > 0 ? cut - 1 : words.length - 1;
   const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === head ? singular(w) : w)).join(" ") + owned;
   const spec = parseTargetPhrase(one);
   if (spec?.kind !== "object" || spec.controller) return null;
@@ -889,6 +891,12 @@ export function parseTargetPhrase(
     const anyOf = [twoKinds[2]!, twoKinds[3]!].map((w) => parseTargetPhrase(`${w} creature`, opts));
     if (anyOf.every((x) => x?.kind === "object" && !x.anyOf)) return { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase()}` };
   }
+  // Bumi Bash: "land creature or nonbasic land": a permanent that's either one, or both.
+  const landOr = /^(target )?(land|artifact) creature or nonbasic land$/.exec(phrase.trim());
+  if (landOr) {
+    const anyOf = [`${landOr[2]} creature`, "nonbasic land"].map((w) => parseTargetPhrase(w, opts));
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase().replace(/^target /, "")}` };
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
@@ -1187,7 +1195,7 @@ export function parseTargetPhrase(
     extra.basePower = Number(m[1]);
     p = p.slice(0, m.index);
   }
-  if ((m = / with toughness greater than its power$/.exec(p))) {
+  if ((m = / (?:with toughness greater than its power|that each have toughness greater than their power)$/.exec(p))) {
     extra.toughnessAbovePower = true;
     p = p.slice(0, m.index);
   }

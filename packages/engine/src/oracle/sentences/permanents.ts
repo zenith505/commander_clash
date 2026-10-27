@@ -1105,7 +1105,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^([Tt]arget .+?|That creature|That land|It|[Ee]ach creature you control) becomes an? ([A-Z][a-z]+|artifact) in addition to its other types$/.exec(s)) && (m[2] === "artifact" ? m[1] !== "That land" : (m[1] === "That land" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES]).includes(m[2]!))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it").replace(/^Each/, "each").replace(/^That land$/, "that land"), ctx);
     const mods: Modification[] = m[2] === "artifact" ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }] : [{ kind: "addTypes", types: [], subtypes: [m[2]!] }];
-    if (what && (what.ref === "target" || what.ref === "each")) return [{ type: "continuous", what, mods, duration: "game" }];
+    // Olivia, Mobilized for War: "that creature" being the trigger's subject, for as long as it's that object (CR 400.7).
+    if (what && (what.ref === "target" || what.ref === "each" || what.ref === "subject")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
   // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield
@@ -1148,7 +1149,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // there as it resolves (CR 611.2c; Disrupt Decorum's ruling: creatures entering later aren't goaded).
   // "Goad up to X target creatures your opponents control" (Death Kiss): each of them.
   // Coronation of Chaos: "Up to three target creatures can't block this turn. Goad them.": the same targets.
-  if ((m = /^Goad (them|it)$/.exec(s))) {
+  if ((m = /^Goad (them|it|that creature)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
   }

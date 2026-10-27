@@ -1912,6 +1912,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone !== "battlefield") continue;
           if (me) o.putBy = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
           s.resolving?.created?.push(o.id);
+          // Deathrender: attached if it could be, otherwise it stays unattached (CR 701.3b; rulings).
+          if (e.attachSelf && self) attachTo(s, self, o);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep) {
             const verb = e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice";
@@ -2347,6 +2349,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
       // "They gain haste until end of turn" (Wake the Past): the permanents they became.
       (s.resolving!.created ??= []).push(...entered);
+      // Rally the Ancestors: each one exiled when your next upkeep begins, if it's still that object (CR 400.7, 603.7).
+      if (e.exileAtYourNextUpkeep) for (const id of entered) addDelayed(s, "yourNextUpkeep", ctx.controller, obj(s, id), { targets: [], effects: [{ type: "exile", what: { ref: "subject" } }], text: "Exile ~." });
       return;
     }
     case "returnFaceDownExiled": {

@@ -846,6 +846,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "doublePlayerCounters":
     case "emblem":
     case "becomeMonarch":
+    case "becomeDayNight":
     case "extraLandThisTurn":
     case "ringTempts":
     case "increaseSpeed":

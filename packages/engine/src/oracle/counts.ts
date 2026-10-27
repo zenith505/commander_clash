@@ -68,6 +68,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^poison counter its controller has$/i.test(p)) return { count: { kind: "affectedControllerPoison" } };
   // Righteous Authority: "Enchanted creature gets +1/+1 for each card in its controller's hand".
   if (each && /^card in its controller's hand$/i.test(p)) return { count: { kind: "affectedControllerHand" } };
+  // Whispering Specter: "that player discards a card for each poison counter they have": the player the trigger is about.
+  if (ctx?.eventPlayer && each && /^poison counter that player has$/i.test(p)) return { count: { kind: "poison", who: { ref: "eventPlayer" } } };
   // Phyrexian Swarmlord: "for each poison counter your opponents have", together.
   if ((each && /^poison counter your opponents have$/i.test(p)) || /^the number of poison counters your opponents have$/i.test(p)) return { count: { kind: "poison", who: { ref: "eachOpponent" } } };
   // "For each Urza's land you control" (Urza's Workshop): the land type Urza's (CR 205.3i), not a possessive.

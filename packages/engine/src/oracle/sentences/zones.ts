@@ -555,7 +555,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Return all creature cards with mana value 2 or less from your graveyard to the battlefield" (Raise the Past).
   // Fix What's Broken: "Return each artifact and creature card with mana value X from your graveyard to the battlefield":
   // exactly the X it was cast with (CR 107.3), the same as "all ... cards".
-  const eachX = /^[Rr]eturn each (.+? card with mana value X) from your graveyard to the battlefield$/.exec(s);
+  // Rally the Ancestors: "Return each creature card with mana value X or less ...".
+  const eachX = /^[Rr]eturn each (.+? card with mana value X(?: or less)?) from your graveyard to the battlefield$/.exec(s);
   if (eachX) s = `Return all ${eachX[1]!.replace(/ card with /, " cards with ")} from your graveyard to the battlefield`;
   if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less| with mana value X)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
     m[1] = m[1]!.replace(/ cards( with mana value (?:X|\d+) or less| with mana value X)?$/, "$1");
@@ -647,9 +648,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to ~" (Danitha,
   // Benalia's Hope): only to the source permanent (see Effect putFromHand's `attachToSelf`).
   const toSelf = / attached to ~$/.test(s);
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : toSelf ? s.replace(/ attached to ~$/, "") : s))) {
+  // "You may put a creature card from your hand onto the battlefield and attach ~ to it" (Deathrender): the Equipment to
+  // the creature it became, if it can equip it (rulings).
+  const attachSelf = / and attach ~ to it$/.test(s);
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : toSelf ? s.replace(/ attached to ~$/, "") : attachSelf ? s.replace(/ and attach ~ to it$/, "") : s))) {
     const orYard = !!m[4];
     if (toSelf && (ctx.spell || m[2] === "any number of" || m[5] || m[6])) return null;
+    if (attachSelf && (ctx.spell || m[2] === "any number of" || m[4] || m[5] || m[6] || m[3] !== "creature card")) return null;
     if (finality && (m[2] === "any number of" || m[6])) return null;
     m.splice(4, 1);
     if (orYard && (m[2] === "any number of" || m[5])) return null;
@@ -667,7 +672,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;
     const filter = filter0 && (lesser || equal) ? { ...filter0, text: m[3]! } : filter0;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}), ...(attachSelf ? { attachSelf: true as const } : {}) }];
   }
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
@@ -804,6 +809,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Broodmoth: "... with a flying counter on it" (a keyword counter, CR 122.1b).
   // With no "under ... control" (Daretti's emblem: "return that card to the battlefield"), under the control of the player
   // who puts it there, the ability's controller (CR 110.2a).
+  // "Return that card to the battlefield under your control if it's a Samurai card" (Oathkeeper, Takeno's Daisho): the
+  // card's own creature types, not the creature's as it left the battlefield (rulings).
+  if ((m = /^([Rr]eturn that card to the battlefield under your control) if it's an? ([A-Z][a-z]+) card$/.exec(s)) && ctx.subjectLeft && CREATURE_TYPES.has(m[2]!)) {
+    const inner = parseZonesSentence(m[1]!, ctx);
+    if (!inner || inner.length !== 1 || inner[0]!.type !== "putOntoBattlefield" || inner[0]!.what.ref !== "subjectCard") return null;
+    return [{ type: "if", cond: { kind: "subjectCardIs", filter: { kind: "card", types: [], subtypes: [m[2]!], text: `${m[2]} card` } }, effects: inner }];
+  }
   if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?( and attach ~ to it)?$`, "i").exec(s)) && ctx.subjectLeft && !(m[7] && ctx.spell)) {
     // Nim Deathmantle: "return that card to the battlefield and attach ~ to it": the permanent it became (CR 701.3).
     const what = parseObject(m[1] ?? m[2]!, ctx);

@@ -6,7 +6,7 @@ import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence,
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches } from "./targeting";
+import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
 import { dealDamageBatch } from "../damage";
@@ -557,6 +557,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)))
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander))
+            : e.cond.kind === "anotherDied"
+            ? ((t) => (s.diedThisTurn?.length ?? 0) - (t?.kind === "object" && s.resolving!.destroyed?.some((d) => d.died && d.o.id === t.id) ? 1 : 0) > 0)(ctx.targets[e.cond.index])
+            : e.cond.kind === "targetSpellTargets"
+            ? ((t, f) => t?.kind === "stack" && targetsMatch(s, (s.stack.find((x) => x.id === t.id)?.targets ?? []).filter((x) => x.kind === "object" && s.objects[x.id]?.zone === "battlefield"), f, ctx.controller))(ctx.targets[e.cond.index], e.cond.filter)
             : e.cond.kind === "exiledThisWay"
             ? !!s.resolving!.exiled?.length
             : e.cond.kind === "digTook"

@@ -385,8 +385,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         .reduce((a, p) => a + p.n, 0);
     case "tokensCreatedThisTurn":
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
-    case "enteredThisTurn":
-      return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
+    case "enteredThisTurn": {
+      const sub = c.notSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
+      return (s.turnLog?.entered ?? []).filter((e) => !(sub && e.id === sub.id && e.zc === (sub.zoneChanges ?? 0)) && e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
+    }
     case "sacrificedThisTurn":
       return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
     case "attackersThisTurn":

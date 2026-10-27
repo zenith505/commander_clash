@@ -1470,6 +1470,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = obj(s, id);
         if (controllerOf(s, w) === hurt) add(w, hurt, (e) => e === "opponentSourceDamagesYouOrYours", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
       }
+    // Hooded Blightfang: a creature its controller controls dealing damage to a planeswalker (or a player), with deathtouch
+    // as it deals it (rulings); the subject is the creature or the planeswalker.
+    const dealer = s.objects[ev.source];
+    const toWalker = !!hit && hit.zone === "battlefield" && objIsType(s, hit, "Planeswalker");
+    if (dealer?.zone === "battlefield" && objIsType(s, dealer, "Creature") && controllerOf(s, dealer) === ev.by && (toWalker || ev.player !== undefined))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) !== ev.by) continue;
+        const fits = (t: TriggeredAbility, dealt: boolean) => !!t.damageTo && !!t.damageTo.subjectDealt === dealt && (toWalker || t.damageTo.what === "playerOrPlaneswalker") && (t.damageTo.self ? w.id === dealer.id : objectMatches(s, t.dealer!.filter, dealer, ev.by, false));
+        add(w, ev.by, (e, t) => e === "yourCreatureDealsDamage" && fits(t, false), undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
+        if (toWalker) add(w, ev.by, (e, t) => e === "yourCreatureDealsDamage" && fits(t, true), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
+      }
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== ev.by) continue;

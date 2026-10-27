@@ -1050,6 +1050,22 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toEnchanted: true };
   }
+  // Hooded Blightfang: "Whenever a creature you control with deathtouch deals damage to a planeswalker, destroy that
+  // planeswalker"; Vraska, Swarm's Eminence: "... to a player or planeswalker, put a +1/+1 counter on that creature"; her
+  // Assassin: "Whenever ~ deals damage to a planeswalker, destroy that planeswalker". Once for each recipient (CR 603.2c);
+  // the creature has to have deathtouch as it deals the damage (rulings).
+  const dealsTo = /^Whenever (~|a creature you control(?: with (deathtouch))?) deals damage to a (planeswalker|player or planeswalker), (.+)$/.exec(line);
+  if (dealsTo) {
+    const what = dealsTo[3] === "planeswalker" ? "planeswalker" : "playerOrPlaneswalker";
+    const dealt = /\bthat planeswalker\b/.test(dealsTo[4]!);
+    if ((dealt && (what !== "planeswalker" || /\bthat creature\b/.test(dealsTo[4]!))) || /\b(?:that player|that much|that many|X)\b/.test(dealsTo[4]!)) return "fail";
+    const body = parseBody(dealsTo[4]!.replace(/\bthat planeswalker\b/g, "it"), { subjectIt: true });
+    if (!body) return "fail";
+    const self = dealsTo[1] === "~";
+    const filter = parseTargetPhrase(dealsTo[1]!.replace(/^a /, "").replace(/ you control/, "").replace(/^~$/, "creature"));
+    if (filter?.kind !== "object") return "fail";
+    return { event: "yourCreatureDealsDamage", dealer: { filter: { ...filter, text: dealsTo[1]!.replace(/^a /, "") } }, damageTo: { what, ...(self ? { self: true as const } : {}), ...(dealt ? { subjectDealt: true as const } : {}) }, body };
+  }
   // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
   // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.
   const anySliver = /^Whenever a ([A-Z][a-z]+) deals combat damage to a player, (.+)$/.exec(line);

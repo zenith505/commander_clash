@@ -103,6 +103,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
+  // Security Bypass: "attacking alone": attacking with no other creature attacking (CR 506.5).
+  if (spec.combat === "attackingAlone" && (o.attacking === undefined || s.battlefield.some((id) => id !== o.id && s.objects[id]!.attacking !== undefined))) return false;
   // Soul Snare: "attacking you or a planeswalker you control": a planeswalker that's still there and still yours (rulings).
   if (spec.combat === "attackingYouOrYourPlaneswalker" && !attacksYouOrYourPlaneswalker(s, o, controller)) return false;
   if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;

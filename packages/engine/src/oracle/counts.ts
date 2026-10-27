@@ -401,6 +401,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^([A-Z][a-z]+) that died this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "diedThisTurn", subtype: m[1]! });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   if (/^creatures? you attacked with this turn$/i.test(p)) return count({ kind: "youAttackedWithThisTurn" });
+  // Geralf, the Fleshwright: "for each other Zombie that entered the battlefield under your control this turn", after
+  // "Whenever a Zombie you control enters": all of them but the one whose entering triggered it (rulings).
+  if (each && ctx?.subjectIt && (m = /^other ([A-Z][a-z]+) that entered the battlefield under your control this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "enteredThisTurn", subtype: m[1]!, notSubject: true });
   // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
     return count({ kind: "enteredThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { types: [capital(m[1]!)] }) });

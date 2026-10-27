@@ -69,6 +69,25 @@ const mazemindTome = card("Mazemind Tome", "Artifact — Book", "{2}", {"cmc":2,
 const nineLives = card("Nine Lives", "Enchantment", "{1}{W}{W}", {"cmc":3,"keywords":["Hexproof"],"oracleText":"Hexproof\nIf a source would deal damage to you, prevent that damage and put an incarnation counter on this enchantment.\nWhen there are nine or more incarnation counters on this enchantment, exile it.\nWhen this enchantment leaves the battlefield, you lose the game.","colors":["W"],"layout":"normal"});
 const archfiendsVessel = card("Archfiend's Vessel", "Creature — Human Cleric", "{B}", {"cmc":1,"power":"1","toughness":"1","keywords":["Lifelink"],"oracleText":"Lifelink (Damage dealt by this creature also causes you to gain that much life.)\nWhen this creature enters, if it entered from your graveyard or you cast it from your graveyard, exile it. If you do, create a 5/5 black Demon creature token with flying.","colors":["B"],"layout":"normal"});
 const deadlyDesigns = card("Deadly Designs", "Enchantment", "{1}{B}", {"cmc":2,"oracleText":"{2}: Put a plot counter on this enchantment. Any player may activate this ability.\nWhen there are five or more plot counters on this enchantment, sacrifice it. If you do, destroy up to two target creatures.","colors":["B"],"layout":"normal"});
+const chocoboKick = card("Chocobo Kick", "Sorcery", "{1}{G}", {"cmc":2,"keywords":["Kicker"],"oracleText":"Kicker—Return a land you control to its owner's hand. (You may return a land you control to its owner's hand in addition to any other costs as you cast this spell.)\nTarget creature you control deals damage equal to its power to target creature an opponent controls. If this spell was kicked, the creature you control deals twice that much damage instead.","colors":["G"],"layout":"normal"});
+const banesContingency = card("Bane's Contingency", "Instant", "{1}{U}{U}", {"cmc":3,"keywords":["Scry"],"oracleText":"Counter target spell. If that spell targets a commander you control, instead counter that spell, scry 2, then draw a card.","colors":["U"],"layout":"normal"});
+const echoingReturn = card("Echoing Return", "Sorcery", "{B}", {"cmc":1,"oracleText":"Return target creature card and all other cards with the same name as that card from your graveyard to your hand.","colors":["B"],"layout":"normal"});
+const cosmicRebirth = card("Cosmic Rebirth", "Instant", "{1}{G}{W}", {"cmc":3,"oracleText":"Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the battlefield. If you don't put it onto the battlefield, put it into your hand.\nYou gain 3 life.","colors":["G","W"],"layout":"normal"});
+const hoodedBlightfang = card("Hooded Blightfang", "Creature — Snake", "{2}{B}", {"cmc":3,"power":"1","toughness":"4","keywords":["Deathtouch"],"oracleText":"Deathtouch\nWhenever a creature you control with deathtouch attacks, each opponent loses 1 life and you gain 1 life.\nWhenever a creature you control with deathtouch deals damage to a planeswalker, destroy that planeswalker.","colors":["B"],"layout":"normal"});
+const vraskaSwarmsEminence = card("Vraska, Swarm's Eminence", "Legendary Planeswalker — Vraska", "{2}{B/G}{B/G}", {"cmc":4,"loyalty":"5","oracleText":"Whenever a creature you control with deathtouch deals damage to a player or planeswalker, put a +1/+1 counter on that creature.\n−2: Create a 1/1 black Assassin creature token with deathtouch and \"Whenever this token deals damage to a planeswalker, destroy that planeswalker.\"","colors":["B","G"],"layout":"normal"});
+const chainAssassination = card("Chain Assassination", "Instant", "{2}{B}{B}", {"cmc":4,"keywords":["Freerunning"],"oracleText":"Freerunning {1}{B} (You may cast this spell for its freerunning cost if you dealt combat damage to a player this turn with an Assassin or commander.)\nDestroy target creature. If another creature died this turn, draw a card.","colors":["B"],"layout":"normal"});
+const geralfTheFleshwright = card("Geralf, the Fleshwright", "Legendary Creature — Human Warlock", "{2}{U}", {"cmc":3,"power":"2","toughness":"3","oracleText":"Whenever you cast a spell during your turn other than your first spell that turn, create a 2/2 blue and black Zombie Rogue creature token.\nWhenever a Zombie you control enters, put a +1/+1 counter on it for each other Zombie that entered the battlefield under your control this turn.","colors":["U"],"layout":"normal"});
+const securityBypass = card("Security Bypass", "Enchantment — Aura", "{1}{U}", {"cmc":2,"keywords":["Enchant","Connive"],"oracleText":"Enchant creature\nAs long as enchanted creature is attacking alone, it can't be blocked.\nEnchanted creature has \"Whenever this creature deals combat damage to a player, it connives.\" (Its controller draws a card, then discards a card. If they discarded a nonland card, they put a +1/+1 counter on this creature.)","colors":["U"],"layout":"normal"});
+const walker = card("Test Walker", "Legendary Planeswalker — Test", "{3}", { cmc: 3, loyalty: "5" });
+/** A planeswalker put straight onto the battlefield, with its loyalty. */
+const withLoyalty = (s: GameState, id: ObjectId, n = 5) => ((s.objects[id]!.counters.loyalty = n), id);
+const sniper = (deathtouch = true) => card("Test Sniper", "Creature — Archer", "{1}", { cmc: 1, power: "1", toughness: "1", ...(deathtouch ? { keywords: ["Deathtouch"] } : {}), oracleText: `${deathtouch ? "Deathtouch\n" : ""}{1}: This creature deals 1 damage to any target.` });
+const shock = card("Test Shock", "Instant", "{R}", { cmc: 1, oracleText: "This spell deals 2 damage to any target." });
+/** Passes priority until `pid` holds it. */
+const toPlayer = (s: GameState, pid: PlayerId) => {
+  for (let i = 0; i < 10 && waitingOn(s) !== pid; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
 
 describe("round 187", () => {
   it("all compile", () => supported(imposingGrandeur, majesticGenesis, visionsOfGlory, visionsOfDread, visionsOfRuin, visionsOfDominance, visionsOfDuplicity, cloudkill, mazemindTome, nineLives, archfiendsVessel, deadlyDesigns));
@@ -251,5 +270,146 @@ describe("round 187", () => {
     s = choose(s, [tgt(a), tgt(b)]);
     expect(zone(s, d)).toBe("graveyard");
     expect([a, b, c].map((id) => zone(s, id))).toEqual(["graveyard", "graveyard", "battlefield"]);
+  });
+});
+
+describe("round 187, second batch", () => {
+  it("all compile", () => supported(chocoboKick, banesContingency, echoingReturn, cosmicRebirth, hoodedBlightfang, vraskaSwarmsEminence, chainAssassination, geralfTheFleshwright, securityBypass));
+
+  it("Chocobo Kick: damage equal to its power; kicked by returning a land, twice that much", () => {
+    for (const kicked of [false, true]) {
+      let { s, ap, ids, opp } = setup([chocoboKick]);
+      const mine = putOnBattlefield(s, ap, bear());
+      const theirs = putOnBattlefield(s, opp, card("Test Giant", "Creature — Giant", "{3}", { cmc: 3, power: "3", toughness: "3" }));
+      const lands = s.players[ap]!.hand.length;
+      s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(mine), tgt(theirs)], undefined, undefined, undefined, kicked ? { kicks: [0], returnToHand: [named(s, ap, "Plains")[0]!] } : {})));
+      expect(zone(s, theirs)).toBe(kicked ? "graveyard" : "battlefield");
+      if (!kicked) expect(s.objects[theirs]!.damage).toBe(2);
+      expect(s.players[ap]!.hand.length).toBe(lands - 1 + (kicked ? 1 : 0));
+    }
+  });
+
+  it("Bane's Contingency: a spell targeting a commander you control is countered and you scry 2 and draw; otherwise only countered", () => {
+    for (const atCommander of [true, false]) {
+      let { s, ap, ids, opp } = setup([banesContingency]);
+      const cmd = bigCommander(s, ap, 3);
+      const b = putOnBattlefield(s, ap, bear());
+      putOnBattlefield(s, opp, mountain);
+      const sh = into(s, opp, shock, "hand");
+      s = toPlayer(s, opp);
+      s = run(s, planCast(s, opp, sh, [tgt(atCommander ? cmd : b)]));
+      s = toPlayer(s, ap);
+      const hand = s.players[ap]!.hand.length;
+      s = run(s, planCast(s, ap, ids[0]!, [{ kind: "stack", id: s.stack[0]!.id }]));
+      s = resolveAll(s);
+      if (atCommander) {
+        const p = s.pending;
+        if (p?.kind !== "arrangeTop" || p.how !== "scry") throw new Error("no scry");
+        expect(p.cards).toHaveLength(2);
+        s = resolveAll(act(s, { type: "arrangeTop", player: ap, top: p.cards, away: [] }));
+      }
+      expect(zone(s, sh)).toBe("graveyard");
+      expect(s.objects[atCommander ? cmd : b]!.damage).toBe(0);
+      expect(s.players[ap]!.hand.length).toBe(hand - 1 + (atCommander ? 1 : 0));
+    }
+  });
+
+  it("Echoing Return returns the target and every other card with its name from your graveyard", () => {
+    let { s, ap, ids } = setup([echoingReturn]);
+    const [a, b] = [into(s, ap, bear(), "graveyard"), into(s, ap, bear(), "graveyard")];
+    const other = into(s, ap, card("Test Elf", "Creature — Elf", "{G}", { cmc: 1, power: "1", toughness: "1" }), "graveyard");
+    const relicCard = into(s, ap, card("Grizzly Bears", "Artifact", "{1}", { cmc: 1 }), "graveyard");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(a)])));
+    expect([a, b, relicCard, other].map((id) => zone(s, id))).toEqual(["hand", "hand", "hand", "graveyard"]);
+  });
+
+  it("Cosmic Rebirth: mana value 3 or less may go onto the battlefield, else into your hand; you gain 3 life", () => {
+    for (const [mv, yes, where] of [[2, true, "battlefield"], [2, false, "hand"], [4, true, "hand"]] as const) {
+      let { s, ap, ids } = setup([cosmicRebirth]);
+      const c = into(s, ap, card("Test Beast", "Creature — Beast", `{${mv}}`, { cmc: mv, power: "3", toughness: "3" }), "graveyard");
+      const before = life(s, ap);
+      s = run(s, planCast(s, ap, ids[0]!, [tgt(c)]));
+      let asked = false;
+      s = resolveAll(s, () => ((asked = true), yes));
+      expect(asked).toBe(mv <= 3);
+      expect(zone(s, c)).toBe(where);
+      expect(life(s, ap)).toBe(before + 3);
+    }
+  });
+
+  it("Hooded Blightfang: a deathtouch creature of yours that damages a planeswalker destroys it; attacking drains each opponent", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, hoodedBlightfang);
+    const sn = putOnBattlefield(s, ap, sniper());
+    const w = withLoyalty(s, putOnBattlefield(s, opp, walker));
+    s = resolveAll(run(s, planActivate(s, ap, sn, 0, [tgt(w)])));
+    expect(zone(s, w)).toBe("graveyard");
+    const w2 = withLoyalty(s, putOnBattlefield(s, opp, walker));
+    const plain = putOnBattlefield(s, ap, sniper(false));
+    s = resolveAll(run(s, planActivate(s, ap, plain, 0, [tgt(w2)])));
+    expect(zone(s, w2)).toBe("battlefield");
+    const others = s.turnOrder.filter((p) => p !== ap);
+    const lives = others.map((p) => life(s, p));
+    const me = life(s, ap);
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: sn, defender: opp }] });
+    s = resolveAll(s);
+    expect(others.map((p) => life(s, p))).toEqual(lives.map((l) => l - 1));
+    expect(life(s, ap)).toBe(me + 1);
+  });
+
+  it("Vraska, Swarm's Eminence: a deathtouch creature that damages a player gets a +1/+1 counter; -2 makes an Assassin", () => {
+    let { s, ap, opp } = setup([]);
+    const v = withLoyalty(s, putOnBattlefield(s, ap, vraskaSwarmsEminence));
+    const sn = putOnBattlefield(s, ap, sniper());
+    const plain = putOnBattlefield(s, ap, sniper(false));
+    s = resolveAll(run(s, planActivate(s, ap, sn, 0, [player(opp)])));
+    s = resolveAll(run(s, planActivate(s, ap, plain, 0, [player(opp)])));
+    expect([counters(s, sn), counters(s, plain)]).toEqual([1, 0]);
+    s = resolveAll(run(s, planActivate(s, ap, v, 0)));
+    const [tok] = named(s, ap, "Assassin");
+    expect(tok).toBeDefined();
+    expect(chars(s, tok!).keywords).toContain("Deathtouch");
+  });
+
+  it("Chain Assassination draws only if a creature other than the target died this turn", () => {
+    for (const earlier of [false, true]) {
+      let { s, ap, ids, opp } = setup([chainAssassination]);
+      const b = putOnBattlefield(s, opp, bear());
+      if (earlier) {
+        const sn = putOnBattlefield(s, ap, sniper());
+        const victim = putOnBattlefield(s, opp, bear());
+        s = resolveAll(run(s, planActivate(s, ap, sn, 0, [tgt(victim)])));
+        expect(zone(s, victim)).toBe("graveyard");
+      }
+      const hand = s.players[ap]!.hand.length;
+      s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)])));
+      expect(zone(s, b)).toBe("graveyard");
+      expect(s.players[ap]!.hand.length).toBe(hand - 1 + (earlier ? 1 : 0));
+    }
+  });
+
+  it("Geralf: each spell after your first this turn makes a Zombie Rogue, which gets a counter per other Zombie that entered this turn", () => {
+    let { s, ap, ids } = setup([relic, relic, relic]);
+    putOnBattlefield(s, ap, geralfTheFleshwright);
+    for (const id of ids) s = resolveAll(run(s, planCast(s, ap, id)));
+    const zs = named(s, ap, "Zombie Rogue");
+    expect(zs).toHaveLength(2);
+    expect(zs.map((z) => counters(s, z)).sort()).toEqual([0, 1]);
+    expect(chars(s, zs[0]!).colors.sort()).toEqual(["B", "U"]);
+  });
+
+  it("Security Bypass: the enchanted creature can't be blocked while it attacks alone", () => {
+    for (const alone of [true, false]) {
+      let { s, ap, ids, opp } = setup([securityBypass]);
+      const a = putOnBattlefield(s, ap, bear());
+      const friend = putOnBattlefield(s, ap, bear());
+      const blocker = putOnBattlefield(s, opp, bear());
+      s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(a)])));
+      s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: (alone ? [a] : [a, friend]).map((attacker) => ({ attacker, defender: opp })) });
+      while (s.pending?.kind !== "declareBlockers" || s.pending.player !== opp) s = act(s, s.pending?.kind === "declareBlockers" ? { type: "declareBlockers", player: s.pending.player, blocks: [] } : { type: "passPriority", player: waitingOn(s)! });
+      const block = () => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: a }] });
+      if (alone) expect(block).toThrow(/can't be blocked/);
+      else expect(() => block()).not.toThrow();
+    }
   });
 });

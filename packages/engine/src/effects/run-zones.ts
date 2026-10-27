@@ -2318,7 +2318,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.toHand) {
         // All at once (CR 608.2c), whatever they are.
         // Garna: only those put there this turn (GameObject.toGraveyardTurn); Gleancrawler: from the battlefield.
-        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
+        // Echoing Return: the target's name, as it is now (CR 201.2).
+        const t = e.sameNameAs !== undefined ? ctx.targets[e.sameNameAs] : undefined;
+        const name = t?.kind === "object" && s.objects[t.id] ? defOf(s, obj(s, t.id)).name : undefined;
+        if (e.sameNameAs !== undefined && name === undefined) return;
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (name === undefined || sameName(defOf(s, obj(s, id)).name, name)) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
         if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${e.who.ref === "you" ? `${player(s, ctx.controller).name}'s hand` : "their owners' hands"}.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;

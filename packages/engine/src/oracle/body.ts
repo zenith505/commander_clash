@@ -838,6 +838,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
   text = text.replace(/^((?:Each (?:player|opponent)|Target (?:player|opponent)) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
   const effects: Effect[] = [];
+  // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
+  // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
+  text = text.replace(/(Choose target permanent card in your graveyard\.) If it has mana value (\d+) or less, you may put it onto the battlefield\. If you don't put it onto the battlefield, put it into your hand\./, "$1 Put that card onto the battlefield if it has mana value $2 or less and you choose to, else into your hand.");
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
@@ -5496,6 +5499,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "kicked" }, effects: [{ ...last, drain: true }], otherwise: [last] });
       continue;
     }
+    // Chain Assassination: "Destroy target creature. If another creature died this turn, draw a card.": one other than that
+    // target, which counts only if this destroyed it; an indestructible target still lets you draw (rulings).
+    const anotherDied = /^If another creature died this turn, (.+)$/.exec(s);
+    if (anotherDied) {
+      const last = effects[effects.length - 1];
+      const fx = parseOne(capital(anotherDied[1]!), ctx);
+      if (last?.type !== "destroy" || last.what.ref !== "target" || effects.length - prevStart !== 1 || !fx || ctx.targets.length !== curTargets) return null;
+      effects.push({ type: "if", cond: { kind: "anotherDied", index: last.what.index }, effects: fx });
+      continue;
+    }
+    // Bane's Contingency: "Counter target spell. If that spell targets a commander you control, instead counter that spell,
+    // scry 2, then draw a card": what the spell targets as this resolves; a commander on the battlefield (rulings).
+    const banes = /^If that spell targets a commander you control, instead counter that spell, (.+)$/.exec(s);
+    if (banes) {
+      const last = effects[effects.length - 1];
+      const filter = parseTargetPhrase("commander you control");
+      const parts = banes[1]!.split(/, then /).map((x) => parseOne(capital(x), ctx));
+      const rest = parts.every(Boolean) ? parts.flatMap((x) => x!) : null;
+      if (last?.type !== "counterSpell" || effects.length - prevStart !== 1 || filter?.kind !== "object" || !rest || ctx.targets.length !== curTargets) return null;
+      effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "targetSpellTargets", index: last.index, filter }, effects: [last, ...rest], otherwise: [last] });
+      continue;
+    }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
     const kicked = /^If (?:~|it) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/.exec(s);
     if (kicked) {
@@ -8598,6 +8623,13 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;
     return { effects: [{ ...prev, amount: amt(more[1]!) }], instead };
+  }
+  // Chocobo Kick: "Target creature you control deals damage equal to its power to target creature an opponent controls. If
+  // ~ was kicked, the creature you control deals twice that much damage instead": the same bite, at twice its power.
+  if (instead && /^The creature you control deals twice that much damage$/.test(t)) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "bite" || prev.times || prev.self || prev.a.ref !== "target") return null;
+    return { effects: [{ ...prev, times: 2 }], instead };
   }
   // "~ deals 7 damage divided as you choose among one, two, or three targets. If at least seven red mana was spent to cast
   // ~, instead ~ deals 7 damage to each of those permanents and/or players" (Sundering Stroke): the damage is still

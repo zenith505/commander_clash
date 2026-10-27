@@ -386,7 +386,7 @@ export type Count =
    */
   | { kind: "plusOnesPutThisTurn"; byYou?: true; onYours?: true; creature?: true; self?: true }
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
-  | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[]; /** Gyome, Master Chef: nontoken ones only. */ nontoken?: true }
+  | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[]; /** Gyome, Master Chef: nontoken ones only. */ nontoken?: true; /** Geralf, the Fleshwright: "each other Zombie that entered ...": not the trigger's subject entering. */ notSubject?: true }
   /** "If you sacrificed a Food this turn" (Elanor Gardner): the permanents its controller sacrificed this turn, of that subtype or card type as they last existed. */
   | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
@@ -551,7 +551,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -2153,7 +2153,7 @@ export type Effect =
    */
   /** Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control" (CR 903.3, 110.2a): every player's. */
   | { type: "commandersOntoBattlefield" }
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Target creature card and all other cards with the same name as that card" (Echoing Return): only cards with target `sameNameAs`'s name, that card included. */ sameNameAs?: number; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true; /** "That weren't put there this way" (Bringer of the Last Gift): not the cards this ability's sacrifice put there (ResolvingState.sacrificedThisWay). */ notSacrificedThisWay?: true; /** Storm of Souls: "Each of them is a 1/1 Spirit with flying in addition to its other types", from then on (CR 611.2c). */ alsoMods?: Modification[]; /** "Exile those creatures at the beginning of your next upkeep" (Rally the Ancestors): a delayed trigger for each permanent it returned (CR 603.7). */ exileAtYourNextUpkeep?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef; /** "Remove all attacking creatures from combat and untap them" (Illusionist's Gambit): those removed are "them" (ref "created"). */ remember?: true }
   /**
@@ -3570,6 +3570,10 @@ export type SpellCondition =
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
   | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true }
+  /** "Destroy target creature. If another creature died this turn" (Chain Assassination): a creature died this turn other than target `index` dying to this. */
+  | { kind: "anotherDied"; index: number }
+  /** "If that spell targets a commander you control" (Bane's Contingency): target `index`, a spell, targets a permanent on the battlefield matching `filter` as this resolves. */
+  | { kind: "targetSpellTargets"; index: number; filter: TargetSpec }
   /** "Exile it. If you do, ..." (Mazemind Tome): this ability's exile instructions exiled a permanent from the battlefield. */
   | { kind: "exiledThisWay" }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
@@ -4055,6 +4059,12 @@ export type TriggerEvent =
   | "creatureYouControlDealsCombatDamage"
   /** "Whenever a Sliver deals combat damage to a creature" (Toxin Sliver): anyone's (TriggeredAbility.dealer), once for each creature dealt it; that creature is the subject. */
   | "creatureDealsCombatDamageToCreature"
+  /**
+   * "Whenever a creature you control with deathtouch deals damage to a planeswalker" (Hooded Blightfang), "... to a player
+   * or planeswalker" (Vraska, Swarm's Eminence), "Whenever ~ deals damage to a planeswalker": once for each recipient;
+   * see TriggeredAbility.damageTo.
+   */
+  | "yourCreatureDealsDamage"
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
@@ -4193,6 +4203,8 @@ export interface TriggeredAbility {
   discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec; /** "For the first time each turn" (Valiant Rescuer): the player's first cycle this turn. */ firstEachTurn?: true };
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix): this permanent too, whatever the filter says. */ orSelf?: true; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
+  /** For "yourCreatureDealsDamage": the creature (`dealer` its filter, or `self` this one), what it's dealt to, and whether the subject is what was dealt damage ("destroy that planeswalker") rather than the creature. */
+  damageTo?: { what: "planeswalker" | "playerOrPlaneswalker"; self?: true; subjectDealt?: true };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
   attacker?: {
     filter: TargetSpec;

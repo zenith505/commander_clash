@@ -7893,7 +7893,7 @@ function askEntersChoice(s: GameState): boolean {
           }
           continue;
         }
-        s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: filter.text, options, count: n, objectId: o.id, prompt: `Sacrifice ${n} ${filter.text}s for ${defOf(s, o).name} to enter` };
+        s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: filter.text, options, count: n, objectId: o.id, prompt: `sacrifice ${n} ${filter.text}s for it to enter` };
         return true;
       }
       if (options.length <= 1) {

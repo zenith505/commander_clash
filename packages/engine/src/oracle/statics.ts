@@ -194,7 +194,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Cloud, Planet's Champion: "During your turn, as long as ~ is equipped, it has double strike and indestructible": both.
   else if ((m = /^During your turn, as long as ([^,]+), (.+)$/.exec(text))) [cond, statement, alsoYourTurn] = [m[1], m[2], true];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
-  // Mesa Lynx: "During turns other than yours, ~ gets +0/+2": while it isn't your turn.
+  // Mesa Lynx: "During turns other than yours, ~ gets +0/+2"; Midnight Mangler: "... ~ is an artifact creature": while it
+  // isn't your turn.
   else if ((m = /^During turns other than yours, (.+)$/.exec(text))) [cond, statement] = ["it's not your turn", m[1]];
   // Zurgo, Thunder's Decree: "During your end step, Warrior tokens you control have ..." (the end step only, not cleanup,
   // CR 513).
@@ -691,8 +692,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 0, max: 0 } : null;
   }
   // Biovisionary: "if you control four or more creatures named ~": with the source's name (CR 201.5), ~ itself among them.
-  if ((m = new RegExp(`^you control ${NUM} or more creatures named ~$`).exec(text))) {
-    const amount = parseCount("the number of creatures you control named ~", null);
+  // Phoenix Fleet Airship: "if you control eight or more permanents named ~".
+  if ((m = new RegExp(`^you control ${NUM} or more (creatures|permanents) named ~$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} you control named ~`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
@@ -742,6 +744,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
   if (text === "a card left your graveyard this turn") return { kind: "cardLeftYourGraveyard" };
+  if ((m = new RegExp(`^${NUM} or more cards left your graveyard this turn$`).exec(text))) return { kind: "cardLeftYourGraveyard", n: num(m[1]!) };
   // Slick Sequence: "If you've cast another spell this turn, draw a card": checked as it resolves (rulings).
   if (text === "you've cast another spell this turn") return { kind: "castAnother", resolving: true };
   // Soul Reap: "if you've cast another black spell this turn": as it resolves, other than itself (rulings).
@@ -1301,6 +1304,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[4]!, [m[1]!, m[5]!]);
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ((?:has|have) .+?),? and ${IS}$`).exec(rest))) return typed(m[5]!, [m[1]!, m[4]!]);
   if ((m = new RegExp(`^(.+?),? and ${IS}$`).exec(rest))) return typed(m[2]!, [m[1]!]);
+  // Runed Stalactite: "gets +1/+1 and is every creature type" (Stalactite Dagger: "is all creature types"), Arachnoform:
+  // "gets +2/+2, has reach, and is every creature type": each creature type in layer 4 (CR 205.3m, 613.1d).
+  if ((m = /^(.+?),? and is (?:every|all) creature types?$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!.replace(/^(gets? [^,]+), ((?:has|have) [^,]+)$/, "$1 and $2"));
+    return first && [...first, { kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true }];
+  }
   // Whispersilk Cloak: "can't be blocked and has shroud" (CR 509.1b, 702.18a).
   if ((m = /^(can't be blocked),? and ((?:has|have) .+)$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);
@@ -1558,9 +1567,10 @@ export function parseStatic(line: string): StaticAbility | null {
   const st = parseStaticLine(line) ?? parseTransform(line);
   if (st) return st;
   // Glamdring: "Equipped creature has first strike and gets +1/+0 for each instant and sorcery card in your graveyard"
-  // says the same as "gets ... and has first strike".
-  const m = /^(Equipped|Enchanted) creature has ([a-z]+(?: [a-z]+)?) and gets ([+-]\d+\/[+-]\d+ for each [^,"]+)\.$/.exec(line);
-  const swapped = m ? parseStaticLine(`${m[1]} creature gets ${m[3]} and has ${m[2]}.`) : null;
+  // says the same as "gets ... and has first strike". So does Runechanter's Pike's "has first strike and gets +X/+0,
+  // where X is ...".
+  const m = /^(Equipped|Enchanted) creature has ([a-z]+(?: [a-z]+)?) and gets ([+-]\d+\/[+-]\d+ for each [^,"]+|[+-][\dX]+\/[+-][\dX]+)(, where X is [^"]+)?\.$/.exec(line);
+  const swapped = m && (!m[4] === !/X/.test(m[3]!)) ? parseStaticLine(`${m[1]} creature gets ${m[3]} and has ${m[2]}${m[4] ?? ""}.`) : null;
   return swapped ? { ...swapped, text: line } : null;
 }
 

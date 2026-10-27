@@ -779,7 +779,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return dealt.some((t) => (t === "*" ? all || mine.length > 0 : all ? CREATURE_TYPES.has(t) : mine.includes(t)));
     }
     case "cardLeftYourGraveyard":
-      return (s.turnLog?.leftGraveyard ?? []).includes(you);
+      return cond.n ? (s.turnLog?.leftGraveyardCount?.[you] ?? 0) >= cond.n : (s.turnLog?.leftGraveyard ?? []).includes(you);
     case "castAnother": { // checked before the spell counts itself (CR 601.2f, 601.2i)
       const mine = (s.castThisTurn ?? []).filter((c) => c.player === you && (!cond.color || c.colors?.includes(cond.color)));
       // As a spell resolves it has counted itself, unless it's a copy, which wasn't cast (CR 707.12). With a color, only if

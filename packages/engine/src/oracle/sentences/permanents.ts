@@ -76,7 +76,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Double ~'s power until end of turn" (Tifa Lockhart), "double target creature's power and toughness": the same, for
   // one creature. "Triple target creature's power and toughness" (Tifa's Limit Break): +X/+Y, twice each (CR 701.11b-c).
-  if ((m = /^([Dd]ouble|[Tt]riple) (~'s|target creature's|that creature's|its) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
+  // Junk Jet: "Double equipped creature's power until end of turn": the creature it's attached to as this resolves.
+  if ((m = /^([Dd]ouble|[Tt]riple) (~'s|target creature's|that creature's|its|equipped creature's|enchanted creature's) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
     const what = parseObject(m[2] === "its" ? "it" : m[2]!.slice(0, -2), ctx);
     if (!what || isGroup(what)) return null;
     return [{ type: "doublePT", what, power: m[3] !== "toughness", toughness: m[3] !== "power", ...(/^t/i.test(m[1]!) ? { triple: true as const } : {}) }];
@@ -506,7 +507,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Stand Together: "Put two +1/+1 counters on target creature and two +1/+1 counters on another target creature": two
   // targets, each getting its counters.
-  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) on (target creature) and (${NUMX} ${COUNTER} counters?) on (another target creature)$`, "i").exec(s))) {
+  // Evolutionary Escalation: "... on target creature you control and three +1/+1 counters on target creature an opponent
+  // controls"; River Heralds' Boon: "... and a +1/+1 counter on up to one target Merfolk" (the same creature may be both
+  // targets, CR 115.3).
+  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) on (target creature(?: you control)?) and (${NUMX} ${COUNTER} counters?) on (another target creature|target creature an opponent controls|up to one target Merfolk)$`, "i").exec(s))) {
     const before = ctx.targets.length;
     const first = parseSentence(`Put ${m[1]} on ${m[4]}`, ctx);
     const second = first && ctx.targets.length === before + 1 ? parseSentence(`Put ${m[5]} on ${m[8]}`, ctx) : null;
@@ -1010,7 +1014,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // it resolves, locked in (CR 611.2c).
   // Zur, Eternal Schemer: "Target non-Aura enchantment you control becomes a creature in addition to its other types and has
   // base power and base toughness each equal to its mana value": no duration either (rulings).
-  if ((m = /^(target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
+  // Tatyova, Steward of Tides: "up to one target land you control becomes a 3/3 Elemental creature with haste": the same.
+  if ((m = /^((?:up to one )?target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

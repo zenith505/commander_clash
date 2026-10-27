@@ -1352,6 +1352,10 @@ export interface TurnLog {
   searched?: PlayerId[];
   /** The owners of cards that left their graveyard this turn (Gau, Feral Youth). */
   leftGraveyard?: PlayerId[];
+  /** How many cards left each player's graveyard this turn (Bonecache Overseer's "three or more cards"). */
+  leftGraveyardCount?: Partial<Record<PlayerId, number>>;
+  /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
+  creaturesLeft?: Partial<Record<PlayerId, number>>;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
   plusOnes?: { by: PlayerId; controller: PlayerId; creature: boolean; id: ObjectId; zc: number; n: number }[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */

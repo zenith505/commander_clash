@@ -1,5 +1,5 @@
 import { playerProtectedFrom, playerProtection } from "./effects/targeting";
-import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type Amount, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type PlayerRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
@@ -1024,6 +1024,19 @@ function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
   }, 0);
 }
 
+/**
+ * "Each player's life total becomes the number of creatures they control" (Biorhythm, Shaman of Forgotten Ways): only
+ * when we'd stay above 0, and either not lose life or take an opponent to 0.
+ */
+function lifeSwapHurts(s: GameState, pid: PlayerId, effects: Effect[]): boolean {
+  const e = allEffects(effects).find((x): x is Extract<Effect, { type: "setLife" }> => x.type === "setLife" && x.who.ref === "eachPlayer" && !!x.amount);
+  if (!e) return false;
+  const own = JSON.parse(JSON.stringify(e.amount).replace(/\{"ref":"eachOne"\}/g, '{"ref":"you"}')) as Amount;
+  const after = (p: PlayerId) => evalAmount(s, own, { controller: p });
+  const mine = after(pid);
+  return mine <= 0 || (mine < player(s, pid).life && !opponents(s, pid).some((p) => after(p) <= 0));
+}
+
 /** castPlan may plan a spell that ends the turn (endTurnCast). */
 let endingTurn = false;
 
@@ -1865,6 +1878,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "search" && e.exileRest)) return null;
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
+  if (lifeSwapHurts(s, pid, compileCard(d).spell?.effects ?? [])) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -3679,6 +3693,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if ((ab.exileSelf && !titan && !craft) || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
+      if (lifeSwapHurts(s, pid, ab.body.effects)) continue;
       // The Deck of Many Things: "roll a d20 and subtract the number of cards in your hand. If the result is 0 or less,
       // discard your hand": with more than three cards in hand, the risk outweighs what the roll brings.
       if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "rollIn" && e.cond.max !== undefined && e.cond.max <= 0 && e.effects.some((x) => x.type === "discard" && x.hand)) && player(s, pid).hand.length > 3) continue;

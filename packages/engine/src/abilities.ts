@@ -218,6 +218,8 @@ export type Count =
   | { kind: "poison"; who: PlayerRef }
   /** "For each card type among cards discarded this way" (Kefka, Court Mage): every card discarded while this resolves. */
   | { kind: "discardedTypes" }
+  /** "For each nonland card discarded this way" (Seasoned Pyromancer): the cards this resolution discarded that match, as they are in the graveyard. */
+  | { kind: "discardedMatching"; filter: TargetSpec }
   /** "For each card drawn this way": the cards drawn in this resolution's draw before (Struggle for Project Purity). */
   | { kind: "drawnThisWay" }
   /** "For each creature card put into a graveyard this way" after a mill (Dread Summons): the milled cards that went there and match. */
@@ -350,6 +352,8 @@ export type Count =
   /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
   | { kind: "mutations" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
+  /** "For each creature that left the battlefield under your control this turn" (Kutzil's Flanker): a token too. */
+  | { kind: "creaturesLeftThisTurn" }
   | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
@@ -389,7 +393,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1693,7 +1697,7 @@ export type StaticCondition =
   | { kind: "youMostLife" }
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
-  | { kind: "cardLeftYourGraveyard" }
+  | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number }
   | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color }
   /**
    * Prowl (CR 702.76a): a player was dealt combat damage this turn by a source that, as it dealt it, was under your control
@@ -1809,7 +1813,7 @@ export type Effect =
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
   /** "Your life total becomes 10" (CR 119.5): that player gains or loses the difference. */
-  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true }
+  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true; /** "The number of creatures they control" (Biorhythm): each player's own (PlayerRef eachOne), all counted before any change; `n` unused. */ amount?: Amount }
   /**
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
@@ -3643,6 +3647,7 @@ export type TriggerEvent =
   | "permanentDealtExcess"
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
+  | "selfIsDealtNoncombatDamage" // "Whenever ~ is dealt noncombat damage" (Smaug the Impenetrable): the same, for damage other than combat damage
   /** "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject; see TriggeredAbility.dealtFilter. */
   | "permanentIsDealtDamage"
   | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
@@ -3821,6 +3826,8 @@ export type TriggerEvent =
   | "youScryOrSurveil"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
   | "youProliferate"
+  /** "Whenever you become the monarch": only when you weren't already (CR 725.3; rulings on Custodi Lich). */
+  | "youBecomeMonarch"
   /** "Whenever a spell or ability you control counters a spell" (Baral): once for each spell countered (CR 701.6a). */
   | "youCounterSpell"
   /** "Whenever you complete a dungeon" (CR 309.7). */
@@ -3988,7 +3995,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** Alania: "if it's the first instant spell, the first sorcery spell, or the first Otter spell other than ~ you've cast this turn": the first of any of these kinds (`notSelfName`: not counting spells with this permanent's name). */ firstOfKinds?: { spec: TargetSpec; notSelfName?: true }[]; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /** Faldorn: "or a land you control enters from exile" triggers it too (CR 603.6a). */ orLandEntersFromExile?: true; /**
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** "A spell other than your first spell each turn" (Arcbound Tracker): its caster's second or later spell this turn. */ notFirst?: true; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** Alania: "if it's the first instant spell, the first sorcery spell, or the first Otter spell other than ~ you've cast this turn": the first of any of these kinds (`notSelfName`: not counting spells with this permanent's name). */ firstOfKinds?: { spec: TargetSpec; notSelfName?: true }[]; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /** Faldorn: "or a land you control enters from exile" triggers it too (CR 603.6a). */ orLandEntersFromExile?: true; /**
    * "If it shares a card type with the exiled card" (Cemetery Protector): the spell or land played shares one with a card
    * this permanent's linked ability exiled (CR 607.2a), an intervening "if" checked again as it resolves (CR 603.4).
    */ sharesTypeWithLinked?: true };
@@ -5135,6 +5142,12 @@ export interface CompiledCard {
   walkBlockable?: string[];
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
+  /**
+   * "Noncreature spells with mana value 4 or greater can't be cast", "Noncreature spells with {X} in their mana costs can't
+   * be cast" (Gaddock Teeg), "Creature spells can't be cast" (Aether Storm): no player's (CR 101.2). The mana value is the
+   * spell's, X as chosen (CR 202.3e).
+   */
+  cantBeCast?: { filter: TargetSpec; hasX?: true; text: string }[];
   /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */
   opponentsCantCast?: TargetSpec[];
   /**

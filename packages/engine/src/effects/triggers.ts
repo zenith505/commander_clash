@@ -952,7 +952,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         printedMatches(t.cast.orPlaysLand, defOf(s, land)) &&
         (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
         (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
-      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
+      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player && (!t.subjectFilter || objectMatches(s, t.subjectFilter, land, you, false))) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "finalChapterResolved") {
     for (const id of s.battlefield) {
@@ -1437,7 +1437,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const hit = s.objects[ev.id];
     if (o?.zone === "battlefield" && hit) {
       const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
-      add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, info);
+      // Vampire Slayer: "deals damage to a Vampire", only a creature that fits (as it's dealt the damage).
+      add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature")) && (!t.subjectFilter || objectMatches(s, t.subjectFilter, hit, controllerOf(s, o), false)), undefined, undefined, hit, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
       // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature": anyone's, as it deals the damage.
       if (ev.combat)

@@ -412,10 +412,10 @@ type GiftPick = { draft: CastDraft; label: string; what: string; options: Player
 type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
 
 /** Choosing which kicker costs to pay (CR 702.33). */
-type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[] };
+type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[]; /** "Kicker—Sacrifice two lands": the cost in words. */ text?: string };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined; faceUp?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined; faceUp?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined; faceUp?: undefined } | { faceUp: FaceUpDraft; draft?: undefined; activate?: undefined; mana?: undefined }) & {
   kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "offering" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor" | "craft";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
@@ -438,6 +438,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
+/** Turning a face-down permanent face up for a morph cost that isn't mana ("Morph—Sacrifice two Mountains", CR 702.37e). */
+type FaceUpDraft = { objectId: string; way: number; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; reveal?: string[] };
 type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; craft?: string[]; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
@@ -823,6 +825,30 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     );
   }
 
+  /** Turning a face-down permanent face up: pick what pays a morph cost that isn't mana, then do it (CR 702.37e). */
+  function continueFaceUp(d: FaceUpDraft) {
+    if (!s) return;
+    const up = faceUpWays(s, s.objects[d.objectId]!)[d.way];
+    if (!up) return;
+    const label = `Turn face up (${up.kind} ${up.text ?? ""})`.replace(/ \)$/, ")");
+    for (const c of up.costs ?? []) {
+      if (c.kind !== "sacrifice" && c.kind !== "returnToHand" && c.kind !== "discard" && c.kind !== "reveal") continue;
+      if (d[c.kind] !== undefined) continue;
+      const me = s.players[HUMAN]!;
+      const candidates =
+        c.kind === "sacrifice"
+          ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
+          : c.kind === "returnToHand"
+            ? returnCandidates(s, HUMAN, c)
+            : me.hand.filter((id) => !c.filter || printedMatches(c.filter, cardOf(s, id)));
+      const what = c.kind === "sacrifice" || c.kind === "returnToHand" ? c.filter.text : (c.filter?.text ?? "card");
+      const verb = c.kind === "returnToHand" ? "return" : c.kind;
+      return setCostPick({ faceUp: d, kind: c.kind, label, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${c.n > 1 ? plural(what) : what}${c.kind === "returnToHand" ? " to hand" : ""}`, n: c.n, candidates, chosen: [] });
+    }
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.reveal?.length ? { reveal: d.reveal } : {}) };
+    dispatch(planTurnFaceUp(s, HUMAN, d.objectId, d.way, 0, costs) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: d.objectId, ...(d.way ? { way: d.way } : {}), costs }]);
+  }
+
   /** Done picking what to sacrifice, discard or exile: carry on casting or activating. */
   function finishCostPick(pick: CostPick) {
     setCostPick(null);
@@ -832,7 +858,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (plan) dispatch(plan);
       return;
     }
-    if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
+    if (pick.faceUp) continueFaceUp({ ...pick.faceUp, [pick.kind]: pick.chosen });
+    else if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
     else if (pick.setsX && s) continueCast({ ...pick.draft, [pick.kind]: pick.chosen, x: manaValue(parseManaCost(cardOf(s, pick.chosen[0]!).manaCost)) });
     else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
@@ -871,7 +898,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setTapPick({ kind: "harmonize", objectId: d.objectId, chosen: [], draft: d });
     }
     if (d.kicks === undefined && compiled.kicker && !compiled.kicker.required)
-      return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
+      return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [], ...(compiled.kicker.text ? { text: compiled.kicker.text } : {}) });
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
     const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;
     if (d.modes === undefined && kickedModal) {
@@ -1610,6 +1637,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   const max = maxX((n) => planTurnFaceUp(s, HUMAN, menu, way, n));
                   return setXPick({ mode: "faceUp", objectId: menu, way, label: `Turn face up (${up.kind})`, cost: up.cost, max, value: max });
                 }
+                if (up?.costs) return continueFaceUp({ objectId: menu, way });
                 dispatch(planTurnFaceUp(s, HUMAN, menu, way) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}) }]);
               }}
               onClose={() => setMenu(null)}
@@ -2000,7 +2028,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
-  if (c.kind === "mill") return `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
+  if (c.kind === "mill") return c.exile ? `exile the top ${c.n === 1 ? "card" : `${c.n} cards`} of your library` : `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }
@@ -2270,7 +2298,7 @@ function KickPickBar({
     return (
       <div className="targeting">
         <span>
-          <strong>{pick.label}</strong>: pay {pick.name} <ManaCost cost={pick.costs[0]!} size="sm" />?
+          <strong>{pick.label}</strong>: pay {pick.name} {pick.text ? `(${pick.text})` : <ManaCost cost={pick.costs[0]!} size="sm" />}?
         </span>
         <button disabled={!can([0])} onClick={() => onDone([0])}>
           {pick.name === "kicker" ? "Kick it" : `Pay ${pick.name}`}
@@ -2304,7 +2332,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -4283,7 +4311,7 @@ function AbilityMenu({
       })}
       {upWays.map((upCost, way) => (
         <button key={`up${way}`} disabled={!planTurnFaceUp(s, HUMAN, objectId, way)} title={turnFaceUpProblem(s, HUMAN, objectId, way) ?? "A special action: it doesn't use the stack."} onClick={() => onTurnFaceUp(way)}>
-          Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} <ManaCost cost={upCost.cost} size="sm" />
+          Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} {upCost.text ?? <ManaCost cost={upCost.cost} size="sm" />}
         </button>
       ))}
       {inYard &&

@@ -4,7 +4,7 @@ import { CREATURE_TYPES, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
 import { NUM, num, keywordOf, plainMana, sacrificeSelf, pumpSelf, BASIC_TYPES, capital, singular, singularWord } from "./words";
-import { parsePayCost } from "./body";
+import { parseBody, parsePayCost } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseStaticCondition } from "./statics";
@@ -145,7 +145,7 @@ export function parseCostKeyword(
   activated?: ActivatedAbility;
   delve?: true;
   assist?: true;
-  faceDown?: { kind: FaceDownKind; cost: string };
+  faceDown?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string };
   madness?: string;
   miracle?: string;
   suspend?: { n: number; cost: string };
@@ -240,7 +240,15 @@ export function parseCostKeyword(
   if (/^Casualty\b/.test(line)) return "fail";
   // Dredge N (CR 702.52a).
   if ((m = /^Dredge (\d+)$/.exec(line))) return { dredge: Number(m[1]) };
-  // Morph, megamorph, disguise (CR 702.37, 702.168): costs other than mana ("Reveal a blue card") aren't modeled.
+  // Morph, megamorph, disguise (CR 702.37, 702.168).
+  // "Morph—Pay 5 life.", "Morph—Reveal a white card in your hand.", "Morph—Return two Islands you control to their owner's
+  // hand.": a morph cost that isn't mana (CR 702.37a, 118.8), paid as it's turned face up (702.37e).
+  if ((m = /^Morph—([A-Z][^{}]+?)\.?$/.exec(line))) {
+    const text = m[1]!.replace(/^./, (c) => c.toLowerCase());
+    const cost = parseAdditionalCost(text.replace(/ in your hand$/, " from your hand"));
+    if (!cost || !["payLife", "discard", "reveal", "sacrifice", "returnToHand"].includes(cost.kind) || ("x" in cost && cost.x) || (cost.kind === "discard" && cost.random) || (cost.kind === "reveal" && cost.orControl)) return "fail";
+    return { faceDown: { kind: "morph", cost: "", costs: [cost], text } };
+  }
   if ((m = /^(Morph|Megamorph|Disguise)(?: |—)(.+?)\.?$/.exec(line))) {
     const cost = m[2]!;
     // "Disguise {X}{3}{W}", "Morph {X}{X}{R}": X chosen as it's turned face up (CR 107.3d), for its own abilities (702.37f, 702.168e).
@@ -250,7 +258,15 @@ export function parseCostKeyword(
   }
   if ((m = /^Echo(?: |—)(.+?)\.?$/.exec(line))) {
     const cost = m[1]!;
-    if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail"; // "Echo—Discard a card." isn't modeled
+    // "Echo—Discard a card.", "Echo—Sacrifice two lands." (CR 702.30a, 118.8): "sacrifice it unless you discard a card",
+    // a choice made as the trigger resolves; with nothing to pay it with, it's sacrificed.
+    if (!/\{/.test(cost) && /^[A-Z]/.test(cost)) {
+      const keep = parseBody(`Sacrifice ~ unless you ${cost.replace(/^./, (c) => c.toLowerCase())}.`, { selfIt: true });
+      const may = keep?.effects.length === 1 && !keep.targets.length ? keep.effects[0] : undefined;
+      if (may?.type !== "may" || may.otherwise?.length !== 1 || may.otherwise[0] !== sacrificeSelf) return "fail";
+      return { trigger: { event: "yourUpkeep", ifEcho: true, body: { targets: [], effects: [{ ...may, text: `Pay echo (${cost.replace(/^./, (c) => c.toLowerCase())}) to keep ~` }], text: `Echo—${cost}: at the beginning of your upkeep, if ~ came under your control since the beginning of your last upkeep, sacrifice it unless you ${cost.replace(/^./, (c) => c.toLowerCase())}.` } } };
+    }
+    if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail";
     const text = `Echo ${cost}: at the beginning of your upkeep, if ~ came under your control since the beginning of your last upkeep, sacrifice it unless you pay ${cost}.`;
     return {
       trigger: {
@@ -433,15 +449,19 @@ export function parseCostKeyword(
     };
   }
   // Embalm and eternalize (CR 702.128, 702.129): exile it from your graveyard to create a token copy of it.
-  if ((m = /^(Embalm|Eternalize) ((?:\{[^}]+\})+)$/.exec(line))) {
+  // "Eternalize—{3}{U}{U}, Discard a card" (Sinuous Striker): a discard as part of the cost (CR 702.129a, 602.2b); the card
+  // itself is in the graveyard, so it can't be the one discarded (rulings).
+  if ((m = /^(Embalm|Eternalize)(?: |—)((?:\{[^}]+\})+)(?:, (Discard a card))?\.?$/.exec(line))) {
     const cost = m[2]!;
     if (!plainMana(cost)) return "fail";
+    const extra = m[3] ? parseAdditionalCost(m[3].toLowerCase()) : undefined;
     const embalm = m[1] === "Embalm";
     const except: CopyExcept = embalm ? { colors: ["W"], addSubtypes: ["Zombie"], noManaCost: true } : { pt: [4, 4], colors: ["B"], addSubtypes: ["Zombie"], noManaCost: true };
     return {
       activated: {
         manaCost: cost,
         tap: false,
+        ...(extra ? { costs: [extra] } : {}),
         sacrificeSelf: false,
         sorcerySpeed: true,
         zone: "graveyard",
@@ -451,7 +471,7 @@ export function parseCostKeyword(
           effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, except, ofSource: true, ...(embalm ? { embalmed: true as const } : {}) }],
           text: `Create a token that's a copy of ~, except it's a ${embalm ? "white" : "4/4 black"} Zombie ${d.subtypes.join(" ")} with no mana cost.`,
         },
-        text: `${m[1]} ${cost}`,
+        text: `${m[1]} ${cost}${m[3] ? `, ${m[3]}` : ""}`,
       },
     };
   }

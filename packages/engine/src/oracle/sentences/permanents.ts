@@ -930,6 +930,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what && parseChanges([m[2], m[3]!.replace(/ this turn$/, "")].filter(Boolean).join(" and "));
     return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }
+  // The Mimics: "~ has base power and toughness 5/3 until end of turn and gains trample until end of turn", "... 3/3 until
+  // end of turn and can't be blocked this turn": both until the cleanup step (CR 514.2), one effect (base power and
+  // toughness in layer 7b, the ability in layer 6, CR 613.1f, 613.4b).
+  if ((m = /^(.+?) has base power and toughness (\d+\/\d+) until end of turn and (gains .+? until end of turn|can't be blocked this turn)$/i.exec(s))) {
+    const gains = /^gains (.+) until end of turn$/.exec(m[3]!);
+    if (gains) return parseSentence(`${m[1]} has base power and toughness ${m[2]} and gains ${gains[1]} until end of turn`, ctx);
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const first = what && parseChanges(`has base power and toughness ${m[2]}`);
+    const second = first && parseStaticMods("can't be blocked");
+    return what && first && second ? [{ type: "continuous", what, mods: [...first, ...second], duration: "endOfTurn" }] : null;
+  }
   // "Target creature gets +1/+0 until end of turn and can't be blocked this turn" (Teleportal), "... and must be blocked
   // this turn if able" (Compelled Duel, CR 509.1c): "this turn" ends with "until end of turn", in the cleanup step (CR
   // 514.2), so it's one change until end of turn.

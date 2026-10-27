@@ -58,6 +58,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
   if (spec.notTypes?.some((t) => c.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
+  if (spec.bothColors?.some((col) => !c.colors.includes(col))) return false;
   if (spec.notColors?.some((col) => c.colors.includes(col))) return false;
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
   if (spec.mostCommonColor !== undefined) {
@@ -329,6 +330,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => d.colors.includes(col))) return false;
+  if (spec.bothColors?.some((col) => !d.colors.includes(col))) return false;
   if (spec.notColors?.some((col) => d.colors.includes(col))) return false;
   if (spec.colorCount && !colorCountIs(spec.colorCount, d.colors.length)) return false;
   if (spec.supertypes?.some((x) => !d.supertypes.includes(x))) return false;

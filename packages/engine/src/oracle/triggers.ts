@@ -309,6 +309,15 @@ function parseExcessTrigger(line: string): TriggeredAbility | "fail" | null {
  * untap step": once for each creature it dealt damage to (CR 603.2c), which "that creature" and "it" mean.
  */
 function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever ~ deals damage to a Vampire, destroy that creature" (Vampire Slayer), "to a Goblin or Orc" (East-Mark
+  // Cavalier): only a creature of those types it deals damage to triggers it, once for each (CR 603.2c).
+  const typed = /^Whenever ~ deals (combat )?damage to an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?, (.+)$/.exec(line);
+  if (typed) {
+    const subtypes = [typed[2]!, ...(typed[3] ? [typed[3]] : [])];
+    if (!subtypes.every((t) => CREATURE_TYPES.has(t))) return "fail";
+    const t = parseDamagesCreatureTrigger(`Whenever ~ deals ${typed[1] ?? ""}damage to a creature, ${typed[4]}`);
+    return !t || t === "fail" ? "fail" : { ...t, subjectFilter: { kind: "object", types: ["Creature"], subtypes, text: subtypes.join(" or ") } };
+  }
   const m = /^Whenever ~ deals (combat )?damage to a creature, (.+)$/.exec(line);
   if (!m) return null;
   let text = m[2]!;
@@ -2767,6 +2776,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ${howEnters[1]} enters, ${howEnters[3]}`);
     if (!t || t === "fail" || t.event !== "permanentEnters" || !t.enters || t.enters.filter.tapped !== undefined) return "fail";
     return { ...t, enters: { ...t.enters, filter: { ...t.enters.filter, tapped: howEnters[2] === "tapped", text: `${t.enters.filter.text} that enters ${howEnters[2]}` } } };
+  }
+  // Jokulmorder: "Whenever you play an Island": playing a land with that subtype (CR 305.1), as it is on the battlefield.
+  const playType = /^Whenever you play an? (Plains|Island|Swamp|Mountain|Forest), (.+)$/.exec(line);
+  if (playType) {
+    const t = parseTrigger(`Whenever you play a land, ${playType[2]}`);
+    return !t || t === "fail" || t.event !== "youPlayLand" || t.subjectFilter ? "fail" : { ...t, subjectFilter: { kind: "object", types: ["Land"], subtypes: [playType[1]!], text: playType[1]! } };
   }
   // "When ~ enters untapped, ..." (Mystic Sanctuary): entering untapped is part of the trigger event.
   const untapped = /^When(?:ever)? ~ enters untapped, (.+)$/.exec(line);

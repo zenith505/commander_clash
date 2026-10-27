@@ -842,9 +842,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.everyone) return s.players.every((p) => p.lost || fits(p.life));
       return fits(s.players[you]?.life ?? 0);
     }
+    case "scriedThisTurn":
+      return (s.turnLog?.scried ?? []).includes(you);
     case "discardedThisTurn":
       return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you) && (!cond.yours || d.player === you));
     case "opponentLostLife":
+      if (cond.damaged && cond.noncombat) return Object.entries(s.turnLog?.noncombatDamage ?? {}).some(([p, v]) => Number(p) !== you && v > 0);
       if (cond.damaged) return (s.damagedThisTurn ?? []).some((p) => p !== you);
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
       if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
@@ -894,6 +897,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
       const same = !!lk && (lk.zc === subjectZc || (lk.zc + 1 === subjectZc && sub?.zoneChanges === subjectZc));
       return same && (lk!.creatureTypes === "all" || !!lk!.creatureTypes?.includes(cond.subtype));
+    }
+    case "subjectCardType": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) return !!chars.get(sub.id)?.types.includes(cond.type);
+      const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      return !!lk && lk.zc === subjectZc && !!lk.types?.includes(cond.type);
     }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);

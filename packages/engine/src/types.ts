@@ -1387,6 +1387,8 @@ export interface TurnLog {
   damagedBy?: Record<number, string[]>;
   /** Noncombat damage each player was dealt this turn (Chandra's Incinerator), also after they lost the game (rulings). */
   noncombatDamage?: Record<number, number>;
+  /** Players who scried or surveilled this turn (Proctor of Potential). */
+  scried?: PlayerId[];
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
   /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */

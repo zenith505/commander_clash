@@ -1516,6 +1516,8 @@ export type StaticCondition =
   | { kind: "subjectNameUnique" }
   /** "If it was a Human" (Slayer's Plate): the trigger's subject's creature types, or as it last existed (CR 608.2h). */
   | { kind: "subjectType"; subtype: string }
+  /** "If it's a creature" (Trail of Mystery): the trigger's subject has this card type, or had it as it last existed (CR 608.2h). */
+  | { kind: "subjectCardType"; type: string }
   /** "If it wasn't put onto the battlefield with this ability" (Kodama of the East Tree): the entering permanent (GameObject.putBy). */
   | { kind: "subjectPutBySelf"; not?: true }
   /** Chainer: "if you didn't cast it from your hand", about the entering permanent (GameObject.castFromHand). */
@@ -1651,7 +1653,9 @@ export type StaticCondition =
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
   /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
   | { kind: "discardedThisTurn"; /** "If an opponent discarded a card this turn" (Tinybones, Trinket Thief): an opponent of `you`. */ opponent?: true; /** "If you've discarded a card this turn" (Recalibrate): `you`. */ yours?: true }
-  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true }
+  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true; /** "Noncombat damage" (Grim Repriser): with `damaged`, only damage that wasn't combat damage (CR 120.2b). */ noncombat?: true }
+  /** "If you've scried or surveilled this turn" (Proctor of Potential): `you` scried or surveilled at least once this turn (CR 701.22, 701.25). */
+  | { kind: "scriedThisTurn" }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
@@ -3784,6 +3788,7 @@ export type TriggerEvent =
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
   | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter
+  | "permanentTurnedFaceUp" // "Whenever a permanent is turned face up" (Aven Farseer): see TriggeredAbility.tappedFilter
   /**
    * "Whenever you tap ~ for mana", "whenever a player taps a land for mana" (CR 106.12: activating a mana ability with {T}
    * in its cost), with a body that adds no mana, so it isn't a mana ability and uses the stack (CR 605.1b). See manaTap.
@@ -4116,7 +4121,7 @@ export interface TriggeredAbility {
    */
   manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
   /**
-   * For "permanentBecomesTapped" and "permanentBecomesUntapped": which permanent ("a Dwarf you control"); it's the subject
+   * For "permanentBecomesTapped", "permanentBecomesUntapped" and "permanentTurnedFaceUp": which permanent ("a Dwarf you control"); it's the subject
    * ("put a wind counter on it").
    */
   tappedFilter?: TargetSpec;
@@ -4184,7 +4189,9 @@ export interface TriggeredAbility {
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
    * (rulings: cycling a card triggers it once).
    */
-  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec; /** "For the first time each turn" (Valiant Rescuer): the player's first cycle this turn. */ firstEachTurn?: true };
+  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec; /** "For the first time each turn" (Valiant Rescuer): the player's first cycle this turn. */ firstEachTurn?: true; /** "Whenever a spell or ability an opponent controls causes you to discard a card" (Spiritual Focus). */ byOpponent?: true };
+  /** "When a spell or ability an opponent controls causes you to discard ~" (Sand Golem): a "selfDiscarded" trigger only for such a discard; the event player is that opponent. */
+  discardedByOpponent?: true;
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix): this permanent too, whatever the filter says. */ orSelf?: true; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
@@ -5758,6 +5765,8 @@ export interface CompiledCard {
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).
    */
   discardedToBattlefield?: boolean;
+  /** Dodecapod: "with two +1/+1 counters on it", as it enters that way. */
+  discardedToBattlefieldCounters?: number;
   /**
    * "If an opponent would mill one or more cards, they mill that many cards plus four instead" (The Water Crystal),
    * "... twice that many cards instead" (Bruvac): replacement effects on its controller's opponents' mills (CR 614.1a).

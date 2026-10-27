@@ -732,6 +732,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // "The exiled creature's mana value" after an "Exile a creature you control" cost (Food Chain); compile() checks it has one.
   if (x === "the exiled creature's") return ctx ? { ref: "sacrificed", exiledCost: true } : null;
   // "The revealed card's power" after a "reveal a colorless creature card from your hand" cost (Titan's Presence).
+  // "Target opponent reveals a card at random from their hand. Target creature gets -X/-X until end of turn, where X is
+  // the revealed card's mana value" (Planeswalker's Scorn): that card.
+  if (x === "the revealed card's" && ctx?.revealedTop) return { ref: "revealed" };
   if (x === "the revealed card's") return ctx ? { ref: "sacrificed", revealedCost: true } : null;
   // A reflexive trigger after "you may sacrifice another creature": that creature, as it last existed (CR 608.2h).
   if (x === "that creature's" && ctx?.sacrificedIt) return { ref: "sacrificed" };

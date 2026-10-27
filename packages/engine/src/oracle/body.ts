@@ -161,8 +161,11 @@ export interface Ctx {
 function thenSubject(first: string, next: string): string {
   // "At the beginning of each player's draw step, that player draws an additional card, then discards a card" (Anvil of
   // Bogardan): lowercase after the trigger.
-  const who = /^(Target player|Target opponent|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
-  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
+  // Hired Torturer: "Target opponent loses 2 life, then reveals a card at random from their hand"; Singe-Mind Ogre: "target
+  // player reveals a card at random from their hand, then loses life ...".
+  const who = /^(Target player|Target opponent|target player|target opponent|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
+  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^[Tt]arget /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
+  if (who && /^[Tt]arget /.test(who[1]!) && /^reveals a card at random from their hand$/.test(next)) return `That player ${next}`;
   // Pendant of Prosperity: "~'s owner draws a card, then that player may put a land card from their hand onto the
   // battlefield": the same owner.
   if (/^~'s owner draws /.test(first) && /^that player may put /.test(next)) return `~'s owner ${next.slice("that player ".length)}`;
@@ -4218,6 +4221,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter) return null;
       effects.push({ type: "may", effects: [{ type: "dig", n: num(mayLookTop[1]!), count: 1, upTo: true, filter, into: "libraryTop", rest: "bottom", reveal: true }], text: `look at the top ${mayLookTop[1]} cards of your library` });
       si++;
+      continue;
+    }
+    // "Target opponent reveals a card at random from their hand" (Planeswalker's Mirth, Hired Torturer), "that player ..."
+    // (Merfolk Spy), "target creature's controller ..." (Friendly Fire): "that card" and "the revealed card" after it are
+    // that card (an empty hand reveals none, and its mana value is 0: rulings on Planeswalker's Scorn).
+    const theyReveal = /^([Tt]arget opponent|[Tt]arget player|[Tt]hat player|Target creature's controller) reveals a card at random from their hand$/.exec(s);
+    if (theyReveal) {
+      const who = parsePlayer(theyReveal[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealTop", randomFromHand: true, who });
+      ctx.revealedTop = true;
       continue;
     }
     const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);

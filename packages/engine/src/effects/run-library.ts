@@ -460,7 +460,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).
         if (!cards.length) {
-          if (n > 0) fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
+          if (n > 0) {
+            noteScried(s, p.id);
+            fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
+          }
           return;
         }
         s.pending = { kind: "arrangeTop", player: p.id, how: e.type, cards, source: src };
@@ -477,6 +480,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
+      noteScried(s, p.id);
       fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size });
       return;
     }
@@ -1414,7 +1418,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
     // Obstinate Baloth: its owner picks this replacement over madness or a graveyard one (CR 616.1, rulings).
     if (c.discardedToBattlefield && cause !== undefined && cause !== pid) {
       log(s, `${defOf(s, o).name} is put onto the battlefield instead.`);
-      moveObject(s, id, "battlefield", { controller: pid });
+      moveObject(s, id, "battlefield", { controller: pid, ...(c.discardedToBattlefieldCounters ? { counters: { "+1/+1": c.discardedToBattlefieldCounters } } : {}) });
       continue;
     }
     const madness = c.madness;
@@ -1441,7 +1445,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   if (cycled) ((s.turnLog ??= {}).cycled ??= {})[pid] = (s.turnLog.cycled?.[pid] ?? 0) + ids.length;
-  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}) }));
+  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}), ...(cause !== undefined ? { cause } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }
 
@@ -1598,4 +1602,12 @@ function sacrificedKin(s: GameState, ctx: ResolveCtx, f: TargetSpec): TargetSpec
   const lk = ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1);
   const kin = !lk ? [] : lk.allCreatureTypes ? [...CREATURE_TYPES] : (lk.subtypes ?? []).filter((t) => CREATURE_TYPES.has(t));
   return { ...rest, subtypes: kin.length ? kin : ["(none)"] };
+}
+
+/** Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn". */
+function noteScried(s: GameState, player: PlayerId) {
+  const log = (s.turnLog ??= {});
+  if ((log.scried ??= []).includes(player)) return;
+  log.scried.push(player);
+  invalidateCharacteristics(s); // "As long as you've scried or surveilled this turn" (Surveillance Phantasm)
 }

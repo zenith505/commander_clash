@@ -2493,8 +2493,12 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
-    if (line === "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield instead of putting it into your graveyard.") {
+    // Dodecapod: "... put it onto the battlefield with two +1/+1 counters on it instead of putting it into your graveyard"
+    // (it enters with them, CR 614.1c).
+    const toBattlefield = /^If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield( with (two|three) \+1\/\+1 counters on it)? instead of putting it into your graveyard\.$/.exec(line);
+    if (toBattlefield) {
       out.discardedToBattlefield = true;
+      if (toBattlefield[2]) out.discardedToBattlefieldCounters = num(toBattlefield[2]);
       continue;
     }
     // Prototype (CR 702.160a, 718): cast it with the alternative mana cost, color, power and toughness (see prototypedDef).
@@ -3509,7 +3513,12 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line) ??
       // Astrologian's Planisphere: "Whenever you cast a noncreature spell and whenever you draw your third card each turn":
       // a cast and a draw are never one event.
-      /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line);
+      /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line) ??
+      // Perimeter Enforcer: "Whenever another Detective you control enters and whenever a Detective you control is turned
+      // face up, ...": entering and turning face up are never one event (CR 708.8). Case of the Pilfered Proof: "Whenever a
+      // Detective you control enters or is turned face up".
+      /^Whenever ((?:~ or )?another [A-Z][a-z]+ you control) enters and whenever (an? [A-Z][a-z]+ you control) is turned face up, (.+)$/.exec(line) ??
+      /^Whenever (an? [A-Z][a-z]+ you control) enters or is turned face up, (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
@@ -3556,6 +3565,10 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
+            : / is turned face up, /.test(line) && twice.length === 4
+              ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[2]} is turned face up, ${effect}`]
+            : / enters or is turned face up, /.test(line) && /^Whenever an? /.test(line)
+              ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} is turned face up, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);

@@ -973,6 +973,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   // Bloodcrazed Goblin: "unless an opponent has been dealt damage this turn" (bloodthirst's condition, CR 702.54a).
   if (/^an opponent (?:has been|was) dealt damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true };
+  // Grim Repriser: "if an opponent has been dealt noncombat damage this turn", whenever it was dealt (rulings).
+  if (/^an opponent (?:has been|was) dealt noncombat damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true, noncombat: true };
+  // Proctor of Potential: "if you've scried or surveilled this turn" (a scry of 0 is no scry, CR 701.22b, 701.25c).
+  if (text === "you've scried or surveilled this turn") return { kind: "scriedThisTurn" };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
   // Mysterio's Mirage: "if you discarded a card this turn" is the same.

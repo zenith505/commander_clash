@@ -573,6 +573,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return src.zone === "command";
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
       return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src));
+    case "topCardIs": {
+      const top = s.objects[s.players[you]?.library[0] ?? ""];
+      return !!top && printedMatches(cond.filter, defOf(s, top));
+    }
     case "graveyardAtLeast": // threshold
       return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
     case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
@@ -1636,7 +1640,8 @@ function countSignature(s: GameState): string {
   for (const pid of s.turnOrder) {
     const p = s.players[pid]!;
     // The mana pool too, for "for each unspent green mana you have" (Omnath, Locus of Mana).
-    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.graveyard.length},${Object.values(p.manaPool).join(".")}`);
+    // The top card of the library too, for "as long as the top card of your library is black" (Vampire Nocturnus).
+    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.library[0] ?? ""},${p.graveyard.length},${Object.values(p.manaPool).join(".")}`);
   }
   for (const id of s.battlefield) {
     const o = s.objects[id]!;

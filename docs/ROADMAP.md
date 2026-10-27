@@ -1,7 +1,7 @@
 # Roadmap
 
-25,295 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,634 of
+25,360 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,677 of
 9,979 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -259,14 +259,38 @@ line blocks.
    Fervent, Lupine Prototype, Technodrome, Training Drone and others), "whenever you cast a spell with {X} in its mana
    cost" (Zaxara, Nev, Owlin Spiralmancer, Lattice Library, Geometer's Arthropod), "enchanted creature or enchantment
    creature" (Feast of Dreams, Nyx Herald, Kestia, Temple Thief).
-   Next most played: Bristlebud Farmer, Kelsien, the Plague, Extract Brain, Astelli Reclaimer, Great Hall of the
-   Biblioplex, Divergent Transformations, Rune of Might, Black Panther, Wakandan King, Grell Philosopher, Pulmonic
-   Sliver, Etrata, Deadly Fugitive, Questing Druid, The Creation of Avacyn, Worldslayer, Progenitor Exarch, Diviner of
-   Mist, Honest Work, Pawpatch Recruit, Jhoira's Timebug, Huntmaster of the Fells, Archelos, Lagoon Mystic; the ones
-   skipped in round 175: Detention Sphere, Tangle Wire, Steward of the Harvest, Solitary Sanctuary, Werewolf Pack
-   Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and Shaw, Rampaging Aetherhood, Unstable Glyphbridge,
-   Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki, God of Mischief, Katsumasa, the Animator, Slagstone
-   Refinery, Inalla, Archmage Ritualist, Threats Undetected, Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
+   Out after round 176: Extract Brain (an opponent chooses X cards from their hand for you to look at), Astelli
+   Reclaimer (X is the mana spent to cast it), Divergent Transformations and Chaos Mutation (each player's replacement
+   in APNAP order), Black Panther, Wakandan King ("move all +1/+1 counters ... if one or more are moved this way, that
+   much"), Grell Philosopher (Horrors gain an opponent's artifact's activated abilities), Pulmonic Sliver (a granted
+   replacement), Etrata, Deadly Fugitive (a granted turn-face-up ability and cloak), The Creation of Avacyn (turning
+   the exiled card face up), Honest Work (a name change), Pawpatch Recruit ("target creature other than that
+   creature" needs the trigger's subject at target choice), Jhoira's Timebug and Greater Gargadon (suspended cards),
+   Huntmaster of the Fells (two targets, one about the other's controller), Archelos, Lagoon Mystic (enters tapped or
+   untapped by its own state), Venerable Warsinger (a target's X from the trigger's damage, unknown at targeting),
+   Rushed Rebirth (a this-turn dies trigger with "lesser mana value" than that creature), Barrin, Tolarian Archmage (no
+   turn log of permanents put into hands), Omarthis (manifest a counted number), Pull from Eternity (no targets in
+   exile yet), Wall of Shards (cumulative upkeep "an opponent gains 1 life"), Shadow of the Grave (the discard log keeps
+   card keys, not the cards), Rampaging War Mammoth (cycling {X}), Pizza Face (an optional target that becomes a
+   Mutant creature), the hybrid Mimics ("a spell that's both blue and red": no all-of-these-colors filter), Does
+   Machines, Crown of Convergence ("share a color with that card"). Round 176 went down the list from Bristlebud Farmer to about rank
+   9,240 (Kelsien, the five Runes, Great Hall of the Biblioplex, Questing Druid, Worldslayer, Progenitor Exarch,
+   Diviner of Mist, Anje Falkenrath, Unite the Coalition, Zedruu, Lotuslight Dancers, Dream Eater, Chandra,
+   Flamecaller, Ever-Watching Threshold, Bonder's Ornament, Alpha Status, Swallowed by Leviathan, Fae Offering, Death
+   Tyrant, Silverfur Partisan, Tainted Indulgence, The Tabernacle at Pendrell Vale, Public Thoroughfare, Fear, Fire,
+   Foes!, Scrounging Bandar, Malboro, Kothophed, Argent Dais, Propagator Drone, Vampire Nocturnus, Mul Daya
+   Channelers, Lluwen, Wartime Protestors, Horned Loch-Whale, Sinkhole Surveyor, Haliya, Realm Seekers, Reality Heist
+   and others), taking the easy ones.
+   Next most played: Conqueror's Galleon, Grub, Storied Matriarch,
+   Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
+   Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
+   Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
+   the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
+   Ula's Temple; the ones skipped in round 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
+   Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
+   God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
+   Leader, Super-Genius; the ones skipped since round 173: Radagast the Brown, Quicksilver Elemental, Secret of
    Bloodbending, Chiss-Goria, Forge Tyrant, Molecule Man, Confiscation Coup, Zoyowa Lava-Tongue, Role Reversal, Scriv,
    the Obligator, Craig Boone, Novac Guard, Spelltwine, Ultimate Magic: Meteor, Spectral Searchlight, Rat King,
    Verminister, Valgavoth's Onslaught, Motivated Pony; and from before round 172: Grindstone, Halo Forager, Moritte of the

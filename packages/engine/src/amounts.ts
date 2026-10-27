@@ -618,6 +618,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) types.add(t);
       return types.size;
     }
+    case "graveyardManaValues": {
+      const mvs = new Set<number>();
+      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) mvs.add(defMv(defOf(s, s.objects[id]!)));
+      return mvs.size;
+    }
     case "greatestPower": {
       // 0 with none, or with only negative values (rulings on Inscription of Abundance: no life gained or lost).
       let best = 0;
@@ -886,6 +891,8 @@ function describeCount(c: Count): string {
       return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
+    case "graveyardManaValues":
+      return "#mana values in your graveyard";
     case "greatestPower":
       return `the ${c.total ? "total" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestMvInExile":

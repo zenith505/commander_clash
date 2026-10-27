@@ -480,9 +480,11 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     const unless = { cost: mariner[1]! };
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[1]}.` } };
   }
-  const m = /^When(?:ever)? (~|an?(?:other)? .+?) becomes the target of a spell( or ability)?( you control| an opponent controls)?( for the first time each turn)?, (.+)$/.exec(line);
+  // Silverfur Partisan: "becomes the target of an instant or sorcery spell": a spell of either type.
+  const typed = /^(When(?:ever)? (?:~|an?(?:other)? .+?) becomes the target of )an instant or sorcery spell(?! or ability)/.exec(line);
+  const m = /^When(?:ever)? (~|an?(?:other)? .+?) becomes the target of a spell( or ability)?( you control| an opponent controls)?( for the first time each turn)?, (.+)$/.exec(typed ? line.replace(typed[0], `${typed[1]}a spell`) : line);
   if (!m) return null;
-  const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
+  const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(typed ? { spellTypes: ["Instant", "Sorcery"] } : {}), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
   const counter = /^counter that spell or ability\.?$/.exec(m[5]!) && m[2];
   if (m[1] === "~") {
     // Bonecrusher Giant: "~ deals 2 damage to that spell's controller": the player who controls it, "that player".
@@ -1206,7 +1208,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(m[2]!.replace(/\bdefending player\b/g, "that player"), { eventPlayer: true, eventGroup: true });
     if (!body) return "fail";
     return { event: "creaturesYouControlAttack", body, anyoneAttacks: true, attacksOpponent: { ...(m[1] ? { orPlaneswalkers: true as const } : {}) } };
-  } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line.replace(/^Whenever (two|three|four|five) or more creatures attack, /, "Whenever a player attacks with $1 or more creatures, ")))) {
+    // Argent Dais: "Whenever two or more creatures attack": the same, whoever attacks (rulings).
     // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player
     // attacks with three or more creatures" (Aurelia, the Law Above): any player's attack, counting all their attackers.
     event = "creaturesYouControlAttack";
@@ -1214,7 +1217,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with power \d+ or greater) deal /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with \+1\/\+1 counters on them|with power \d+ or greater) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
@@ -1287,9 +1290,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
-    const counters = / with counters on them$/.exec(phrase);
+    // Haliya, Ascendant Cadet: "creatures you control with +1/+1 counters on them".
+    const counters = / with (\+1\/\+1 )?counters on them$/.exec(phrase);
     const words = counters ? phrase.slice(0, counters.index) : phrase;
-    const spec = parseTargetPhrase(words.split(/\s+/).map(singularWord).join(" ") + (counters ? " with counters on it" : ""));
+    const spec = parseTargetPhrase(words.split(/\s+/).map(singularWord).join(" ") + (counters ? ` with ${counters[1] ? "a +1/+1 counter" : "counters"} on it` : ""));
     if (!spec || spec.kind !== "object") return "fail";
     group = { ...spec, text: phrase };
   }
@@ -1589,10 +1593,13 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
  * discard a creature card". "One or more cards" (once per batch) isn't modeled.
  */
 function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card), (.+)$/.exec(line);
+  // Anje Falkenrath: "Whenever you discard a card, if it has madness, ...": a card with madness, which it can't lose on
+  // the way to exile or the graveyard, so the same as checking it again as the trigger resolves (CR 603.4).
+  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card(?: with madness)?), (.+)$/.exec(line.replace(/^(Whenever you discard a card), if it has madness, /, "$1 with madness, "));
   if (!m) return null;
   let filter: TargetSpec | undefined;
-  if (m[4] !== "card") {
+  if (m[4] === "card with madness") filter = { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Madness"], text: "card with madness" };
+  else if (m[4] !== "card") {
     const f = parseSearchFilter(m[4]!);
     if (!f || f.kind !== "card") return "fail";
     filter = f;
@@ -2386,7 +2393,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Struggle for Project Purity: "Whenever a player attacks you with one or more creatures, that player gets twice that
   // many rad counters": only an opponent can attack you (CR 506.2); "that many" is how many were declared attacking you
   // (rulings).
-  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control|you), (.+)$/.exec(line);
+  // Ever-Watching Threshold: "Whenever an opponent attacks, if they attacked you and/or a planeswalker you control": the
+  // same, the attack declared before it triggers (rulings: once for each such opponent).
+  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control|you), (.+)$/.exec(line.replace(/^Whenever an opponent attacks, if they attacked you and\/or a planeswalker you control, /, "Whenever an opponent attacks you and/or one or more planeswalkers you control, "));
   if (attacked && (/^Whenever a player/.test(line) ? /^you with one or more creatures$/.test(attacked[1]!) : true)) {
     const thatMany = /\bthat many\b/.test(attacked[2]!);
     if (thatMany && (/\bX\b/.test(attacked[2]!) || !/^you with/.test(attacked[1]!))) return "fail";

@@ -340,6 +340,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const filter = parseSearchFilter(m[1]!.replace(/s$/, ""));
     return who && filter ? count({ kind: "cardsInHand", who, filter }) : null;
   }
+  // Realm Seekers: "the total number of cards in all players' hands", every player's added up.
+  if (/^cards? in all players' hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachPlayer" } });
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });
@@ -500,6 +502,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Target player draws X cards and loses X life, where X is the number of creatures they control of the chosen type"
   // (Pact of the Serpent): the player targeted.
   else if (ctx?.lastPlayerTarget !== undefined && !ctx.eventPlayer) p = p.replace(/ they control( of the chosen type)?$/, " that player controls$1");
+  // Zedruu the Greathearted: "the number of permanents you own that your opponents control" (CR 108.3, 108.4).
+  if ((m = /^([a-z]+) you own that your opponents control$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${singularWord(m[1]!)} an opponent controls`, { chosen: true });
+    return spec?.kind === "object" && !spec.owner ? count({ kind: "permanents", filter: { ...spec, owner: "you", text: p } }) : null;
+  }
   if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();

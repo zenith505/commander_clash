@@ -79,11 +79,12 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 1, upTo: false, required: true, filter, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
-    } else if ((m = /^You may reveal any number of ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
+    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
-      const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
-      if (!filter || / of the chosen /.test(m[1]!)) return null;
-      Object.assign(dig, { count: 99, upTo: true, filter, into: "hand", reveal: true });
+      // Reality Heist: "You may reveal up to two artifact cards from among them and put them into your hand".
+      const filter = parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
+      if (!filter || / of the chosen /.test(m[2]!)) return null;
+      Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand", reveal: true });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) into your hand$/.exec(s))) {
       // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
       const phrase = (m[1] ?? m[2])!.replace(/^an? /, "");

@@ -1,7 +1,7 @@
 # Roadmap
 
-25,572 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,720 of
+25,648 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,722 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -297,15 +297,33 @@ line blocks.
    Custodi Lich, Resolute Archangel, Jadelight Spelunker, Smaug, Tatyova, Gaddock Teeg, Aether Storm, Taigam, Lord of
    the Pit, Biorhythm, Flux, Awaken the Erstwhile, Martha Jones, Phoenix Fleet Airship, Bloodspore Thrinax, Yorvo,
    Prismari Pianist, Baru, Sokka, Arcbound Tracker, Gold Rush, Tainted Treats and others), taking the easy ones.
-   Next most played after rank 10,060: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke
-   Spirits' Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Dimir Charm, Overabundance,
-   Throatseeker, Voice of Resurgence, Giott, Avalanche of Sector 7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli,
-   Foe-Razer Regent, Donal, Gandalf, White Rider; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
+   Out after round 178: Giott, Colossal Rattlewurm, Dregscape Sliver, Foe-Razer Regent, Mathas, Ozox and Arcbound
+   Javelineer (their other lines), Yosei, the Morning Star (targets limited by the other target, a player), Ravener
+   (must attack a target opponent), Zameck Guildmage ("this turn" extra counters as creatures enter), Cunning
+   Nightbonder (spells "cast", copies left out), Bushy Bodyguard and Treetop Sentries (forage as an effect, a new
+   choice), Ride Down ("blocked by that creature"), Flesh Reaver (damage to several recipients at once), Quest for the
+   Nihil Stone (two intervening-if conditions), Alpharael (ward with a random discard), Fealty to the Realm. Known
+   limits: Spellbreaker Behemoth and Carrion Grub read a spell's or card's printed power, so a */* is 0 there. Round 178
+   went down from rank 10,060 to about rank 10,640 (Baneful Omen, Galvanic Relay, Lightning, Security Sergeant, Daxos
+   of Meletis, Isolated Watchtower, Tale of Momo, Fix What's Broken, Avatar of Might, Deepwood Denizen, Drillworks
+   Mole, Azure Fleet Admiral, Gwafa Hazid, Hour of Devastation, Iridian Maelstrom, Thran Turbine, Spellbreaker
+   Behemoth, Cursed Recording, Lulu, Fertile Thicket, Mirko Vosk, Dimir Charm, Gandalf, White Rider, Steal the Show,
+   Willowdusk, Gisa's Favorite Shovel, Reality Smasher, Voice of Resurgence, Throatseeker and others), taking the easy
+   ones, and further cards sharing their mechanics (Psychic Spiral, Hurkyl's Recall, Perennation, Cemetery
+   Recruitment, Carrion Grub, Curse of Thirst).
+   Next most played after rank 10,640: Smoldering Egg, Cryptic Spires, Jadzi, Oracle of Arcavios, Oskar, Rubbish
+   Reclaimer, Strict Proctor, Kadena's Silencer, Alacrian Armory, Deadly Cover-Up, Caller of the Claw, Chandra, Fire
+   Artisan, Obzedat, Ghost Council, Kusari-Gama, Reap, Herald of Amity, Fearless Swashbuckler, Ajani Unyielding,
+   Friendly Rivalry, Invoke Justice, Bess, Soul Nourisher, Mana Breach, The Eagles Are Coming!; the harder ones from
+   ranks 10,060 to 10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
+   Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
+   7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
+   Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in rounds 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,

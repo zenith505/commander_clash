@@ -158,7 +158,7 @@ function withOtherOpponents(body: AbilityBody): AbilityBody {
 }
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
-const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true }][] = [
+const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true; spell?: true }][] = [
   [/^attacks or blocks, (.+)$/, "selfAttacksOrBlocks", {}],
   [/^attacks, (.+)$/, "selfAttacks", { defending: true }],
   [/^blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked", {}],
@@ -177,6 +177,8 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals combat damage, (.+)$/, "selfDealsCombatDamage", { thatMuch: true }],
   [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
+  // Spectral Prison: "When enchanted creature becomes the target of a spell, sacrifice ~": of a spell only.
+  [/^becomes the target of a spell, (.+)$/, "selfBecomesTarget", { spell: true }],
   [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
   [/^becomes untapped, (.+)$/, "selfBecomesUntapped", {}],
   [/^is dealt damage, (.+)$/, "selfIsDealtDamage", { thatMuch: true }],
@@ -262,7 +264,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
       body = moved;
     }
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.spell ? { targeted: { spell: true as const } } : {}), ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -548,14 +550,16 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[1]}.` } };
   }
   // Silverfur Partisan: "becomes the target of an instant or sorcery spell": a spell of either type.
-  const typed = /^(When(?:ever)? (?:~|an?(?:other)? .+?) becomes the target of )an instant or sorcery spell(?! or ability)/.exec(line);
+  // Fugitive Druid: "becomes the target of an Aura spell": a spell with that subtype.
+  const typed = /^(When(?:ever)? (?:~|an?(?:other)? .+?) becomes the target of )an (instant or sorcery|Aura) spell(?! or ability)/.exec(line);
   const m = /^When(?:ever)? (~|an?(?:other)? .+?) becomes the target of a spell( or ability)?( you control| an opponent controls)?( for the first time each turn)?, (.+)$/.exec(typed ? line.replace(typed[0], `${typed[1]}a spell`) : line);
   if (!m) return null;
-  const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(typed ? { spellTypes: ["Instant", "Sorcery"] } : {}), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
+  const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(typed ? (typed[2] === "Aura" ? { spellSubtypes: ["Aura"] } : { spellTypes: ["Instant", "Sorcery"] }) : {}), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
   const counter = /^counter that spell or ability\.?$/.exec(m[5]!) && m[2];
   if (m[1] === "~") {
     // Bonecrusher Giant: "~ deals 2 damage to that spell's controller": the player who controls it, "that player".
-    const text = m[5]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ").replace(m[2] ? /^$/ : /\bthat spell's controller\b/g, "that player");
+    // Retromancer: "~ deals 3 damage to that spell or ability's controller" likewise.
+    const text = m[5]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ").replace(m[2] ? /\bthat spell or ability's controller\b/g : /\bthat spell's controller\b/g, "that player");
     // Frost Titan: "counter that spell or ability unless its controller pays {2}", as ward does (CR 702.21a).
     const selfTaxed = m[2] && /^counter that spell or ability unless its controller pays (\{\d+\})\.?$/.exec(m[5]!);
     if (selfTaxed) return { event: "selfBecomesTarget", targeted, body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: selfTaxed[1]! } }], text: `counter that spell or ability unless its controller pays ${selfTaxed[1]}.` } };
@@ -1157,7 +1161,8 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature(?: with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks you or a planeswalker you control" (Blood Reckoning, Isperia): one attacking this
   // permanent's controller, or a planeswalker they control (CR 506.2, 508.3a); "attacks you" alone, not a planeswalker.
-  const you = m || any ? null : /^Whenever (an?) ((?:[a-z]+ )?creature(?: with(?:out)? [a-z]+| with power \d+ or (?:greater|less))?) attacks you( or a planeswalker you control)?, (.+)$/.exec(line);
+  // "When a creature attacks you ..." (Guardian of the Ages) is the same: it triggers each time (CR 603.2).
+  const you = m || any ? null : /^When(?:ever)? (an?) ((?:[a-z]+ )?creature(?: with(?:out)? [a-z]+| with power \d+ or (?:greater|less))?) attacks you( or a planeswalker you control)?, (.+)$/.exec(line);
   if (you) {
     const filter = parseTargetPhrase(you[2]!);
     if (!filter || filter.kind !== "object" || filter.controller || !filter.types?.includes("Creature")) return "fail";
@@ -2440,7 +2445,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (fromHandAnd) intervening![3] = `if you cast it from your hand, ${intervening![3]}`;
   // Momentum Rumbler: "Whenever ~ attacks, if it doesn't have first strike, ...", "... if it has first strike, ...": its
   // keywords as it triggers and resolves (CR 603.4).
-  const kwIf = intervening && /^Whenever ~ /.test(intervening[1]!) ? /^it (has|doesn't have) (first strike|double strike|flying|trample|vigilance|deathtouch|lifelink|haste|reach|menace|defender)$/.exec(intervening[2]!) : null;
+  // Guardian of the Ages: "When a creature attacks you or a planeswalker you control, if ~ has defender, it loses defender
+  // and gains trample": ~'s, "it" being ~ after it.
+  const kwIf = intervening && (/^Whenever ~ /.test(intervening[1]!) || /^~ /.test(intervening[2]!)) ? /^(?:it|~) (has|doesn't have) (first strike|double strike|flying|trample|vigilance|deathtouch|lifelink|haste|reach|menace|defender)$/.exec(intervening[2]!) : null;
   const kw = kwIf ? keywordOf(kwIf[2]!) : undefined;
   const kwCond: StaticCondition | null = kwIf && kw ? { kind: "selfIs", filter: { kind: "object", ...(kwIf[1] === "has" ? { keywords: [kw] } : { notKeywords: [kw] }), text: `${kwIf[1] === "has" ? "with" : "without"} ${kwIf[2]}` } } : null;
   // Wall of Resistance: "At the beginning of each end step, if ~ was dealt damage this turn, ...": as it triggers and
@@ -2464,14 +2471,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const thatControls = eachStep ? /^that player controls (an? .+)$/.exec(eachStep) : null;
   const thatControlsCond = thatControls ? parseStaticCondition(`you control ${thatControls[1]}`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
   const thatTypes = eachStep ? new RegExp(`^there are ${NUM} or more basic land types among lands that player controls$`).exec(eachStep) : null;
-  const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : null;
+  // Razor Pendulum: "At the beginning of each player's end step, if that player has 5 or less life": the active player's.
+  const thatLife = eachStep ? /^that player has (\d+) or less life$/.exec(eachStep) : null;
+  const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : thatLife ? { kind: "amount", amount: { count: { kind: "life", who: { ref: "eventPlayer" } } }, max: Number(thatLife[1]) } : null;
   const ifCond = activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
     // Feast of the Victorious Dead: "if one or more creatures died this turn, you gain that much life and distribute that
     // many +1/+1 counters": the number of creatures that died this turn, counted as it resolves.
-    let rest = intervening[3]!;
+    let rest = kwIf && /^~ /.test(intervening[2]!) ? intervening[3]!.replace(/^it (?=(?:loses|gains|gets|has|becomes)\b)/, "~ ") : intervening[3]!;
     if (/^one or more creatures died this turn$/.test(intervening[2]!) && /\bthat (much|many)\b/.test(rest)) {
       const died = "the number of creatures that died this turn";
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
@@ -2984,6 +2993,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifHadCounter = hadKind[1]!;
         body0 = hadKind[2]!;
       }
+      // The Zubera: "When ~ dies, if 4 or more damage was dealt to it this turn, ...": an intervening if (CR 603.4) on damage
+      // that can't change once it's gone.
+      let ifDamaged: number | undefined;
+      const damagedM = /^if (\d+) or more damage was dealt to it this turn, (.+)$/.exec(body0);
+      if (damagedM) {
+        if (event !== "selfDies") return "fail" as const;
+        ifDamaged = Number(damagedM[1]);
+        body0 = damagedM[2]!;
+      }
       let fewer: string | undefined;
       const fewerM = / with one fewer ([a-z]+) counter on it\b/.exec(body0);
       if (fewerM) {
@@ -3111,7 +3129,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

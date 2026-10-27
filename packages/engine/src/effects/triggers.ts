@@ -728,7 +728,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       o,
       ev.controller,
       (e, t) =>
-        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
+        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
         e === "selfLeaves" ||
         e === "selfLostControl",
@@ -1738,6 +1738,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!w) return true;
         if (w.spell && item!.kind !== "spell") return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
+        if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
         const mine = (p: PlayerId) => (w.by === "you" ? p === watcher : w.by === "opponent" ? p !== watcher : true);
         if (!mine(by)) return false;
         return !w.first || !before.some(mine);
@@ -1748,7 +1749,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const noWard = exposed(s, o) || !!characteristics(s, o).wardLost;
       const ward = (tr: TriggeredAbility) => tr.body.effects.some((x) => x.type === "counterUnlessPays" && x.ward);
       add(o, you, (e, tr) => ((e === "becomesTargetOfOpponent" && you !== by) || (e === "selfBecomesTarget" && fits(tr, you))) && !(noWard && ward(tr)), undefined, ev.stackId, undefined, undefined, undefined, undefined, that);
-      addHosted(o, (e) => e === "selfBecomesTarget", ev.stackId);
+      // Spectral Prison: "When enchanted creature becomes the target of a spell" (TriggeredAbility.targeted).
+      addHosted(o, (e, tr) => e === "selfBecomesTarget" && fits(tr, you), ev.stackId);
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);

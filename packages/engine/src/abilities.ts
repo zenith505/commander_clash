@@ -602,6 +602,13 @@ export interface TargetSpec {
   combatDamagedBySource?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
   attackedThisTurn?: true;
+  /**
+   * For players: "target opponent who has more life than you do as you activate this ability", "who controls more
+   * creatures", "who has at least two more cards in hand", "who has at least two fewer creature cards in their graveyard"
+   * (the Keepers): `stat` theirs minus yours is at least `by` (with `fewer`, yours minus theirs), checked only as it's chosen
+   * (rulings: it resolves even if that's no longer true).
+   */
+  comparedToYou?: { stat: "life" | "creatures" | "hand" | "creatureCardsInGraveyard"; by: number; fewer?: true };
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   notPlayer?: PlayerId;
@@ -654,6 +661,8 @@ export interface TargetSpec {
   inGraveyardOfControllerOf?: number[];
   /** "Target player shuffles up to three target cards from their graveyard" (Memory's Journey): owned by this player target. */
   inGraveyardOfTarget?: number;
+  /** "Choose target opponent ... Destroy target nonblack creature that player controls" (Keeper of the Dead): controlled by this player target. */
+  controlledByTarget?: number;
   /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
   differentControllerFrom?: number[];
   /**
@@ -780,6 +789,12 @@ export interface TargetSpec {
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */
   targetsWhat?: TargetSpec | "you";
+  /** "Counter target spell that targets ~" (Mistfolk): this ability's source, made into `targetsWhat` (as `objectId`) as targets are chosen and as it resolves (bindBound). */
+  targetsSource?: true;
+  /** For "any" targets: "target creature token, player, or planeswalker" (Coalborn Entity): a creature only if it's a token. */
+  creatureTokens?: true;
+  /** That very object (see `targetsSource`). */
+  objectId?: string;
   /** "That targets you or a creature you control" (Siren Stormtamer): with `targetsWhat`, a spell that targets you counts too. */
   targetsYouToo?: true;
   /**
@@ -1873,6 +1888,8 @@ export type Effect =
       by?: "subject" | "attached" | "castSpell" | "created" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
+      /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
+      merge?: true;
     }
   /**
    * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
@@ -2846,7 +2863,10 @@ export type Effect =
       type: "takeFromHand";
       who: PlayerRef;
       filter?: TargetSpec;
-      action: "discard" | "exile" | /** Lost Hours */ "libraryThird" | /** Perish the Thought: "That player shuffles that card into their library." */ "shuffleIn";
+      action: "discard" | "exile" | /** Lost Hours */ "libraryThird" | /** Perish the Thought: "That player shuffles that card into their library." */ "shuffleIn" | /** Painful Memories: "Put that card on top of that player's library." */ "libraryTop";
+      /** "Choose two cards from it", "X cards" (Mind Warp): that many, or every card there is if fewer (CR 609.3); `upTo`: "up to two", none to that many. */
+      n?: Amount;
+      upTo?: true;
       until?: "sourceLeaves";
       linked?: boolean;
       /** "You may exile a nonland card from it" (Elite Spellbinder): or none. */
@@ -4107,7 +4127,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -4285,6 +4305,8 @@ export interface TriggeredAbility {
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
   ifHadCounter?: string;
+  /** "When ~ dies, if 4 or more damage was dealt to it this turn" (the Zuberas): from all sources (rulings), as it last existed (CR 603.10a). */
+  ifDamagedThisTurn?: number;
   /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
   ifNotToken?: true;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */

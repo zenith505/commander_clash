@@ -2258,16 +2258,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Realmbreaker: you choose from their graveyard. O-Kagachi Made Manifest: another player chooses from yours, for you.
         const chooser = e.chooser ? players(s, e.chooser, ctx).find((pid) => !player(s, pid).lost) : undefined;
         if (e.chooser && chooser === undefined) return;
-        s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+        // Visions of Dread: they choose for you, so the card that helps you least (bots).
+        const under = e.underYours && p.id !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
+        s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : (chooser ?? p.id), source: src, what: e.youChoose || chooser !== undefined ? `${what} in ${p.name}'s graveyard` : what, ...under, ...(chooser !== undefined && chooser !== p.id ? { forPlayer: p.id, ...(e.dest === undefined || e.dest === "battlefield" ? { helps: true as const } : {}) } : {}), cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
       if (e.dest === "battlefield") {
         // An Aura's controller chooses what it enchants as it enters (CR 303.4f), or it stays in the graveyard (303.4g).
-        const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: e.youChoose ? ctx.controller : p.id })), src);
+        const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: e.youChoose || e.underYours ? ctx.controller : p.id })), src);
         if (hosts === "paused") return "paused";
         const ids = found.filter((id) => !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
-        if (e.youChoose) {
+        if (e.youChoose || e.underYours) {
           // Realmbreaker: under your control; "it" afterwards is the permanent it became (CR 400.7).
           const me = player(s, ctx.controller);
           if (ids.length) log(s, `${me.name} puts ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${p.name}'s graveyard onto the battlefield under their control${e.tapped ? ", tapped" : ""}.`);
@@ -2325,7 +2327,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.toHand) {
         // All at once (CR 608.2c), whatever they are.
         // Garna: only those put there this turn (GameObject.toGraveyardTurn); Gleancrawler: from the battlefield.
-        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
+        // Echoing Return: the target's name, as it is now (CR 201.2).
+        const t = e.sameNameAs !== undefined ? ctx.targets[e.sameNameAs] : undefined;
+        const name = t?.kind === "object" && s.objects[t.id] ? defOf(s, obj(s, t.id)).name : undefined;
+        if (e.sameNameAs !== undefined && name === undefined) return;
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (name === undefined || sameName(defOf(s, obj(s, id)).name, name)) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
         if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${e.who.ref === "you" ? `${player(s, ctx.controller).name}'s hand` : "their owners' hands"}.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;

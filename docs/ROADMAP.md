@@ -1,7 +1,7 @@
 # Roadmap
 
-26,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,809 of
+26,671 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,829 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -454,6 +454,24 @@ line blocks.
    target spell, cast it later), Koll, the Forgemaster ("if it was enchanted or equipped" as it died), Sorceress's
    Schemes ("an exiled card with flashback you own" as a target), Fumiko the Lowblood (bushido X, counted as it
    resolves), Archon of Coronation (damage that doesn't cause life loss).
+   Round 187 went on from the top: "the greatest mana value of a commander you own on the battlefield or in the command
+   zone" (the Visions cycle's flashback costs {X} less, Cloudkill, Majestic Genesis, Imposing Grandeur with each
+   player's own commanders), Visions of Dread (the target opponent picks the card, which enters under your control;
+   browser test), "When there are N or more X counters on ~" with number words (Mazemind Tome, Deadly Designs), "exile
+   it. If you do" (Archfiend's Vessel), Nine Lives (prevent damage to you and put a counter on it, one for each
+   source), Chocobo Kick (kicked: twice that much damage), Bane's Contingency ("if that spell targets a commander you
+   control", as it resolves), Echoing Return ("all other cards with the same name"), Cosmic Rebirth, "whenever a
+   creature you control with deathtouch deals damage to a planeswalker / player or planeswalker" (Hooded Blightfang,
+   Vraska, Swarm's Eminence), Chain Assassination ("if another creature died this turn"), Geralf, the Fleshwright
+   ("each other Zombie that entered the battlefield under your control this turn"), Security Bypass ("as long as
+   enchanted creature is attacking alone"), "with lesser mana value" in enters triggers (Clement, the Worrywort) and
+   "with lesser toughness" in dies triggers (Colfenor, the Last Yew; "other target creature card" is other than the one
+   that died, which also fixes Jackdaw Savior, rulings), Exponential Growth (doubling X times), granted extort (Pontiff
+   of Blight), Analyze the Pollen (either search, by evidence).
+   Out after round 187 (looked at, not done): Force Bubble (damage to you replaced by that many counters on it),
+   Killer Service ("you may pay {2} and sacrifice a token": a paid "may" with a sacrifice in it), Vivi's Persistence
+   ("whenever your commander enters or attacks" from the graveyard: "your commander attacks" isn't parsed), Abundant
+   Harvest ("choose land or nonland": a new choice).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1831,7 +1849,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ironclaw Curse; Flaring Flame-Kin; Hint of Insanity; "prevent all damage that would be dealt (to ~) by target
   creature this turn" (Stonewise Fortifier, Kry Shield); Ana Battlemage's "tap target untapped creature and that
   creature deals damage equal to its power to its controller". No new prompt: the "you may" question and the existing
-  pickers ask. +28 (26,645 with round 186).
+  pickers ask. +28 (26,671 with round 187).
 - Skipped there, with reasons: Drake Familiar (returns an enchantment of any player: the pick is among one player's
   permanents); Chisei, Heart of Oceans ("remove a counter from a permanent": a counter of any kind, chosen as it resolves); Demonic Hordes ("of an
   opponent's choice" in multiplayer); Rapid Fire (rampage is a trigger, not a keyword a creature can gain);
@@ -1853,7 +1871,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Cry); Yawgmoth Demon and Archdemon of Greed ("tap ~ and it deals N damage to you"); Inventive Wingsmith; Touch of the
   Eternal; Budding Insurgent; Skullknocker Ogre; Charnel Troll ("exile a creature card from your graveyard. If you do
   ... Otherwise, sacrifice it"); Ether Well; Gore Vassal; "if ~ attacked or blocked this combat" (Kjeldoran Home
-  Guard, that combat only). No new prompt: the clash, "you may" and existing pickers ask. +38 (26,683 with round 186).
+  Guard, that combat only). No new prompt: the clash, "you may" and existing pickers ask. +38 (26,709 with round 187).
 - Skipped there, with reasons: Recross the Paths (its reveal-until-a-land line); Scattering Stroke (mana at your next
   main phase); Wormfang Newt and Wormfang Turtle ("exile a land you control" and its linked return); Curse Artifact,
   Mind Whip, Soul Charmer and Nakaya Shade (punishers another player answers); Glittering Lion and Glittering Lynx

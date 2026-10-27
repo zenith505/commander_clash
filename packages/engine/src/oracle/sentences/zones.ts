@@ -79,6 +79,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const t = ctx.targets[0]!;
     if (t.kind === "card" && t.owner === "you" && !t.many) return [{ type: "mayCastFromGraveyard", what: { ref: "target", index: 0 } }];
   }
+  // Cosmic Rebirth (joined in body.ts): its hand otherwise, for a greater mana value too (rulings).
+  if ((m = /^Put that card onto the battlefield if it has mana value (\d+) or less and you choose to, else into your hand$/.exec(s)) && ctx.targets.length === 1) {
+    const t = ctx.targets[0]!;
+    if (t.kind !== "card" || t.owner !== "you" || t.many) return null;
+    const what = { ref: "target", index: 0 } as const;
+    const hand: Effect[] = [{ type: "bounce", what }];
+    return [{ type: "if", cond: { kind: "targetIs", index: 0, filter: { kind: "card", manaValue: { max: Number(m[1]) }, text: `card with mana value ${m[1]} or less` } }, effects: [{ type: "may", text: "put that card onto the battlefield", effects: [{ type: "putOntoBattlefield", what }], otherwise: hand }], otherwise: structuredClone(hand) }];
+  }
   // Conduit of Worlds: "Choose target nonland permanent card in your graveyard. If you haven't cast a spell this turn, you
   // may cast that card. If you do, you can't cast additional spells this turn." (joined into one sentence in body.ts):
   // cast as it resolves or not at all (rulings).
@@ -485,6 +493,22 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     if (!filter || !filter.types?.includes("Creature")) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
+  }
+  // Echoing Return: "Return target creature card and all other cards with the same name as that card from your graveyard to
+  // your hand": all at once; nothing if the target is gone (rulings).
+  if ((m = /^Return (target .+? card) and all other cards with the same name as that card from your graveyard to your hand$/.exec(s))) {
+    const fx = parseZonesSentence(`Return ${m[1]} from your graveyard to your hand`, ctx);
+    const one = fx?.length === 1 ? fx[0] : undefined;
+    if (one?.type !== "bounce" || one.what.ref !== "target") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", text: "card with the same name as that card" }, toHand: true, sameNameAs: one.what.index }];
+  }
+  // Visions of Dread: "Target opponent puts a creature card of their choice from their graveyard onto the battlefield under
+  // your control": that player chooses one of their own as it resolves, not targeted; it enters under your control.
+  if ((m = /^(Target opponent|Target player) puts an? (creature card) of their choice from their graveyard onto the battlefield under your control$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseSearchFilter(m[2]!);
+    if (!who || !filter) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who, underYours: true }];
   }
   // "... with a number of +1/+1 counters on it equal to that result" (Grave Endeavor): counted as it resolves.
   const counted = new RegExp(`^([Rr]eturn an? .+? from your graveyard to the battlefield(?: tapped)?) with a number of (${COUNTER}) counters on it equal to (.+)$`).exec(s);

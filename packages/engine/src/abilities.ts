@@ -638,6 +638,12 @@ export interface TargetSpec {
   };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
+  /**
+   * Colfenor, the Last Yew: "Whenever ~ or another creature you control dies, return up to one other target creature
+   * card": not the card whose death triggered it (rulings), fixed as `notId` as the trigger is put on the stack.
+   */
+  notSubject?: true;
+  notId?: ObjectId;
   /** With `notSource`: "target creatures and/or other planeswalkers" (Sorin, Lord of Innistrad): the source can be chosen while it's a creature (rulings). */
   notSourceUnlessCreature?: true;
   /**

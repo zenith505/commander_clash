@@ -841,6 +841,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
   text = text.replace(/(Choose target permanent card in your graveyard\.) If it has mana value (\d+) or less, you may put it onto the battlefield\. If you don't put it onto the battlefield, put it into your hand\./, "$1 Put that card onto the battlefield if it has mana value $2 or less and you choose to, else into your hand.");
+  // Analyze the Pollen: "Search your library for a basic land card. If evidence was collected, instead search your
+  // library for a creature or land card. Reveal that card, put it into your hand, then shuffle.": either search, each
+  // revealed and put into your hand.
+  text = text.replace(/^Search your library for (an? [a-z ]+? card)\. If evidence was collected, instead search your library for (an? [a-z ]+? card)\. Reveal that card, put it into your hand, then shuffle\.$/, "Search your library for $1, reveal it, put it into your hand, then shuffle. If evidence was collected, instead search your library for $2, reveal it, put it into your hand, then shuffle.");
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
@@ -5914,6 +5918,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Doubling a creature's power (CR 701.10b-c): it gets +X/+0, where X is its power as this resolves (for a negative
     // power, -X/-0 for X below 0 comes to the same). Its power and toughness: +X/+Y, Y its toughness (Grunn, Dragonclaw
     // Strike), each signed on its own.
+    // Exponential Growth: "Until end of turn, double target creature's power X times": one doubling after another, each
+    // +X/+0 for its power then (CR 701.10b), X the number announced (CR 107.3a).
+    if (/^Until end of turn, double target creature's power X times$/.test(s) && ctx.spell) {
+      const index = ctx.targets.length;
+      ctx.targets.push({ kind: "object", types: ["Creature"], text: "target creature" });
+      const double: Effect = { type: "continuous", what: { ref: "target", index }, mods: [{ kind: "modifyPT", power: { count: { kind: "power", of: { ref: "target", index } }, signed: true }, toughness: 0 }], duration: "endOfTurn" };
+      effects.push({ type: "repeat", n: { count: { kind: "x" } }, effects: [double] });
+      continue;
+    }
     const double = /^[Dd]ouble (?:(its|target creature's) power( and toughness)?|the power( and toughness)? of (target creature(?: you control)?)) until end of turn$/.exec(s);
     const doubleBoth = !!double && !!(double[2] ?? double[3]);
     if (double) s = `${double[1] === "its" ? "It" : double[4] ? double[4].charAt(0).toUpperCase() + double[4].slice(1) : "Target creature"} gets +X/+0 until end of turn, where X is its power`;

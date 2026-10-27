@@ -855,8 +855,17 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const ifCast = /^if you cast it, /.exec(bodyText);
   if (ifCast && filter.controller !== "you") return "fail";
   if (ifCast) bodyText = bodyText.slice(ifCast[0].length);
-  const body = parseBody(bodyText, { subjectIt: true });
+  // Clement, the Worrywort: "return up to one target creature you control with lesser mana value": less than the entering
+  // permanent's, as the target is chosen (TargetSpec.bound, settled in triggerBody).
+  const lesser = / with lesser mana value\b/.test(bodyText);
+  if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "");
+  let body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
+  if (lesser) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "object" || t.bound || t.manaValue) return "fail";
+    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+  }
   const kind = m[1]!.toLowerCase();
   return {
     event: "permanentEnters",
@@ -970,8 +979,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (hadKw) bodyText = hadKw[3]!;
   // "Return to your hand target artifact card in your graveyard with lesser mana value" (Scrap Trawler, Orah, Havi): less
   // than the one that died, as it last existed (rulings on Scrap Trawler); fixed as the target is chosen (TargetSpec.bound).
-  const lesser = !attached && / with lesser mana value\b/.test(bodyText);
-  if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
+  // Colfenor, the Last Yew: "with lesser toughness": the same, as the creature last existed on the battlefield (rulings).
+  const lesserKey = attached ? undefined : / with lesser (mana value|toughness)\b/.exec(bodyText)?.[1];
+  const lesser = lesserKey !== undefined;
+  if (lesser) bodyText = bodyText.replace(/ with lesser (?:mana value|toughness)\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
   // Mimic Vat: "you may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (CR
   // 607.2a). The card is exiled linked to ~; if it has left the graveyard, nothing happens and the other card stays (rulings).
   const imprint = !attached && /^you may exile that card\. If you do, return each other card exiled with ~ to its owner's graveyard\.?$/.test(bodyText);
@@ -985,8 +996,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   if (lesser) {
     const [t, ...more] = body.targets;
-    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue) return "fail";
-    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue || t.toughness) return "fail";
+    const key = lesserKey === "toughness" ? ("toughness" as const) : ("manaValue" as const);
+    // "Return up to one other target creature card" after "~ or another creature ... dies": other than the one that died.
+    const { notSource, ...rest } = t;
+    if (notSource && m?.[1] !== "~ or another") return "fail";
+    body = { ...body, targets: [{ ...rest, ...(notSource ? { notSubject: true as const } : {}), bound: { key, at: "most", amount: { count: { kind: key, of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser ${lesserKey}` }] };
   }
   if (attached) {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature

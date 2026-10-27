@@ -4,7 +4,7 @@
 // Nine Lives' prevention.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, mountain, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, mountain, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
 import { characteristics, controllerOf, invalidateCharacteristics, isFullySupported, moveObject, parseManaCost, planActivate, planCast, planMana, power, spellCost, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -88,6 +88,11 @@ const toPlayer = (s: GameState, pid: PlayerId) => {
   for (let i = 0; i < 10 && waitingOn(s) !== pid; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
   return s;
 };
+const clementTheWorrywort = card("Clement, the Worrywort", "Legendary Creature — Frog Druid", "{1}{G}{U}", {"cmc":3,"power":"3","toughness":"3","keywords":["Vigilance"],"oracleText":"Vigilance\nWhenever Clement or another creature you control enters, return up to one target creature you control with lesser mana value to its owner's hand.\nFrogs you control have \"{T}: Add {G} or {U}. Spend this mana only to cast a creature spell.\"","colors":["G","U"],"layout":"normal"});
+const colfenorTheLastYew = card("Colfenor, the Last Yew", "Legendary Creature — Treefolk Shaman", "{3}{W}{B}{G}", {"cmc":6,"power":"3","toughness":"7","keywords":["Reach","Vigilance"],"oracleText":"Reach, vigilance\nWhenever Colfenor or another creature you control dies, return up to one other target creature card with lesser toughness from your graveyard to your hand.","colors":["B","G","W"],"layout":"normal"});
+const exponentialGrowth = card("Exponential Growth", "Sorcery", "{X}{X}{G}{G}", {"cmc":2,"keywords":["Double"],"oracleText":"Until end of turn, double target creature's power X times.","colors":["G"],"layout":"normal"});
+const pontiffOfBlight = card("Pontiff of Blight", "Creature — Zombie Cleric", "{4}{B}{B}", {"cmc":6,"power":"2","toughness":"7","keywords":["Extort"],"oracleText":"Extort (Whenever you cast a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain that much life.)\nOther creatures you control have extort. (If a creature has multiple instances of extort, each triggers separately.)","colors":["B"],"layout":"normal"});
+const analyzeThePollen = card("Analyze the Pollen", "Sorcery", "{G}", {"cmc":1,"keywords":["Collect evidence"],"oracleText":"As an additional cost to cast this spell, you may collect evidence 8. (Exile cards with total mana value 8 or greater from your graveyard.)\nSearch your library for a basic land card. If evidence was collected, instead search your library for a creature or land card. Reveal that card, put it into your hand, then shuffle.","colors":["G"],"layout":"normal"});
 
 describe("round 187", () => {
   it("all compile", () => supported(imposingGrandeur, majesticGenesis, visionsOfGlory, visionsOfDread, visionsOfRuin, visionsOfDominance, visionsOfDuplicity, cloudkill, mazemindTome, nineLives, archfiendsVessel, deadlyDesigns));
@@ -410,6 +415,82 @@ describe("round 187, second batch", () => {
       const block = () => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: a }] });
       if (alone) expect(block).toThrow(/can't be blocked/);
       else expect(() => block()).not.toThrow();
+    }
+  });
+});
+
+describe("round 187, third batch", () => {
+  it("all compile", () => supported(clementTheWorrywort, colfenorTheLastYew, exponentialGrowth, pontiffOfBlight, analyzeThePollen));
+
+  it("Clement: a creature entering returns up to one creature you control with lesser mana value", () => {
+    const beast = card("Test Beast", "Creature — Beast", "{2}{G}", { cmc: 3, power: "3", toughness: "3" });
+    let { s, ap, ids } = setup([beast]);
+    putOnBattlefield(s, ap, clementTheWorrywort);
+    const b = putOnBattlefield(s, ap, bear());
+    const peer = putOnBattlefield(s, ap, card("Test Peer", "Creature — Beast", "{1}{G}{G}", { cmc: 3, power: "3", toughness: "3" }));
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(peer)] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(ids[0]!)] })).toThrow();
+    s = choose(s, [tgt(b)]);
+    expect(zone(s, b)).toBe("hand");
+    expect(zone(s, peer)).toBe("battlefield");
+  });
+
+  it("Colfenor: a creature card with lesser toughness than the one that died (as it last existed), not that card itself", () => {
+    const kill = card("Test Kill", "Instant", "{B}", { cmc: 1, oracleText: "Destroy target creature." });
+    let { s, ap, ids } = setup([kill]);
+    putOnBattlefield(s, ap, colfenorTheLastYew);
+    const giant = putOnBattlefield(s, ap, card("Test Giant", "Creature — Giant", "{3}", { cmc: 3, power: "3", toughness: "3" }));
+    s.objects[giant]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s);
+    const small = into(s, ap, bear(), "graveyard");
+    const tough = into(s, ap, card("Test Wall", "Creature — Wall", "{2}", { cmc: 2, power: "0", toughness: "4" }), "graveyard");
+    s = run(s, planCast(s, ap, ids[0]!, [tgt(giant)]));
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(zone(s, giant)).toBe("graveyard");
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(giant)] })).toThrow();
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(tough)] })).toThrow();
+    s = choose(s, [tgt(small)]);
+    expect([zone(s, small), zone(s, tough), zone(s, giant)]).toEqual(["hand", "graveyard", "graveyard"]);
+  });
+
+  it("Exponential Growth doubles the power X times, one after another", () => {
+    let { s, ap, ids } = setup([exponentialGrowth]);
+    const b = putOnBattlefield(s, ap, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(b)], undefined, undefined, 2)));
+    expect(pt(s, b)).toEqual([8, 2]);
+  });
+
+  it("Pontiff of Blight gives your other creatures extort, each instance triggering", () => {
+    let { s, ap, ids } = setup([relic]);
+    putOnBattlefield(s, ap, pontiffOfBlight);
+    putOnBattlefield(s, ap, bear());
+    putOnBattlefield(s, ap, swamp);
+    const others = s.turnOrder.filter((p) => p !== ap);
+    const lives = others.map((p) => life(s, p));
+    const me = life(s, ap);
+    let asked = 0;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)), () => (asked++, true));
+    expect(asked).toBe(2);
+    expect(others.map((p) => life(s, p))).toEqual(lives.map((l) => l - 2));
+    expect(life(s, ap)).toBe(me + 6);
+  });
+
+  it("Analyze the Pollen finds a basic land, or with evidence collected a creature or land", () => {
+    for (const evidence of [false, true]) {
+      let { s, ap, ids } = setup([analyzeThePollen]);
+      const big = [0, 1].map(() => into(s, ap, card("Test Wurm", "Creature — Wurm", "{3}{G}", { cmc: 4, power: "4", toughness: "4" }), "graveyard"));
+      s = run(s, planCast(s, ap, ids[0]!, undefined, undefined, undefined, undefined, evidence ? { evidence: big } : {}));
+      for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      const p = s.pending;
+      if (p?.kind !== "searchLibrary") throw new Error("no search");
+      const names = new Set(p.cards.map((id) => chars(s, id).name));
+      expect([...names].sort()).toEqual(evidence ? ["Forest", "Grizzly Bears"] : ["Forest"]);
+      const pick = p.cards.find((id) => chars(s, id).name === (evidence ? "Grizzly Bears" : "Forest"))!;
+      s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [pick] }));
+      expect(zone(s, pick)).toBe("hand");
     }
   });
 });

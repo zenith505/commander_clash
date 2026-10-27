@@ -2190,9 +2190,14 @@ function amassedPowerNow(s: GameState, a: { id: ObjectId; zc: number }): number 
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}) });
+  // Clement: "with lesser mana value" than a subject still on the battlefield: its mana value now (CR 202.3).
+  const subj = t.subject && s.objects[t.subject.id];
+  const lki = t.lki?.manaValue === undefined && subj?.zone === "battlefield" && (subj.zoneChanges ?? 0) === t.subject!.zc ? { ...t.lki, manaValue: evalAmount(s, { count: { kind: "manaValue", of: { ref: "subject" } } }, { controller: t.controller, objects: (r) => (r.ref === "subject" ? [subj] : []) }) } : t.lki;
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(lki ? { lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}), ...(t.amassed ? { amassedPower: amassedPowerNow(s, t.amassed) } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
+  // Colfenor: "other target creature card": not the card that died (TargetSpec.notSubject).
+  if (t.subject && body.targets.some((x) => x.notSubject)) return { ...body, targets: body.targets.map((x) => (x.notSubject ? { ...x, notId: t.subject!.id } : x)) };
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {

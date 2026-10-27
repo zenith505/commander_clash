@@ -143,6 +143,29 @@ export function dealDamage(
     }
     return 0;
   }
+  // Ugin's Conjurant: "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove
+  // that many +1/+1 counters from ~" (CR 615.5): all of it prevented, as many counters as it has removed (rulings). Combat
+  // damage is one event (CR 510.2), so every source's share is prevented once it applies. Damage that can't be prevented
+  // is dealt and still removes the counters (615.12, rulings).
+  if ("object" in to && abilitiesOf(s, to.object).counterShield) {
+    const o = to.object;
+    const event = opts.combat ? `${s.turn}:${s.combatsThisTurn ?? 0}:${s.step}` : undefined;
+    const has = o.counters["+1/+1"] ?? 0;
+    if (has > 0 || (event && o.phantomEvent === event)) {
+      if (has) {
+        const off = Math.min(n, has);
+        o.counters["+1/+1"] = has - off;
+        if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
+        invalidateCharacteristics(s);
+        log(s, `${off} +1/+1 counter${off === 1 ? " is" : "s are"} removed from ${targetName}.`);
+      }
+      o.phantomEvent = event;
+      if (canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
+        log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
+        return 0;
+      }
+    }
+  }
   // Case of the Burning Masks: each source once, as the object it was (CR 400.7), under its controller as it dealt damage.
   const key = src.ref ? `${src.ref.object}@${src.ref.zc}` : src.name;
   const sources = (((s.turnLog ??= {}).damageSources ??= {})[src.controller] ??= []);
@@ -971,6 +994,7 @@ export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: numbe
   const prev = canPreventDamage(s) && !unpreventable(src, combat);
   if (combat && s.preventCombatDamage && prev) return 0;
   if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).phantom) return 0;
+  if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).counterShield && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0) return 0;
   const k = recKey(to);
   return planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true).final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0);
 }

@@ -801,6 +801,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "creatureDied":
       if (cond.notNamedSelf) return (s.diedNamesThisTurn ?? []).some((n) => !n || !sameName(n, defOf(s, src).name));
+      if (cond.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => (!cond.yours || d.controller === you) && (d.all || d.subtypes.includes(cond.subtype!))).length >= (cond.n ?? 1);
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
     case "meldPartner": {
       // "If you both own and control ~ and a creature named Bruna, the Fading Light" (CR 701.42): ~ as it is now.
@@ -1015,7 +1016,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "sourcesDealtDamage":
       return (s.turnLog?.damageSources?.[you]?.length ?? 0) >= cond.n;
     case "castCount":
-      return (s.castThisTurn ?? []).filter((c) => c.player === (cond.activePlayer ? s.activePlayer : you) && (!cond.fromHand || c.from === "hand") && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n !== !!cond.not;
+      return (s.castThisTurn ?? []).filter((c) => c.player === (cond.activePlayer ? s.activePlayer : you) && (!cond.fromHand || c.from === "hand") && (cond.mvAtLeast === undefined || (c.mv ?? 0) >= cond.mvAtLeast) && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n !== !!cond.not;
     case "colorsAmong": {
       const colors = new Set<Color>();
       for (const c of chars.values()) if (c.controller === you) for (const k of c.colors) colors.add(k);

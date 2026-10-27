@@ -265,6 +265,8 @@ export type Count =
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes"; /** Allied Strategies: "among lands they control", that player's. */ whose?: PlayerRef }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
+  /** "Each different power among creatures you control" (Golden Ratio). */
+  | { kind: "powersAmongCreatures" }
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
@@ -366,6 +368,8 @@ export type Count =
   | { kind: "creaturesLeftThisTurn" }
   /** "For each (nontoken) creature put into your graveyard from the battlefield this turn" (Caller of the Claw): its owner's graveyard, whoever controlled it. */
   | { kind: "creaturesToYourGraveyard"; nontoken?: true }
+  /** "The number of artifacts that were put into graveyards from the battlefield this turn" (Structural Assault): anyone's, tokens too. */
+  | { kind: "artifactsToGraveyardThisTurn" }
   /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
   | { kind: "typeToYourGraveyardThisTurn"; type: string }
   | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
@@ -1587,7 +1591,7 @@ export type StaticCondition =
   /** "Unless it's paired with a creature with soulbond" (CR 702.95b): `not` for "unless". */
   | { kind: "paired"; withKeyword?: string; not?: true }
   /** Morbid: "if a creature died this turn" (CR 700.4); `n`: "if two or more creatures died this turn"; `yours`: "under your control". */
-  | { kind: "creatureDied"; n?: number; yours?: true; /** "A creature not named ~" (Ebondeath, Dracolich): with another name as it last existed. */ notNamedSelf?: true }
+  | { kind: "creatureDied"; n?: number; yours?: true; /** "A creature not named ~" (Ebondeath, Dracolich): with another name as it last existed. */ notNamedSelf?: true; /** "If another Human died under your control this turn" (White Glove Gourmand): of this creature type as it last existed. */ subtype?: string }
   /**
    * "If no creatures are on the battlefield", "if four or more creatures are attacking" (Arrow Volley Trap), "if there are
    * thirteen or more creatures on the battlefield": how many permanents matching `filter` there are, under anyone's control.
@@ -1716,7 +1720,7 @@ export type StaticCondition =
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
-  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true }
+  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true; /** "A spell with mana value 4 or greater" (Rhino, Barreling Brute): its mana value as it was cast. */ mvAtLeast?: number }
   /** "There are five colors among permanents you control" (CR 105.2). */
   | { kind: "colorsAmong"; n: number }
   /** "You've gained 5 or more life this turn": in total. */
@@ -1859,7 +1863,7 @@ export type Effect =
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
   /** "Your life total becomes 10" (CR 119.5): that player gains or loses the difference. */
-  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true; /** "The number of creatures they control" (Biorhythm): each player's own (PlayerRef eachOne), all counted before any change; `n` unused. */ amount?: Amount }
+  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true; /** "The highest life total among all players" (Arbiter of Knollridge): likewise. */ highest?: true; /** "The number of creatures they control" (Biorhythm): each player's own (PlayerRef eachOne), all counted before any change; `n` unused. */ amount?: Amount }
   /**
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
@@ -2187,7 +2191,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth" }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth" | /** "Just beneath the top X cards of that library" (Unexpectedly Absent): the spell's X. */ "beneathX" }
   | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** "Exile all cards from all hands and graveyards" (Worldfire): the hand too, then the graveyard. */ hand?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "All cards with flashback" (Tombfire): cards that have it there, their own or given by an effect (CR 702.34a). */ withFlashback?: true; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
@@ -2262,7 +2266,7 @@ export type Effect =
    * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
    * (not targeted, rulings), from none up to `n`.
    */
-  | { type: "untapUpTo"; n: Amount; filter: TargetSpec }
+  | { type: "untapUpTo"; n: Amount; filter: TargetSpec; /** "That player untaps a land they control" (Hokori, Dust Drinker): this player chooses, "you control" being them. */ who?: PlayerRef }
   /**
    * "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
    * control": which ones are chosen as it resolves (CR 608.2d), none allowed; "for each creature tapped this way" counts them.
@@ -2720,7 +2724,7 @@ export type Effect =
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
    */
   /** `drain`: "Each opponent loses X life and you gain X life, where X is that card's mana value" (Twilight Prophet). */
-  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
+  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true }; /** Duskmantle Seer: each player reveals their own top card, loses life equal to its mana value, then puts it into their hand. */ each?: true }
   /**
    * Keen Duelist, Parker Luck: two players each reveal the top card of their library, each loses life equal to the mana
    * value of the card the other revealed, then each puts the card they revealed into their hand.
@@ -2910,6 +2914,8 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef; /** "Into your library": yours is shuffled even if no card is put into it. */ yours?: true; /** "Target player shuffles ... into their library" (Memory's Journey): that player's is, the same way. */ who?: PlayerRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
+  /** Morality Shift: "Exchange your graveyard and library" (the library's cards go to the graveyard in an order its owner chooses, rulings). */
+  | { type: "exchangeGraveyardLibrary"; who: PlayerRef }
   | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
@@ -3735,6 +3741,8 @@ export type TriggerEvent =
   | "selfMutates"
   /** "Whenever a creature you control mutates" (Essence Symbiote): one matching `tappedFilter`, the subject (CR 702.140d). */
   | "permanentMutates"
+  /** "Whenever a creature you control explores" (Wildgrowth Walker): once the exploring is done (CR 701.44b), the explorer the subject. */
+  | "creatureYouControlExplores"
   /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
   | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
@@ -4017,6 +4025,8 @@ export interface TriggeredAbility {
   firstEachTurn?: true;
   /** For "youGainLife": "Whenever you gain or lose life during your turn" (Moonstone Harbinger): a life loss too, and only on your turn. */
   orLoseLife?: true;
+  /** For "youGainLife" and "youLoseLife": "during your turn" (Vampire Scrivener): only on its controller's turn. */
+  yourTurnOnly?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */

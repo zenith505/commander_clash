@@ -282,7 +282,7 @@ export interface GameObject {
    */
   triggeredThisTurn?: string[];
   /** When counters were last put on it (turn, and its zoneChanges then): "for the first time each turn". */
-  countersPutAt?: { turn: number; zc: number };
+  countersPutAt?: { turn: number; zc: number; /** The kinds put on it that turn (Axgard Artisan's "+1/+1 counters ... for the first time each turn"). */ kinds?: string[] };
   /**
    * "Choose one that hasn't been chosen [this turn]" (Demonic Pact, Gala Greeters): the modes chosen so far for each such
    * ability of this object, keyed by the ability's text, with the turn for "this turn". Any player's choices count, and a
@@ -1364,6 +1364,8 @@ export interface TurnLog {
   creaturesToYard?: { owner: PlayerId; token?: true }[];
   /** The card types, as they last existed, of the permanents put into each owner's graveyard from the battlefield this turn (Kami of Transience). */
   permanentTypesToYard?: Record<number, string[]>;
+  /** How many artifacts were put into graveyards from the battlefield this turn, tokens too (Structural Assault). */
+  artifactsToYard?: number;
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
   creaturesLeft?: Partial<Record<PlayerId, number>>;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
@@ -1572,7 +1574,7 @@ export interface GameState {
   /** Their names, as they last existed ("" for a face-down one, CR 708.2): "a creature not named ~ died this turn" (Ebondeath). */
   diedNamesThisTurn?: string[];
   /** Their creature types as they last existed ("for each Zubera that died this turn"): `all` for a changeling (CR 702.73a); none for a face-down one. */
-  diedTypesThisTurn?: { subtypes: string[]; all?: true }[];
+  diedTypesThisTurn?: { subtypes: string[]; all?: true; /** Who controlled it as it last existed (White Glove Gourmand's "died under your control"). */ controller?: PlayerId }[];
   /** The same for nontoken creatures (Gadrak, the Crown-Scourge). */
   nontokenDiedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */

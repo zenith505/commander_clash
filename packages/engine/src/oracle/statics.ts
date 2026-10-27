@@ -771,6 +771,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
+  // Rhino, Barreling Brute: "if you've cast a spell with mana value 4 or greater this turn": its mana value on the stack,
+  // X included (CR 202.3e).
+  if ((m = /^you've cast a spell with mana value (\d+) or greater this turn$/.exec(text))) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, mvAtLeast: Number(m[1]) };
   // Nightpack Ambusher: "if you didn't cast a spell this turn".
   // Stoic Sphinx: "~ has hexproof as long as you haven't cast a spell this turn" likewise, in a static ability (an
   // effect's "If you haven't cast a spell this turn, you may cast that card" is Conduit of Worlds' own instruction).
@@ -916,6 +919,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
+  // White Glove Gourmand: "if another Human died under your control this turn": "another" can only be another object (~ is
+  // still on the battlefield for this to matter), so any Human that died.
+  if ((m = /^(?:another|an?) ([A-Z][a-z]+) died( under your control)? this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "creatureDied", subtype: m[1]!, ...(m[2] ? { yours: true as const } : {}) };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
@@ -1488,6 +1494,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
+  }
+  // Predatory Impetus: "gets +3/+3, must be blocked if able, and is goaded": all three.
+  const RIDER = "can't [^,]+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|doesn't untap during its controller's untap step";
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), (${RIDER}),? and (${RIDER})$`).exec(rest))) {
+    const parts = [m[1]!, m[4]!, m[5]!].map((x) => parseStaticMods(x));
+    return parts.every((x) => x) ? parts.flatMap((x) => x!) : null;
   }
   // "Equipped creature gets +3/+0 and loses flying" (Colossus Hammer): abilities lost in layer 6.
   if ((m = new RegExp(`^gets? ${PT}/${PT} and loses (.+)$`).exec(rest))) {

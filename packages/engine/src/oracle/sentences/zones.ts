@@ -38,6 +38,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Morality Shift: "Exchange your graveyard and library."
+  if (/^Exchange your graveyard and library$/.test(s)) return [{ type: "exchangeGraveyardLibrary", who: { ref: "you" } }];
   // Nicol Bolas, the Arisen: "Exile all but the bottom card of target player's library": the top cards, as many as there
   // are less one.
   if ((m = /^Exile all but the bottom card of (target player|target opponent)'s library$/.exec(s))) {
@@ -867,6 +869,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: second ? "ownersChoiceSecond" : "ownersChoice" }];
   }
+  // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that library."
+  if ((m = /^Put (target .+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && (what.n ?? 1) === 1 && ctx.targets[what.index]?.kind === "object" ? [{ type: "putInLibrary", what, position: "beneathX" }] : null;
+  }
   // Aetherspouts: "For each attacking creature, its owner puts it on their choice of the top or bottom of their library":
   // one at a time, each owner choosing for each of theirs (their order among them being the order they're put there).
   if (/^For each attacking creature, its owner puts it on their choice of the top or bottom of their library$/.test(s)) {
@@ -1228,9 +1235,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "exile", greatest: "power" }] : null;
   }
-  if ((m = /^(.+?) sacrifices? a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
+  // Blot Out: "Target opponent exiles a creature or planeswalker they control with the greatest mana value among creatures
+  // and planeswalkers they control": that player chooses among those tied.
+  if ((m = /^(.+?) (sacrifices?|exiles?) a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: "sacrifice", greatest: "manaValue" }] : null;
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: /^sac/i.test(m[2]!) ? "sacrifice" : "exile", greatest: "manaValue" }] : null;
   }
   // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
   // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before

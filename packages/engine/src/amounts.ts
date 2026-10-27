@@ -362,6 +362,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
     case "typeToYourGraveyardThisTurn":
       return s.turnLog?.permanentTypesToYard?.[ctx.controller]?.includes(c.type) ? 1 : 0;
+    case "artifactsToGraveyardThisTurn":
+      return s.turnLog?.artifactsToYard ?? 0;
     case "creaturesToYourGraveyard":
       return (s.turnLog?.creaturesToYard ?? []).filter((d) => d.owner === ctx.controller && !(c.nontoken && d.token)).length;
     case "diedThisTurn":
@@ -711,6 +713,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
       return (s.castThisTurn ?? []).reduce((n, x, i) => n + (x.player === ctx.controller && i !== self ? (x.mv ?? 0) : 0), 0);
     }
+    case "powersAmongCreatures": {
+      const powers = new Set<number>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (ch && ch.controller === ctx.controller && ch.types.includes("Creature")) powers.add(ch.power);
+      }
+      return powers.size;
+    }
     case "colorsAmongPermanents": {
       const colors = new Set<string>();
       for (const id of s.battlefield) {
@@ -899,6 +909,8 @@ function describeCount(c: Count): string {
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":
       return `an ${c.type.toLowerCase()} put into your graveyard from the battlefield this turn`;
+    case "artifactsToGraveyardThisTurn":
+      return "#artifacts put into graveyards from the battlefield this turn";
     case "creaturesToYourGraveyard":
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":
@@ -955,6 +967,8 @@ function describeCount(c: Count): string {
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";
+    case "powersAmongCreatures":
+      return "#different powers among your creatures";
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":

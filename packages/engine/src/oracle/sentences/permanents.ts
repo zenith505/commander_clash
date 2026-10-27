@@ -187,6 +187,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m.at(-1)!);
     return filter?.kind === "object" ? [{ type: "untapUpTo", n: /^an?$/.test(m[1]!) ? 1 : num(m[1]!), filter: { ...filter, controller: "you", text: `${filter.text} you control` } }] : null;
   }
+  // Hokori, Dust Drinker: "that player untaps a land they control": one of theirs, chosen as it resolves (CR 608.2d), the
+  // same way.
+  if (ctx.eventPlayer && /^[Tt]hat player untaps a land they control$/.test(s))
+    return [{ type: "untapUpTo", n: 1, filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], controller: "you", text: "land they control" }, who: { ref: "eventPlayer" } }];
   // "Tap or untap target permanent" (Twiddle, Pestermite): which is chosen as it resolves (CR 608.2d).
   if ((m = /^Tap or untap ((?:another )?target .+|that creature|it|~|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -289,6 +293,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const inner = parseSentence(capital(m[2]!), ctx);
     return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[2]!, thisTurn: true, ...(m[1] ? { underYourControl: true as const } : {}) }] : null;
   }
+  // Virulent Wound: "When that creature dies this turn, its controller gets a poison counter": the player who controlled
+  // it as it last existed on the battlefield (CR 603.10a, 608.2h).
+  if (/^When that creature dies this turn, its controller gets a poison counter$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "poison", who: { ref: "subjectController" }, n: 1 }], text: "its controller gets a poison counter", thisTurn: true }];
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
   // doesn't return (rulings).

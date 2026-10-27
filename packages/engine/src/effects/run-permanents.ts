@@ -240,20 +240,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Chosen as it resolves among the tapped ones (CR 608.2d), then untapped together.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      if (!sc.chosen?.[ctx.controller]) {
+      const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (chooser === undefined || player(s, chooser).lost) return;
+      if (!sc.chosen?.[chooser]) {
         const n = amountNow(s, e.n, ctx);
-        const options = s.battlefield.filter((id) => obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+        const options = s.battlefield.filter((id) => obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), chooser, false));
         if (n <= 0 || !options.length) return;
-        sc.queue = [ctx.controller];
+        sc.queue = [chooser];
         sc.chosen = {};
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "untap", what: `tapped ${e.filter.text}`, options, count: Math.min(n, options.length), min: 0 };
+        s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "untap", what: `tapped ${e.filter.text}`, options, count: Math.min(n, options.length), min: 0 };
         return "paused";
       }
-      const ids = sc.chosen[ctx.controller]!;
+      const ids = sc.chosen[chooser]!;
       sc.chosen = undefined;
       sc.queue = undefined;
       for (const id of ids) if (s.objects[id]?.zone === "battlefield") untapPermanent(s, obj(s, id));
-      if (ids.length) log(s, `${player(s, ctx.controller).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      if (ids.length) log(s, `${player(s, chooser).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       return;
     }
     case "tapAnyNumber": {
@@ -1570,12 +1572,18 @@ export function lockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]): { 
 function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {
   const p = player(s, ctx.controller);
   const sc = (s.resolving!.scratch ??= {});
+  // The permanent has explored once this is done, whatever could be done of it (CR 701.44b): "whenever a creature you
+  // control explores" (Wildgrowth Walker) triggers.
+  const explored = () => {
+    if (self) fireEvent(s, { type: "explored", id: self.id, controller: self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller });
+  };
   if (sc.explored === undefined) {
     const top = p.library[0];
     const name = self ? characteristics(s, self).name : src;
     if (top && isType(defOf(s, obj(s, top)), "Land")) {
       log(s, `${name} explores: ${p.name} reveals ${defOf(s, obj(s, top)).name} and puts it into their hand.`);
       moveObject(s, top, "hand");
+      explored();
       return;
     }
     log(s, `${name} explores${top ? `: ${p.name} reveals ${defOf(s, obj(s, top)).name}` : ""}.`);
@@ -1583,7 +1591,7 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
       putCounters(s, self, "+1/+1", 1);
       invalidateCharacteristics(s);
     }
-    if (!top) return; // nothing revealed: just the counter (rulings)
+    if (!top) return explored(); // nothing revealed: just the counter (rulings)
     sc.explored = top;
     s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, top)).name} into your graveyard`, source: src, card: top };
     return "paused";
@@ -1591,4 +1599,5 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
   if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
   // Done: "it explores, then it explores again" (Jadelight Ranger) starts over, revealing the same card if it stayed.
   sc.explored = sc.may = undefined;
+  explored();
 }

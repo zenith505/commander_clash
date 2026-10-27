@@ -3415,7 +3415,7 @@ export function compile(d: CardDef): CompiledCard {
       // Voice of Resurgence: "Whenever an opponent casts a spell during your turn and when ~ dies, ...": a cast and a death are
       // never one event.
       /^(Whenever an opponent casts a spell during your turn) and when ~ dies, (.+)$/.exec(line) ??
-      /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
+      /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step|your first main phase)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
       // and turning it face up isn't entering (CR 708.8), so one or the other.

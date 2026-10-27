@@ -389,6 +389,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Repay in Kind: "Each player's life total becomes the lowest life total among all players."
   if (/^Each player's life total becomes the lowest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, lowest: true }];
+  // Arbiter of Knollridge: "each player's life total becomes the highest life total among all players".
+  if (/^[Ee]ach player's life total becomes the highest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, highest: true }];
   // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
   // total becomes half their starting life total, rounded down" (Torgaar): 20 in Commander (CR 903.7, 119.5).
   if ((m = /^(Your|Target player's|Up to one target player's|Target opponent's) life total becomes half (?:your|their) starting life total, rounded (up|down)$/i.exec(s))) {
@@ -539,6 +541,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "Untap up to two lands" (Teferi, Hero of Dominaria): chosen then (rulings).
     if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame", "untapUpTo"].includes(y.type)))
       return [{ type: "delayed", when, effects: inner, text: m[1]! }];
+    // Bearer of the Heavens: "destroy all permanents at the beginning of the next end step": the ones there then.
+    if (players && refs.size === 1 && refs.has("each") && inner.every((y) => y.type === "destroy")) return [{ type: "delayed", when, effects: inner, text: m[1]! }];
     if (!players || refs.size !== 1 || when === "yourNextUpkeep") return null;
     const [ref] = refs;
     // "Target creature you control gets +2/+2 until end of turn. Return it to its owner's hand at the beginning of the next

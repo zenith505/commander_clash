@@ -204,7 +204,8 @@ describe("a counter of any kind, keyword counters of two words, 'he' and 'she'",
     // "He" and "his" are Jack of Hearts himself.
     expect(compileCard(jack).triggers[0]!.body.text).toBe("~ deals damage equal to ~'s power to each creature.");
     // Not a legendary card: "her controller" is the Liliana's, not this card's.
-    expect(compileCard(defeat).unsupported.join(" ")).toContain("her controller");
+    // (Lane B round 5 supports the card, with "her controller" read as the destroyed permanent's controller.)
+    expect(JSON.stringify(compileCard(defeat).spell)).toContain('"type":"loseLife","who":{"ref":"targetController","index":0}');
     // Themberchaud's exert ("as he attacks") still reads.
     expect(compileCard(themberchaud).unsupported).toEqual([]);
   });

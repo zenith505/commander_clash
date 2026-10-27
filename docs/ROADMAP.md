@@ -1,7 +1,7 @@
 # Roadmap
 
-25,360 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,677 of
+25,437 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,679 of
 9,979 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1299,6 +1299,35 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   tracking); Garza's Assassin (recover by paying half your life); Opal Titan (protection from that spell's colors),
   Veiled Sentry (P/T equal to that spell's mana value), Hidden Herd ("plays a nonbasic land"), Hidden Predators,
   Lurking Jackals, Opal Avenger and Veiled Crocodile (state triggers on an enchantment).
+- Round B5 (ranks about 26,400 up to about 25,250, template clusters, plus more played cards the same templates cover:
+  Realm of Koh, The Legend of Kuruk, Questing Druid, Lavinia of the Tenth, Gimli's Fury, Banishing Slash and others):
+  "During turns other than yours" (Mesa Lynx, Glory of Warfare, Oak Street Innkeeper, Vibrating Sphere); "~ is a 2/3
+  Gargoyle artifact creature with flying" as a conditional self static (CR 205.1b: it keeps its other types); "your
+  opponents control no creatures", "you control exactly one creature" (and "that creature gets ... and has ..."),
+  "there are no Zombies on the battlefield", "an opponent has been dealt damage this turn", "you didn't play a land
+  this turn", "you control an artifact and an enchantment", "(don't) control a permanent named X (or a permanent named
+  Y)"; "attacks each combat if able unless you control ..."; "can't block or be blocked by creatures with power 2 or
+  greater / non-Spirit creatures"; pump riders "If it's legendary / a Goblin or Orc / a token, it also gains ...",
+  "Colorless (White, Kithkin) creatures you control also gain ..."; "If that creature is a Human, put two +1/+1
+  counters on it instead"; "If that creature has toxic, ~ deals 4 damage to that creature instead"; "Destroy target
+  ... If that permanent (land) was blue or black / nonbasic / a Liliana planeswalker, ..." (CR 608.2h, as it last
+  existed); punishers "Destroy (Tap, Exile) target creature unless its controller pays {X}"; "Destroy target blocking
+  creature at end of combat" (a delayed trigger with its own target; bots aim it at an opponent's blocker); "When ~
+  enters or is turned face up" (a face-down permanent entering has no such trigger, CR 708.8); detain "up to two
+  target" and "each ..."; "nonattacking" targets; "Exile all cards from target player's hand and graveyard";
+  "Monocolored creatures can't block this turn"; "discards two cards, then draws as many cards as they discarded this
+  way"; "You gain 3 life for each land card discarded this way"; "each creature each opponent controls"; "cards in
+  your opponents' hands"; affinity for Plains; "attacks or blocks while you control a Dinosaur"; "When ~ is put into
+  a graveyard from the battlefield, if it was a creature". +79, two of them (Questing Druid, Quirion Dryad) also done
+  by round 176: +77 (25,437 with round 176).
+- Skipped there, with reasons: Mystic Decree ("lose flying and islandwalk" isn't parsed); Hei Bai (reveal until a
+  Shrine); Avatar of Discord ("unless you discard two cards" with one card in hand: a partial payment question);
+  Polar Kraken and Phyrexian Soulgorger (cumulative upkeep paid by sacrificing); Stand United (an "if" effect that
+  pauses for a scry); Nissa's Defeat (its target phrase); Wargling (an ability word before "until end of turn,");
+  Phoenix Fleet Airship ("permanents named ~"); Galactus and Kookus (a name with ~ in it); Festering Newt, Ruin in
+  Their Wake, Rix Maadi Guildmage, Dragon Hunter, Will of the All-Hunter, Foe-liage, Inflame and Executioner's Swing
+  (each needs a check not modeled: which creatures were dealt damage this turn, "if it's blocking", Dragons as
+  though reach, lands entering during your turn).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1311,6 +1340,12 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling Stance (forecast),
   Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
+  Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
+  trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
+  cost), Haphazard Bombardment (aim counters), Perimeter Enforcer and Projektor Inspector ("a Detective is turned face
+  up", now close), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
+  ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Surge of Zeal ("shares a
+  color with it"), Sabotage Strategist, Lavabrink Venturer (odd or even).
 
 ## Known gaps (from earlier rounds)
 

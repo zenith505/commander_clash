@@ -678,6 +678,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Worldfire: "Exile all cards from all hands and graveyards."
   if (s === "Exile all cards from all hands and graveyards") return [{ type: "exileGraveyard", who: { ref: "eachPlayer" }, hand: true }];
+  // Identity Crisis: "Exile all cards from target player's hand and graveyard."
+  if ((m = /^Exile all cards from (target player's|target opponent's) hand and graveyard$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
+    return who ? [{ type: "exileGraveyard", who, hand: true }] : null;
+  }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =
@@ -979,6 +984,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
   // "Creatures with power 3 or less can't block this turn" (Temur Charm): those entering later too, and each creature's
   // power as blockers are declared (rulings).
+  // Awe for the Guilds: "Monocolored creatures can't block this turn", each creature's colors as blockers are declared.
+  if (/^Monocolored creatures can't block this turn$/.test(s)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], colorCount: "monocolored", text: "monocolored creatures" } }];
   if ((m = /^Creatures( without flying| with power \d+ or less)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;

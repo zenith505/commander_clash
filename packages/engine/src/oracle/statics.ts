@@ -10,6 +10,7 @@ import { parseGrants } from "./grants";
 import { parseSearchFilter } from "./search";
 import { parseDamageMod } from "./damage-mods";
 import { QUOTED_SOURCE_NAME } from "./compile";
+import { parseBecomes } from "./sentence";
 
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
 export function parseEntersCondition(text: string): EntersCondition | null {
@@ -171,11 +172,19 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   let negate = false;
   let notCond = false;
   let alsoYourTurn = false;
+  // Homicidal Seclusion: "As long as you control exactly one creature, that creature gets +3/+1 and has lifelink": the one
+  // creature you control, so each creature you control while there's just one.
+  if ((m = /^As long as (you control exactly one creature), that creature gets ([+-]\d+\/[+-]\d+)(?: and has ([a-z, ]+))?$/.exec(text))) {
+    const st = parseConditionalStatic(`As long as ${m[1]}, creatures you control get ${m[2]}${m[3] ? ` and have ${m[3]}` : ""}.`);
+    return st && { ...st, text: line };
+  }
   if ((m = /^(.+?) as long as (.+)$/.exec(text)) && !/^During your turn, /.test(text)) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   // Cloud, Planet's Champion: "During your turn, as long as ~ is equipped, it has double strike and indestructible": both.
   else if ((m = /^During your turn, as long as ([^,]+), (.+)$/.exec(text))) [cond, statement, alsoYourTurn] = [m[1], m[2], true];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
+  // Mesa Lynx: "During turns other than yours, ~ gets +0/+2": while it isn't your turn.
+  else if ((m = /^During turns other than yours, (.+)$/.exec(text))) [cond, statement] = ["it's not your turn", m[1]];
   // Zurgo, Thunder's Decree: "During your end step, Warrior tokens you control have ..." (the end step only, not cleanup,
   // CR 513).
   else if ((m = /^During your end step, (.+)$/.exec(text))) [cond, statement] = ["it's your end step", m[1]];
@@ -209,6 +218,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Any other "~ can't attack or block unless <condition>" (Lupine Prototype's "unless a player has no cards in hand",
   // Relic Golem's "unless an opponent has eight or more cards in their graveyard"): the restriction applies while the
   // condition is false (a "not" condition, see below).
+  // Marauding Maulhorn: "~ attacks each combat if able unless you control a creature named Advocate of the Beast".
+  else if ((m = /^(~ attacks each combat if able) unless (you control .+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2], true];
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (.+)$/.exec(text))) [statement, cond, notCond] = [m[1], m[2]!.replace(/^it(?='s | has | is )|^its (?=power |toughness )/, (w) => (w === "it" ? "~" : "~'s ")), true];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
@@ -228,6 +239,17 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // value stay (rulings).
   if (statement === "it's a land" && /^~ has an? [a-z]+ counter on it$/.test(cond)) {
     const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setTypes", types: ["Land"], subtypes: [] }], text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
+  // Rusted Relic: "~ is a 5/5 Golem artifact creature as long as ...", Warden of the Wall: "During turns other than yours,
+  // ~ is a 2/3 Gargoyle artifact creature with flying": it keeps its other card types and subtypes, its creature types
+  // replaced (CR 205.1b), with that base power and toughness (layers 4 and 7b).
+  const artifactCreature = /^~ is (an? (?:\d+\/\d+ )?(?:[A-Z][a-z]+ )*artifact creature(?: with [a-z ,]+)?)$/.exec(statement);
+  if (artifactCreature) {
+    const mods = parseBecomes(artifactCreature[1]!);
+    if (!mods || mods.some((x) => x.kind === "setColors")) return null;
+    const self: StaticAbility = { affects: { kind: "self" }, mods, text: line };
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
@@ -652,6 +674,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const g = parseGroup(`all ${m[2]}`);
     return g ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!), ...(g.other ? { other: true as const } : {}) } : null;
   }
+  // Spirit Mirror: "if there are no Reflection tokens on the battlefield": anyone's.
+  if ((m = /^there are no (.+) on the battlefield$/.exec(text))) {
+    const g = parseGroup(`all ${m[1]}`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 0, max: 0 } : null;
+  }
   // Biovisionary: "if you control four or more creatures named ~": with the source's name (CR 201.5), ~ itself among them.
   if ((m = new RegExp(`^you control ${NUM} or more creatures named ~$`).exec(text))) {
     const amount = parseCount("the number of creatures you control named ~", null);
@@ -814,6 +841,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  // Bloodcrazed Goblin: "unless an opponent has been dealt damage this turn" (bloodthirst's condition, CR 702.54a).
+  if (/^an opponent (?:has been|was) dealt damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
@@ -949,6 +978,28 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^no opponent controls (an? .+)$/.exec(text))) {
     const c = parseStaticCondition(`an opponent controls ${m[1]}`, st);
     return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, min: undefined, max: 0, every: true } : null;
+  }
+  // Mercadian Atlas: "if you didn't play a land this turn".
+  if (/^you didn't play a land this turn$/.test(text)) return { kind: "not", cond: { kind: "playedLandThisTurn" } };
+  // Naomi, Pillar of Order; Kami of Terrible Secrets: "if you control an artifact and an enchantment": both.
+  if ((m = /^you control (an? [a-z]+) and (an? [a-z]+)$/.exec(text))) {
+    const conds = [m[1]!, m[2]!].map((x) => parseStaticCondition(`you control ${x}`, st));
+    return conds.every((c) => c?.kind === "control" && c.min === 1) ? { kind: "allOf", conds: conds as StaticCondition[] } : null;
+  }
+  // Liu Bei, Lord of Shu: "as long as you control a permanent named Guan Yu, Sainted Warrior or a permanent named Zhang Fei,
+  // Fierce Warrior"; Rufus Shinra: "if you don't control a creature named Darkstar": by name (CR 201.2), any of them.
+  if ((m = /^you (don't )?control an? (permanent|creature|land|artifact) named ([^~]+?)(?: or an? \2 named ([^~]+))?$/.exec(text))) {
+    const type = m[2] === "permanent" ? [] : [capital(m[2]!)];
+    const filter = (name: string): TargetSpec => ({ kind: "object", types: type, notTypes: [], notColors: [], named: name, text: `${m![2]} named ${name}` });
+    const conds: StaticCondition[] = [m[3]!, m[4]].filter((x): x is string => !!x).map((name) => ({ kind: "control", who: "you", filter: filter(name), ...(m![1] ? { max: 0 } : { min: 1 }) }));
+    return conds.length === 1 ? conds[0]! : m[1] ? { kind: "allOf", conds } : { kind: "anyOf", conds };
+  }
+  // Kezzerdrix: "if your opponents control no creatures": none of them controls one, as "no opponent controls a creature".
+  if ((m = /^your opponents control no ([a-z]+)s$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]}`, st);
+  // Homicidal Seclusion, Demonic Rising: "as long as you control exactly one creature".
+  if ((m = /^you control exactly one ([a-z]+)$/.exec(text))) {
+    const c = parseStaticCondition(`you control a ${m[1]}`, st);
+    return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, max: 1 } : null;
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
@@ -1335,6 +1386,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const grants = parseGrants(m[1]!);
     return grants ? [{ kind: "cantBeAttacked" }, ...grants] : null;
   }
+  // Sneaky Homunculus: "can't block or be blocked by creatures with power 2 or greater", the Spirit tokens of Avatar: "can't
+  // block or be blocked by non-Spirit creatures": both restrictions (CR 509.1b).
+  if ((m = /^can't block or be blocked by (.+)$/.exec(rest))) {
+    const [a, b] = [parseStaticMods(`can't block ${m[1]}`), parseStaticMods(`can't be blocked by ${m[1]}`)];
+    return a?.length === 1 && b?.length === 1 && a[0]!.kind === "cantBlockCreatures" && b[0]!.kind === "cantBeBlockedBy" ? [...a, ...b] : null;
+  }
   // Spitfire Handler: an attacker's power compared with its own as blockers are declared (CR 509.1b).
   if (/^can't block creatures with power greater than ~'s power$/.test(rest)) return [{ kind: "cantBlockGreaterPower" }];
   // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
@@ -1349,7 +1406,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // "Can't block black creatures" (Gibbering Hyenas), "can't block artifact creatures", "can't block creatures with flying",
   // "can't block white creatures with power 2 or greater" (Orcish Veteran): attackers it can't block (CR 509.1b).
-  if ((m = /^can't block ((?:[a-z]+ )*creatures(?: with .+)?)$/.exec(rest)) && !/\b(?:this turn|each combat|you control|your opponents control|alone)\b/.test(m[1]!)) {
+  if ((m = /^can't block ((?:[a-z]+ |non-[A-Z][a-z]+ )*creatures(?: with .+)?)$/.exec(rest)) && !/\b(?:this turn|each combat|you control|your opponents control|alone)\b/.test(m[1]!)) {
     const [head, ...more] = m[1]!.split(/ (?=with )/);
     const filter = parseTargetPhrase([head!.split(" ").map(singular).join(" "), ...more].join(" "));
     return filter?.kind === "object" && !filter.controller && (filter.types?.includes("Creature") || filter.allTypes?.includes("Creature")) ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: m[1]! } }] : null;

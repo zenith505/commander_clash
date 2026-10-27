@@ -1049,6 +1049,8 @@ export function moveObject(
   if (fromZone === "graveyard" && to !== "graveyard" && !o.isToken) {
     const left = ((s.turnLog ??= {}).leftGraveyard ??= []);
     if (!left.includes(o.owner)) left.push(o.owner);
+    const count = (s.turnLog!.leftGraveyardCount ??= {});
+    count[o.owner] = (count[o.owner] ?? 0) + 1;
   }
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
   if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (fromZone === "library" && to === "exile"))
@@ -1116,6 +1118,10 @@ export function moveObject(
   if (to === "graveyard" && o.zone === "graveyard" && fromZone !== "graveyard" && !o.isToken) (s.cardsToGraveyardThisTurn ??= {})[o.owner] = (s.cardsToGraveyardThisTurn?.[o.owner] ?? 0) + 1;
   if (fromZone === "battlefield") {
     if (!(s.permanentLeftThisTurn ??= []).includes(lastController)) s.permanentLeftThisTurn.push(lastController); // revolt
+    if (wasCreature) {
+      const left = ((s.turnLog ??= {}).creaturesLeft ??= {});
+      left[lastController] = (left[lastController] ?? 0) + 1;
+    }
     if (!last.types.includes("Land")) s.voidThisTurn = true;
   }
   // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
@@ -5363,6 +5369,12 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       return `${characteristics(s, o).name}: opponents can't cast noncreature spells with mana value greater than the number of lands they control`;
     if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
+    for (const b of abilitiesOf(s, o).cantBeCast ?? []) {
+      const { manaValue: range, ...rest } = b.filter;
+      if (!printedMatches(rest, d) || (b.hasX && !parseManaCost(d.manaCost).hasX)) continue;
+      if (range && (value === undefined || value < (range.min ?? 0) || value > (range.max ?? Infinity))) continue;
+      return `${characteristics(s, o).name}: ${b.filter.text}s can't be cast`;
+    }
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])

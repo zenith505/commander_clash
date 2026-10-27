@@ -310,6 +310,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
   if (dealt) return { ref: "damagedThisWay", ...(dealt[1]!.toLowerCase() !== "permanent" ? { filter: { kind: "object" as const, types: [dealt[1]![0]!.toUpperCase() + dealt[1]!.slice(1).toLowerCase()], text: dealt[1]!.toLowerCase() } } : {}) };
+  // "~ and up to one other target creature can't be blocked this turn" (Martha Jones), "~ and another target creature each
+  // get +1/+0": the source while it's still there (CR 611.2c), and the one target, other than the source.
+  const selfAndTarget = !ctx.spell && !ctx.selfCard && !cards && !ctx.targets.length ? /^~ and ((?:up to one other|another) target (?:creature|creature you control))$/i.exec(x) : null;
+  if (selfAndTarget) {
+    const t = parseObjectNow(selfAndTarget[1]!, ctx, cards);
+    return t?.ref === "target" && !t.n && !t.sameName ? { ...t, andSelf: true } : null;
+  }
   const several = SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
@@ -332,6 +339,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^~ and that creature(?: each)?$/i.test(x) && !ctx.spell && !ctx.selfCard && ctx.lastObjectTarget !== undefined && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget, andSelf: true };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
+    // "Create a 1/1 ... Otter creature token ... put a +1/+1 counter on that creature" (Otterball Antics): a spell's one
+    // token, with no other creature it could mean.
+    if (ctx.lastCreatedCreature && ctx.spell && /^that creature$/i.test(x) && !ctx.targets.length && !ctx.subject && !ctx.subjectIt) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if (ctx.subjectIt) return { ref: "subject" };
     // "Tap enchanted creature. ... put three stun counters on it": the creature named last.
@@ -581,6 +591,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const equalToughness = many === "any" && / with equal toughness$/.test(mine0);
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
   const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "").replace(equalToughness ? / with equal toughness$/ : /^$/, "");
+  // "Up to three target creatures with toughness X or less" (Finale of Eternity): each one, with the spell's X.
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
   // "Up to three other target creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity):
@@ -589,7 +600,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const perm = both ? parseTargetPhrase(singularPhrase(mine.slice(0, both.index))) : undefined;
   const yard = both ? parseTargetPhrase(`${singularPhrase(both[1]!)} from a graveyard`) : undefined;
   if (both && (perm?.kind !== "object" || yard?.kind !== "card" || perm.controller || yard.owner || theirs)) return null;
-  const parsed = perm && yard ? { ...perm, orCard: yard, text: `${perm.text} or ${yard.text.replace(/^target /, "")}` } : differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx), target: true });
+  const parsed = perm && yard ? { ...perm, orCard: yard, text: `${perm.text} or ${yard.text.replace(/^target /, "")}` } : differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine), ctx.spell && / with (?:toughness|power|mana value) X or less$/.test(mine) ? { x: true } : undefined) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx), target: true });
   // Skullsnatcher: "up to two target cards from that player's graveyard": cards that player owns (as for one target).
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind === "card" ? !!parsed.owner : parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
@@ -1323,11 +1334,12 @@ export function parseTargetPhrase(
     ];
     p = "permanent";
   }
-  // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell": either one (CR 205.3).
-  const orSub = /^(creature|instant) or (spacecraft|aura)$/.exec(p);
+  // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell"; Sokka, Bold Boomeranger:
+  // "artifact or Lesson spell": either one (CR 205.3).
+  const orSub = /^(creature|instant) or (spacecraft|aura)$|^(artifact) or (lesson)$/.exec(p);
   if (orSub && !extra.orSubtypes) {
-    extra.orSubtypes = [capital(orSub[2]!)];
-    p = orSub[1]!;
+    extra.orSubtypes = [capital(orSub[2] ?? orSub[4]!)];
+    p = orSub[1] ?? orSub[3]!;
   }
   // "Each land and Ally you control" (Great Divide Guide): a land, or an Ally whatever its card types.
   // "Artifact creature and/or Vehicle" (Iron Spider): every Vehicle is an artifact (CR 205.3g), so "artifact" is for both

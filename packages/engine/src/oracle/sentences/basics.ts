@@ -364,6 +364,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
   }
+  // Biorhythm: "Each player's life total becomes the number of creatures they control": each player's own number, all
+  // counted before any life total changes (CR 119.5).
+  if ((m = /^Each player's life total becomes the number of (creatures) they control$/.exec(s))) {
+    const amount = parseCount(`the number of ${m[1]} that player controls`, { ...ctx, eachOne: true });
+    return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, amount }] : null;
+  }
   // Repay in Kind: "Each player's life total becomes the lowest life total among all players."
   if (/^Each player's life total becomes the lowest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, lowest: true }];
   // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
@@ -372,6 +378,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: (m[2] === "up" ? Math.ceil : Math.floor)(STARTING_LIFE / 2) }] : null;
   }
+  // Resolute Archangel: "your life total becomes your starting life total": 40 in Commander (CR 903.7, 119.5).
+  if (/^[Yy]our life total becomes (?:equal to )?your starting life total$/.test(s)) return [{ type: "setLife", who: { ref: "you" }, n: STARTING_LIFE }];
   // Beacon of Immortality: "Double target player's life total": they gain (or, below 0, lose) as much life as it takes
   // (CR 701.10d).
   // Celestial Mantle: "Whenever enchanted creature deals combat damage to a player, double its controller's life total."

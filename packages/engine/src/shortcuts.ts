@@ -389,6 +389,9 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     entered,
     damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
     toGraveyard: capped(t.toGraveyard ?? {}),
+    // Bonecache Overseer counts to three; Kutzil's Flanker counts as it enters, not in a loop of passing.
+    leftGraveyardCount: capped((t.leftGraveyardCount ?? {}) as Record<number, number>),
+    creaturesLeft: capped((t.creaturesLeft ?? {}) as Record<number, number>),
     // The Cases count to three (sources, creature cards) and to 5 life.
     toGraveyardTypes: capped(t.toGraveyardTypes ?? {}),
     diedDamaged: Math.min(t.diedDamaged?.length ?? 0, TURN_LOG_CAP),

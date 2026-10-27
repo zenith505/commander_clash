@@ -646,10 +646,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // lose life at the same time (rulings).
       const who = players(s, e.who, ctx);
       const lowest = e.lowest ? Math.min(...livingPlayers(s).map((pid) => player(s, pid).life)) : 0;
+      const own = new Map(e.amount ? who.map((pid) => [pid, amountNow(s, e.amount!, { ...ctx, eachOne: pid })] as const) : []);
       simultaneousLifeLoss(s, () => {
         for (const pid of who) {
           const p = player(s, pid);
-          const diff = (e.double ? 2 * p.life : e.lowest ? lowest : e.n) - p.life;
+          const diff = (e.double ? 2 * p.life : e.lowest ? lowest : e.amount ? own.get(pid)! : e.n) - p.life;
           if (diff > 0 && canGainLife(s, pid)) {
             gainLife(s, pid, diff);
             log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
@@ -781,6 +782,7 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   s.monarch = pid;
   invalidateCharacteristics(s); // "as long as you're the monarch"
   log(s, `${p.name} becomes the monarch.`);
+  fireEvent(s, { type: "becameMonarch", player: pid });
   // Palace Jailer: what it exiled returns as one of its controller's opponents becomes the monarch (CR 610.3).
   const due = (s.exiledUntilMonarch ?? []).filter((x) => x.controller !== pid && opponents(s, x.controller).includes(pid));
   if (!due.length) return;

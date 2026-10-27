@@ -518,7 +518,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Each player returns all creature cards from their graveyard to the battlefield" (Twilight's Call), "... all creature
   // cards of a type chosen this way ..." (Patriarch's Bidding) likewise.
   const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s) ?? /^Each player returns all (.+?) cards from their graveyard to the battlefield( tapped)?$/.exec(s);
-  if (eachReturns) s = `Return all ${eachReturns[1]} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
+  // Balthor the Defiled: "all black and all red creature cards": each card that is either.
+  if (eachReturns) s = `Return all ${eachReturns[1]!.replace(/^(white|blue|black|red|green) and all (white|blue|black|red|green) creature$/, "$1 or $2 creature")} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
   const ofChosen = /^Each player returns all (\w+) cards of a type chosen this way from their graveyard to the battlefield$/.exec(s);
   if (ofChosen) {
     const spec = parseTargetPhrase(`${ofChosen[1]} card of a type chosen this way from a graveyard`, { chosen: true });

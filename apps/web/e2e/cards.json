@@ -14075,6 +14075,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4f9942ee-d3fd-4c01-93eb-870d642ebd83",
+  "name": "See Beyond",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw two cards, then shuffle a card from your hand into your library.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "roe",
+  "releasedAt": "2010-04-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3d1b09a3-f151-4218-974b-02bb6159247a",
   "name": "Seize the Spotlight",
   "manaCost": "{2}{R}",

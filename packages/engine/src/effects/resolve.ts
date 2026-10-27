@@ -556,6 +556,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.chosen?.player : lk && lk.zc === ctx.sourceZc ? lk.chosenPlayer : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "hostController": {
+      // Gremlin Infestation: "enchanted artifact's controller", the permanent the source is attached to now.
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const host = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) && me.attachedTo ? s.objects[me.attachedTo] : undefined;
+      return host?.zone === "battlefield" && !player(s, controllerOf(s, host)).lost ? [controllerOf(s, host)] : [];
+    }
     case "selfController": {
       // The source's controller now, or as it last existed on the battlefield (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

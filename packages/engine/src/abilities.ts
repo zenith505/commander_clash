@@ -291,6 +291,8 @@ export type Count =
       total?: true;
       /** "The greatest power among those creatures" (Shriekwood Devourer): only the trigger event's group still on the battlefield, as it resolves (rulings). */
       inEventGroup?: true;
+      /** "The least power among creatures on the battlefield" (Wretched Banquet): the least instead, 0 with none. */
+      least?: true;
     }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
@@ -594,6 +596,8 @@ export interface TargetSpec {
    * now, checked as it's chosen (a fact that can't change by the time it resolves).
    */
   combatDamagedBySource?: true;
+  /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
+  attackedThisTurn?: true;
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   notPlayer?: PlayerId;
@@ -1049,6 +1053,8 @@ export type PlayerRef =
   | { ref: "selfChosenPlayer" }
   /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
   | { ref: "selfController" }
+  /** "Enchanted artifact's controller" (Gremlin Infestation): who controls the permanent the source is attached to now. */
+  | { ref: "hostController" }
   /** "The player to your right" (Bucknard's Everfull Purse): the one before you in turn order, "to your left" the one after (CR 101.4). */
   | { ref: "neighbor"; side: "left" | "right" }
   /** "Its owner" in an ability of ~ about ~ itself (Yes Man): whose ~ is (CR 108.3). */
@@ -3843,6 +3849,11 @@ export type TriggerEvent =
   | "creatureBlocks"
   | "creatureBecomesBlocked"
   /**
+   * "Whenever a creature blocks a black or red creature" (Righteous Indignation): once for each creature it blocks that
+   * fits `blockFilter` (CR 509.3c), the blocker its subject (`subjectFilter`).
+   */
+  | "creatureBlocksCreature"
+  /**
    * "Whenever a creature deals damage to you" (Dread), "Whenever a source an opponent controls deals damage to you" (Michiko
    * Konda): once for each source dealing damage to this permanent's controller (CR 603.2c), see `damagesYou`.
    */
@@ -4151,6 +4162,8 @@ export interface TriggeredAbility {
    * creatures" (Rashka the Slayer): once per combat, if any creature it blocks or that blocks it matches (rulings).
    */
   blockFilter?: TargetSpec;
+  /** "Whenever ~ blocks two or more creatures" (Lairwatch Giant): only if it blocks at least this many as blockers are declared. */
+  blocksAtLeast?: number;
   /**
    * For "dealsDamageToYou": a source that's a permanent fitting `subjectFilter` (the subject, "it", "that creature"), or
    * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its

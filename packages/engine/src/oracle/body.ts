@@ -933,8 +933,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\b(Create an? \d+\/\d+) ([A-Z][a-z]+) creature token that's ((?:white|blue|black|red|green), (?:white|blue|black|red|green),? and (?:white|blue|black|red|green))\./g, "$1 $3 $2 creature token.");
   // Michelangelo, On the Scene: "When ~ dies, return ~ to your hand": a card goes only to its owner's hand (CR 400.3).
   text = text.replace(/^([Rr])eturn ~ to your hand\.$/, "$1eturn ~ to its owner's hand.");
-  // Primal Order: "... the number of nonbasic lands they control", the same.
-  text = text.replace(/^(~ deals damage to that player equal to the number of (?:nonbasic )?[A-Za-z]+) they control\.$/, "$1 that player controls.");
+  // Primal Order: "... the number of nonbasic lands they control", the same; Cold Snap's "snow lands they control".
+  text = text.replace(/^(~ deals damage to that player equal to the number of (?:nonbasic |snow )?[A-Za-z]+) they control\.$/, "$1 that player controls.");
+  // Strength of Night: "If ~ was kicked, Zombie creatures you control get an additional +2/+2 until end of turn": a
+  // second pump on top of the first.
+  text = text.replace(/(\. If ~ was kicked, [A-Z][a-z]+ creatures you control get) an additional ([+-]\d+\/[+-]\d+ until end of turn\.)$/, "$1 $2");
+  // Thoughtcutter Agent: "Target player loses 1 life and reveals their hand": two instructions, in order.
+  text = text.replace(/^(Target (?:player|opponent) loses \d+ life) and reveals their hand\.$/, "$1. That player reveals their hand.");
+  // Rookie Mistake: "Until end of turn, target creature gets +0/+2 and another target creature gets -2/-0": each until end
+  // of turn, two different targets.
+  text = text.replace(/^Until end of turn, target creature (gets [+-]\d+\/[+-]\d+) and another target creature (gets [+-]\d+\/[+-]\d+)\.$/, "Target creature $1 until end of turn. Another target creature $2 until end of turn.");
+  // Stinging Vitriol: "That player reveals their hand. You choose a nonland card from it. They discard that card.": the
+  // same as "... That player discards that card.", "they" being that player.
+  text = text.replace(/(\. That player reveals their hand\. You choose an? (?:[a-z]+ )?card from it\.) They discard that card\.$/, "$1 That player discards that card.");
+  // Burning Palm Efreet: "~ deals 2 damage to target creature with flying and that creature loses flying until end of
+  // turn": two instructions, in order.
+  text = text.replace(/^(~ deals \d+ damage to target creature with flying) and (that creature loses flying until end of turn)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Word of Blasting: "Destroy target Wall. ... deals damage equal to that Wall's mana value to the Wall's controller": the
+  // creature destroyed, as it last existed (CR 608.2h).
+  text = text.replace(/(\. ~ deals damage equal to) that Wall's mana value to the Wall's controller\.$/, "$1 that creature's mana value to that creature's controller.");
   // Rakdos Ickspitter: "~ deals 1 damage to target creature and that creature's controller loses 1 life": two
   // instructions, in order; the controller as the creature is now or last existed (CR 608.2h).
   text = text.replace(/^(~ deals \d+ damage to target creature) and (that creature's controller loses \d+ life)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
@@ -4477,6 +4494,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!fx || fx.length !== 1 || fx[0]!.type !== "putOntoBattlefield") return null;
       effects.push(...fx, { type: "damage", amount: { count: { kind: "power", of: { ref: "created" } } }, to: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "each other creature" }, notCreated: true }, by: "created" });
       si++;
+      continue;
+    }
+    // Wretched Banquet: "Destroy target creature if it has the least power or is tied for least power among creatures on
+    // the battlefield": any creature may be the target; its power is checked as it resolves (rulings).
+    const leastIf = /^(Destroy target creature) if it has the least power or is tied for least power among creatures on the battlefield$/.exec(s);
+    if (leastIf) {
+      const before = ctx.targets.length;
+      const fx = parseOne(leastIf[1]!, ctx);
+      if (!fx || ctx.targets.length !== before + 1) return null;
+      const creatures: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures on the battlefield" };
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], bound: { key: "power", at: "most", amount: { count: { kind: "greatestPower", filter: creatures, least: true } } }, text: "the least power among creatures on the battlefield" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: fx });
       continue;
     }
     // "Return target creature to its owner's hand. If its mana value was 3 or less, scry 1." (Fading Hope, Perilous

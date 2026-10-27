@@ -677,6 +677,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greatestPower": {
       // 0 with none, or with only negative values (rulings on Inscription of Abundance: no life gained or lost).
       let best = 0;
+      let least: number | undefined;
       const filter = bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       for (const id of s.battlefield) {
@@ -687,9 +688,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) {
           const n = c.toughness ? ch.toughness : ch.power;
           best = c.total ? best + n : Math.max(best, n);
+          least = Math.min(least ?? n, n);
         }
       }
-      return best;
+      return c.least ? (least ?? 0) : best;
     }
     case "cardsInExile": {
       if (!c.who) return s.turnOrder.reduce((n, pid) => n + s.players[pid]!.exile.length, 0);
@@ -976,7 +978,7 @@ function describeCount(c: Count): string {
     case "graveyardManaValues":
       return "#mana values in your graveyard";
     case "greatestPower":
-      return `the ${c.total ? "total" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
+      return `the ${c.total ? "total" : c.least ? "least" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestMvInExile":
       return "the greatest mana value among cards in exile";
     case "cardsInExile":

@@ -73,6 +73,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Depletion lands: "~ doesn't untap during your untap step if it has a depletion counter on it" is the same as "as
   // long as it has one" (checked as the untap step begins, CR 502.3).
   // Steel Dromedary: "if it has a +1/+1 counter on it"; Alirios, Enraptured: "if you control a Reflection".
+  // Relic Runner: "~ can't be blocked if you've cast a historic spell this turn": the same as "as long as", checked as
+  // blockers are declared (rulings: casting one later doesn't undo a block).
+  const ifCast = /^~ can't be blocked if (you've cast an? [a-z]+ spell this turn)\.$/.exec(line);
+  if (ifCast) {
+    const st = parseConditionalStatic(`~ can't be blocked as long as ${ifCast[1]}.`);
+    return st && { ...st, text: line };
+  }
   const ifCounter = /^~ doesn't untap during your untap step if it has an? ([a-z]+|\+1\/\+1) counter on it\.$/.exec(line);
   if (ifCounter) {
     const st = parseConditionalStatic(`As long as ~ has a ${ifCounter[1]} counter on it, it doesn't untap during your untap step.`);
@@ -1746,6 +1753,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
 export function parseStatic(line: string): StaticAbility | null {
   const st = parseStaticLine(line) ?? parseTransform(line);
   if (st) return st;
+
   // Glamdring: "Equipped creature has first strike and gets +1/+0 for each instant and sorcery card in your graveyard"
   // says the same as "gets ... and has first strike". So does Runechanter's Pike's "has first strike and gets +X/+0,
   // where X is ...".
@@ -2155,7 +2163,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Marble Priest: "All Walls able to block ~ do so": only Walls (CR 509.1c), any player's.
   const lureBy = /^All ([A-Z][a-z]+)s able to block ~ do so$/.exec(text);
   if (lureBy && CREATURE_TYPES.has(lureBy[1]!))
-    return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock", by: { kind: "object", types: ["Creature"], subtypes: [lureBy[1]!], text: lureBy[1]! } }], text: line };
+    return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock", by: { kind: "object", types: ["Creature"], subtypes: [lureBy[1]!], text: `${lureBy[1]!}s` } }], text: line };
+  // Talruum Piper: "All creatures with flying able to block ~ do so": only those with flying, the same.
+  if (/^All creatures with flying able to block ~ do so$/.test(text))
+    return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock", by: { kind: "object", types: ["Creature"], keywords: ["Flying"], text: "creatures with flying" } }], text: line };
   if (/^All creatures able to block (enchanted|equipped) creature do so$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line };
   // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).
   const unblocked = [{ kind: "unblockedDamage" }] as const;

@@ -726,11 +726,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Apocalypse Demon: "tap ~ unless you sacrifice another creature": tapped instead.
   // Primeval Force: "... unless you sacrifice three Forests", Hecatomb's "four creatures", Jokulmorder's "five lands": all of
   // them or none (Hecatomb's rulings).
-  if ((m = /^([Ss]acrifice|[Ee]xile|[Tt]ap) (~|it) unless you sacrifice (an? .+?|another .+?|(?:two|three|four|five) (?:[A-Z][a-z]+s|lands|creatures))$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+  // Psychic Allergy: "destroy ~ unless you sacrifice two Islands": destroyed instead.
+  if ((m = /^([Ss]acrifice|[Ee]xile|[Tt]ap|[Dd]estroy) (~|it) unless you sacrifice (an? .+?|another .+?|(?:two|three|four|five) (?:[A-Z][a-z]+s|lands|creatures))$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const many = /^(two|three|four|five) /.exec(m[3]!);
     const filter = pickFilter(many ? singular(m[3]!.slice(many[0].length)) : m[3]!.replace(/^(?:an?|another) /, ""));
     if (!filter || / or |,/.test(m[3]!)) return null;
-    const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
+    const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : /^destroy/i.test(m[1]!) ? { type: "destroy", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: many ? num(many[1]!) : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
   }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).

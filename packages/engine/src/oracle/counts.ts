@@ -23,6 +23,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // modified creatures you control".
   p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
   let m: RegExpExecArray | null;
+  // Superior Numbers: "the number of creatures you control in excess of the number of creatures target opponent controls":
+  // the first less the second, 0 if it's not more (CR 107.1b).
+  if (!each && (m = /^(the number of .+?) in excess of (the number of .+)$/.exec(p))) {
+    const a = parseCount(m[1]!, ctx);
+    const b = a && parseCount(m[2]!, ctx);
+    return a && b && Object.keys(a).length === 1 && Object.keys(b).length === 1 ? { count: { kind: "difference", of: [a.count, b.count] } } : null;
+  }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
   // Curse of Thirst: "the number of Curses attached to them", them being the enchanted player whose upkeep it is.

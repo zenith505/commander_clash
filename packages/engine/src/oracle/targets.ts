@@ -119,6 +119,8 @@ export function pickFilter(phrase: string): TargetSpec | null {
 export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   const x = p.trim().toLowerCase();
   if (x === "you") return { ref: "you" };
+  // Gremlin Infestation: "enchanted artifact's controller", in a permanent's own ability.
+  if (/^enchanted (?:artifact|creature|enchantment|land|permanent)'s controller$/.test(x) && !ctx.spell) return { ref: "hostController" };
   if (x === "each opponent") return { ref: "eachOpponent" };
   if (x === "each player") return { ref: "eachPlayer" };
   // Blightning: "... to target player or planeswalker. That player or that planeswalker's controller discards two cards":
@@ -258,6 +260,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // Hope of Ghirapur: "target player who was dealt combat damage by ~ this turn" (turnLog.combatDamagedBy, ~ as it is).
   if (x === "target player who was dealt combat damage by ~ this turn") {
     const index = addTarget(ctx, { kind: "player", combatDamagedBySource: true, text: x });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
+  // Fire and Brimstone: "target player who attacked this turn" (Player.attackedTurn).
+  if (x === "target player who attacked this turn") {
+    const index = addTarget(ctx, { kind: "player", attackedThisTurn: true, text: x });
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
@@ -410,8 +418,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   }
   // Hubris: "target creature and all Auras attached to it"; Silence the Believers: "any number of target creatures and all
   // Auras attached to them"; Turn to Slag: "all Equipment attached to that creature" (the target before).
-  // Eaten by Spiders: "target creature with flying and all Equipment attached to that creature" likewise.
-  const andAttached = /^(.*target creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
+  // Eaten by Spiders: "target creature with flying and all Equipment attached to that creature" likewise; Soul Nova:
+  // "target attacking creature and all Equipment attached to it".
+  const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   if ((andAttached || attachedThat) && !cards) {
     const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;

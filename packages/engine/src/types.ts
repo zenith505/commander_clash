@@ -1535,7 +1535,7 @@ export interface GameState {
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
-  cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
+  cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId; /** Not this object (Intimidation Bolt's target), while it's the same one (CR 400.7). */ except?: { id: string; zc: number } }[];
   /** "Creatures can't be blocked this turn": matching creatures can't be blocked, also ones that arrive later. */
   cantBeBlockedThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast (and ability activated) this turn as it was put on the stack, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
@@ -1572,7 +1572,7 @@ export interface GameState {
   /** Their names, as they last existed ("" for a face-down one, CR 708.2): "a creature not named ~ died this turn" (Ebondeath). */
   diedNamesThisTurn?: string[];
   /** Their creature types as they last existed ("for each Zubera that died this turn"): `all` for a changeling (CR 702.73a); none for a face-down one. */
-  diedTypesThisTurn?: { subtypes: string[]; all?: true }[];
+  diedTypesThisTurn?: { subtypes: string[]; all?: true; /** Who controlled it as it died. */ controller?: PlayerId }[];
   /** The same for nontoken creatures (Gadrak, the Crown-Scourge). */
   nontokenDiedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */

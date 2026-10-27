@@ -122,6 +122,8 @@ export interface Characteristics {
   /** "You may have ~ assign its combat damage as though it weren't blocked." */
   unblockedDamage: boolean;
   doesntUntap: boolean;
+  /** "Can't become untapped" (Frozen in Ice): not by any effect either (game.ts untapPermanent). */
+  cantBecomeUntapped?: true;
   cantBeSuspected: boolean;
   /** "Can block only creatures with flying" (CR 509.1b). */
   blocksOnlyFlyers: boolean;
@@ -1363,6 +1365,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "doesntUntap":
       c.doesntUntap = true;
+      return;
+    case "cantBecomeUntapped":
+      c.doesntUntap = true;
+      c.cantBecomeUntapped = true;
       return;
     case "cantBeSuspected":
       c.cantBeSuspected = true;

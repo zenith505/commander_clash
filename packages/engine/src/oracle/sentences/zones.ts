@@ -349,7 +349,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
-  if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ on top of your library)$/.exec(s)))
+  if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ (?:from your graveyard )?on top of your library)$/.exec(s)))
     return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   // Gryff's Boon: "{3}{W}: Return ~ from your graveyard to the battlefield attached to target creature": the target, which
   // the ability targets (the Aura isn't cast, so it targets nothing itself, CR 303.4f); with that creature an illegal
@@ -879,6 +879,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
+  // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
+  // library": the X it was cast with.
+  if ((m = /^Put (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "putInLibrary", what, position: "top", beneath: amt("X") }] : null;
+  }
   // Mortuary: "Whenever a creature is put into your graveyard from the battlefield, put that card on top of your
   // library": the card, if it's still in your graveyard (CR 400.7); yours, so its owner's library.
   if (/^[Pp]ut that card on top of your library$/.test(s) && ctx.subjectLeft) {
@@ -1066,6 +1072,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // Intimidation Bolt: "~ deals 3 damage to target creature. Other creatures can't attack this turn.": every creature but
+  // that one, also ones that arrive later, and all of them if it left the battlefield (rulings).
+  if (/^Other creatures can't attack this turn$/.test(s) && ctx.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "other creatures" }, exceptTarget: ctx.lastObjectTarget }];
   // Venser, the Sojourner: "Creatures can't be blocked this turn": all creatures, also ones that arrive later (rulings).
   if (/^Creatures can't be blocked this turn$/.test(s)) return [{ type: "cantBeBlockedRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
   // "Until your next turn, those permanents can't attack or block and their activated abilities can't be activated" (Mythos

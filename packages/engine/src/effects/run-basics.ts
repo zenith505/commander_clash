@@ -563,9 +563,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `Until end of turn, ${player(s, ctx.controller).name} doesn't lose unspent ${e.color ? `${COLOR_NAMES[e.color].toLowerCase()} ` : ""}mana as steps and phases end.`);
       return;
     case "cantAttackRule":
-      (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
+    {
+      const t = e.exceptTarget !== undefined ? ctx.targets[e.exceptTarget] : undefined;
+      const except = t?.kind === "object" ? { id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 } : undefined;
+      (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller, ...(except ? { except } : {}) });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
       return;
+    }
     case "costModThisTurn":
       (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
       log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);
@@ -651,15 +655,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "setLife": {
       // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
-      // "The lowest life total among all players" (Repay in Kind): counted once, before anyone's changes; the players
+      // "The lowest (or highest, Arbiter of Knollridge) life total among all players" (Repay in Kind): counted once, before anyone's changes; the players
       // lose life at the same time (rulings).
       const who = players(s, e.who, ctx);
-      const lowest = e.lowest ? Math.min(...livingPlayers(s).map((pid) => player(s, pid).life)) : 0;
+      const shared = e.lowest ? Math.min(...livingPlayers(s).map((pid) => player(s, pid).life)) : e.highest ? Math.max(...livingPlayers(s).map((pid) => player(s, pid).life)) : 0;
       const own = new Map(e.amount ? who.map((pid) => [pid, amountNow(s, e.amount!, { ...ctx, eachOne: pid })] as const) : []);
       simultaneousLifeLoss(s, () => {
         for (const pid of who) {
           const p = player(s, pid);
-          const diff = (e.double ? 2 * p.life : e.lowest ? lowest : e.amount ? own.get(pid)! : e.n) - p.life;
+          const diff = (e.double ? 2 * p.life : e.lowest || e.highest ? shared : e.amount ? own.get(pid)! : e.n) - p.life;
           if (diff > 0 && canGainLife(s, pid)) {
             gainLife(s, pid, diff);
             log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);

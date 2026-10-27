@@ -187,6 +187,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m.at(-1)!);
     return filter?.kind === "object" ? [{ type: "untapUpTo", n: /^an?$/.test(m[1]!) ? 1 : num(m[1]!), filter: { ...filter, controller: "you", text: `${filter.text} you control` } }] : null;
   }
+  // Hokori, Dust Drinker: "At the beginning of each player's upkeep, that player untaps a land they control": that player's
+  // choice among their tapped ones, as White Plume Adventurer's above.
+  if (/^[Tt]hat player untaps a land they control$/.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    return who ? [{ type: "untapUpTo", n: 1, filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], controller: "you", text: "land they control" }, who }] : null;
+  }
   // "Tap or untap target permanent" (Twiddle, Pestermite): which is chosen as it resolves (CR 608.2d).
   if ((m = /^Tap or untap ((?:another )?target .+|that creature|it|~|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

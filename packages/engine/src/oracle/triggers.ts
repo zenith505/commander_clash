@@ -761,6 +761,14 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
     const body = parseBody(either[1]!, {});
     return body ? { event: "youGainLife", orLoseLife: true, body } : "fail";
   }
+  // Vampire Scrivener: "Whenever you gain life during your turn, ...", "Whenever you lose life during your turn, ...": only
+  // while you're the active player.
+  const yourTurn = /^Whenever you (gain|lose) life during your turn, (.+)$/.exec(line);
+  if (yourTurn) {
+    if (/\b(?:that much|that many|X)\b/.test(yourTurn[2]!)) return "fail";
+    const body = parseBody(yourTurn[2]!, {});
+    return body ? { event: yourTurn[1] === "gain" ? "youGainLife" : "youLoseLife", onYourTurn: true, body } : "fail";
+  }
   const m = /^Whenever an opponent loses life for the first time during each of their turns, (.+)$/.exec(line);
   if (!m) return null;
   const body = parseBody(m[1]!, { eventPlayer: true });

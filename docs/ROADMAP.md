@@ -1,7 +1,7 @@
 # Roadmap
 
-25,870 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,724 of
+25,931 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,725 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -322,19 +322,34 @@ line blocks.
    chooses targets), Curse of Shallow Graves ("that attacking player may"), Namor (blue mana symbols in a cost), Tune
    Up (a Vehicle becoming an artifact creature with no duration), Bounding Felidar ("for each of those creatures" after
    counters), Gleam of Authority ("other creatures" there means other than the enchanted creature), Azog, Sengir,
-   Mysterio, Gate to the Aether. Rules bug found (fix first next round): Bravado, Conclave's Blessing and Vampirism
-   ("Enchanted creature gets +1/+1 for each other creature you control") leave out the Aura rather than the enchanted
-   creature, so the enchanted creature counts itself (Count permanents' `other` skips only the source). Round 179 went down from rank 10,640 to about rank 11,250 (Caller of the Claw,
+   Mysterio, Gate to the Aether. Round 179 went down from rank 10,640 to about rank 11,250 (Caller of the Claw,
    Obzedat, Herald of Amity, Ajani Unyielding, Bess, Mana Breach, Nahiri, Heir of the Ancients, Goldwardens' Gambit,
    Expel from Orazca, Mystical Dispute, Stern Scolding, Roalesk, King Macar, Deathrender, Oathkeeper, Goro-Goro and
    Satoru, Catapult Fodder, From Father to Son, Besmirch, Sly Instigator, Strategic Betrayal, Wasitora, Millicent,
    Unnatural Moonrise, Rally the Ancestors, Ever After, Olivia, Mobilized for War, Kurbis, Vile Redeemer and others),
    taking the easy ones.
-   Next most played after rank 11,250: Tom, Bert, and William, Ich-Tekik, Salvage Splicer, Spellweaver Helix, Ian
-   Malcolm, Chaotician, Panther Habit, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, Trailblazer's Torch, The
-   Nipton Lottery, Emergent Sequence, Vengeful Regrowth, The Seventh Doctor, Lucy MacLean, Gideon Jura, Ceaseless
-   Conflict, Call a Surprise Witness, Relentless Rats, Treacherous Greed, Foggy Swamp Visions; the harder ones from
-   ranks 10,640 to 11,250 (above); the harder ones from ranks 10,060 to
+   Out after round 180: Tom, Bert, and William and Fang, Roku's Companion (returning as another type), Spellweaver
+   Helix, Ian Malcolm, Chaotician, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, The Nipton Lottery, Emergent
+   Sequence, The Seventh Doctor, Lucy MacLean, Gideon Jura, Treacherous Greed ("a creature that dealt damage this
+   turn"), Foggy Swamp Visions, Ferocious Tigorilla (a choice of counter as it enters), Gate to the Afterlife, Galloping
+   Lizrog, Dimir Machinations (exiling some of target player's top cards), Read the Runes, Liege of the Tangle, Sunder
+   the Gateway (transform an Incubator you control), Myriad Construct, Zaffai, Thunder Conductor (an opponent chosen at
+   random), All-Seeing Arbiter, Life's Finale (an opponent's library into their graveyard), Aerith Rescue Mission (a
+   stun counter on one of them), Territorial Aetherkite, Stunning Reversal, Manabond, Glowcap Lantern (granting "look at
+   the top card of your library any time"), Wernog, Jinxed Choker, Fall of the Impostor (the greatest power among a
+   target opponent's creatures), Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
+   counters" as a cost), Power Surge (untapped lands at the start of the turn), Jace, Cunning Castaway, Curse of
+   Vengeance, Shaile ("entered under your control this turn"), Ugin's Conjurant, Tales of the Ancestors. Round 180
+   fixed "other" in Auras' and group statics (Bravado, Conclave's Blessing, Vampirism, Heroes' Podium, Sliver Legion:
+   other than the permanent it affects; Daru Stinger and Kjeldoran Javelineer counted their target's counters) and went
+   down from rank 11,250 to about rank 11,770 (Anoint with Affliction, Ceaseless Conflict, Desperate Measures, Egon,
+   Faithbound Judge, Feast on the Fallen, Kami of Transience, Lightmine Field, Mark of Sakiko, Miles "Tails" Prower,
+   Caradora, Melira, Samut, She-Hulk, Herald of Ilharg, Vengeful Regrowth, Panther Habit, Tide Shaper, Essence
+   Symbiote, Mask of the Schemer, Vantress Gargoyle, Aether Snap, Serra Avenger and others), taking the easy ones.
+   Next most played after rank 11,770: Gloom Ripper, Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow
+   Marauder, Gorex, the Tombshell, Flamescroll Celebrant, Jacob Hauken, Flourishing Bloom-Kin, Pit Automaton, Pyxis of
+   Pandemonium, Guile, Jaya, Fiery Negotiator, Urge to Feed, Skanos Dragonheart, Fumble; the harder ones from ranks
+   10,640 to 11,770 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
@@ -343,7 +358,7 @@ line blocks.
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in rounds 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,

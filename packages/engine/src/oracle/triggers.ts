@@ -1773,6 +1773,13 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
  * discard a creature card". "One or more cards" (once per batch) isn't modeled.
  */
 function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // Spiritual Focus: "Whenever a spell or ability an opponent controls causes you to discard a card": a discard that's an
+  // effect of such a spell or ability, not a cost (rulings on Psychic Purge).
+  const byOpponent = /^Whenever a spell or ability an opponent controls causes you to discard a card, /.test(line0);
+  if (byOpponent) {
+    const t = parseDiscardTrigger(line0.replace(/^Whenever a spell or ability an opponent controls causes you to discard a card, /, "Whenever you discard a card, "));
+    return t && t !== "fail" && t.discards ? { ...t, discards: { ...t.discards, byOpponent: true } } : t;
+  }
   // Valiant Rescuer: "Whenever you cycle another card for the first time each turn": the player's first cycle this turn.
   const first = /^(Whenever you cycle (?:another|a) card) for the first time each turn, /.exec(line0);
   const line = first ? `${first[1]}, ${line0.slice(first[0].length)}` : line0;
@@ -2628,6 +2635,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = filter && filter.kind === "object" && parseBody(tapped[3]!, { subjectIt: true });
     return filter && body ? { event: tapped[2] === "tapped" ? "permanentBecomesTapped" : "permanentBecomesUntapped", tappedFilter: filter, body } : "fail";
   }
+  // "Whenever a permanent is turned face up" (Aven Farseer, Bonethorn Valesk), "Whenever ~ or another creature you control
+  // is turned face up" (Pine Walker), "Whenever a face-down permanent you control is turned face up" (Sumala Sentry): the
+  // permanent, as it is once face up (CR 708.8: it doesn't enter), is the subject ("that creature", "it"). "Face-down"
+  // is what it was until then, so any permanent turned face up.
+  // "If it's a creature" (Trail of Mystery, Salt Road Ambushers): an intervening "if" about it (CR 603.4).
+  const faceUp = /^Whenever (~ or another|another|an?(?: face-down)?) ((?:[A-Z][a-z]+|permanent|creature)(?: you control)?) is turned face up, (if it's a creature, )?(.+)$/.exec(line);
+  if (faceUp) {
+    const filter = parseTargetPhrase(faceUp[2]!);
+    const body = filter?.kind === "object" ? parseBody(faceUp[4]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true }) : null;
+    if (!filter || filter.kind !== "object" || !body) return "fail";
+    return { event: "permanentTurnedFaceUp", tappedFilter: { ...filter, ...(faceUp[1] === "another" ? { notSource: true } : {}) }, ...(faceUp[3] ? { ifCond: { kind: "subjectCardType", type: "Creature" } as const } : {}), body };
+  }
   // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
   const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);
   if (mutates) {
@@ -2791,6 +2810,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (discarded) {
     const body = parseBody(discarded[1]!, { selfCard: true });
     return body ? { event: "selfDiscarded", body } : "fail";
+  }
+  // "When a spell or ability an opponent controls causes you to discard ~" (Sand Golem, Metrognome, Psychic Purge): the
+  // same, only for a discard that's an effect of a spell or ability an opponent controls, not a cost (rulings on Psychic
+  // Purge); a choice that spell or ability gave you counts (rulings on Ajani's Last Stand). "That player" is that opponent.
+  // Guerrilla Tactics: "it deals 4 damage" (the card is the source, rulings). Quagnoth: "return it to your hand" from
+  // wherever it went (rulings: from exile too).
+  const discardedBy = /^When a spell or ability an opponent controls causes you to discard ~, (.+)$/.exec(line);
+  if (discardedBy) {
+    const text = discardedBy[1]!.replace(/^it deals /, "~ deals ");
+    const body: AbilityBody | null = text === "return it to your hand." ? { targets: [], effects: [{ type: "bounce", what: { ref: "selfCard" } }], text } : parseBody(text, { selfCard: true, eventPlayer: true });
+    return body ? { event: "selfDiscarded", discardedByOpponent: true, body } : "fail";
   }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   // "When you have 30 or more life, flip ~" (Rune-Tail), "When ~ has flying, flip it" (Student of Elements).

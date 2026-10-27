@@ -367,7 +367,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const selfAndTarget = !ctx.spell && !ctx.selfCard && !cards && !ctx.targets.length ? /^~ and ((?:up to one other|another) target (?:creature|creature you control))$/i.exec(x) : null;
   if (selfAndTarget) {
     const t = parseObjectNow(selfAndTarget[1]!, ctx, cards);
-    return t?.ref === "target" && !t.n && !t.sameName ? { ...t, andSelf: true } : null;
+    return t?.ref === "target" && !t.n && !t.sameName && !t.sharesColor ? { ...t, andSelf: true } : null;
   }
   const several = SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
@@ -421,6 +421,15 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     ctx.lastAttached = true;
     return { ref: "attached" };
   }
+  // Radiance: "target creature and each other creature that shares a color with it" (Wojek Siren), Leave No Trace's
+  // enchantments: one target, and the others by color as it resolves.
+  const radiance = /^target (creature|enchantment) and each other (creature|enchantment) that shares a color with it$/i.exec(x);
+  if (radiance && !cards && radiance[1] === radiance[2]) {
+    const t = parseObjectNow(`target ${radiance[1]}`, ctx, cards);
+    if (t?.ref !== "target" || t.n) return null;
+    const type = radiance[1] === "creature" ? "Creature" : "Enchantment";
+    return { ...t, sharesColor: { filter: { kind: "object", types: [type], text: radiance[2]! } } };
+  }
   // "Target creature and all other creatures with the same name as that creature" (Maelstrom Pulse, Homing Lightning,
   // Declaration in Stone's "all other creatures its controller controls", Legions to Ashes' "all tokens that player
   // controls"): one target, and the others by name as it resolves.
@@ -442,12 +451,18 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "target attacking creature and all Equipment attached to it".
   const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
-  // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land.
-  const attachedTarget = !cards ? /^all Auras attached to (target land)$/i.exec(x) : null;
+  // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
+  // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
+  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature)$/i.exec(x) : null;
   if (attachedTarget) {
-    const t = parseObjectNow(attachedTarget[1]!, ctx, cards);
+    const t = parseObjectNow(attachedTarget[2]!, ctx, cards);
     if (t?.ref !== "target" || t.n) return null;
-    return { ...t, attachedToo: { filter: { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" }, only: true } };
+    const kind = attachedTarget[1]!;
+    const filter: TargetSpec =
+      kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" }
+      : kind === "Equipment" ? { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" }
+      : { kind: "object", subtypes: ["Aura", "Equipment"], text: "Aura or Equipment" };
+    return { ...t, attachedToo: { filter, only: true } };
   }
   if ((andAttached || attachedThat) && !cards) {
     const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
@@ -459,7 +474,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
       return { ref: "target", index: i, attachedToo: { filter, only: true } };
     }
     const t = parseObjectNow(andAttached![1]!, ctx, cards);
-    if (t?.ref !== "target" || t.sameName) return null;
+    if (t?.ref !== "target" || t.sameName || t.sharesColor) return null;
     return { ...t, attachedToo: { filter } };
   }
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
@@ -716,8 +731,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   }
   const first = ctx.targets.length;
   if (many) {
-    if (single || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    // Rats' Feast: "X target cards from a single graveyard": each in the graveyard of the others (TargetSpec.singleGraveyard).
+    if ((single && many !== "exactX") || share || ctx.targets.some((t) => t.many)) return null;
+    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
@@ -1199,6 +1215,12 @@ export function parseTargetPhrase(
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
   }
+  // Sizzling Barrage: "target creature that blocked this turn".
+  const blockedTurn = / that blocked this turn$/.exec(p);
+  if (blockedTurn && !extra.combat) {
+    extra.combat = "blockedThisTurn";
+    p = p.slice(0, blockedTurn.index);
+  }
   // Kratos, God of War: "creatures that player controls that didn't attack this turn": not declared as attackers this
   // turn (CR 508.1a); one put onto the battlefield attacking never attacked (CR 508.4).
   const didnt = !/, except for creatures that couldn't attack$/.test(p) && / that didn't attack this turn$/.exec(p);
@@ -1233,11 +1255,11 @@ export function parseTargetPhrase(
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
   }
-  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
+  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creature you control with a level counter on it" (Time of Heroes), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

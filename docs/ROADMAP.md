@@ -1,7 +1,7 @@
 # Roadmap
 
-26,502 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,805 of
+26,578 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,808 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1773,6 +1773,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Lifelace and Purelace still (a color change on a spell); Brine Comber (its back face); Browse
   (exiling the rest of the cards looked at); Gremlin Mine ("up to four" charge counters removed); Agonizing Memories
   (the two cards' order on the library); Purging Scythe, Pyramids and Dragon Hunter (not looked at in depth yet).
+- Round B16 (harder skipped cards, least played first): "Return this card from your graveyard to the battlefield with a
+  finality counter on it" activations (Grim Repriser, Proctor of Potential, Resurrected Cultist, Balustrade Wurm, CR
+  122.1h) with "an opponent has been dealt noncombat damage this turn" and "you've scried or surveilled this turn";
+  "When a spell or ability an opponent controls causes you to discard this card" (Sand Golem, Mangara's Blessing,
+  Quagnoth, Metrognome, Psychic Purge, Guerrilla Tactics, Ajani's Last Stand; not for a discard paid as a cost, rulings),
+  Dodecapod's replacement, Spiritual Focus; "Whenever a permanent is turned face up" (Bonethorn Valesk, Aven Farseer,
+  Aphetto Runecaster, Unblinking Bleb, True Identity, Mastery of the Unseen, Pine Walker and others, CR 708.8); a card
+  revealed at random from a hand and its mana value (the Planeswalker's enchantments, Hired Torturer, Singe-Mind Ogre,
+  Merfolk Spy, Ignite Memories); Radiance's "target creature and each other creature that shares a color with it"
+  (Cleansing Beam, Wojek Siren, Brightflame, Rally the Righteous, Leave No Trace and five more; colorless shares none,
+  rulings); "target creature that blocked this turn" (Sizzling Barrage); "can't attack, block, or crew Vehicles"
+  (Revoke Privileges, Bound in Gold, Intercessor's Arrest; the crew picker skips the creature, browser test); "can't be
+  equipped" (Goblin Brawler, CR 701.3b, 704.5n); Misstep, Disarm, Strip Bare, Twisted Justice, Tyrannize, Flunk, Eye
+  Spy, Lurking Informant and Draugr Thought-Thief (browser test), Wizard Mentor, Snow Hound, Kitsune Palliator,
+  Tahngarth's Rage, Even the Odds, Time of Heroes, Make a Wish, Rats' Feast, Vitalizing Cascade, An-Havva Inn and
+  others. +76 (26,545 with round 185).
+- Skipped there, with reasons: Dragon Whelp, Farrelite Priest, Initiates of the Ebon Hand and Nalathni Dragon (how
+  many times it was activated this turn, counted as the delayed trigger resolves); the Licids (paying to end the
+  effect is a special action); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
+  Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
+  twice: no ruling); Gideon's Triumph and Inferno Hellion ("attacked or blocked this turn", and Gideon's "two of
+  those creatures instead"); Heat Stroke ("was blocked this turn"); Perilous Predicament (two sacrifices of different
+  kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
+  Planeswalker's Mischief, Dementia Sliver and Wand of Ith (not looked at in depth).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Heart Wolf (Dwarves, a
@@ -1784,10 +1808,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   and Aven Soulgazer (look at a face-down creature).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
-  cost), Haphazard Bombardment (aim counters), Perimeter Enforcer and Projektor Inspector ("a Detective is turned face
-  up", now close), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
-  ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Surge of Zeal ("shares a
-  color with it"), Sabotage Strategist, Lavabrink Venturer (odd or even).
+  cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
+  ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Sabotage Strategist, Lavabrink Venturer (odd or even).
   Then up from about 21,900 (round B8 took the easier ones; these are left): Wall of Shadows, Festering Newt,
   Flameskull, Defiant Greatmaw, Aegis Sculptor, Fickle Efreet, Burn Away ("when that creature dies this turn"), Bill
   Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame
@@ -1803,8 +1825,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch
   Paladin, Dragon's Disciple, Dream Salvage, Misinformation, Obscura Interceptor, Rewrite History, Wight, Frenzy Sliver,
   Mondo Gecko, Baru, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
-  Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Blind Seer, Lo and Li, Chisei, Merfolk Spy,
-  Withercrown, Throne of Makindi, Brightflame, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
+  Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Blind Seer, Lo and Li, Chisei,
+  Withercrown, Throne of Makindi, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
   Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
   Gomazoa, Mine Worker, Woolly Razorback, Temporary Truce, Information Dealer, Fractalize, Loxodon Lifechanter,
   Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig.

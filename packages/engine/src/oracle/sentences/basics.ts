@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { COLOR_WORDS, NUM, NUMX, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular, COUNTER } from "../words";
+import { COLOR_WORDS, NUM, NUMX, X, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular, COUNTER } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -285,6 +285,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = { ref: "target" as const, index: before };
     if (!fx || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who, options, effects: fx.map((e) => (e.type === "loseLife" && e.who.ref === "target" ? { ...e, who: { ref: "punished" as const } } : e)) }];
+  }
+  // Tyrannize: "Target player discards their hand unless they pay 7 life": that player decides as it resolves (CR 608.2d).
+  if ((m = /^(Target player|Target opponent) discards their hand unless they (pay \d+ life)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`${m[1]} discards their hand`, ctx);
+    const options = parsePunisherOptions(m[2]!.replace(/^pay/, "pays"), ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "discard" || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "target", index: before }, options, effects: [{ ...fx[0]!, who: { ref: "punished" } }] }];
   }
   // Vectis Dominator: "Tap target creature unless its controller pays 2 life": that player decides as it resolves.
   if ((m = /^(Tap target creature) unless its controller (pays \d+ life)$/.exec(s))) {
@@ -866,6 +874,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(?:it|that creature) gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.subjectIt && !ctx.spell)
     return [{ type: "pumpPerBlocker", what: { ref: "subject" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: false }];
   // Prevention (CR 615): shields for the next N damage this turn, and Fog.
+  // Kitsune Palliator: "Prevent the next 1 damage that would be dealt to each creature and each player this turn": a shield
+  // on each one there as it resolves, none for creatures that come later (rulings).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to each creature and each player this turn$`, "i").exec(s))) {
+    const n = amt(m[1]!);
+    return [
+      { type: "preventNext", n, to: { ref: "each", filter: { kind: "object", types: ["Creature"], text: "each creature" } } },
+      { type: "preventNext", n, to: { ref: "eachPlayer" } },
+    ];
+  }
   // "... dealt to ~ this turn" (Revered Elder), "to you" (Conservator), "to target player or planeswalker" (Noble Vestige),
   // "dealt this turn to target creature you control" (Samite Alchemist), "to enchanted creature" (Fylgja).
   if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt (?:to (any target|target .+?|~|it|you|enchanted creature|equipped creature) this turn|this turn to (target .+?|~|you))$`, "i").exec(s))) {
@@ -1078,8 +1095,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = bySubject ?? new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {
     // "to each creature and each player": dealt to all of them at once (CR 120.3).
     const tos: DamageRecipient[] = [];
-    // "To target creature and each other creature with the same name as that creature" is one recipient.
-    for (const part of /with the same name as that/i.test(m[2]!) ? [m[2]!] : m[2]!.split(/,? and (?=each )/i)) {
+    // "To target creature and each other creature with the same name as that creature" is one recipient, and so is
+    // Radiance's "target creature and each other creature that shares a color with it" (Cleansing Beam).
+    for (const part of /with the same name as that|that shares a color with it$/i.test(m[2]!) ? [m[2]!] : m[2]!.split(/,? and (?=each )/i)) {
       // "Each opponent and each battle they protect" (Joyful Stormsculptor): the battles any opponent protects (CR 310.9).
       // "Each opponent and each creature they control" (Delayed Blast Fireball): the creatures any opponent controls.
       if (/^each creature they control$/i.test(part) && tos.length === 1 && tos[0]!.ref === "eachOpponent") {
@@ -1155,6 +1173,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who) return null;
     return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: amt(m[3]!) }];
   }
+  // Vitalizing Cascade: "You gain X plus 3 life".
+  if ((m = /^You gain X plus (one|two|three|four|five|\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: { ...X, plus: num(m[1]!) } }];
   return undefined;
 }
 

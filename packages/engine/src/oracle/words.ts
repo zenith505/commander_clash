@@ -60,7 +60,7 @@ export function singular(word: string): string {
 /** "Elves" -> "Elf"; "Plains" stays (it's already singular). */
 export const singularWord = (w: string) => (/^(Plains|plains|Aurochs|less|this|its|basic|Equipment|Locus)$/.test(w) ? w : singular(w));
 
-export const isGroup = (r: ObjRef) => r.ref === "allCreatures" || r.ref === "each" || (r.ref === "target" && (!!r.sameName || !!r.attachedToo));
+export const isGroup = (r: ObjRef) => r.ref === "allCreatures" || r.ref === "each" || (r.ref === "target" && (!!r.sameName || !!r.sharesColor || !!r.attachedToo));
 /** Several targets: "up to two target creatures". */
 export const isSeveral = (r: ObjRef) => r.ref === "target" && (r.n ?? 1) > 1;
 

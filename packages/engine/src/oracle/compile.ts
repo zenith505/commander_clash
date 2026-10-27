@@ -491,6 +491,9 @@ export function compile(d: CardDef): CompiledCard {
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")
+      // Intercessor's Arrest: "Enchanted permanent can't attack, block, or crew Vehicles. Its activated abilities can't be
+      // activated unless they're mana abilities.": the same as Bound in Gold's one sentence.
+      .replace(/^(Enchanted (?:creature|permanent) can't attack, block, or crew Vehicles)\. Its activated abilities can't be activated unless they're mana abilities\.$/m, "$1, and its activated abilities can't be activated unless they're mana abilities.")
       // Kothophed, Soul Hoarder: "a permanent owned by another player": every other player is an opponent (CR 102.3).
       .replace(/^Whenever a permanent owned by another player is put into a graveyard from the battlefield, /m, "Whenever a permanent an opponent owns is put into a graveyard from the battlefield, ")
       // Death Tyrant: "Whenever an attacking creature you control or a blocking creature an opponent controls dies, ...":
@@ -2506,8 +2509,12 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
-    if (line === "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield instead of putting it into your graveyard.") {
+    // Dodecapod: "... put it onto the battlefield with two +1/+1 counters on it instead of putting it into your graveyard"
+    // (it enters with them, CR 614.1c).
+    const toBattlefield = /^If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield( with (two|three) \+1\/\+1 counters on it)? instead of putting it into your graveyard\.$/.exec(line);
+    if (toBattlefield) {
       out.discardedToBattlefield = true;
+      if (toBattlefield[2]) out.discardedToBattlefieldCounters = num(toBattlefield[2]);
       continue;
     }
     // Prototype (CR 702.160a, 718): cast it with the alternative mana cost, color, power and toughness (see prototypedDef).
@@ -3333,16 +3340,18 @@ export function compile(d: CardDef): CompiledCard {
     // is that, the other while it isn't, each checked continuously (CR 611.3a).
     // Relic Axe: "Equipped creature gets +1/+1. If it's a Warrior, it gets +2/+1 instead." is the same, for Equipment.
     const insteadIf = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+)\. If it's (an? [A-Z][a-z]+), it gets ([+-]\d+\/[+-]\d+) instead\.$/.exec(line);
-    // Bonds of Faith: "Enchanted creature gets +2/+2 as long as it's a Human. Otherwise, it can't attack or block."
+    // Bonds of Faith: "Enchanted creature gets +2/+2 as long as it's a Human. Otherwise, it can't attack or block."; Tahngarth's
+    // Rage: "Enchanted creature gets +3/+0 as long as it's attacking. Otherwise, it gets -2/-1."
     const boonLine = insteadIf ? `${insteadIf[1]} creature gets ${insteadIf[4]} as long as it's ${insteadIf[3]}. Otherwise, it gets ${insteadIf[2]}.` : line;
-    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it (gets [+-]\d+\/[+-]\d+|can't attack or block)\.$/.exec(boonLine);
+    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact|attacking)\. Otherwise, it (gets [+-]\d+\/[+-]\d+|can't attack or block)\.$/.exec(boonLine);
     if (boon) boon.splice(1, 1);
     if (boon) {
       const w = boon[2]!;
-      const yes: TargetSpec | null = COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[w]!], text: `${w} creature` }
+      // Tahngarth's Rage: "as long as it's attacking" (CR 506.4), checked continuously like the rest.
+      const yes: TargetSpec | null = w === "attacking" ? { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[w]!], text: `${w} creature` }
         : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], allTypes: [capital(w.slice(3))], text: `${w.slice(3)} creature` }
         : CREATURE_TYPES.has(w.replace(/^an? /, "")) ? { kind: "object", types: ["Creature"], subtypes: [w.replace(/^an? /, "")], text: `${w.replace(/^an? /, "")} creature` } : null;
-      const no: TargetSpec | null = !yes ? null : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], notColors: [COLOR_WORDS[w]!], text: `non${w} creature` }
+      const no: TargetSpec | null = !yes ? null : w === "attacking" ? { kind: "object", types: ["Creature"], combat: "notAttacking", text: "nonattacking creature" } : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], notColors: [COLOR_WORDS[w]!], text: `non${w} creature` }
         : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], notTypes: [capital(w.slice(3))], text: `non${w.slice(3)} creature` }
         : { kind: "object", types: ["Creature"], notSubtypes: [w.replace(/^an? /, "")], text: `non-${w.replace(/^an? /, "")} creature` };
       const who = /^Equipped /.test(boonLine) ? "Equipped" : "Enchanted";
@@ -3550,7 +3559,12 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line) ??
       // Astrologian's Planisphere: "Whenever you cast a noncreature spell and whenever you draw your third card each turn":
       // a cast and a draw are never one event.
-      /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line);
+      /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line) ??
+      // Perimeter Enforcer: "Whenever another Detective you control enters and whenever a Detective you control is turned
+      // face up, ...": entering and turning face up are never one event (CR 708.8). Case of the Pilfered Proof: "Whenever a
+      // Detective you control enters or is turned face up".
+      /^Whenever ((?:~ or )?another [A-Z][a-z]+ you control) enters and whenever (an? [A-Z][a-z]+ you control) is turned face up, (.+)$/.exec(line) ??
+      /^Whenever (an? [A-Z][a-z]+ you control) enters or is turned face up, (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
@@ -3597,6 +3611,10 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
+            : / is turned face up, /.test(line) && twice.length === 4
+              ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[2]} is turned face up, ${effect}`]
+            : / enters or is turned face up, /.test(line) && /^Whenever an? /.test(line)
+              ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} is turned face up, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);

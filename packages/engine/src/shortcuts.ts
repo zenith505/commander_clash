@@ -384,6 +384,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
   }
   return {
     searched: t.searched,
+    scried: t.scried,
     gainedLife: t.gainedLife,
     destroyed: [...new Set((t.destroyed ?? []).map((e) => JSON.stringify(e)))].sort(),
     entered,

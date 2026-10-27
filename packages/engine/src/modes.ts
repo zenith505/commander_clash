@@ -187,7 +187,7 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
-  const { many: _many, differentManaValues, ...spec0 } = fix(body.targets[i]!);
+  const { many: _many, differentManaValues, singleGraveyard, ...spec0 } = fix(body.targets[i]!);
   // "X damage divided as you choose among any number of targets": divided among the ones announced.
   const spec: TargetSpec = spec0.divided ? { ...spec0, divided: { ...spec0.divided, first: i, n } } : spec0;
   const copies: TargetSpec[] =
@@ -196,7 +196,7 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
       : Array.from({ length: k }, (_, c) => {
           const distinct = [...(spec.distinctFrom ?? []), ...Array.from({ length: c }, (_, j) => i + j)];
           const group = Array.from({ length: c }, (_, j) => i + j);
-          return { ...spec, ...(optional ? { optional: true as const } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}), ...(differentManaValues && c ? { differentManaValueFrom: group } : {}) };
+          return { ...spec, ...(optional ? { optional: true as const } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}), ...(differentManaValues && c ? { differentManaValueFrom: group } : {}), ...(singleGraveyard && c ? { sameGraveyardAs: group } : {}) };
         });
   return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
 }

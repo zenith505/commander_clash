@@ -1524,6 +1524,8 @@ export function canAttachTo(s: GameState, me: GameObject, host: GameObject | Pla
   if (objIsType(s, me, "Creature") && !compileCard(defOf(s, me)).reconfigure) return false;
   // "Equip planeswalker": to a planeswalker as though it were a creature (Luxior rulings).
   const creature = objIsType(s, host, "Creature") || (!!asCreature && !aura && objIsType(s, host, "Planeswalker"));
+  // Goblin Brawler: "can't be equipped" (CR 701.3b).
+  if (!aura && characteristics(s, host).cantBeEquipped) return false;
   const only = aura ? undefined : abilitiesOf(s, me).attachOnly; // O-Naginata
   return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : creature && objectMatches(s, only ?? { kind: "object", text: "" }, host, who, false, meChars);
 }

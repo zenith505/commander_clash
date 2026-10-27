@@ -8756,7 +8756,7 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     // creatures able to block it beside them against menace.
     if (ac.allMustBlockBy && !ac.allMustBlock && !ac.maxOneBlocker) {
       const shirk = could.find((b) => lureBinds(s, at, b) && !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
-      if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (${ac.allMustBlockBy.map((f) => f.text).join(" and ")}s able to block it do so)`;
+      if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (${ac.allMustBlockBy.map((f) => f.text).join(" and ")} able to block it do so)`;
     }
     if (!ac.allMustBlock && !ac.mustBeBlocked) continue;
     const blocked = blocks.some((b) => b.attacker === at.id);

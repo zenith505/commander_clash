@@ -305,7 +305,7 @@ export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [
  */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const c = characteristics(s, o);
-  let own = withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
+  let own = withGranted(c.hasPrintedAbilities ? withoutLost(compileCard(defOf(s, o)), c.lostActivated) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
@@ -474,6 +474,28 @@ function withChosenName(base: CompiledCard, name: string): CompiledCard {
 }
 
 const merged = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+const lostFrom = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+
+/** Its printed abilities without the activated ones it lost ("~ loses this ability", a Licid; CR 613.1f). */
+function withoutLost(base: CompiledCard, lost: readonly number[] | undefined): CompiledCard {
+  if (!lost?.length) return base;
+  const key = lost.join(",");
+  let byKey = lostFrom.get(base);
+  if (!byKey) lostFrom.set(base, (byKey = new Map()));
+  let hit = byKey.get(key);
+  if (!hit) byKey.set(key, (hit = { ...base, activated: base.activated.filter((_, i) => !lost.includes(i)) }));
+  return hit;
+}
+
+const ENCHANT_CREATURE: TargetSpec = { kind: "object", types: ["Creature"], text: "creature to enchant" };
+
+/**
+ * What an Aura on the battlefield can enchant (CR 303.4a, 702.5a): its enchant ability, printed, or from an effect that
+ * made it "an Aura enchantment with enchant creature" (a Licid).
+ */
+export function enchantOf(s: GameState, o: GameObject): TargetSpec | undefined {
+  return compileCard(defOf(s, o)).enchant ?? (characteristics(s, o).enchantCreature ? ENCHANT_CREATURE : undefined);
+}
 /** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */
 export function withGranted(base: CompiledCard, granted: readonly string[]): CompiledCard {
   if (!granted.length) return base;

@@ -57,6 +57,8 @@ export function layerOf(m: Modification): Layer {
     case "loseAllAbilities":
     case "addAbility":
     case "unblockedDamage":
+    case "loseActivated":
+    case "enchantCreature":
       return "6";
     case "definePT":
       return "7a";
@@ -177,6 +179,10 @@ export interface Characteristics {
   goadedBy: PlayerId[];
   /** Keywords it can't have (Arcane Lighthouse), removed after all of layer 6. */
   cantHave?: string[];
+  /** "~ loses this ability" (a Licid): the indexes of its printed activated abilities it doesn't have (abilitiesOf). */
+  lostActivated?: number[];
+  /** "Becomes an Aura enchantment with enchant creature" (a Licid): enchant creature from an effect (enchantOf). */
+  enchantCreature?: true;
   /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
@@ -1325,6 +1331,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "unblockedDamage":
       c.unblockedDamage = true;
+      return;
+    case "loseActivated":
+      c.lostActivated = [...(c.lostActivated ?? []), m.index];
+      return;
+    case "enchantCreature":
+      c.enchantCreature = true;
       return;
     case "addAbility":
       if (/^ward\b/i.test(m.text)) delete c.wardLost;

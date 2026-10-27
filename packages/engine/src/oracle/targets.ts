@@ -645,7 +645,7 @@ function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];
 }
 
-const SEVERAL_TARGETS = /^(?:(up to )?(one hundred|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (other )?|(another) |(one or two|one, two, or three|any number of) (other )?)target (.+)$/i;
+const SEVERAL_TARGETS = /^(?:(up to )?(one hundred|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (other )?|(another) |(one or two|one, two, or three|any number of|one or more) (other )?)target (.+)$/i;
 
 /**
  * "Up to two target creatures", "two target artifacts", "one or two target creatures", "another target
@@ -665,7 +665,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // more than that many (TargetSpec.manyMax).
   const most = upTo && count !== "X" ? (count!.toLowerCase() === "one hundred" ? 100 : num(count!)) : 0;
   const manyMax = most > 6 ? most : undefined;
-  const many = range === "any number of" || manyMax ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
+  // "One or more target creatures" (Dwarven Song): as with "any number of", but at least one (TargetSpec.manyMin).
+  const many = range === "any number of" || range === "one or more" || manyMax ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
   // A spell's X, or an activated ability's {X} (CR 107.3a, 602.2b), announced before targets are chosen.
   // "Up to X target creatures ..., where X is ..." (Endurance Bobblehead): the amount, as the targets are chosen
   // (TargetSpec.manyCount, set where "where X is" is read).
@@ -733,7 +734,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (many) {
     // Rats' Feast: "X target cards from a single graveyard": each in the graveyard of the others (TargetSpec.singleGraveyard).
     if ((single && many !== "exactX") || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    addTarget(ctx, { ...spec, ...(single ? { singleGraveyard: true as const, text: spec.text.replace(/ from a graveyard$/, " from a single graveyard") } : {}), ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(range === "one or more" ? { manyMin: 1 as const } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };

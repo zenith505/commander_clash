@@ -249,7 +249,8 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   // Tide Shaper: "target land becomes an Island for as long as ~ remains on the battlefield": the same as until end of turn,
   // ending when ~ leaves instead (CR 611.2b, 305.7).
-  const remainsLand = !ctx.spell && /^([Tt]arget land becomes an? (?:Plains|Island|Swamp|Mountain|Forest)) for as long as ~ remains on the battlefield$/.exec(s);
+  // Graceful Antelope: "... become a Plains until ~ leaves the battlefield": the same (CR 611.2b).
+  const remainsLand = !ctx.spell && /^([Tt]arget land becomes an? (?:Plains|Island|Swamp|Mountain|Forest)) (?:for as long as ~ remains on the battlefield|until ~ leaves the battlefield)$/.exec(s);
   if (remainsLand) {
     const fx = parseSentence(`${remainsLand[1]} until end of turn`, ctx);
     return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "endOfTurn" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
@@ -484,6 +485,7 @@ export function parseBecomes(text: string): Modification[] | null {
   // The color or basic land type chosen as it resolves (see parseBody). A land's basic land type replaces its land
   // types and the abilities from its rules text (CR 305.7): "becomes an Island" too.
   if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
+  if (/^the chosen colors$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: "colors" }];
   if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
   // "Becomes an Island in addition to its other types" (Xolatoyac's flood counters): the land keeps its types and abilities

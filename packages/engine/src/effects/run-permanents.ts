@@ -1572,12 +1572,18 @@ export function lockedDoors(s: GameState, pid: PlayerId, among?: ObjectId[]): { 
 function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, src: string): "paused" | void {
   const p = player(s, ctx.controller);
   const sc = (s.resolving!.scratch ??= {});
+  // The permanent has explored once this is done, whatever could be done of it (CR 701.44b): "whenever a creature you
+  // control explores" (Wildgrowth Walker) triggers.
+  const explored = () => {
+    if (self) fireEvent(s, { type: "explored", id: self.id, controller: self.zone === "battlefield" ? controllerOf(s, self) : ctx.controller });
+  };
   if (sc.explored === undefined) {
     const top = p.library[0];
     const name = self ? characteristics(s, self).name : src;
     if (top && isType(defOf(s, obj(s, top)), "Land")) {
       log(s, `${name} explores: ${p.name} reveals ${defOf(s, obj(s, top)).name} and puts it into their hand.`);
       moveObject(s, top, "hand");
+      explored();
       return;
     }
     log(s, `${name} explores${top ? `: ${p.name} reveals ${defOf(s, obj(s, top)).name}` : ""}.`);
@@ -1585,7 +1591,7 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
       putCounters(s, self, "+1/+1", 1);
       invalidateCharacteristics(s);
     }
-    if (!top) return; // nothing revealed: just the counter (rulings)
+    if (!top) return explored(); // nothing revealed: just the counter (rulings)
     sc.explored = top;
     s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, top)).name} into your graveyard`, source: src, card: top };
     return "paused";
@@ -1593,4 +1599,5 @@ function explore(s: GameState, self: GameObject | undefined, ctx: ResolveCtx, sr
   if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
   // Done: "it explores, then it explores again" (Jadelight Ranger) starts over, revealing the same card if it stayed.
   sc.explored = sc.may = undefined;
+  explored();
 }

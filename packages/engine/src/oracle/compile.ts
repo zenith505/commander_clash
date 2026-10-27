@@ -1891,6 +1891,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsDrawOnce = true;
       continue;
     }
+    // Spirit of the Labyrinth: the same for every player, its controller too.
+    if (line === "Each player can't draw more than one card each turn.") {
+      out.playersDrawOnce = true;
+      continue;
+    }
     // Bloodletter of Aclazotz (CR 614.1a): life lost to damage too (CR 120.3a), and life paid (CR 119.4).
     if (line === "If an opponent would lose life during your turn, they lose twice that much life instead.") {
       out.opponentsLoseDouble = true;
@@ -2847,6 +2852,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsSorceryTiming = true;
       continue;
     }
+    // Dosan the Falling Leaf: no player can cast a spell during another player's turn, even while something resolves.
+    if (line === "Players can cast spells only during their own turns.") {
+      out.castOnlyOwnTurn = true;
+      continue;
+    }
     if (/^Compleated(?: \(|$)/.test(line) && d.types.includes("Planeswalker")) {
       out.compleated = true;
       continue;
@@ -3429,7 +3439,7 @@ export function compile(d: CardDef): CompiledCard {
       // Voice of Resurgence: "Whenever an opponent casts a spell during your turn and when ~ dies, ...": a cast and a death are
       // never one event.
       /^(Whenever an opponent casts a spell during your turn) and when ~ dies, (.+)$/.exec(line) ??
-      /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
+      /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step|your first main phase)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
       // and turning it face up isn't entering (CR 708.8), so one or the other.

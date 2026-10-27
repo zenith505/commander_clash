@@ -2,8 +2,8 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
-import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
+import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches } from "./targeting";
@@ -603,6 +603,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetGreatestPower"
+            ? ((o) => !!o && o.zone === "battlefield" && objIsType(s, o, "Creature") && !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && power(s, obj(s, id)) > power(s, o)))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "flickeredIs"
             ? (s.resolving!.flickeredBack ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "damagedThisWayIs"
@@ -833,6 +835,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "created" && effects.some((x) => x.type === "pick" && effects.indexOf(x) < effects.indexOf(e))) continue;
     // Discarding your hand can be done with an empty hand (rulings on Moonveil Regent).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
+    // "You may discard two cards. If you do, ..." (Thrilling Discovery): discarding fewer isn't doing it (CR 609.3).
+    if (e.type === "discard" && e.who.ref === "you" && !e.hand && typeof e.n === "number" && e.n > 1 && !e.upTo && player(s, ctx.controller).hand.length < e.n) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
@@ -841,6 +845,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
     if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
+    // "You may gain 1 life for each creature card in your graveyard. If you do, ..." (Skyfisher Spider): gaining no life,
+    // or life that can't be gained, isn't gaining life (CR 119.7, 119.9).
+    if (e.type === "gainLife" && e.who.ref === "you" && (!canGainLife(s, ctx.controller) || amountNow(s, e.n, ctx) <= 0)) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;

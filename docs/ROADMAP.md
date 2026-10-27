@@ -1,7 +1,7 @@
 # Roadmap
 
-26,578 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,808 of
+26,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,809 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1790,17 +1790,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Tahngarth's Rage, Even the Odds, Time of Heroes, Make a Wish, Rats' Feast, Vitalizing Cascade, An-Havva Inn and
   others. +76 (26,545 with round 185).
 - Skipped there, with reasons: Dragon Whelp, Farrelite Priest, Initiates of the Ebon Hand and Nalathni Dragon (how
-  many times it was activated this turn, counted as the delayed trigger resolves); the Licids (paying to end the
-  effect is a special action); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
+  many times it was activated this turn, counted as the delayed trigger resolves); Pure Intentions' first line; Cryptid Inspector ("a face-down permanent enters"); Friendly
   Fire (damage to two recipients from a revealed card); Toil to Renown (whether an artifact creature counts once or
   twice: no ruling); Gideon's Triumph and Inferno Hellion ("attacked or blocked this turn", and Gideon's "two of
   those creatures instead"); Heat Stroke ("was blocked this turn"); Perilous Predicament (two sacrifices of different
   kinds); Pendrell Flux (pay its mana cost); Experiment Twelve, Printlifter Ooze, Deathmist Raptor, Roshan,
   Planeswalker's Mischief, Dementia Sliver and Wand of Ith (not looked at in depth).
+- Round B17 (harder skipped cards, least played first): the Licids (Calming, Convulsing, Corrupting, Dominating,
+  Enraging, Gliding, Leeching, Nurturing, Quickening, Stinging, Tempting and Transmogrifying Licid): "loses this ability
+  and becomes an Aura enchantment with enchant creature" as a layer 4 and 6 effect, "You may pay {W} to end this
+  effect" as a special action (CR 116.2c, the `endEffect` action, a menu button with a browser test; bots activate
+  them but never pay to end them); "the color or colors of your choice" (Prismatic Lace, Prismwake Merrow, Quickchange,
+  Scuttlemutt, Swirling Spriggan, Shyft, Dream Coat; a picker with a browser test), "the color of your choice" with no
+  duration (Alchor's Tomb) and "hexproof from that color" (Mondo Gecko); "one or more target creatures become red"
+  (Dwarven Song, Heaven's Gate, Sea Kings' Blessing, Sylvan Paradise, Touch of Darkness) and Incite; "scry N, then
+  reveal the top card of your library" with its mana value (Riddle of Lightning, Judge Unworthy, Putrid Cyclops,
+  Stormchaser Chimera); "When that creature leaves the battlefield this turn, sacrifice ~" (Kjeldoran Elite Guard,
+  Heart Wolf); a land becomes a basic land type with no duration or until ~ leaves (Cyclopean Giant, Thelonite Monk,
+  Graceful Antelope) and "a Plains or an Island" (Tundra Kavu); Lobotomy and Shimian Specter (a card chosen from a
+  revealed hand names the cards exiled). +39 (26,617 with round 186).
+- Skipped there, with reasons: Flanking Licid (old wording, "Summon Licid"); Phantasmal Mount (a delayed trigger of ~
+  that must also find its target); Kjeldoran Guard ("defending player" in multiplayer); Lifelace and the other Laces (a
+  color change on a spell); Govern the Guildless (forecast and "monocolored"); Gaea's Liege (a conditional
+  characteristic-defining P/T); Orcish Farmer ("until its controller's next untap step"); Hatchet Bully and Wandering
+  Mage (a -1/-1 counter as a cost); Hint of Insanity, Haunting Echoes, Reap Intellect, Pick the Brain and Thought
+  Hemorrhage (not looked at in depth).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
-  supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Heart Wolf (Dwarves, a
-  delayed leaves trigger), Exiled Doomsayer (morph cost tax), Treacherous Vampire and Rotting Giant (sacrifice unless
+  supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Exiled Doomsayer (morph cost tax), Treacherous Vampire and Rotting Giant (sacrifice unless
   you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
   the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Tribal Golem, Forethought
   Amulet; Reign of Terror ("for each creature that died this way"), Steeling

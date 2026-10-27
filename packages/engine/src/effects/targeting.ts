@@ -277,7 +277,7 @@ export const ENTERS_COUNTER = "+1/+1 counter";
 export function choiceOptions(what: ChoiceKind | EntersOption, except?: string): string[] {
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
-  const all = what === "color" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES].sort();
+  const all = what === "color" || what === "colors" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES].sort();
   return all.filter((x) => x.toLowerCase() !== except?.toLowerCase());
 }
 
@@ -290,6 +290,8 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "cardName") return { ...chosen, name: choice };
   if (what === "number") return { ...chosen, number: Number(choice) };
   if (what === "opponent") return { ...chosen, player: Number(choice) };
+  // "The color or colors of your choice": the colors named, "White,Blue", in WUBRG order.
+  if (what === "colors") return { ...chosen, colors: (Object.keys(COLOR_NAMES) as Color[]).filter((c) => choice.split(",").includes(COLOR_NAMES[c])) };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
 }
@@ -942,7 +944,8 @@ export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined):
  */
 export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   // "Any number of target creatures" can be none (CR 115.6), and so can "up to X" (see TargetSpec.many).
-  const free = (spec: TargetSpec) => spec.optional || spec.skip || !!spec.many;
+  // "One or more target creatures" needs one (TargetSpec.manyMin).
+  const free = (spec: TargetSpec) => spec.optional || spec.skip || (!!spec.many && !spec.manyMin);
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
   if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.inGraveyardOfControllerOf?.length || spec.inGraveyardOfTarget !== undefined || spec.differentControllerFrom?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.total)) return true;

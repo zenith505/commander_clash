@@ -1512,6 +1512,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // of your opponents, it deals triple that damage to that player instead": that target's combat damage to each of them
   // (see parseDamageModSentence).
   text = text.replace(/^Choose target creature\. Until your next turn, if that creature would deal combat damage to one of your opponents, it deals (double|triple) that damage to that player instead\.$/, "Until your next turn, each time target creature would deal combat damage to an opponent, it deals $1 that damage instead.");
+  // Riddle of Lightning: "Choose any target. Scry 3, then reveal the top card of your library. ~ deals damage equal to that
+  // card's mana value to that permanent or player." Judge Unworthy: "Choose target attacking or blocking creature. ...
+  // to that creature." The target is chosen as the spell is cast (CR 601.2c); if it's illegal as the spell resolves,
+  // nothing happens, no scry or reveal either (rulings).
+  text = text.replace(/^Choose (any target|target [a-z ]+creature)\. (Scry \d+, then reveal the top card of your library\. ~ deals damage equal to that card's mana value to) (?:that permanent or player|that creature)\.$/, "$2 $1.");
+  // Incite: "Target creature becomes red until end of turn and attacks this turn if able": two changes to that target.
+  text = text.replace(/^(Target creature) becomes (white|blue|black|red|green) until end of turn and attacks this turn if able\.$/, "$1 becomes $2 until end of turn. It attacks this turn if able.");
   // V.A.T.S.: "Choose any number of target creatures with equal toughness. Destroy the chosen creatures." The targets.
   text = text.replace(/^Choose (any number of target creatures with equal toughness)\. Destroy the chosen creatures\.$/, "Destroy $1.");
   // Angelic Skirmisher: "Choose first strike, vigilance, or lifelink. Creatures you control gain that ability until end of
@@ -2005,6 +2012,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (vivien && sentences[si + 1]?.replace(/\.$/, "") === "Exile one face down and put the rest on the bottom of your library in any order" && sentences[si + 2]?.replace(/\.$/, "") === "For as long as it remains exiled, you may cast it if it's a creature spell") {
       effects.push({ type: "hideaway", n: num(vivien[1]!), castCreature: true });
       si += 2;
+      continue;
+    }
+    // Shyft: "At the beginning of your upkeep, you may have ~ become the color or colors of your choice." Chosen as it
+    // resolves (CR 608.2d), only if you do; with no duration, for as long as it stays on the battlefield (rulings).
+    if (!ctx.spell && /^[Yy]ou may have ~ become the color or colors of your choice$/.test(s)) {
+      effects.push({ type: "may", effects: [{ type: "choose", choice: "colors" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "setColors", colors: [], chosen: "colors" }], duration: "game" }], text: "have ~ become the color or colors of your choice" });
       continue;
     }
     // The Irencrag: "you may have ~ become a legendary Equipment artifact named Everflame, Heroes' Legacy. If you do, it
@@ -4279,6 +4292,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Putrid Cyclops: "Reveal the top card of your library. ~ gets -X/-X until end of turn, where X is that card's mana
+    // value"; Riddle of Lightning: "~ deals damage equal to that card's mana value to any target": the card revealed, still
+    // on top of the library (CR 701.20a).
+    // A Licid's ability: "~ loses this ability and becomes an Aura enchantment with enchant creature. Attach it to target
+    // creature. You may pay {W} to end this effect." (CR 116.2c; see the "becomeLicid" effect).
+    if (ctx.activated && si === 0 && sentences.length === 3 && s === "~ loses this ability and becomes an Aura enchantment with enchant creature" && sentences[1] === "Attach it to target creature") {
+      const endCost = /^You may pay ((?:\{[^}]+\})+) to end this effect$/.exec(sentences[2]!)?.[1];
+      const host = parseObject("target creature", ctx);
+      if (!endCost || host?.ref !== "target" || host.index !== 0) return null;
+      effects.push({ type: "becomeLicid", endCost });
+      si += 2;
+      continue;
+    }
+    if (/^[Rr]eveal the top card of your library$/.test(s) && /\bthat card's mana value\b/.test(sentences[si + 1] ?? "") && !/^If /.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "revealTop" });
+      ctx.revealedTop = true;
+      continue;
+    }
     if (/^[Rr]eveal the top card of your library$/.test(s) || (atRandom && /^If that card has the chosen name, /.test(sentences[si + 1] ?? ""))) {
       const r = parseRevealedIf(sentences, si + 1, ctx);
       if (!r) return null;
@@ -5139,6 +5170,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       // Venarian Glimmer: "with mana value X or less": the X it was cast with (CR 107.3a), bound as it resolves.
       if (/\bX\b/.test(choose[2] ?? "") && !ctx.spell) return null;
+      // Lobotomy: "Search that player's graveyard, hand, and library for all cards with the same name as the chosen card and
+      // exile them. Then that player shuffles." Shimian Specter: "... as that card ...". The card's name (CR 201.2), the
+      // search as for Memoricide's (CR 701.23; "Then that player shuffles" is part of it).
+      if (!choose[2] && !choose[3] && /^Search that player's graveyard, hand, and library for all cards with the same name as (?:that|the chosen) card and exile them\.?$/.test(sentences[si + 1] ?? "")) {
+        const filter = parseSearchFilter(choose[1]!);
+        if (filter === null) return null;
+        effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: "name" }, { type: "exileNamed", who: prev.who, filter: { kind: "card", chosen: "name", text: "card with the chosen name" }, all: true });
+        si++;
+        continue;
+      }
       // Lost Hours: "That player puts that card into their library third from the top."
       const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?|That player puts that card into their library third from the top|That player shuffles that card into their library)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!then) return null;
@@ -8178,9 +8219,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "choose", choice: "basicLandType" });
       s = s.replace(/\b(becomes?) the basic land type of your choice\b/, "$1 the chosen basic land type");
     }
+    // Prismatic Lace: "Target permanent becomes the color or colors of your choice": one or more colors, chosen as it
+    // resolves (CR 608.2d), which replace its colors (CR 105.3).
+    if (/\bbecomes? the color or colors of your choice\b/.test(s)) {
+      effects.push({ type: "choose", choice: "colors" });
+      s = s.replace(/\b(becomes?) the color or colors of your choice\b/, "$1 the chosen colors");
+    }
     if (/\bbecomes? the color of your choice\b/.test(s)) {
       effects.push({ type: "choose", choice: "color" });
-      s = s.replace(/\b(becomes?) the color of your choice\b/, "$1 the chosen color");
+      // Mondo Gecko: "~ becomes the color of your choice and gains hexproof from that color": the same color.
+      s = s.replace(/\b(becomes?) the color of your choice\b/, "$1 the chosen color").replace(/\b(gains? hexproof) from that color\b/, "$1 from the chosen color");
+    }
+    // Tundra Kavu: "Target land becomes a Plains or an Island until end of turn": one of the two, chosen as it resolves
+    // (CR 608.2d), the same as "the basic land type of your choice" with only those two.
+    const landOr = /\bbecomes? an? (Plains|Island|Swamp|Mountain|Forest) or an? (Plains|Island|Swamp|Mountain|Forest)\b/.exec(s);
+    if (landOr && landOr[1] !== landOr[2]) {
+      effects.push({ type: "choose", choice: "basicLandType", options: [landOr[1]!, landOr[2]!] });
+      s = s.replace(/\b(becomes?) an? (?:Plains|Island|Swamp|Mountain|Forest) or an? (?:Plains|Island|Swamp|Mountain|Forest)\b/, "$1 the chosen basic land type");
     }
     if (/\bbecomes? the creature type of your choice\b/.test(s) || (/\bof the creature type of your choice\b/.test(s) && !/\btarget\b/i.test(s))) {
       effects.push({ type: "choose", choice: "creatureType" });

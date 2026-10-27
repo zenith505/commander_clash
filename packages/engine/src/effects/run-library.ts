@@ -353,13 +353,20 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!cards.length || n <= 0) return;
         const kind = e.filter?.text ?? "card";
         const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : "to exile";
+        const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : "to exile";
         s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
       s.resolving!.tookFromHand = ids.length;
-      if (e.action === "discard") {
+      if (e.action === "name") {
+        // Lobotomy: "you choose a card other than a basic land card from it. Search ... for all cards with the same name as
+        // the chosen card": its name, the card staying in the hand (CR 201.2).
+        const id = ids[0];
+        if (id === undefined) return;
+        s.resolving!.chosen = { ...s.resolving!.chosen, name: defOf(s, obj(s, id)).name };
+        log(s, `${player(s, ctx.controller).name} chooses ${defOf(s, obj(s, id)).name} from ${p.name}'s hand.`);
+      } else if (e.action === "discard") {
         const tops = discardToTop(s, pid, ids, src, ctx);
         if (tops === "paused") return "paused";
         discardCards(s, pid, ids, "", false, false, ctx.controller, undefined, tops);

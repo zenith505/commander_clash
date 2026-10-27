@@ -1472,6 +1472,16 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     }
     return null;
   }
+  // A Licid: in our main phase, an Aura on our best creature if it helps what it enchants (Gliding, Nurturing Licid), on
+  // an opponent's otherwise (Calming, Leeching, Dominating Licid). Bots don't pay to end the effect.
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "becomeLicid" && sourceId) {
+    const own = compileCard(defOf(s, obj(s, sourceId)));
+    const helps = own.statics.length ? !modsAreHarmful(own.statics.flatMap((st) => st.mods)) : !own.triggers.length && own.activated.length > 1;
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, botSource(s, sourceId), sourceId).filter((t) => t.kind === "object" && t.id !== sourceId);
+    const ranked = all.filter((t) => t.kind === "object" && (controllerOf(s, obj(s, t.id)) === pid) === helps).sort((a, b) => (a.kind === "object" && b.kind === "object" ? worth(s, pid, obj(s, b.id)) - worth(s, pid, obj(s, a.id)) : 0));
+    if (forced) return ranked[0] ? [ranked[0]] : all[0] ? [all[0]] : null;
+    return ranked[0] && s.activePlayer === pid && s.step === "main1" && !s.stack.length ? [ranked[0]] : null;
+  }
   // Misleading Signpost: the attacker we'd turn, the strongest one attacking us first, then one of ours.
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "reselectAttack") {
     const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
@@ -3373,6 +3383,8 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
+  // "The color or colors of your choice": one color is enough, the one it would choose alone.
+  if (what === "colors") return chooseOption(s, pid, "color", card, options);
   const c = card ? compileCard(card) : undefined;
   // Serra's Emissary: protection from creatures for you and yours shuts off most attacks and blockers.
   if (what === "cardType" && c?.youProtectedFromChosenType && options.includes("Creature")) return "Creature";

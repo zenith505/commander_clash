@@ -593,6 +593,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(`untapped ${m[2]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (w === "or" ? w : singular(w))).join(" ")}`);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: num(m[1]!), action: "tap" }];
   }
+  // Zimone's Hypothesis: "Put a +1/+1 counter on a creature": any player's, picked as it resolves, not targeted. Gix's
+  // Command: "Put two +1/+1 counters on up to one creature": the same, or none (rulings: chosen as it resolves).
+  if ((m = /^Put (a|two|three) \+1\/\+1 counters? on (a|up to one) creature$/i.exec(s)) && (m[1] === "a") === !/counters/.test(s)) {
+    const pick: Effect = { type: "pick", who: { ref: "you" }, filter: pickFilter("creature")!, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1] === "a" ? "1" : m[1]!) }, anyController: true };
+    return m[2] === "a" ? [pick] : [{ type: "may", effects: [pick], text: s.charAt(0).toLowerCase() + s.slice(1) }];
+  }
   // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));

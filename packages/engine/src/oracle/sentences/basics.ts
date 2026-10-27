@@ -857,12 +857,19 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The Ring tempts you (CR 701.54).
   if (/^the Ring tempts you$/i.test(s)) return [{ type: "ringTempts" }];
-  if (/^Target player becomes the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "target", index: addTarget(ctx, { kind: "player", text: "target player" }) } }];
+  if ((m = /^Target (player|opponent) becomes the monarch$/i.exec(s))) return [{ type: "becomeMonarch", who: { ref: "target", index: addTarget(ctx, { kind: "player", ...(m[1] === "opponent" ? { opponent: true } : {}), text: `target ${m[1]}` }) } }];
+  // Starscream, Seeker Leader: "that player becomes the monarch", the player dealt the damage (CR 725.1).
+  if (/^That player becomes the monarch$/i.test(s)) {
+    const who = parsePlayer("that player", ctx);
+    return who ? [{ type: "becomeMonarch", who }] : null;
+  }
   // "Choose a creature type." / "Choose a color." (the rest of the text says what it's for).
   // "Each player chooses a creature type." (Patriarch's Bidding, Harsh Mercy): one each, "a type chosen this way" after.
   if (/^Each player chooses a creature type$/.test(s)) return [{ type: "choose", choice: "creatureType", each: true }];
   // "Choose a number between 0 and 10." (Expel the Interlopers): as it resolves, kept for the rest (CR 608.2d).
   if ((m = /^Choose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
+  // "Choose odd or even." (Extinction Event): as it resolves; "of the chosen quality" after it (zero is even).
+  if (/^Choose odd or even$/i.test(s)) return [{ type: "choose", choice: "parity" }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
     return [{ type: "choose", choice: m[1]!.toLowerCase() === "color" ? "color" : "creatureType", ...(m[2] ? { except: m[2] } : {}) }];
 
@@ -975,6 +982,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
     const what = p && /^(~|it|that creature|(?:another )?target .+|up to (?:one|two|three) target creatures?)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
+  }
+  // Gatta and Luzzu: "If damage would be dealt to target creature you control this turn, prevent that damage and put
+  // that many +1/+1 counters on it" (from "Choose target creature you control. If damage would be dealt to that
+  // creature this turn, ..."): a prevention effect on it until the turn ends, the counters even for damage that can't be
+  // prevented (CR 615.12, rulings).
+  if ((m = /^If damage would be dealt to (target creature you control) this turn, prevent that damage and put that many \+1\/\+1 counters on it$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], duration: "endOfTurn" }] : null;
   }
   // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent
   // an opponent controls": the same, until its controller's next turn begins (CR 611.2b).

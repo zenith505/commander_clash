@@ -10,7 +10,7 @@ import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
-import { objectMatches } from "./targeting";
+import { bindChosen, objectMatches } from "./targeting";
 import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
@@ -606,7 +606,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);
       return;
     case "cantBlockRule":
-      (s.cantBlockThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
+      // "Of that quality" (Twins of Discord): the choice made as it resolved.
+      (s.cantBlockThisTurn ??= []).push({ filter: bindChosen(e.filter, ctx.chosen), controller: ctx.controller });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't block this turn.`);
       return;
     case "cantBeBlockedRule":

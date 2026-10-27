@@ -678,6 +678,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "monarch":
       if (cond.none) return s.monarch === undefined;
+      if (cond.eventPlayer) return eventPlayer !== undefined && s.monarch === eventPlayer;
       return cond.opponent ? s.monarch !== undefined && s.monarch !== you : (s.monarch === you) !== !!cond.not;
     case "initiative":
       return s.initiative === you;

@@ -294,7 +294,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "revealedManaValue": {
       const rv = s.resolving?.revealed;
       const o = rv && s.objects[rv.id];
-      return o && (o.zoneChanges ?? 0) === rv.zc ? defMv(defOf(s, o)) : 0;
+      if (!o || (o.zoneChanges ?? 0) !== rv.zc) return 0;
+      return c.stat ? characteristics(s, o)[c.stat] : defMv(defOf(s, o));
     }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
@@ -831,7 +832,7 @@ function describeCount(c: Count): string {
     case "discardedManaValue":
       return "the discarded card's mana value";
     case "revealedManaValue":
-      return "the revealed card's mana value";
+      return `the revealed card's ${c.stat ?? "mana value"}`;
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
     case "cardsExiledThisWay":

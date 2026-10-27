@@ -880,6 +880,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you're not the monarch$/.test(text)) return { kind: "monarch", not: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
+  if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1

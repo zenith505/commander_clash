@@ -628,6 +628,13 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
   // "You may reveal it and put it into your hand" (Frost Augur): a card only looked at is revealed as it's put there.
   const shown = /^you may reveal it and put it into your hand$/.test(text);
   if (shown) return [{ type: "may", effects: [{ type: "revealRevealed" }, { type: "bounce", what: { ref: "revealed" } }], text: "reveal the revealed card and put it into your hand" }];
+  // Sapling of Colfenor: "you gain life equal to that card's toughness, lose life equal to its power, then put it into
+  // your hand": three events in turn (rulings), each read from the card as it is in the library.
+  const sapling = /^you gain life equal to that card's (power|toughness), lose life equal to its (power|toughness), then put it into your hand$/.exec(text);
+  if (sapling) {
+    const stat = (w: string) => ({ count: { kind: "revealedManaValue" as const, stat: w as "power" | "toughness" } });
+    return [{ type: "gainLife", who: { ref: "you" }, n: stat(sapling[1]!) }, { type: "loseLife", who: { ref: "you" }, n: stat(sapling[2]!) }, { type: "bounce", what: { ref: "revealed" } }];
+  }
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
     // Not about the card: "draw a card" (Track Down, Thrasios), "sacrifice ~ and draw three cards" (Diviner's Lockbox).
@@ -737,6 +744,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
+  text = text.replace(/^[Cc]hoose (target creature you control)\. If damage would be dealt to that creature this turn, /, "If damage would be dealt to $1 this turn, ");
   // Willowdusk, Essence Seer: "Choose another target creature. Put a number of +1/+1 counters on it equal to ...": the same.
   text = text.replace(/(^|: )Choose (another target creature)\. (Put a number of [+-]1\/[+-]1 counters) on it (equal to [^.]+)\./, "$1$3 on $2 $4.");
   // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted

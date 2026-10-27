@@ -1858,6 +1858,8 @@ export interface Chosen {
   colorsBy?: Record<number, Color>;
   /** Gluntch: the players chosen by Effect "choosePlayer", in the order chosen. */
   players?: PlayerId[];
+  /** "Choose odd or even" (Extinction Event). */
+  parity?: "odd" | "even";
 }
 
 export interface TurnRule {

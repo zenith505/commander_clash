@@ -1611,7 +1611,8 @@ function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
     const rules = compileCard(defOf(s, src)).othersEnterTapped;
     if (!rules || !characteristics(s, src).hasPrintedAbilities) return false;
     const you = controllerOf(s, src);
-    return rules.some((r) => objectMatches(s, r.filter, o, you, false));
+    // "Of the chosen quality" (Ashling's Prerogative): chosen as the source entered.
+    return rules.some((r) => objectMatches(s, bindChosen(r.filter, src.chosen), o, you, false));
   });
 }
 
@@ -7118,6 +7119,10 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   if (pend.objectId) {
     s.pending = null;
     const entry = s.entersChoices?.shift();
+    if (entry?.what === "sacrificeInstead") {
+      sacrificedInstead(s, obj(s, pend.objectId), ids, entry.enters);
+      return;
+    }
     if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     else devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     return;
@@ -7753,10 +7758,10 @@ function neverEnters(s: GameState, o: GameObject) {
 }
 
 /** Lake of the Dead: the permanent chosen is sacrificed, then it enters (CR 614.1a). */
-function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId, enters?: { x?: number }) {
-  const x = obj(s, id);
-  log(s, `${player(s, controllerOf(s, o)).name} sacrifices ${nameOf(s, id)}, so ${defOf(s, o).name} enters.`);
-  if (x.zone === "battlefield") moveObject(s, id, "graveyard", { sacrificed: true });
+function sacrificedInstead(s: GameState, o: GameObject, id: ObjectId | ObjectId[], enters?: { x?: number }) {
+  const ids = typeof id === "string" ? [id] : id;
+  log(s, `${player(s, controllerOf(s, o)).name} sacrifices ${ids.map((id) => nameOf(s, id)).join(" and ")}, so ${defOf(s, o).name} enters.`);
+  for (const id of ids) if (obj(s, id).zone === "battlefield") moveObject(s, id, "graveyard", { sacrificed: true });
   invalidateCharacteristics(s);
   if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
 }
@@ -7870,7 +7875,23 @@ function askEntersChoice(s: GameState): boolean {
       // to the graveyard instead. It isn't on the battlefield yet, so it can't be the one.
       const you = controllerOf(s, o);
       const filter = compileCard(defOf(s, o)).entersSacrificeInstead!;
+      const n = compileCard(defOf(s, o)).entersSacrificeInsteadN ?? 1;
       const options = s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, filter, obj(s, id), you, false) && canBeSacrificed(s, obj(s, id)));
+      if (n > 1) {
+        // Lotus Vale: "two untapped lands", sacrificed together; with fewer, none is sacrificed and it never enters
+        // (rulings).
+        if (options.length <= n) {
+          q.shift();
+          if (options.length === n) sacrificedInstead(s, o, options, c.enters);
+          else {
+            log(s, `${player(s, you).name} doesn't have ${n} ${filter.text}s to sacrifice, so ${defOf(s, o).name} goes to its owner's graveyard instead.`);
+            neverEnters(s, o);
+          }
+          continue;
+        }
+        s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: filter.text, options, count: n, objectId: o.id, prompt: `Sacrifice ${n} ${filter.text}s for ${defOf(s, o).name} to enter` };
+        return true;
+      }
       if (options.length <= 1) {
         q.shift();
         if (options.length) sacrificedInstead(s, o, options[0]!, c.enters);

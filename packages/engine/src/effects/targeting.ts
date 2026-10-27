@@ -90,7 +90,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!host || (view && !hostChars) || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, hostChars, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen") return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity") return false;
+  if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (c.types.includes("Creature") ? c.power : undefined) : defMv(defOf(s, o)), spec.parity)) return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   if (spec.notCounter && (o.counters[spec.notCounter] ?? 0) > 0) return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
@@ -266,6 +267,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if (kind === "number" && chosen?.number !== undefined) return { ...rest, equals: chosen.number };
+  if (kind === "parity" && chosen?.parity && rest.parity) return { ...rest, parity: { ...rest.parity, is: chosen.parity } };
   if (kind === "powerAtLeast" && chosen?.number !== undefined) return { ...rest, power: { ...rest.power, min: Math.max(rest.power?.min ?? -Infinity, chosen.number) } };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
@@ -276,7 +278,13 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
 /** Riot's and unleash's choice (see choiceOptions). */
 export const ENTERS_COUNTER = "+1/+1 counter";
 
+/** Is `n` odd (or even)? Zero is even; with no number (a noncreature's power), neither (CR 208.3). */
+function isParity(n: number | undefined, p: { is?: "odd" | "even"; not?: true }): boolean {
+  return n !== undefined && ((Math.abs(n) % 2 === 1) === (p.is === "odd")) !== !!p.not;
+}
+
 export function choiceOptions(what: ChoiceKind | EntersOption, except?: string): string[] {
+  if (what === "parity") return ["odd", "even"];
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
   const all = what === "color" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES].sort();
@@ -291,6 +299,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "cardType") return { ...chosen, cardType: choice };
   if (what === "cardName") return { ...chosen, name: choice };
   if (what === "number") return { ...chosen, number: Number(choice) };
+  if (what === "parity") return { ...chosen, parity: choice === "odd" ? "odd" : "even" };
   if (what === "opponent") return { ...chosen, player: Number(choice) };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
@@ -353,7 +362,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.counter) return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.chosen === "parity" || spec.counter) return false;
+  if (spec.parity?.is && !isParity(spec.parity.of === "power" ? (d.types.includes("Creature") && /^-?\d+$/.test(d.power ?? "") ? Number(d.power) : undefined) : defMv(d), spec.parity)) return false;
   const hasKw = (k: string) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.toxic && !d.keywords.some((x) => /^toxic\b/i.test(x))) return false;
@@ -420,7 +430,7 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   const d = defOf(s, o);
   // "With power or toughness 2 or less" (Stern Scolding): either one, as it is on the stack (below).
   const ptEither = isPtAnyOf(spec.anyOf) ? spec.anyOf : undefined;
-  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, ...rest0 } = spec;
+  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, parity, ...rest0 } = spec;
   const { anyOf: _anyOf, ...rest1 } = rest0;
   const rest = ptEither ? rest1 : rest0;
   if (!printedMatches(rest, d)) return false;
@@ -436,6 +446,8 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   if (ptEither && !ptEither.some((a) => (["power", "toughness"] as const).some((key) => { const n = a[key] && pt(key); return n !== undefined && !!a[key] && inRange(n, a[key]!); }))) return false;
   // Talion: one of them equal to the chosen number; nothing chosen, nothing matches. An X spell's mana value counts its X (CR 202.3e).
   if (equalsChosen && (equals === undefined || !equalsChosen.some((k) => (k === "manaValue" ? spellManaValue(s, item) : pt(k)) === equals))) return false;
+  // Gollum, Riddle Master: "a spell with mana value of the chosen quality", its X counted (CR 202.3e).
+  if (parity && (!parity.is || !isParity(parity.of === "power" ? pt("power") : spellManaValue(s, item), parity))) return false;
   return true;
 }
 
@@ -1028,7 +1040,9 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+  // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
+  if (e.anyController && e.action === "counters") return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
   // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
   if (e.filter.saddledSource) {
     const { saddledSource: _, ...filter } = e.filter;

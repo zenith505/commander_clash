@@ -1111,8 +1111,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Awe for the Guilds: "Monocolored creatures can't block this turn", each creature's colors as blockers are declared.
   if (/^Monocolored creatures can't block this turn$/.test(s)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], colorCount: "monocolored", text: "monocolored creatures" } }];
   // Goblin Locksmith: "creatures with defender can't block this turn".
-  if ((m = /^[Cc]reatures( without flying| with power \d+ or less| with defender)? can't block this turn$/.exec(s))) {
-    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
+  // Twins of Discord: "Creatures with mana value of that quality can't block this turn", after "choose odd or even".
+  if ((m = /^[Cc]reatures( without flying| with power \d+ or less| with defender| with mana value of that quality)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`, { chosen: true });
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
   }
   // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.

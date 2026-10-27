@@ -881,6 +881,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
+  // Mortuary: "Whenever a creature is put into your graveyard from the battlefield, put that card on top of your
+  // library": the card, if it's still in your graveyard (CR 400.7); yours, so its owner's library.
+  if (/^[Pp]ut that card on top of your library$/.test(s) && ctx.subjectLeft) {
+    const what = parseObject("that card", ctx);
+    return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
+  }
+  // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
+  if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
   // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
   // library": the X it was cast with.
   if ((m = /^Put (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {

@@ -813,7 +813,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   if (twoHues) p = `${twoHues[1]} or ${twoHues[2]} creatures`;
   // "Non-Elf creatures get -2/-2 until end of turn" (Eyeblight Massacre): every creature that isn't an Elf.
   const nonType = /^non-([a-z]+) creatures$/i.exec(p);
-  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
+  // "Creature tokens get -2/-2 until end of turn" (Bloodline Culling): every creature token, whoever controls it.
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^(?:nonartifact creatures|creature tokens)$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
   // Harvester of Misery: "other creatures get -2/-2 until end of turn": every creature but the source.
   const othersAll = other && /^creatures$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued && !othersAll) return null;

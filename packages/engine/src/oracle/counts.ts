@@ -86,7 +86,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "Each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way."
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
-  if (ctx && ((each && /^creature sacrificed this way$/.test(p)) || /^the number of creatures sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
+  if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
   // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
@@ -412,6 +412,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? you've cast (?:your|a) commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });
   if (/^the chosen commander's mana value$/i.test(p)) return count({ kind: "chosenCommanderMv" });
   if (!each && /^the greatest mana value among your commanders$/i.test(p)) return count({ kind: "commandersMv" });
+  // Cloudkill, Majestic Genesis, the Visions cycle: "the greatest mana value of a commander you own on the battlefield or
+  // in the command zone", 0 with none there. Imposing Grandeur: "... a commander they own ...", each player's own.
+  if (!each && (m = /^the greatest mana value of a commander (you|they) own on the battlefield or in the command zone$/i.exec(p)))
+    return count({ kind: "commandersMv", onBattlefieldOrCommand: true, ...(m[1] === "they" ? { who: { ref: "eachOne" } as const } : {}) });
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
   if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
   if (each ? /^1 life you(?:'ve| have)? gained this turn$/i.test(p) : /^the (?:total )?amount of life you(?:'ve| have)? gained this turn$/i.test(p)) return count({ kind: "lifeGainedThisTurn" });

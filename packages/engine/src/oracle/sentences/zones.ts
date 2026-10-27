@@ -469,6 +469,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!filter || !filter.types?.includes("Creature")) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
   }
+  // Visions of Dread: "Target opponent puts a creature card of their choice from their graveyard onto the battlefield under
+  // your control": that player chooses one of their own as it resolves, not targeted; it enters under your control.
+  if ((m = /^(Target opponent|Target player) puts an? (creature card) of their choice from their graveyard onto the battlefield under your control$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseSearchFilter(m[2]!);
+    if (!who || !filter) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who, underYours: true }];
+  }
   // "... with a number of +1/+1 counters on it equal to that result" (Grave Endeavor): counted as it resolves.
   const counted = new RegExp(`^([Rr]eturn an? .+? from your graveyard to the battlefield(?: tapped)?) with a number of (${COUNTER}) counters on it equal to (.+)$`).exec(s);
   if (counted) {

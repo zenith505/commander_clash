@@ -175,6 +175,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const n = num(m[2]!);
     return [{ type: "eachMay", who, text: `discard your hand and draw ${m[2]} cards`, wheel: n, effects: [{ type: "discard", who: { ref: "choseThisWay" }, n: 0, hand: true }, { type: "draw", who: { ref: "choseThisWay" }, n }] }];
   }
+  // Imposing Grandeur: "Each player may discard their hand and draw cards equal to the greatest mana value of a commander
+  // they own on the battlefield or in the command zone": each player's own number, counted as they draw.
+  if ((m = /^Each player may discard their hand and draw cards equal to (the greatest mana value of a commander they own .+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx);
+    if (!n || !("count" in n) || n.count.kind !== "commandersMv" || !n.count.who) return null;
+    return [{ type: "eachMay", who: { ref: "eachPlayer" }, text: "discard your hand and draw cards equal to the greatest mana value of a commander you own on the battlefield or in the command zone", wheel: n, effects: [{ type: "discard", who: { ref: "choseThisWay" }, n: 0, hand: true }, { type: "draw", who: { ref: "choseThisWay" }, n }] }];
+  }
   // "Discard your hand", "each opponent discards their hand", "discard all the cards in your hand" (CR 701.9b: no
   // choice to make). Wheels: "each player discards their hand, then draws seven cards" (all of them discard, then all
   // of them draw, CR 608.2c), "then draw that many cards", "then draws cards equal to the greatest number of cards a

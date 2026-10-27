@@ -2542,6 +2542,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life.": only if it was
+    // exiled from the battlefield (rulings: not from the zone it went to if it left first).
+    if (sacDo && !/, where X is /.test(s) && sacPrev?.type === "exile" && sacPrev.what.ref === "self" && Object.keys(sacPrev).length === 2) {
+      const inner = parseOne(capital(sacDo[1]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "exiledThisWay" }, effects: inner });
+      continue;
+    }
     // Self-Inflicted Wound: "Target opponent sacrifices a green or white creature of their choice. If that player does, they
     // lose 2 life.": only if that player sacrificed one.
     const sacTheyDo = /^If that player does, they (lose \d+ life)$/.exec(s);

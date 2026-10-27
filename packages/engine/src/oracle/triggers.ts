@@ -2788,10 +2788,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When you control seven or more Thrulls, sacrifice ~" (Endrek Sahr).
   // The Millennium Calendar: "When there are 1,000 or more time counters on ~, sacrifice it and each opponent loses 1,000
   // life": "1,000" is a number.
-  const many = /^When there are (\d{1,3}(?:,\d{3})*) or more ([a-z]+) counters on ~, (.+)$/.exec(line);
+  // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life."
+  const many = new RegExp(`^When there are (\\d{1,3}(?:,\\d{3})*|${NUM.replace(/^\(/, "(?:")}) or more ([a-z]+) counters on ~, (.+)$`).exec(line);
   if (many) {
     const body = parseBody(many[3]!.replace(/\b(\d{1,3}),(\d{3})\b/g, "$1$2"), { selfIt: true });
-    return body ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min: Number(many[1]!.replace(/,/g, "")) }, body } : "fail";
+    const min = /^[\d,]+$/.test(many[1]!) ? Number(many[1]!.replace(/,/g, "")) : num(many[1]!);
+    return body && Number.isInteger(min) && min > 0 ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min }, body } : "fail";
   }
   // Lurking Jackals: "When an opponent has 10 or less life", Opal Avenger: "When you have 10 or less life", Veiled
   // Crocodile: "When a player has no cards in hand", Hidden Predators: "When an opponent controls a creature with power 4

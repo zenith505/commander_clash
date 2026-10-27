@@ -415,7 +415,13 @@ export type Count =
   | { kind: "chosenCommanderMv" }
   /** "The greatest mana value among your commanders" (Cactus Preserve): the commanders you own wherever they are, with
    * their current characteristics (CR 903.3; rulings); 0 with none. */
-  | { kind: "commandersMv" }
+  | {
+      kind: "commandersMv";
+      /** "A commander you own on the battlefield or in the command zone" (Cloudkill): only those there. */
+      onBattlefieldOrCommand?: true;
+      /** "A commander they own" (Imposing Grandeur): that player's (PlayerRef eachOne), not yours. */
+      who?: PlayerRef;
+    }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
@@ -2174,7 +2180,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; /** Instead of `n`: "return that many creature cards" (Lich-Knights' Conquest), as it resolves. */ nAmount?: Amount; upTo?: true; /** "With total mana value 4 or less" (Lively Dirge): of all the cards chosen. */ totalMv?: number; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Whenever one or more creature cards are put into your graveyard from your library, put one of them onto the battlefield" (Colossal Grave-Reaver): only the trigger's cards. */ eventGroup?: true; /** "Return another permanent card" after "if you sacrificed a creature this way" (Rise of the Witch-king): not the card you sacrificed. */ notSacrificed?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library; "castThisTurn": it stays there, and you may cast it this turn (Mission Briefing, with `exileAfter` as for mayCastFromGraveyard). */ dest?: "exile" | "battlefield" | "libraryTop" | "castThisTurn"; exileAfter?: true; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "Defending player chooses a nonland card in your graveyard" (O-Kagachi Made Manifest): another player chooses from `who`'s graveyard, for its owner; the card is kept for "that card" (ObjRef chosenFromYard). */ chooser?: PlayerRef; /** "Choose a face-up artifact card you own in exile. Put that card into your hand." (Karn, the Great Creator): from among the face-up cards you own in exile instead, into your hand. With `who` and `dest` "battlefield" (Oblivion Sower): that player's face-up cards in exile, put onto the battlefield under your control. */ fromExile?: true; /** "Any number of": as many as there are; `n` is ignored. */ anyNumber?: true; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true; /** "Exile a card from a graveyard" (Cemetery Prowler): from any player's graveyard, chosen by you as it resolves. */ anyGraveyard?: true; /** "A creature card put into your graveyard this way" after a destroy (Starfall Invocation): one that died to it, still that card (CR 400.7). */ destroyedThisWay?: true; /** The cards it exiles are linked to this source (CR 607.2a): "the exiled card", "cards exiled with ~". */ linked?: true }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; /** Instead of `n`: "return that many creature cards" (Lich-Knights' Conquest), as it resolves. */ nAmount?: Amount; upTo?: true; /** "With total mana value 4 or less" (Lively Dirge): of all the cards chosen. */ totalMv?: number; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Whenever one or more creature cards are put into your graveyard from your library, put one of them onto the battlefield" (Colossal Grave-Reaver): only the trigger's cards. */ eventGroup?: true; /** "Return another permanent card" after "if you sacrificed a creature this way" (Rise of the Witch-king): not the card you sacrificed. */ notSacrificed?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library; "castThisTurn": it stays there, and you may cast it this turn (Mission Briefing, with `exileAfter` as for mayCastFromGraveyard). */ dest?: "exile" | "battlefield" | "libraryTop" | "castThisTurn"; exileAfter?: true; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "Defending player chooses a nonland card in your graveyard" (O-Kagachi Made Manifest): another player chooses from `who`'s graveyard, for its owner; the card is kept for "that card" (ObjRef chosenFromYard). */ chooser?: PlayerRef; /** "Choose a face-up artifact card you own in exile. Put that card into your hand." (Karn, the Great Creator): from among the face-up cards you own in exile instead, into your hand. With `who` and `dest` "battlefield" (Oblivion Sower): that player's face-up cards in exile, put onto the battlefield under your control. */ fromExile?: true; /** "Any number of": as many as there are; `n` is ignored. */ anyNumber?: true; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true; /** "Target opponent puts a creature card of their choice from their graveyard onto the battlefield under your control" (Visions of Dread): `who` chooses from their own graveyard, and it enters under your control. */ underYours?: true; /** "Exile a card from a graveyard" (Cemetery Prowler): from any player's graveyard, chosen by you as it resolves. */ anyGraveyard?: true; /** "A creature card put into your graveyard this way" after a destroy (Starfall Invocation): one that died to it, still that card (CR 400.7). */ destroyedThisWay?: true; /** The cards it exiles are linked to this source (CR 607.2a): "the exiled card", "cards exiled with ~". */ linked?: true }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -3081,7 +3087,7 @@ export type Effect =
   /**
    * "Each player may discard their hand and draw five cards" (Will of the Jeskai): each of them decides in APNAP order,
    * knowing the earlier answers (CR 101.4), then `effects` happen to those who chose to ({ ref: "choseThisWay" }).
-   * `wheel`: the number of cards drawn, for the bots' answer.
+   * `wheel`: the number of cards drawn (each player's own with PlayerRef eachOne, Imposing Grandeur), for the bots' answer.
    */
   /**
    * `each`: a tempting offer and the like ("Each opponent may create a Treasure token. For each opponent who does, you
@@ -3098,7 +3104,7 @@ export type Effect =
    * (CR 101.4, rulings), each one's amount kept too.
    */
   | { type: "joinForces"; activeFirst?: true }
-  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
+  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: Amount; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard" | "hand"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true }; pay?: PayCost }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
    * a card". Each player in APNAP order picks one of `options` they can do (or none) and, for a discard or a sacrifice,
@@ -3564,6 +3570,8 @@ export type SpellCondition =
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
   | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true }
+  /** "Exile it. If you do, ..." (Mazemind Tome): this ability's exile instructions exiled a permanent from the battlefield. */
+  | { kind: "exiledThisWay" }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
   | { kind: "bouncedThisWay"; subtype: string; another: true }
   /** "If you return four or more nontoken permanents you control this way" (Flood of Tears): this resolution's "return all ..." returned at least `n` of them, counting one a replacement sent elsewhere (rulings). */
@@ -4974,6 +4982,8 @@ export interface CastFromGraveyard {
   exileIfToGraveyard?: true;
   /** "Cast this card from your graveyard using its warp ability" (Timeline Culler): only for that alternative cost. */
   alt?: AltCostKind;
+  /** "This spell costs {X} less to cast this way, where X is ..." (Visions of Glory): generic mana off when cast this way. */
+  less?: Amount;
 }
 
 /**
@@ -5259,6 +5269,8 @@ export interface CompiledCard {
   damageToOpponentsMills?: true;
   /** Angel of Suffering: "If damage would be dealt to you, prevent that damage and mill twice that many cards" (CR 615.5, 615.12). */
   damageToYouMillsTwice?: true;
+  /** Nine Lives: "If a source would deal damage to you, prevent that damage and put an incarnation counter on ~": the counter kind, one for each source (rulings, CR 615.5, 615.12). */
+  preventToYouCounter?: string;
   /** "Prevent all noncombat damage that would be dealt to you and other permanents you control." (The Wanderer, CR 615.1): see staticRules in damage.ts. */
   preventToYou?: { combat?: "only" | "non"; others?: true };
   /**

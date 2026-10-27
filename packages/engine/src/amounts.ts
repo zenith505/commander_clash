@@ -413,8 +413,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
       return s.resolving?.commanderMv ?? 0;
-    case "commandersMv":
-      return Math.max(0, ...Object.values(s.objects).filter((o) => o.isCommander && o.owner === ctx.controller).map((o) => (o.zone === "battlefield" ? (view(o)?.manaValue ?? 0) : defMv(defOf(s, o)))));
+    case "commandersMv": {
+      const owners = c.who ? refPlayers(s, c.who, ctx) : [ctx.controller];
+      return Math.max(0, ...Object.values(s.objects).filter((o) => o.isCommander && owners.includes(o.owner) && (!c.onBattlefieldOrCommand || o.zone === "battlefield" || o.zone === "command")).map((o) => (o.zone === "battlefield" ? (view(o)?.manaValue ?? 0) : defMv(defOf(s, o)))));
+    }
     case "commanderCasts":
       return (c.who ? refPlayers(s, c.who, ctx) : [ctx.controller]).reduce((n, pid) => n + Object.values(s.players[pid]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0), 0);
     case "party":
@@ -958,7 +960,7 @@ function describeCount(c: Count): string {
     case "chosenCommanderMv":
       return "the chosen commander's mana value";
     case "commandersMv":
-      return "the greatest mana value among your commanders";
+      return c.onBattlefieldOrCommand ? `the greatest mana value of a commander ${c.who ? "they" : "you"} own on the battlefield or in the command zone` : "the greatest mana value among your commanders";
     case "party":
       return "#creatures in your party";
     case "opponentsLifeLost":

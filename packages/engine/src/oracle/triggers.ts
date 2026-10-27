@@ -2285,7 +2285,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Skizzik: "At the beginning of the end step, if ~ wasn't kicked, sacrifice it": as it was cast (CR 702.33d), kept by
   // the permanent; a copy or one put onto the battlefield wasn't (rulings).
   const kickCond: StaticCondition | null = intervening && /^At the beginning of /.test(intervening[1]!) && /^~ wasn't kicked$/.test(intervening[2]!) ? { kind: "self", is: "kicked", not: true } : null;
-  const ifCond = kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // Slayer's Plate: "Whenever equipped creature dies, if it was a Human, ...": the creature as it last existed on the
+  // battlefield (CR 603.10a, 608.2h), as it triggers and resolves (CR 603.4).
+  const diedType = intervening && /^Whenever (?:equipped|enchanted) creature dies$/.test(intervening[1]!) ? /^it was an? ([A-Z][a-z]+)$/.exec(intervening[2]!) : null;
+  const diedTypeCond: StaticCondition | null = diedType && CREATURE_TYPES.has(diedType[1]!) ? { kind: "subjectType", subtype: diedType[1]! } : null;
+  const ifCond = diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

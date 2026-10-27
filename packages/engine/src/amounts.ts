@@ -688,9 +688,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "basicLandTypes": {
       const types = new Set<string>();
+      const whose = c.whose ? refPlayers(s, c.whose, ctx) : [ctx.controller];
       for (const id of s.battlefield) {
         const ch = view(s.objects[id]!);
-        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Land")) continue;
+        if (!ch || !whose.includes(ch.controller) || !ch.types.includes("Land")) continue;
         for (const st of ch.subtypes) if (["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(st)) types.add(st);
       }
       return types.size;

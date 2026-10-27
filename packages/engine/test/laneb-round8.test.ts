@@ -655,3 +655,227 @@ describe("Kicked-spell damage, artifact counts, Warrior equipment, block trigger
     for (const p of s.turnOrder) if (p !== ap) expect(life(s, p)).toBe(37);
   });
 });
+
+const meglonoth = card("Meglonoth", "Creature — Beast", "{3}{R}{G}{W}", { cmc: 6, power: "6", toughness: "6", keywords: ["Vigilance","Trample"], colors: ["G","R","W"], oracleText: "Vigilance, trample\nWhenever this creature blocks a creature, this creature deals damage to that creature's controller equal to this creature's power." });
+const assembledAlphas = card("Assembled Alphas", "Creature — Wolf", "{5}{R}", { cmc: 6, power: "5", toughness: "5", oracleText: "Whenever this creature blocks or becomes blocked by a creature, this creature deals 3 damage to that creature and 3 damage to that creature's controller." });
+const nessianBoar = card("Nessian Boar", "Creature — Boar", "{3}{G}{G}", { cmc: 5, power: "10", toughness: "6", oracleText: "All creatures able to block this creature do so.\nWhenever this creature becomes blocked by a creature, that creature's controller draws a card." });
+const bloodstoneGoblin = card("Bloodstone Goblin", "Creature — Goblin Warrior", "{1}{R}", { cmc: 2, power: "2", toughness: "2", oracleText: "Whenever you cast a spell, if that spell was kicked, this creature gets +1/+1 and gains menace until end of turn. (It can't be blocked except by two or more creatures.)" });
+
+describe("That creature's controller, for the creature in combat with it", () => {
+  it("are fully supported", () => supported(meglonoth, assembledAlphas, nessianBoar, bloodstoneGoblin));
+
+  it("Meglonoth deals damage equal to its power to the controller of the creature it blocks", () => {
+    let { s, ap, opp } = setup([]);
+    const m = putOnBattlefield(s, ap, meglonoth);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    s = passUntil(s, "main1", opp);
+    s = block(toBlocks(s, opp, [{ attacker: bear, defender: ap }]), ap, [{ blocker: m, attacker: bear }]);
+    s = settle(s);
+    expect(life(s, opp)).toBe(34);
+    expect(life(s, ap)).toBe(40);
+  });
+
+  it("Assembled Alphas deals 3 damage to the creature blocking it and 3 to its controller", () => {
+    let { s, ap, opp } = setup([]);
+    const a = putOnBattlefield(s, ap, assembledAlphas);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    s = block(toBlocks(s, ap, [{ attacker: a, defender: opp }]), opp, [{ blocker: bear, attacker: a }]);
+    s = settle(s);
+    expect(zone(s, bear)).toBe("graveyard");
+    expect(life(s, opp)).toBe(37);
+  });
+
+  it("Nessian Boar: the controller of a creature blocking it draws a card", () => {
+    let { s, ap, opp } = setup([]);
+    const b = putOnBattlefield(s, ap, nessianBoar);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    s = toBlocks(s, ap, [{ attacker: b, defender: opp }]);
+    const hand = s.players[opp]!.hand.length;
+    s = settle(block(s, opp, [{ blocker: bear, attacker: b }]));
+    expect(s.players[opp]!.hand.length).toBe(hand + 1);
+  });
+
+  it("Bloodstone Goblin gets +1/+1 and menace when you cast a kicked spell", () => {
+    const kicky = card("Test Kicker", "Sorcery", "{R}", { cmc: 1, oracleText: "Kicker {1}\nYou gain 1 life." });
+    for (const kick of [true, false]) {
+      let { s, ap, ids } = setup([kicky]);
+      const g = putOnBattlefield(s, ap, bloodstoneGoblin);
+      s = settle(run(s, planCast(s, ap, ids[0]!, [], undefined, "auto", undefined, { kicks: kick ? [0] : [] })));
+      expect(pt(s, g), `kicked ${kick}`).toBe(kick ? "3/3" : "2/2");
+      expect(has(s, g, "Menace"), `kicked ${kick}`).toBe(kick);
+    }
+  });
+});
+
+const demonlordOfAshmouth = card("Demonlord of Ashmouth", "Creature — Demon", "{2}{B}{B}", { cmc: 4, power: "5", toughness: "4", keywords: ["Flying","Undying"], oracleText: "Flying\nWhen this creature enters, exile it unless you sacrifice another creature.\nUndying (When this creature dies, if it had no +1/+1 counters on it, return it to the battlefield under its owner's control with a +1/+1 counter on it.)" });
+const furnacePunisher = card("Furnace Punisher", "Creature — Phyrexian Warrior", "{2}{R}", { cmc: 3, power: "3", toughness: "3", keywords: ["Menace"], oracleText: "Menace\nAt the beginning of each player's upkeep, this creature deals 2 damage to that player unless they control two or more basic lands." });
+const vulshokBattlemaster = card("Vulshok Battlemaster", "Creature — Human Warrior", "{4}{R}", { cmc: 5, power: "2", toughness: "2", keywords: ["Haste"], oracleText: "Haste\nWhen this creature enters, attach all Equipment on the battlefield to it. (Control of the Equipment doesn't change.)" });
+const alliedStrategies = card("Allied Strategies", "Sorcery", "{4}{U}", { cmc: 5, keywords: ["Domain"], oracleText: "Domain — Target player draws a card for each basic land type among lands they control." });
+const waitingInTheWeeds = card("Waiting in the Weeds", "Sorcery", "{1}{G}{G}", { cmc: 3, oracleText: "Each player creates a 1/1 green Cat creature token for each untapped Forest they control." });
+const manaSeism = card("Mana Seism", "Sorcery", "{1}{R}", { cmc: 2, oracleText: "Sacrifice any number of lands, then add that much {C}." });
+const ultimateNullification = card("Ultimate Nullification", "Sorcery", "{4}{W}", { cmc: 5, oracleText: "As an additional cost to cast this spell, sacrifice a legendary creature.\nExile all creatures and graveyards. Put Ultimate Nullification on the bottom of its owner's library." });
+const deathWatch = card("Death Watch", "Enchantment — Aura", "{B}", { cmc: 1, keywords: ["Enchant"], oracleText: "Enchant creature\nWhen enchanted creature dies, its controller loses life equal to its power and you gain life equal to its toughness." });
+const lunarForce = card("Lunar Force", "Enchantment", "{2}{U}", { cmc: 3, oracleText: "When an opponent casts a spell, sacrifice this enchantment and counter that spell." });
+const teyoLightshieldExpert = card("Teyo, Lightshield Expert", "Legendary Creature — Human Cleric", "{1}{W}", { cmc: 2, power: "1", toughness: "1", keywords: ["Flash"], oracleText: "Flash\nWhen Teyo enters, target permanent you control gains hexproof until end of turn. Put a +1/+1 counter on it if it's a creature. Put a loyalty counter on it if it's a planeswalker. (It can't be the target of spells or abilities your opponents control.)" });
+const slayersPlate = card("Slayer's Plate", "Artifact — Equipment", "{3}", { cmc: 3, keywords: ["Equip"], oracleText: "Equipped creature gets +4/+2.\nWhenever equipped creature dies, if it was a Human, create a 1/1 white Spirit creature token with flying.\nEquip {3}" });
+const hydraTroopers = card("HYDRA Troopers", "Creature — Human Soldier Villain", "{2}{B}", { cmc: 3, power: "3", toughness: "2", keywords: ["Mill"], oracleText: "When this creature enters, create a tapped 2/1 black Villain creature token with menace if there are two or more creature cards in your graveyard. Otherwise, mill two cards. (Put the top two cards of your library into your graveyard.)" });
+const magmaticSprinter = card("Magmatic Sprinter", "Creature — Phyrexian Warrior", "{2}{R}", { cmc: 3, power: "3", toughness: "2", keywords: ["Haste"], oracleText: "Haste\nWhen this creature enters, put two oil counters on target artifact or creature you control.\nAt the beginning of your end step, return this creature to its owner's hand unless you remove two oil counters from it." });
+/** Permanents with this name, or tokens of it ("Cat Token"). */
+const named = (s: GameState, name: string) => s.battlefield.filter((id) => [name, `${name} Token`].includes(characteristics(s, s.objects[id]!).name));
+const testBlade = () => card("Test Blade", "Artifact — Equipment", "{1}", { cmc: 1, keywords: ["Equip"], oracleText: "Equipped creature gets +1/+0.\nEquip {1}" });
+
+describe("Keep-or-lose upkeeps, the trigger's player's lands, domain for a player, sacrificing for mana", () => {
+  it("are fully supported", () => supported(demonlordOfAshmouth, furnacePunisher, vulshokBattlemaster, alliedStrategies, waitingInTheWeeds, manaSeism, ultimateNullification, deathWatch, lunarForce, teyoLightshieldExpert, slayersPlate, hydraTroopers, magmaticSprinter));
+
+  it("Demonlord of Ashmouth is exiled as it enters unless you sacrifice another creature", () => {
+    for (const yes of [true, false]) {
+      let { s, ap, ids } = setup([demonlordOfAshmouth]);
+      const bear = putOnBattlefield(s, ap, greenBear());
+      s = settle(run(s, planCast(s, ap, ids[0]!, [])), { yes, pick: [bear] });
+      expect(zone(s, ids[0]!), `sacrifice ${yes}`).toBe(yes ? "battlefield" : "exile");
+      expect(zone(s, bear), `sacrifice ${yes}`).toBe(yes ? "graveyard" : "battlefield");
+    }
+  });
+
+  it("Furnace Punisher deals 2 damage to each upkeep's player unless they control two or more basic lands", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, furnacePunisher);
+    putOnBattlefield(s, opp, forest);
+    s = toUpkeep(s, opp);
+    expect(life(s, opp)).toBe(38);
+    putOnBattlefield(s, opp, island);
+    s = toUpkeep(passUntil(s, "main1", next(s, opp)), opp);
+    expect(life(s, opp)).toBe(38);
+    s = toUpkeep(passUntil(s, "main1", next(s, opp)), ap);
+    expect(life(s, ap)).toBe(40);
+  });
+
+  it("Vulshok Battlemaster attaches every Equipment, an opponent's too, without changing who controls it", () => {
+    let { s, ap, opp, ids } = setup([vulshokBattlemaster]);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    const theirs = attach(s, opp, testBlade(), bear);
+    const mine = putOnBattlefield(s, ap, testBlade());
+    s = settle(run(s, planCast(s, ap, ids[0]!, [])));
+    expect(s.objects[theirs]!.attachedTo).toBe(ids[0]);
+    expect(s.objects[mine]!.attachedTo).toBe(ids[0]);
+    expect(s.objects[theirs]!.controller).toBe(opp);
+    expect(pt(s, ids[0]!)).toBe("4/2");
+  });
+
+  it("Allied Strategies: the target player draws one card for each basic land type among their lands", () => {
+    let { s, ap, opp, ids } = setup([alliedStrategies]);
+    for (const l of [forest, forest, island, swamp]) putOnBattlefield(s, opp, l);
+    const hand = s.players[opp]!.hand.length;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [player(opp)])));
+    expect(s.players[opp]!.hand.length).toBe(hand + 3);
+  });
+
+  it("Waiting in the Weeds: each player gets a Cat for each untapped Forest they control", () => {
+    let { s, ap, opp, ids } = setup([waitingInTheWeeds]);
+    const f1 = putOnBattlefield(s, opp, forest);
+    putOnBattlefield(s, opp, forest);
+    s.objects[f1]!.tapped = true;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [])));
+    const cats = (p: PlayerId) => named(s, "Cat").filter((id) => s.objects[id]!.controller === p).length;
+    expect(cats(opp)).toBe(1);
+    // Three Forests, two of them tapped to cast it.
+    expect(cats(ap)).toBe(1);
+  });
+
+  it("Mana Seism sacrifices any number of lands and adds that much {C}", () => {
+    let { s, ap, ids } = setup([manaSeism]);
+    s = run(s, planCast(s, ap, ids[0]!, []));
+    const untapped = s.battlefield.filter((id) => s.objects[id]!.controller === ap && !s.objects[id]!.tapped && characteristics(s, s.objects[id]!).types.includes("Land")).slice(0, 3);
+    s = settle(s, { pick: untapped });
+    for (const id of untapped) expect(zone(s, id)).toBe("graveyard");
+    expect(s.players[ap]!.manaPool.C).toBe(3);
+  });
+
+  it("Ultimate Nullification exiles every creature and graveyard, then goes to the bottom of its owner's library", () => {
+    let { s, ap, opp, ids } = setup([ultimateNullification]);
+    const legend = putOnBattlefield(s, ap, creature("Test Legend", "Legendary Creature — Human", "{W}", 2, 2));
+    const bear = putOnBattlefield(s, opp, greenBear());
+    const dead = into(s, opp, redOgre(), "graveyard");
+    s = settle(run(s, planCast(s, ap, ids[0]!, [], undefined, "auto", undefined, { sacrifice: [legend] })));
+    // Sacrificed as it was cast, then exiled with the graveyards.
+    expect(zone(s, legend)).toBe("exile");
+    expect(zone(s, bear)).toBe("exile");
+    expect(zone(s, dead)).toBe("exile");
+    for (const p of s.turnOrder) expect(s.players[p]!.graveyard.length).toBe(0);
+    expect(zone(s, ids[0]!)).toBe("library");
+    expect(s.players[ap]!.library.at(-1)).toBe(ids[0]);
+  });
+
+  it("Death Watch: the dead creature's controller loses its power in life, you gain its toughness", () => {
+    let { s, ap, opp, ids } = setup([testShock()]);
+    const raider = putOnBattlefield(s, opp, creature("Test Raider", "Creature — Human", "{R}", 3, 1));
+    attach(s, ap, deathWatch, raider);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(raider)])));
+    expect(zone(s, raider)).toBe("graveyard");
+    expect(life(s, opp)).toBe(37);
+    expect(life(s, ap)).toBe(41);
+  });
+
+  it("Lunar Force is sacrificed and counters an opponent's spell", () => {
+    let { s, ap, opp } = setup([]);
+    const lf = putOnBattlefield(s, ap, lunarForce);
+    const shock = into(s, opp, testShock());
+    putOnBattlefield(s, opp, mountain);
+    s = passUntil(s, "main1", opp);
+    s = settle(run(s, planCast(s, opp, shock, [player(ap)])));
+    expect(zone(s, lf)).toBe("graveyard");
+    expect(zone(s, shock)).toBe("graveyard");
+    expect(life(s, ap)).toBe(40);
+  });
+
+  it("Teyo gives hexproof, then a +1/+1 counter to a creature or a loyalty counter to a planeswalker", () => {
+    const walker = card("Test Walker", "Legendary Planeswalker — Test", "{2}", { cmc: 2, loyalty: "3", oracleText: "" });
+    for (const def of [greenBear(), walker]) {
+      let { s, ap, ids } = setup([teyoLightshieldExpert]);
+      const t = putOnBattlefield(s, ap, def);
+      if (def === walker) s.objects[t]!.counters.loyalty = 3;
+      s = run(s, planCast(s, ap, ids[0]!, []));
+      s = settle(s, { targets: [tgt(t)] });
+      expect(has(s, t, "Hexproof"), def.name).toBe(true);
+      expect(s.objects[t]!.counters["+1/+1"] ?? 0, def.name).toBe(def === walker ? 0 : 1);
+      expect(s.objects[t]!.counters.loyalty ?? 0, def.name).toBe(def === walker ? 4 : 0);
+    }
+  });
+
+  it("Slayer's Plate makes a Spirit only when the equipped creature that died was a Human", () => {
+    for (const human of [true, false]) {
+      let { s, ap, ids } = setup([testShock()]);
+      const c = putOnBattlefield(s, ap, creature("Test Body", human ? "Creature — Human Soldier" : "Creature — Elf Soldier", "{W}", 0, 0));
+      attach(s, ap, slayersPlate, c);
+      s.objects[c]!.damage = 1;
+      s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(c)])));
+      expect(zone(s, c)).toBe("graveyard");
+      expect(named(s, "Spirit").length, `human ${human}`).toBe(human ? 1 : 0);
+    }
+  });
+
+  it("HYDRA Troopers makes a tapped Villain with two creature cards in your graveyard, otherwise mills two", () => {
+    for (const two of [true, false]) {
+      let { s, ap, ids } = setup([hydraTroopers]);
+      into(s, ap, greenBear(), "graveyard");
+      if (two) into(s, ap, redOgre(), "graveyard");
+      const yard = s.players[ap]!.graveyard.length;
+      s = settle(run(s, planCast(s, ap, ids[0]!, [])));
+      const villains = named(s, "Villain");
+      expect(villains.length, `two ${two}`).toBe(two ? 1 : 0);
+      if (two) expect(s.objects[villains[0]!]!.tapped).toBe(true);
+      expect(s.players[ap]!.graveyard.length, `two ${two}`).toBe(two ? yard : yard + 2);
+    }
+  });
+
+  it("Magmatic Sprinter goes back to its owner's hand at your end step unless you remove two oil counters from it", () => {
+    for (const oil of [2, 1]) {
+      let { s, ap } = setup([]);
+      const m = putOnBattlefield(s, ap, magmaticSprinter);
+      s.objects[m]!.counters.oil = oil;
+      s = settle(passUntil(s, "end", ap));
+      expect(zone(s, m), `${oil} oil`).toBe(oil === 2 ? "battlefield" : "hand");
+      if (oil === 2) expect(s.objects[m]!.counters.oil ?? 0).toBe(0);
+    }
+  });
+});

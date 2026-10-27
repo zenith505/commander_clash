@@ -912,6 +912,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Ss]acrifice an? [a-z]+) if you don't control (an? [A-Z][a-z]+)\.$/, "$1 unless you control $2.");
   // Second Chance: "sacrifice ~ and take an extra turn after this one": two instructions.
   text = text.replace(/^([Ss]acrifice ~) and (take an extra turn after this one)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Death Watch: "its controller loses life equal to its power and you gain life equal to its toughness": two instructions,
+  // both about the creature that died.
+  text = text.replace(/^(its controller loses life equal to its power) and (you gain life equal to its toughness)\.$/, (_, a: string, b: string) => `${capital(a)}. ${capital(b)}.`);
+  // Lunar Force: "sacrifice ~ and counter that spell": two instructions; the spell is countered even if ~ is already gone
+  // (rulings).
+  text = text.replace(/^sacrifice ~ and counter that spell\.$/, "Sacrifice ~. Counter that spell.");
+  // Teyo, Lightshield Expert: "Put a +1/+1 counter on it if it's a creature. Put a loyalty counter on it if it's a
+  // planeswalker.": each checked as it resolves (CR 608.2c); both if it's both (rulings).
+  text = text.replace(/(^|\. )Put (an? [+\-/0-9a-z]+ counter) on it if it's an? (creature|planeswalker)(?=\.)/g, "$1If it's a $3, put $2 on it");
+  // HYDRA Troopers: "create a tapped 2/1 ... token with menace if there are two or more creature cards in your graveyard.
+  // Otherwise, mill two cards.": checked as it resolves (CR 608.2c), not an intervening "if".
+  text = text.replace(/^create ([^.]+?) if (there are [a-z]+ or more [a-z]+ cards in your graveyard)\. Otherwise,/, "If $2, create $1. Otherwise,");
+  // Ultimate Nullification: "Exile all creatures and graveyards": the creatures, then the graveyards they didn't go to.
+  text = text.replace(/^Exile all creatures and graveyards\./, "Exile all creatures. Exile all graveyards.");
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
   // (CR 608.2c), not an intervening "if".
   text = text.replace(/^(you gain \d+ life) if (~ is (?:un)?tapped)\. (Otherwise, [^.]+\.)$/, (_, a: string, cond: string, b: string) => `If ${cond}, ${a}. ${b}`);
@@ -2042,13 +2056,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield
     // tapped, then shuffle." (Scapeshift): the same count.
+    // Mana Seism: "Sacrifice any number of lands, then add that much {C}": one {C} for each land sacrificed.
+    const seism = /^[Ss]acrifice any number of lands$/.test(s) && /^(?:[Tt]hen )?[Aa]dd that much \{C\}$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     const anySac = /^(?:[Yy]ou may )?[Ss]acrifice any number of (other )?(.+)$/.exec(s);
     const thatMany = sentences[si + 1]?.replace(/\.$/, "").replace(/^If you do, /, "") ?? "";
-    if (anySac && /\bthat many\b/.test(thatMany) && !/\bthat many\b.*\bthat many\b/.test(thatMany)) {
+    if (anySac && (seism || (/\bthat many\b/.test(thatMany) && !/\bthat many\b.*\bthat many\b/.test(thatMany)))) {
       const filter = pickFilter(anySac[2]!);
       if (!filter) return null;
       const before = ctx.targets.length;
-      const next = parseOne(capital(thatMany.replace(/\bthat many\b/, "X")), ctx);
+      const next = seism ? [{ type: "addMana" as const, mana: "{C}", times: { count: { kind: "x" as const } } }] : parseOne(capital(thatMany.replace(/\bthat many\b/, "X")), ctx);
       if (!next || ctx.targets.length !== before) return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: anySac[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "sacrifice", anyNumber: true }, ...replaceX(next, { count: { kind: "sacrificedThisWayCount" } }));
       si++;
@@ -4291,7 +4307,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Up to one target ... loses all abilities until your next turn. If it's a creature, it also has base power and
       // toughness 2/2 until your next turn" (Azure Beastbinder): with no target chosen, the condition is false.
       const then = ifIts[3]!.replace(/^it also /, "it ");
-      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && ["untap", "tap", "counters", "continuous", "attach"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
+      if (t?.kind === "object" && (!t.optional || prev?.type === "continuous") && !t.many && known && prev && (["untap", "tap", "counters", "continuous", "attach"].includes(prev.type) || (prev.type === "if" && prev.cond.kind === "targetIs" && prev.cond.index === i)) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(then)) {
         const fx = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
         if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
         const filter: TargetSpec = ifIts[1] ? { kind: "object", types: [], notTypes: types, notColors: [], text: `not ${ifIts[2]}` } : { ...typed, text: ifIts[2]! };
@@ -6046,7 +6062,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // choice": whether a creature died, not whether a card was drawn (rulings).
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -6806,7 +6822,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You lose 2 life unless you control another Pirate": the instruction happens only if the condition is false as it
     // resolves (CR 608.2c).
     const unlessState = !ifState ? /^(.+) unless ([^,]+)$/.exec(s) : null;
-    const unlessCond = unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // Furnace Punisher: "unless they control two or more basic lands": the trigger's player.
+    const theyControl = unlessState && ctx.eventPlayer ? /^(?:they control|that player controls) (.+)$/.exec(unlessState[2]!) : null;
+    const theirCond = theyControl ? parseStaticCondition(`you control ${theyControl[1]}`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const unlessCond = theirCond ? (theirCond.kind === "control" && theirCond.who === "you" && !theirCond.other ? { ...theirCond, who: "eventPlayer" as const } : null) : unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (unlessState && unlessCond) {
       const inner = parseOne(unlessState[1]!, ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -8160,9 +8179,18 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
       const scaled = scaleEffect(e, { count: { ...count.count, whose: { ref: "eventPlayer" } } });
       return scaled ? [scaled] : null;
     }
-    if (e.type !== "loseLife" && e.type !== "gainLife" && e.type !== "draw") return null;
+    // Waiting in the Weeds: "Each player creates a 1/1 green Cat creature token for each untapped Forest they control": each
+    // their own number.
+    const eachCreates = e.type === "createToken" && e.who?.ref === "eachPlayer" ? e.who : null;
+    const who = e.type === "loseLife" || e.type === "gainLife" || e.type === "draw" ? e.who : eachCreates;
+    if (!who) return null;
     // "That player gains 2 life for each creature they control" (Benevolent Offering): the chosen opponent.
-    const whose: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : e.who.ref === "eventPlayer" || (e.who.ref === "chosenPlayer" && e.who.nth === undefined) ? e.who : null;
+    const whose: PlayerRef | null = eachCreates ? { ref: "eachOne" } : who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { ref: "eachOne" } : who.ref === "target" && !who.n ? who : who.ref === "eventPlayer" || (who.ref === "chosenPlayer" && who.nth === undefined) ? who : null;
+    // Allied Strategies: "draws a card for each basic land type among lands they control": that player's domain.
+    if (whose && /^basic land type among lands$/.test(theirs[1]!)) {
+      const scaled = scaleEffect(e, { count: { kind: "basicLandTypes", whose } });
+      return scaled ? [scaled] : null;
+    }
     const count = whose && parseCount(`${theirs[1]} on the battlefield`, ctx, true);
     if (!count || count.count.kind !== "permanents" || count.times || count.plus) return null;
     const scaled = scaleEffect(e, { count: { ...count.count, whose } });

@@ -662,9 +662,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Junk Golem: "sacrifice ~ unless you remove a +1/+1 counter from it": removing one keeps it; with none, or choosing not
   // to, it's sacrificed.
-  if ((m = new RegExp(`^[Ss]acrifice (~|it) unless you remove an? (${COUNTER}) counter from (?:it|~)$`).exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
-    const counter = counterKind(m[2]!);
-    return [{ type: "may", effects: [{ type: "removeCounters", what: { ref: "self" }, counter, n: 1 }], otherwise: [sacrificeSelf], keep: true, text: `Remove a ${m[2]} counter from ~ to keep it` }];
+  // Magmatic Sprinter: "return ~ to its owner's hand unless you remove two oil counters from it": with fewer, it's returned.
+  if ((m = new RegExp(`^([Ss]acrifice|[Rr]eturn) (~|it)( to its owner's hand)? unless you remove (an?|two|three) (${COUNTER}) counters? from (?:it|~)$`).exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)) && /^s/i.test(m[1]!) === !m[3]) {
+    const counter = counterKind(m[5]!);
+    const n = /^an?$/.test(m[4]!) ? 1 : num(m[4]!);
+    const away: Effect = m[3] ? { type: "bounce", what: { ref: "self" } } : sacrificeSelf;
+    return [{ type: "may", effects: [{ type: "removeCounters", what: { ref: "self" }, counter, n }], otherwise: [away], keep: true, text: `Remove ${m[4]} ${m[5]} counter${n > 1 ? "s" : ""} from ~ to keep it` }];
   }
   // Command Bridge: "sacrifice it unless you tap an untapped permanent you control". Tapping one keeps it; with none
   // untapped, or choosing not to, it's sacrificed.
@@ -678,11 +681,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // sacrifice, or choosing not to, it's sacrificed.
   // "... unless you sacrifice two Swamps" (Mold Demon): both, or it's sacrificed (with fewer, they can't be).
   // Cosmic Larva: "... unless you sacrifice two lands" likewise.
-  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s|two lands)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
-    const two = /^two /.test(m[2]!);
-    const filter = pickFilter(two ? singular(m[2]!.slice(4)) : m[2]!.replace(/^(?:an?|another) /, ""));
-    if (!filter || / or |,/.test(m[2]!)) return null;
-    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: two ? 2 : 1, action: "sacrifice" }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice ${m[2]} to keep ~` }];
+  // Demonlord of Ashmouth: "exile it unless you sacrifice another creature": exiled instead of sacrificed.
+  if ((m = /^([Ss]acrifice|[Ee]xile) (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s|two lands)$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const two = /^two /.test(m[3]!);
+    const filter = pickFilter(two ? singular(m[3]!.slice(4)) : m[3]!.replace(/^(?:an?|another) /, ""));
+    if (!filter || / or |,/.test(m[3]!)) return null;
+    const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : { type: "exile", what: { ref: "self" } };
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: two ? 2 : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~` }];
   }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
   if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);

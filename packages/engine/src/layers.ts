@@ -861,6 +861,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
       return !!lk && lk.zc === subjectZc && (lk.counters?.[cond.counter] ?? 0) > 0;
     }
+    case "subjectType": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) {
+        const c = chars.get(sub.id);
+        return !!c && (c.subtypes.includes(cond.subtype) || (!!c.allCreatureTypes && c.types.includes("Creature")));
+      }
+      // Gone: as it last existed on the battlefield, whether the trigger names it there or in the zone it went to.
+      const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      const same = !!lk && (lk.zc === subjectZc || (lk.zc + 1 === subjectZc && sub?.zoneChanges === subjectZc));
+      return same && (lk!.creatureTypes === "all" || !!lk!.creatureTypes?.includes(cond.subtype));
+    }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
     case "opponentsDealtExcess":
@@ -1059,7 +1070,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "control": {
       // "Defending player" is the player the source is attacking (CR 506.2); it has none otherwise.
       // "An opponent controls seven or more lands": any one opponent.
-      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
+      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.

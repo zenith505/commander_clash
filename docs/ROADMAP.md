@@ -1,7 +1,7 @@
 # Roadmap
 
-25,870 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,724 of
+25,938 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,725 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1472,10 +1472,43 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
   Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (moving every +1/+1 counter); Driftgloom Coyote
   ("if that creature had power 2 or less" after an exile until).
+- Round B9 (ranks about 19,600 up to about 17,100, the easier templates, plus more played cards the same templates
+  cover: Goblin Shrine, Kjeldoran Pride, Ancient Runes, Pippin's Bravery, Giant Opportunity, Regenerate and others):
+  "~ can't have counters put on it"; "enchanted creature is tapped/untapped", "enchanted land is a basic Mountain",
+  "you control another creature named ~", "your opponents control three or more creatures", "you discarded a card this
+  turn", "you lost life last turn" (kept for one turn), "~ doesn't have a +1/+1 counter on it", "~ didn't enter the
+  battlefield this turn", "any player controls a white permanent", "is a Human or an Angel"; "can only attack alone";
+  "can't attack, block, or transform" (CR 701.28f); "as long as it's a Human. Otherwise, it can't attack or block";
+  threshold "an additional +1/+1"; "can't be blocked if ~'s power is 1 or less" (a static condition); cost reductions
+  for each creature you attacked with this turn; "N plus the number of other spells you've cast this turn"; targets
+  "without a +1/+1 counter on it", "other than enchanted creature", "attacking red creatures"; "if that creature is
+  1/1" on entering; "Whenever one or more creatures attack you"; "Whenever a creature attacks or blocks" (two
+  triggers); "if he's equipped"; "Sacrifice those tokens at the beginning of your next upkeep" and "At the beginning
+  of your next upkeep, discard three cards at random"; "Shuffle enchanted creature into its owner's library";
+  "Counter target spell if you control more creatures than that spell's controller"; "Exile a card from your hand";
+  "Return target permanent to its owner's hand. Then that player discards a card (if you control a Zombie)"; damage
+  "except for creatures you control with flying"; "It deals 5 damage instead if that target is white and/or blue";
+  "If that creature is a Demon, exile it instead"; "If an opponent controls that creature, put a stun counter on it";
+  "If target player has exactly 10 life"; "you may reveal a Dinosaur card from your hand. If you do" (a reveal picker
+  of at most one card); "If that creature has toxic, instead it gets ..."; "Then if that creature's power is 0 or
+  less, destroy it"; "If it had mana value 3 or less" after an exile; "If it was a Soldier" after a bounce; "You may
+  sacrifice a Food. If you do, ... Otherwise, ..."; Doomgape's "You gain life equal to that creature's toughness";
+  "the total life lost by your opponents this turn"; "You gain X life and scry X"; "each player draws two cards, then
+  discards a card at random" after a trigger (this also fixes Vile Mutilator, whose second sacrifice was yours instead
+  of each opponent's). +68 (25,938 with round 179).
+- Skipped there, with reasons: Sokenzan Smelter ("pay {1} and sacrifice an artifact" as one optional cost); Lethal
+  Sting (an additional cost that puts a -1/-1 counter); Heaven's Gate and Touch of Darkness ("one or more target
+  creatures"); Urgoros ("discards a card at random. If the player can't"); Searing Blood, Burn Away and A Good Day to
+  Die ("When that creature dies this turn" from a spell); Enslave (enchanted creature as the damage source); Rupture
+  (the sacrificed creature's power to each creature and player); Trade Route Envoy ("If you don't draw a card this
+  way"); Sanctuary Wall ("You may put a stun counter on it. If you do"); Gilt-Leaf Winnower ("whose power and toughness
+  aren't equal"); Graceful Reprieve (a dies trigger from a spell); Firemane Angel (a trigger in the graveyard or on the
+  battlefield); Deepway Navigator ("attacked with three or more Merfolk"); Patron of the Nezumi (a permanent put into
+  an opponent's graveyard).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
-  (creatures sharing a type), Melira's Keepers ("can't have counters put on it"), Heart Wolf (Dwarves, a delayed
+  (creatures sharing a type), Heart Wolf (Dwarves, a delayed
   leaves trigger), Endangered Armodon (state trigger), Exiled Doomsayer (morph cost tax), Treacherous Vampire and
   Rotting Giant (sacrifice unless you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in
   a graveyard dealing damage), Cut the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of
@@ -1499,8 +1532,17 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Martyr of Frost, Haunted Plate
   Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Porphyry Nodes, Gnarlbark Elm, Time to Feed,
   Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,
-  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dense Foliage, Dralnu's Crusade, then on up from 21,300
-  (`LO=19500 HI=21300` in a band listing).
+  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dense Foliage, Dralnu's Crusade.
+  Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):
+  Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
+  before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch
+  Paladin, Dragon's Disciple, Dream Salvage, Misinformation, Obscura Interceptor, Rewrite History, Wight, Frenzy Sliver,
+  Mondo Gecko, Baru, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
+  Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Blind Seer, Lo and Li, Chisei, Merfolk Spy,
+  Withercrown, Throne of Makindi, Brightflame, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
+  Spider-Slayer, Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
+  Gomazoa, Mine Worker, Woolly Razorback, Temporary Truce, Information Dealer, Fractalize, Loxodon Lifechanter,
+  Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig; then on up from 17,100.
 
 ## Known gaps (from earlier rounds)
 

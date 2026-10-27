@@ -858,7 +858,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
             ? { ...m, filter: (({ chosen: _, ...rest }) => (s.resolving?.chosen?.color ? { ...rest, colors: [s.resolving.chosen.color] } : { ...rest, controlledBy: -1 }))(m.filter) }
             : m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
             ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_LAND_TYPE ? [st] : s.resolving?.chosen?.landType ? [s.resolving.chosen.landType] : [])) }
-            : m.kind === "setColors" && m.chosen
+            : // "Becomes the color or colors of your choice" (Prismatic Lace): the colors chosen as it resolved.
+              m.kind === "setColors" && m.chosen === "colors"
+              ? { kind: "setColors", colors: [...(s.resolving?.chosen?.colors ?? [])] }
+              : m.kind === "setColors" && m.chosen
               ? { kind: "setColors", colors: s.resolving?.chosen?.color ? [s.resolving.chosen.color] : [] }
               : m,
   );
@@ -1073,6 +1076,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "playerGains":
     case "attackBanNextTurn":
     case "attach":
+    case "becomeLicid":
     case "attachAny":
     case "attachAll":
     case "attachLastKnown":

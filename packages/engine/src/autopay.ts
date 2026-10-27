@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -817,6 +817,16 @@ export function planUnlock(s: GameState, pid: PlayerId, id: ObjectId, door: numb
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(cost)) : [];
   return taps ? [...taps, { type: "unlockDoor", player: pid, objectId: id, door }] : null;
+}
+
+/** Tap mana to pay to end an effect on this permanent (a Licid; CR 116.2c), then end it, or null if that can't be done now. */
+export function planEndEffect(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const e = endableEffect(s, pid, id);
+  if (!e) return null;
+  const problem = endEffectProblem(s, pid, id);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost(e.endable!.cost)) : [];
+  return taps ? [...taps, { type: "endEffect", player: pid, objectId: id }] : null;
 }
 
 /** Tap mana for a card's plot cost, then plot it (CR 702.170a), or null if that can't be done now. */

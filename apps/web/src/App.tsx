@@ -14,6 +14,9 @@ import {
   castProblem,
   planTurnFaceUp,
   planUnlock,
+  planEndEffect,
+  endableEffect,
+  endEffectProblem,
   forageWays,
   untapChoiceProblem,
   unlockCost,
@@ -1237,6 +1240,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
       return;
     }
+    // A permanent with an effect you may pay to end (a Licid that's an Aura), whoever controls it now (CR 116.2c).
+    if (o.zone === "battlefield" && endableEffect(s, HUMAN, o.id)) return setMenu(o.id);
     // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
     if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer)) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
@@ -1628,6 +1633,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onUnlock={(door) => {
                 setMenu(null);
                 dispatch(planUnlock(s, HUMAN, menu, door) ?? [{ type: "unlockDoor", player: HUMAN, objectId: menu, door }]);
+              }}
+              onEndEffect={() => {
+                setMenu(null);
+                dispatch(planEndEffect(s, HUMAN, menu) ?? [{ type: "endEffect", player: HUMAN, objectId: menu }]);
               }}
               onTurnFaceUp={(way) => {
                 setMenu(null);
@@ -2418,6 +2427,30 @@ function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<Game
         +
       </button>
       <button onClick={done}>{pending.what === "payLife" ? `Pay ${n} life` : pending.what === "payEnergy" ? `Pay ${n} energy` : `Choose ${n}`}</button>
+    </div>
+  );
+}
+
+/** "The color or colors of your choice" (CR 105.3): toggle one or more colors, then Done. */
+function ColorsPick({ pending, dispatch }: { pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>; dispatch: ReturnType<typeof useGame>["dispatch"] }) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const colors = (Object.keys(COLOR_NAMES) as (keyof typeof COLOR_NAMES)[]).filter((c) => pending.options.includes(COLOR_NAMES[c]));
+  const toggle = (name: string) => setPicked((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
+  // In WUBRG order, whatever order they were clicked in.
+  const choice = colors.map((c) => COLOR_NAMES[c]).filter((n) => picked.includes(n));
+  return (
+    <div className="controls color-pick">
+      <span>
+        <strong>{pending.source}:</strong> choose one or more colors
+      </span>
+      {colors.map((c) => (
+        <button key={c} className={picked.includes(COLOR_NAMES[c]) ? "" : "ghost"} aria-pressed={picked.includes(COLOR_NAMES[c])} title={COLOR_NAMES[c]} onClick={() => toggle(COLOR_NAMES[c])}>
+          <ManaCost cost={`{${c}}`} size="sm" /> {COLOR_NAMES[c]}
+        </button>
+      ))}
+      <button disabled={!choice.length} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: choice.join(",") }])}>
+        Done
+      </button>
     </div>
   );
 }
@@ -4098,6 +4131,7 @@ function AbilityMenu({
   onForetell,
   onTurnFaceUp,
   onUnlock,
+  onEndEffect,
   onClose,
 }: {
   s: GameState;
@@ -4133,6 +4167,8 @@ function AbilityMenu({
   onTurnFaceUp: (way: number) => void;
   /** For your Room: unlock this locked door by paying its mana cost (CR 709.5e). */
   onUnlock: (door: number) => void;
+  /** "You may pay {W} to end this effect" (a Licid): pay it, a special action (CR 116.2c). */
+  onEndEffect: () => void;
   onClose: () => void;
 }) {
   const o = s.objects[objectId]!;
@@ -4312,6 +4348,16 @@ function AbilityMenu({
           </button>,
         ];
       })}
+      {(() => {
+        const e = endableEffect(s, HUMAN, objectId);
+        return (
+          e && (
+            <button disabled={!planEndEffect(s, HUMAN, objectId)} title={endEffectProblem(s, HUMAN, objectId) ?? "A special action: it doesn't use the stack."} onClick={onEndEffect}>
+              End {e.sourceName}&apos;s effect <ManaCost cost={e.endable!.cost} size="sm" />
+            </button>
+          )
+        );
+      })()}
       {upWays.map((upCost, way) => (
         <button key={`up${way}`} disabled={!planTurnFaceUp(s, HUMAN, objectId, way)} title={turnFaceUpProblem(s, HUMAN, objectId, way) ?? "A special action: it doesn't use the stack."} onClick={() => onTurnFaceUp(way)}>
           Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} {upCost.text ?? <ManaCost cost={upCost.cost} size="sm" />}
@@ -5013,6 +5059,7 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "chooseOption" && pending.what === "colors" && pending.player === HUMAN) return <ColorsPick key={pending.source} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && pending.what === "color" && pending.player === HUMAN)
     return (
       <div className="controls color-pick">

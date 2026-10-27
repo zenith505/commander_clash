@@ -4109,13 +4109,16 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : needs.add("creatureType"));
-    if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
+    if (typeof o.chosen === "string" && o.kind !== "setColors") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : needs.add("creatureType"));
+    if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
+    if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     if (o.ref === "selfChosenPlayer" && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
+    // Lobotomy: a card chosen from a revealed hand gives the name (Effect takeFromHand "name").
+    if (o.type === "takeFromHand" && o.action === "name") choices.add("cardName");
     Object.values(o).forEach(visit);
   };
   const needs = new Set<ChoiceKind>();

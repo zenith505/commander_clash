@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layo
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
 import { bindBound, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
@@ -445,6 +445,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "unlockDoor":
       requireNoPending(s);
       unlockDoor(s, p, action.objectId, action.door);
+      break;
+    case "endEffect":
+      requireNoPending(s);
+      endEffect(s, p, action.objectId);
       break;
     case "foretell":
       requireNoPending(s);
@@ -7256,6 +7260,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
   if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
   const inRange = pend.numberRange && /^\d+$/.test(choice) && Number(choice) >= pend.numberRange.min && Number(choice) <= pend.numberRange.max;
+  // "The color or colors of your choice" (CR 105.3): one or more different colors, named together ("White,Blue").
+  if (pend.what === "colors") {
+    const named = choice.split(",");
+    if (!named.length || named.some((c) => !pend.options.includes(c)) || new Set(named).size !== named.length) throw new RulesError(`${choice} isn't one or more colors you can choose`);
+    s.pending = null;
+    const r = s.resolving!;
+    r.chosen = withChoice(r.chosen, "colors", choice);
+    log(s, `${p.name} chooses ${named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}` : named[0]}.`);
+    continueResolution(s);
+    return;
+  }
   if (!pend.options.includes(choice) && !inRange) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : pend.numberRange ? `a number from ${pend.numberRange.min} to ${pend.numberRange.max}` : "an option"} you can choose`);
   s.pending = null;
   if (pend.what === "secretNumber") {
@@ -9288,7 +9303,7 @@ function attachmentSBAs(s: GameState): boolean {
         changed = true;
       }
     } else if (c.subtypes.includes("Aura")) {
-      const enchant = compileCard(defOf(s, o)).enchant;
+      const enchant = enchantOf(s, o);
       // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
       // effect that "doesn't remove" this Aura.
       const hc = host && characteristics(s, host);
@@ -9584,6 +9599,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });
   }
   for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
+  for (const id of s.battlefield) if (endEffectProblem(s, pid, id) === null) out.push({ type: "endEffect", player: pid, objectId: id });
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
     for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid) && !nameLandBan(s, pid, defOf(s, obj(s, id)))) out.push({ type: "playLand", player: pid, objectId: id });
@@ -9820,6 +9836,35 @@ function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
   spendFromPool(s, p.id, parseManaCost(cost), "other");
   log(s, `${p.name} unlocks ${roomOf(s, o)!.faces![door]!.name} (${cost}).`);
   setUnlocked(s, o, [...o.unlocked!, door]);
+  s.passedInSuccession = [];
+}
+
+/** The effect on this permanent `pid` may pay to end ("You may pay {W} to end this effect", a Licid), if any. */
+export function endableEffect(s: GameState, pid: PlayerId, id: ObjectId): ContinuousEffect | undefined {
+  return s.effects.find((e) => e.endable && e.controller === pid && e.affected.includes(id));
+}
+
+/**
+ * Why `pid` can't pay to end the effect on this permanent now, or null (with the mana in their pool). It's a special
+ * action they may take any time they have priority (CR 116.2c), so nothing can respond to it (rulings on the Licids).
+ */
+export function endEffectProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const e = endableEffect(s, pid, id);
+  if (!e || s.objects[id]?.zone !== "battlefield") return "there's no effect on that permanent you may pay to end";
+  if (s.priority !== pid || s.pending) return "you can end that effect only while you have priority";
+  if (!canPayFromPool(s, pid, parseManaCost(e.endable!.cost), "other")) return `not enough mana to end ${e.sourceName}'s effect (${e.endable!.cost})`;
+  return null;
+}
+
+/** Pay to end an effect (CR 116.2c), then get priority again (CR 116.3). */
+function endEffect(s: GameState, p: Player, id: ObjectId) {
+  const problem = endEffectProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const e = endableEffect(s, p.id, id)!;
+  spendFromPool(s, p.id, parseManaCost(e.endable!.cost), "other");
+  s.effects = s.effects.filter((x) => x !== e);
+  invalidateCharacteristics(s);
+  log(s, `${p.name} pays ${e.endable!.cost} to end ${e.sourceName}'s effect.`);
   s.passedInSuccession = [];
 }
 

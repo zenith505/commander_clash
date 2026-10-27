@@ -827,6 +827,8 @@ export interface TargetSpec {
    */
   /** With `many` "any": "up to one hundred target creatures" (Baldin), no more than this many. */
   manyMax?: number;
+  /** With `many` "any": "one or more target creatures" (Dwarven Song), at least one. */
+  manyMin?: 1;
   /**
    * With `many` "x": "up to X target creatures ..., where X is the number of Bobbleheads you control" (Endurance
    * Bobblehead): X worked out as the targets are chosen (CR 601.2c), not an announced X. `manyWhere` marks it until
@@ -1288,8 +1290,8 @@ export type Modification =
   | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   /** Layer 4, "loses all creature types" (Amoeboid Changeling): its creature types go, changeling's too; ones gained later come back (rulings, CR 613.7). */
   | { kind: "loseCreatureTypes" }
-  /** `chosen`: "becomes the color of your choice", the color chosen as it resolved. */
-  | { kind: "setColors"; colors: Color[]; chosen?: true } // layer 5
+  /** `chosen`: "becomes the color of your choice", the color chosen as it resolved; "colors": "the color or colors of your choice", the colors chosen. */
+  | { kind: "setColors"; colors: Color[]; chosen?: true | "colors" } // layer 5
   | { kind: "addColors"; colors: Color[] } // layer 5, "is blue in addition to its other colors"
   /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
   /**
@@ -1332,6 +1334,10 @@ export type Modification =
   | { kind: "cantBeBlocked" }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
+  /** Layer 6: "~ loses this ability" (a Licid): its printed activated ability with this index (in CompiledCard.activated). */
+  | { kind: "loseActivated"; index: number }
+  /** Layer 6: "becomes an Aura enchantment with enchant creature" (a Licid): it has enchant creature (CR 702.5a). */
+  | { kind: "enchantCreature" }
   | { kind: "doesntUntap" }
   /** "Can't become untapped" (Frozen in Ice): it doesn't untap in its untap step or from any effect (see untapPermanent). */
   | { kind: "cantBecomeUntapped" }
@@ -2686,6 +2692,11 @@ export type Effect =
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
    */
+  /**
+   * A Licid: "~ loses this ability and becomes an Aura enchantment with enchant creature. Attach it to target creature.
+   * You may pay {W} to end this effect." (target 0). Ending it is a special action (CR 116.2c): the "endEffect" action.
+   */
+  | { type: "becomeLicid"; endCost: string }
   | { type: "attach"; what: ObjRef; source?: ObjRef; /** "If that artifact is an Equipment, attach it" (Thieving Skydiver): not an Aura. */ equipmentOnly?: true; /** "Equip planeswalker" (Luxior): to a planeswalker as though it were a creature. */ asCreature?: true }
   /**
    * "Attach any number of Auras and Equipment you control to target permanent or player" (Ardenn): chosen as it resolves
@@ -2891,7 +2902,7 @@ export type Effect =
       type: "takeFromHand";
       who: PlayerRef;
       filter?: TargetSpec;
-      action: "discard" | "exile" | /** Lost Hours */ "libraryThird" | /** Perish the Thought: "That player shuffles that card into their library." */ "shuffleIn" | /** Painful Memories: "Put that card on top of that player's library." */ "libraryTop";
+      action: "discard" | "exile" | /** Lost Hours */ "libraryThird" | /** Perish the Thought: "That player shuffles that card into their library." */ "shuffleIn" | /** Painful Memories: "Put that card on top of that player's library." */ "libraryTop" | /** Lobotomy: the card stays; its name becomes the chosen name ("cards with the same name as the chosen card"). */ "name";
       /** "Choose two cards from it", "X cards" (Mind Warp): that many, or every card there is if fewer (CR 609.3); `upTo`: "up to two", none to that many. */
       n?: Amount;
       upTo?: true;
@@ -3545,7 +3556,7 @@ export type Effect =
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
 /** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number";
+export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number";
 
 /**
  * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,

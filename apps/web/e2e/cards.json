@@ -6705,6 +6705,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a07b8619-224d-46d0-a17a-38d04aba574e",
+  "name": "Gliding Licid",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Licid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Licid"
+  ],
+  "oracleText": "{U}, {T}: This creature loses this ability and becomes an Aura enchantment with enchant creature. Attach it to target creature. You may pay {U} to end this effect.\nEnchanted creature has flying.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sth",
+  "releasedAt": "1998-03-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e3886fe8-9b76-4613-8891-4ec74657c087",
   "name": "Glorious Anthem",
   "manaCost": "{1}{W}{W}",
@@ -12767,6 +12797,32 @@
   "commanderLegal": "legal",
   "set": "xln",
   "releasedAt": "2017-09-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d4a3c9a5-3c91-4135-a19d-98eb5bcf5e00",
+  "name": "Prismatic Lace",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target permanent becomes the color or colors of your choice. (This effect lasts indefinitely.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -1032,6 +1032,14 @@ export function compile(d: CardDef): CompiledCard {
       else (out.othersEnterAs ??= []).push({ filter: g.filter, mods, text: line });
       continue;
     }
+    // Thunderous Velocipede: "Each other Vehicle and creature you control enters with an additional +1/+1 counter on it if
+    // its mana value is 4 or less. Otherwise, it enters with three additional +1/+1 counters on it.": each Vehicle and each
+    // creature, by its mana value as it would exist on the battlefield (CR 614.12, X being 0).
+    if (line === "Each other Vehicle and creature you control enters with an additional +1/+1 counter on it if its mana value is 4 or less. Otherwise, it enters with three additional +1/+1 counters on it.") {
+      const base = { kind: "object" as const, types: [], notTypes: [], notColors: [], controller: "you" as const, anyOf: [{ kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, { kind: "object" as const, types: [], notTypes: [], notColors: [], subtypes: ["Vehicle"], text: "Vehicle" }] };
+      (out.othersEnterWithCounters ??= []).push({ filter: { ...base, manaValue: { max: 4 }, text: "Vehicle or creature you control with mana value 4 or less" }, counter: "+1/+1", n: 1, text: line }, { filter: { ...base, manaValue: { min: 5 }, text: "Vehicle or creature you control with mana value 5 or greater" }, counter: "+1/+1", n: 3, text: line });
+      continue;
+    }
     // Twins of Discord: "Each other colorless creature you control has bloodthirst 2": as each one would enter, it has
     // bloodthirst (CR 614.12), so it enters with two more +1/+1 counters if an opponent was dealt damage this turn (CR
     // 702.54a); instances add up (rulings).

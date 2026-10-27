@@ -1442,6 +1442,8 @@ export interface TurnLog {
    * permanents that dealt it damage (Krovikan Vampire's "if a creature dealt damage by ~ this turn died").
    */
   diedDamaged?: { id: ObjectId; zc: number; by: ObjectId[] }[];
+  /** Wolverine, Best There Is: the sources that dealt damage to a creature other than themselves this turn, as `id@zoneChanges`. */
+  damagedCreature?: string[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
   /** The damage each source dealt in total, by the player who controlled it as it dealt it (Dragon Cultist). */

@@ -76,7 +76,14 @@ const starscream = scry("transform", [
   { name: "Starscream, Seeker Leader", type_line: "Legendary Artifact — Vehicle", color_indicator: ["B"], power: "2", toughness: "3", oracle_text: "Living metal (During your turn, this Vehicle is also a creature.)\nFlying, menace, haste\nWhenever Starscream deals combat damage to a player, if there is no monarch, that player becomes the monarch.\nWhenever you become the monarch, convert Starscream." },
 ], { keywords: ["Flying", "Living metal", "Haste", "Convert", "Menace", "More Than Meets the Eye"] });
 
-const ALL = [lotusVale, scorchedRuins, balduvianTradingPost, soldeviExcavations, gattaAndLuzzu, mBakuJabariChieftain, saplingOfColfenor, extinctionEvent, mutinousMassacre, twinsOfDiscord, zimonesHypothesis, thanosTheMadTitan, gollumRiddleMaster, ashlingsPrerogative, gixsCommand, starscream];
+const thunderousVelocipede = card("Thunderous Velocipede", "Artifact — Vehicle", "{1}{G}{G}", {"cmc":3,"power":"5","toughness":"5","keywords":["Crew","Trample"],"oracleText":"Trample\nEach other Vehicle and creature you control enters with an additional +1/+1 counter on it if its mana value is 4 or less. Otherwise, it enters with three additional +1/+1 counters on it.\nCrew 3","colors":["G"],"layout":"normal"});
+const kiboUktabiPrince = card("Kibo, Uktabi Prince", "Legendary Creature — Monkey Noble", "{2}{G}", {"cmc":3,"power":"2","toughness":"2","oracleText":"{T}: Each player creates a colorless artifact token named Banana with \"{T}, Sacrifice this token: Add {R} or {G}. You gain 2 life.\"\nWhenever an artifact an opponent controls is put into a graveyard from the battlefield, put a +1/+1 counter on each creature you control that's an Ape or a Monkey.\nWhenever Kibo attacks, defending player sacrifices an artifact of their choice.","colors":["G"],"layout":"normal"});
+const botanicalBrawler = card("Botanical Brawler", "Creature — Elemental Warrior", "{G}{W}", {"cmc":2,"power":"0","toughness":"0","keywords":["Trample"],"oracleText":"Trample\nThis creature enters with two +1/+1 counters on it.\nWhenever one or more +1/+1 counters are put on another permanent you control, if it's the first time +1/+1 counters have been put on that permanent this turn, put a +1/+1 counter on this creature.","colors":["G","W"],"layout":"normal"});
+const wolverineBestThereIs = card("Wolverine, Best There Is", "Legendary Creature — Mutant Berserker Hero", "{1}{R}{G}", {"cmc":3,"power":"2","toughness":"2","keywords":["Heal","Regenerate","Unrivaled Lethality","Double"],"oracleText":"Unrivaled Lethality — Double all damage Wolverine would deal.\nAt the beginning of each end step, if Wolverine dealt damage to another creature this turn, put a +1/+1 counter on him.\n{1}{G}: Regenerate Wolverine. (The next time he would be destroyed this turn, instead tap him, remove him from combat, and heal all damage on him.)","colors":["G","R"],"layout":"normal"});
+const growth = card("Test Growth", "Instant", "{G}", { cmc: 1, oracleText: "Put a +1/+1 counter on target creature." });
+const fight = card("Test Fight", "Sorcery", "{G}", { cmc: 1, oracleText: "Target creature you control fights target creature you don't control." });
+
+const ALL = [lotusVale, scorchedRuins, balduvianTradingPost, soldeviExcavations, gattaAndLuzzu, mBakuJabariChieftain, saplingOfColfenor, extinctionEvent, mutinousMassacre, twinsOfDiscord, zimonesHypothesis, thanosTheMadTitan, gollumRiddleMaster, ashlingsPrerogative, gixsCommand, starscream, thunderousVelocipede, kiboUktabiPrince, botanicalBrawler, wolverineBestThereIs];
 
 describe("round 188", () => {
   it("all compile", () => supported(...ALL));
@@ -325,5 +332,79 @@ describe("round 188", () => {
     expect(objHasKeyword(s, s.objects[big]!, "Lifelink")).toBe(true);
     expect(zone(s, big)).toBe("battlefield");
     expect(zone(s, small)).toBe("graveyard");
+  });
+
+  it("Thunderous Velocipede: other creatures and Vehicles you control enter with one +1/+1 counter at mana value 4 or less, three otherwise", () => {
+    let { s, ap, opp } = setup([]);
+    const v = putOnBattlefield(s, ap, thunderousVelocipede);
+    const small = into(s, ap, mvCreature(4), "hand");
+    const big = into(s, ap, mvCreature(5), "hand");
+    const theirs = into(s, opp, mvCreature(2), "hand");
+    s.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 9, C: 0 } as never;
+    for (const id of [small, big]) s = resolveAll(run(s, planCast(s, ap, id)));
+    expect([counters(s, small), counters(s, big), counters(s, v)]).toEqual([1, 3, 0]);
+    const vehicle = into(s, ap, card("Test Wagon", "Artifact — Vehicle", "{6}", { cmc: 6, power: "3", toughness: "3", oracleText: "Crew 1" }), "hand");
+    const rock = into(s, ap, card("Test Rock", "Artifact", "{2}", { cmc: 2 }), "hand");
+    s.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 8 } as never;
+    for (const id of [vehicle, rock]) s = resolveAll(run(s, planCast(s, ap, id)));
+    expect([counters(s, vehicle), counters(s, rock)]).toEqual([3, 0]);
+    const other = putOnBattlefield(s, opp, mvCreature(2));
+    expect(counters(s, other)).toBe(0);
+    expect(zone(s, theirs)).toBe("hand");
+  });
+
+  it("Kibo: each player creates a Banana; an opponent's artifact dying puts +1/+1 counters on your Apes and Monkeys; attacking makes the defender sacrifice an artifact", () => {
+    let { s, ap, opp } = setup([]);
+    const k = putOnBattlefield(s, ap, kiboUktabiPrince);
+    s = resolveAll(run(s, planActivate(s, ap, k, 0)));
+    const bananas = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Banana");
+    expect(bananas.map((id) => controllerOf(s, s.objects[id]!)).sort()).toEqual([...s.turnOrder].sort());
+    expect(characteristics(s, s.objects[bananas[0]!]!).types).toEqual(["Artifact"]);
+    expect(characteristics(s, s.objects[bananas[0]!]!).colors).toEqual([]);
+    const theirs = bananas.find((id) => controllerOf(s, s.objects[id]!) === opp)!;
+    s.objects[k]!.tapped = false;
+    s = passUntil(s, "declareAttackers", ap);
+    s = resolveAll(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: k, defender: opp }] }));
+    expect(s.objects[theirs]?.zone ?? "gone").not.toBe("battlefield");
+    expect(counters(s, k)).toBe(1);
+  });
+
+  it("Botanical Brawler: the first +1/+1 counters put on each other permanent you control this turn, entering with them included", () => {
+    let { s, ap, ids } = setup([botanicalBrawler, growth, growth, growth]);
+    s.players[ap]!.manaPool = { W: 1, U: 0, B: 0, R: 0, G: 3, C: 0 } as never;
+    const b = putOnBattlefield(s, ap, bear());
+    const c = putOnBattlefield(s, ap, bear());
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [tgt(b)])));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(counters(s, ids[0]!)).toBe(2);
+    // Counters were already put on the first bear this turn, before Brawler was here.
+    s = resolveAll(run(s, planCast(s, ap, ids[2]!, [tgt(b)])));
+    expect(counters(s, ids[0]!)).toBe(2);
+    s = resolveAll(run(s, planCast(s, ap, ids[3]!, [tgt(c)])));
+    expect(counters(s, ids[0]!)).toBe(3);
+    // A creature entering with a +1/+1 counter counts.
+    const entering = into(s, ap, card("Test Hatchling", "Creature — Elf", "{G}", { cmc: 1, power: "0", toughness: "0", oracleText: "This creature enters with a +1/+1 counter on it." }), "hand");
+    s.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 1, C: 0 } as never;
+    s = resolveAll(run(s, planCast(s, ap, entering)));
+    expect([counters(s, entering), counters(s, ids[0]!)]).toEqual([1, 4]);
+  });
+
+  it("Wolverine deals double damage and grows at end step only after damaging another creature", () => {
+    let { s, ap, opp, ids } = setup([fight]);
+    const w = putOnBattlefield(s, ap, wolverineBestThereIs);
+    const big = putOnBattlefield(s, opp, card("Test Wall", "Creature — Wall", "{4}", { cmc: 4, power: "1", toughness: "5" }));
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(w), tgt(big)])));
+    expect(s.objects[big]!.damage).toBe(4);
+    expect(s.objects[w]!.damage).toBe(1);
+    s = resolveAll(passUntil(s, "end", ap));
+    expect(counters(s, w)).toBe(1);
+    // A turn with only damage to a player: no counter.
+    s = passUntil(s, "main1", ap);
+    const life0 = life(s, opp);
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: w, defender: opp }] });
+    s = resolveAll(passUntil(s, "combatDamage", ap));
+    expect(life(s, opp)).toBe(life0 - 6);
+    s = resolveAll(passUntil(s, "end", ap));
+    expect(counters(s, w)).toBe(1);
   });
 });

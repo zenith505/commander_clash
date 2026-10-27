@@ -1131,7 +1131,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "permanentCountersPut" && !t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+      // Botanical Brawler: "if it's the first time +1/+1 counters have been put on that permanent this turn".
+      add(w, ctrl, (e, t) => e === "permanentCountersPut" && !t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id) && (!t.countersFirstTime || (t.countersKind === undefined ? first : firstOfKind)), undefined, undefined, o, undefined, undefined, undefined, info);
       // "Whenever a -1/-1 counter is put on a creature" (Flourishing Defenses): once for each counter.
       for (let i = 0; i < ev.amount; i++) add(w, ctrl, (e, t) => e === "permanentCountersPut" && !!t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, { amount: 1 });
     }

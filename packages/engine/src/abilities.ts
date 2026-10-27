@@ -1567,6 +1567,8 @@ export type StaticCondition =
   | { kind: "selfCommandOrBattlefield" }
   /** "If ~ is in the command zone" (Oloro, Ageless Ascetic): an ability that works only there (CR 113.6). */
   | { kind: "selfInCommand" }
+  /** "If ~ dealt damage to another creature this turn" (Wolverine, Best There Is): as the object it is now (TurnLog.damagedCreature). */
+  | { kind: "selfDamagedCreature" }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
   | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */

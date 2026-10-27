@@ -2637,7 +2637,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
   // Axgard Artisan: "Whenever one or more +1/+1 counters are put on ~ for the first time each turn": that kind.
   const firstTime = !youPut && /^Whenever one or more (?:\+1\/\+1 )?counters are put on ~ for the first time each turn, /.test(line);
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
+  // Botanical Brawler: "Whenever one or more +1/+1 counters are put on another permanent you control, if it's the first
+  // time +1/+1 counters have been put on that permanent this turn, ...": counters put on it earlier this turn count, even
+  // before Botanical Brawler was on the battlefield (rulings).
+  const firstOn = !youPut && !firstTime ? /^(Whenever one or more \+1\/\+1 counters are put on another permanent you control), if it's the first time \+1\/\+1 counters have been put on that permanent this turn, /.exec(line) : null;
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another permanent you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : firstOn ? line.replace(firstOn[0], `${firstOn[1]}, `) : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};
@@ -2656,7 +2660,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const orPlayer = put[2] === "a permanent or player" ? { countersOrPlayer: true as const } : {};
     const filter = parseTargetPhrase(put[2]!.replace(/ or player$/, "").replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));
     if (filter?.kind !== "object") return "fail";
-    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind, ...byYou, ...orPlayer };
+    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind, ...byYou, ...orPlayer, ...(firstOn ? { countersFirstTime: true as const } : {}) };
   }
   // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped", "Whenever a
   // permanent becomes untapped" (Mesmeric Orb: "that permanent's controller").

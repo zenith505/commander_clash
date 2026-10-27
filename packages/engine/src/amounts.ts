@@ -369,7 +369,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "creaturesToYourGraveyard":
       return (s.turnLog?.creaturesToYard ?? []).filter((d) => d.owner === ctx.controller && !(c.nontoken && d.token)).length;
     case "diedThisTurn":
-      if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => d.all || d.subtypes.includes(c.subtype!)).length;
+      if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => (d.all || d.subtypes.includes(c.subtype!)) && (!c.yours || d.controller === ctx.controller)).length;
       return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "plusOnesPutThisTurn":
       return (s.turnLog?.plusOnes ?? [])
@@ -906,7 +906,7 @@ function describeCount(c: Count): string {
     case "creaturesToYourGraveyard":
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":
-      return `#${c.nontoken ? "nontoken " : ""}${c.subtype ?? "creature"}s that died this turn`;
+      return `#${c.nontoken ? "nontoken " : ""}${c.subtype ?? "creature"}s that died${c.yours ? " under your control" : ""} this turn`;
     case "plusOnesPutThisTurn":
       return `#+1/+1 counters ${c.byYou ? "you've " : ""}put on ${c.self ? "~" : `${c.onYours ? "your " : ""}${c.creature ? "creatures" : "permanents"}`} this turn`;
     case "tokensCreatedThisTurn":

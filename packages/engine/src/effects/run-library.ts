@@ -553,7 +553,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             continue;
           }
           if (p.hand.length > 1) {
-            s.pending = { kind: "handToTop", player: p.id, count: n, source: src, ...(e.bottom ? { bottom: true as const } : {}) };
+            s.pending = { kind: "handToTop", player: p.id, count: n, source: src, ...(e.bottom ? { bottom: true as const } : {}), ...(e.shuffle ? { shuffle: true as const } : {}) };
             return "paused";
           }
           ids = [...p.hand];
@@ -561,6 +561,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const cards = ids.filter((id) => p.hand.includes(id));
         // On the bottom the first pick goes lowest; on top it ends on top.
         for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
+        if (e.shuffle) {
+          shuffleLibrary(s, p);
+          log(s, `${p.name} shuffles ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand into their library.`);
+          done[pid] = true;
+          continue;
+        }
         log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
         done[pid] = true;
       }
@@ -720,6 +726,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        if (e.exchange) {
+          // Morality Shift: both at once (CR 701.12, exchanging zones' contents); the library's cards land in its order.
+          const lib = [...p.library];
+          for (const id of ids) moveObject(s, id, "library");
+          for (const id of lib) moveObject(s, id, "graveyard");
+          log(s, `${p.name} exchanges their graveyard (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
+          continue;
+        }
         if (e.bottom) {
           // Endurance: "puts all the cards from their graveyard on the bottom of their library in a random order".
           shuffle(s, ids);

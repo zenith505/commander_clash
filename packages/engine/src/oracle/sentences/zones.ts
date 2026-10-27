@@ -618,6 +618,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // See Beyond: "Draw two cards, then shuffle a card from your hand into your library."
+  if ((m = new RegExp(`^Shuffle (a|${NUM}) cards? from your hand into your library$`, "i").exec(s))) return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), shuffle: true }];
   // Chimney Imp: "target opponent puts a card from their hand on top of their library"; Sadistic Augermage: "each player
   // puts ..."; Stunted Growth: "Target player chooses three cards from their hand and puts them on top of their library in
   // any order": each from their own hand, chosen as it resolves.

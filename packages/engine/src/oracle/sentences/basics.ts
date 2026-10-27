@@ -384,6 +384,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Repay in Kind: "Each player's life total becomes the lowest life total among all players."
   if (/^Each player's life total becomes the lowest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, lowest: true }];
+  // Invincible Hymn: "Your life total becomes the number of cards in your library" (rewritten from "Count ...").
+  if (/^Your life total becomes the number of cards in your library$/.test(s)) return [{ type: "setLife", who: { ref: "you" }, n: 0, amount: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }];
+  // Arbiter of Knollridge: "each player's life total becomes the highest life total among all players": in Commander
+  // every player is in range of influence (rulings), each gaining the difference (CR 119.5).
+  if (/^[Ee]ach player's life total becomes the highest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, highest: true }];
   // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
   // total becomes half their starting life total, rounded down" (Torgaar): 20 in Commander (CR 903.7, 119.5).
   if ((m = /^(Your|Target player's|Up to one target player's|Target opponent's) life total becomes half (?:your|their) starting life total, rounded (up|down)$/i.exec(s))) {
@@ -453,6 +458,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^((?:[Uu]p to one t|[Tt])arget player|[Ee]ach player) puts all the cards from their graveyard on the bottom of their library in a random order$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "shuffleZones", who, graveyard: true, bottom: true }] : null;
+  }
+  // Morality Shift: "Exchange your graveyard and library. Then shuffle your library."
+  if (/^Exchange your graveyard and library$/.test(s)) {
+    return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, exchange: true }];
   }
   // "Shuffle all creature cards from your graveyard into your library" (Rooting Kavu, Barishi): those cards only.
   if ((m = /^[Ss]huffle all (?:(.+?) )?cards from your graveyard into your library$/.exec(s))) {
@@ -546,6 +555,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return [{ type: "delayed", when, of, effects, text: m[1]! }];
     }
     if (ref === "subject") return [{ type: "delayed", when, each: "subject", effects: inner, text: m[1]! }];
+    // Bearer of the Heavens: "When ~ dies, destroy all permanents at the beginning of the next end step": all of them as
+    // the delayed trigger resolves, whenever they arrived (rulings).
+    if (ref === "each" && when === "nextEndStep" && inner.length === 1 && inner[0]!.type === "destroy") return [{ type: "delayed", when, effects: inner, text: m[1]! }];
     // The Locust God: "When ~ dies, return it to its owner's hand at the beginning of the next end step": about the card
     // in the graveyard now; if it leaves there first, it stays where it went (rulings).
     // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step": the card in

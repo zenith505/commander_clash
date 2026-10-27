@@ -1463,6 +1463,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Pp]ut an? [^.]+? counter on ~) and add ((?:\{[WUBRGC]\})+)\.$/, "$1. Add $2.");
   // "That creature also gains trample until end of turn if you control a creature with power 4 or greater" (Temur Battle
   // Rage): checked as it resolves (CR 608.2c).
+  // Invincible Hymn: "Count the number of cards in your library. Your life total becomes that number.": counted as it
+  // resolves (CR 119.5).
+  text = text.replace(/^Count the number of cards in your library\. Your life total becomes that number\.$/, "Your life total becomes the number of cards in your library.");
+  // Grim Giganotosaurus: "destroy all artifacts and creatures other than ~": the same as "all other artifacts and creatures".
+  text = text.replace(/^([Dd]estroy) all ([a-z]+s(?: and [a-z]+s)?) other than ~\.$/, "$1 all other $2.");
+  // Patron of the Orochi: "Untap all Forests and all green creatures.": each of them (a green Forest creature once).
+  text = text.replace(/^Untap all ([A-Z][a-z]+s) and all (white|blue|black|red|green) creatures\.$/, "Untap all $1. Untap all $2 creatures.");
+  // See Beyond: "Draw two cards, then shuffle a card from your hand into your library.": two instructions, in order.
+  text = text.replace(/^Draw (\w+) cards, then shuffle (a|one|two) cards? from your hand into your library\.$/, (all, n, k) => `Draw ${n} cards. Shuffle ${k} card${k === "a" || k === "one" ? "" : "s"} from your hand into your library.`);
+  // Savage Punch: "Target creature you control fights target creature you don't control. The creature you control gets
+  // +2/+2 until end of turn before it fights if you control a creature with power 4 or greater.": the bonus first,
+  // checked as it resolves (CR 608.2c; rulings), then the fight.
+  text = text.replace(/^Target creature you control fights target creature you don't control\. The creature you control gets (\+\d+\/\+\d+) until end of turn before it fights if (you control a creature with power 4 or greater)\.$/, "If $2, target creature you control gets $1 until end of turn. It fights target creature you don't control.");
   // Marcus, Mutant Mayor: "draw a card if that creature has a +1/+1 counter on it. If it doesn't, put a +1/+1 counter
   // on it": one condition, checked as it resolves (CR 608.2c).
   text = text.replace(/^[Dd]raw a card if (that creature has an? [^.]+? counter on it)\. If it doesn't, ([^.]+)\.$/, "If $1, draw a card. Otherwise, $2.");
@@ -2481,6 +2494,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const yard = parseCount("the number of cards in your graveyard", ctx);
       if (!exile || !inner || !yard || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: yard, min: num(yardExile[1]!) }, effects: exile, otherwise: inner });
+      si++;
+      continue;
+    }
+    // Roots of Wisdom: "return a land card or Elf card from your graveyard to your hand. If you can't, draw a card.": you
+    // must return one if there's one (rulings), so the rest happens only with none there.
+    const yardReturn = /^[Rr]eturn an? [^.]+? card from your graveyard to your hand$/.test(s) ? /^If you can't, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (yardReturn) {
+      const before = ctx.targets.length;
+      const ret = parseOne(capital(s), ctx);
+      const inner = parseOne(capital(yardReturn[1]!), ctx);
+      const pick = ret?.length === 1 && ret[0]!.type === "chooseFromGraveyard" ? ret[0] : undefined;
+      if (pick?.type !== "chooseFromGraveyard" || pick.n !== 1 || pick.upTo || pick.who || pick.dest || !pick.filter || Object.keys(pick).length !== 3 || !inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: pick.filter } }, min: 1 }, effects: [pick], otherwise: inner });
       si++;
       continue;
     }
@@ -5131,6 +5157,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
           }
           return all;
         });
+      // Bitter Chill: "you may pay {1}. If you do, scry 1, then draw a card": instructions that stop for a choice run
+      // under an "if you do" of their own, which keeps its place while they wait.
+      if (inner && inner.length > 1 && inner.some((e) => pauses(e)) && !payFirst.payX) {
+        effects.push({ type: "may", effects: [], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` }, { type: "if", cond: { kind: "youDid" }, effects: inner });
+        payFirst = null;
+        continue;
+      }
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
       payFirst = null;
@@ -6124,7 +6157,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (ifTypeDestroyed) {
       const prev = effects[effects.length - 1];
       const type = capital(ifTypeDestroyed[1]!);
-      if (prev?.type !== "destroy" || prev.what.ref !== "target" || !ctx.targets[prev.what.index]?.types?.includes(type) || /\b(?:its?|that)\b/.test(ifTypeDestroyed[2]!)) return null;
+      // Acolyte Hybrid: "If an artifact is destroyed this way, its controller draws a card": the destroyed target's
+      // controller as it last existed (CR 608.2h).
+      const itsController = /^its controller (?!.*\b(?:its?|that)\b)/.test(ifTypeDestroyed[2]!) && prev?.type === "destroy" && prev.what.ref === "target" && ctx.targets.length === prev.what.index + 1;
+      if (prev?.type !== "destroy" || prev.what.ref !== "target" || !ctx.targets[prev.what.index]?.types?.includes(type) || (!itsController && /\b(?:its?|that)\b/.test(ifTypeDestroyed[2]!))) return null;
       const inner = parseOne(capital(ifTypeDestroyed[2]!), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "destroyedThisWay", cardType: type }, effects: inner });

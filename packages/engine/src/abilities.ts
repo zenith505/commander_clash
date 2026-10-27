@@ -1861,7 +1861,7 @@ export type Effect =
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
   /** "Your life total becomes 10" (CR 119.5): that player gains or loses the difference. */
-  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true; /** "The number of creatures they control" (Biorhythm): each player's own (PlayerRef eachOne), all counted before any change; `n` unused. */ amount?: Amount }
+  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true; /** "The lowest life total among all players" (Repay in Kind): as it resolves; `n` unused. */ lowest?: true; /** "The highest life total among all players" (Arbiter of Knollridge): the same, the highest. */ highest?: true; /** "The number of creatures they control" (Biorhythm): each player's own (PlayerRef eachOne), all counted before any change; `n` unused. */ amount?: Amount }
   /**
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
@@ -2849,7 +2849,7 @@ export type Effect =
   | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
-  | { type: "handToTop"; n: Amount; bottom?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
+  | { type: "handToTop"; n: Amount; bottom?: true; /** "Shuffle a card from your hand into your library" (See Beyond): shuffled in instead; with an empty hand, no shuffle (rulings). */ shuffle?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
   /** Scroll Rack: any number of cards from the hand exiled face down, that many from the top of the library put into the hand (not drawn), then the exiled cards on top in any order. */
   | { type: "scrollRack" }
   /**
@@ -2912,7 +2912,7 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef; /** "Into your library": yours is shuffled even if no card is put into it. */ yours?: true; /** "Target player shuffles ... into their library" (Memory's Journey): that player's is, the same way. */ who?: PlayerRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
-  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true }
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). */ exchange?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens
@@ -4017,6 +4017,8 @@ export interface TriggeredAbility {
   firstEachTurn?: true;
   /** For "youGainLife": "Whenever you gain or lose life during your turn" (Moonstone Harbinger): a life loss too, and only on your turn. */
   orLoseLife?: true;
+  /** For "youGainLife" and "youLoseLife": "Whenever you gain life during your turn" (Vampire Scrivener): only while you're the active player. */
+  onYourTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */

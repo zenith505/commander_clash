@@ -637,8 +637,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
   // "attacking creature", "tapped creature": any controller. "Other attacking creatures" (Ghalta and Mavren): not the
   // object with the ability.
-  if ((m = /^(other )?(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${m[2]} creature`);
+  // Siani, Eye of the Storm: "the number of attacking creatures with flying". Sophina, Spearsage Deserter: "for each
+  // nontoken attacking creature".
+  if ((m = /^(other )?(nontoken )?(attacking|blocking|tapped) (creatures?)( with flying)?$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[2] ?? ""}${m[3]} creature${m[5] ?? ""}`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, ...(m[1] ? { other: true } : {}) }) : null;
   }
   // Shared Animosity: "it gets +1/+0 until end of turn for each other attacking creature that shares a creature type with

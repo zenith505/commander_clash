@@ -506,7 +506,8 @@ export function parseBecomes(text: string): Modification[] | null {
     addColors = m[2] !== "types";
   }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
-  if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
+  // Kormus Bell: "1/1 black creatures that are still lands", one color too.
+  if ((m = /^(\d+\/\d+ (?:(?:white|blue|black|red|green) )?(?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
   // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): new card types replace the old ones (CR 205.1a),

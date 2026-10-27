@@ -5240,11 +5240,12 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}: </strong>click {pending.count} card{pending.count === 1 ? "" : "s"} to put on {pending.bottom ? "the bottom" : "top"} of your library
-          {pending.count > 1 ? (pending.bottom ? " (first pick goes lowest)" : " (first pick ends on top)") : ""}.
+          <strong>{pending.source}: </strong>click {pending.count} card{pending.count === 1 ? "" : "s"} to{" "}
+          {pending.shuffle ? "shuffle into your library" : `put on ${pending.bottom ? "the bottom" : "top"} of your library`}
+          {pending.count > 1 && !pending.shuffle ? (pending.bottom ? " (first pick goes lowest)" : " (first pick ends on top)") : ""}.
         </span>
         <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
-          {pending.bottom ? "Put on bottom" : "Put on top"}
+          {pending.shuffle ? "Shuffle in" : pending.bottom ? "Put on bottom" : "Put on top"}
         </button>
       </div>
     );

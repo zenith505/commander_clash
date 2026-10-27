@@ -916,6 +916,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
+  // White Glove Gourmand: "if another Human died under your control this turn": of that type as it last existed. "Another"
+  // can't be the permanent with the ability, which hasn't died while it's on the battlefield.
+  if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
@@ -1958,6 +1961,15 @@ function parseStaticLine(line: string): StaticAbility | null {
   // the battlefield, spells, and permanents are colorless" (layer 5, everywhere: offFieldAll); Thran Lens: "All
   // permanents are colorless".
   if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
+  // Living Lands: "All Forests are 1/1 creatures that are still lands", Kormus Bell: "All Swamps are 1/1 black creatures
+  // that are still lands", Nature's Revolt: "All lands are 2/2 creatures that are still lands": creatures in addition to
+  // their types (layer 4, CR 205.1b), with that base power and toughness (7b) and that color instead of theirs (5, CR 105.3).
+  const allLands = /^All (lands|Plains|Islands|Swamps|Mountains|Forests) are (\d+\/\d+ (?:(?:white|blue|black|red|green) )?creatures that are still lands)$/.exec(text);
+  if (allLands) {
+    const affects = parseAffected(`All ${allLands[1]}`);
+    const mods = parseBecomes(allLands[2]!);
+    return affects?.kind === "filter" && mods ? { affects, mods, text: line } : null;
+  }
   // Darkest Hour: "All creatures are black": that color instead of their others, in layer 5 (CR 105.3, 613.1e).
   const allColor = /^All creatures are (white|blue|black|red|green)$/.exec(text);
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };

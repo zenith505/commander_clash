@@ -823,6 +823,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // Kami's Flare: "~ also deals 2 damage to that permanent's controller if you control a modified creature": checked as it
+  // resolves (CR 608.2c), the same as "If you control a modified creature, ~ deals 2 damage to ...".
+  text = text.replace(/(^|\. )~ also deals (\d+) damage to that permanent's controller if (you control an? [a-z ]+ creature)\./, "$1If $3, ~ deals $2 damage to that permanent's controller.");
+  // Nightmare Incursion: "Search target player's library for up to X cards, where X is the number of Swamps you control,
+  // and exile them.": the "where" at the end, as usual.
+  text = text.replace(/(^|\. )Search (target player's|target opponent's) library for (up to )?X cards, where X is ([^.,]+), and exile them\./, "$1Search $2 library for $3X cards and exile them, where X is $4.");
   // Harvest Season: "Search your library for up to X basic land cards, where X is ..., put those cards onto the
   // battlefield tapped, then shuffle." The same; "put them" too (Rampant Rejuvenator, its power as it last existed).
   text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.,]+), put (?:those cards|them) onto the battlefield( tapped)?, then shuffle\./, "$1$2earch your library for up to X $3, put them onto the battlefield$5, then shuffle, where X is $4.");
@@ -2008,6 +2014,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const next = parseOne(capital(thatMany.replace(/\bthat many\b/, "X")), ctx);
       if (!next || ctx.targets.length !== before) return null;
       effects.push({ type: "pick", who: { ref: "you" }, filter: anySac[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "sacrifice", anyNumber: true }, ...replaceX(next, { count: { kind: "sacrificedThisWayCount" } }));
+      si++;
+      continue;
+    }
+    // Hellion Eruption: "Sacrifice all creatures you control, then create that many 4/4 red Hellion creature tokens": as many
+    // as were sacrificed.
+    if (/^[Ss]acrifice all [^.]+ you control$/.test(s) && /\bthat many\b/.test(thatMany) && !/\bthat many\b.*\bthat many\b/.test(thatMany) && /^[Cc]reate that many /.test(thatMany)) {
+      const before = ctx.targets.length;
+      const sac = parseOne(s, ctx);
+      const next = sac && parseOne(capital(thatMany.replace(/\bthat many\b/, "X")), ctx);
+      if (!sac || sac.length !== 1 || sac[0]!.type !== "sacrifice" || !next || ctx.targets.length !== before) return null;
+      effects.push(...sac, ...replaceX(next, { count: { kind: "sacrificedThisWayCount" } }));
       si++;
       continue;
     }
@@ -4050,21 +4067,6 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    // "Destroy target artifact or creature. If its mana value was 4 or less, create a Food token." (Tainted Treats, Raze to
-    // the Ground, Seedship Impact, Extinguish the Light): its mana value as it last existed on the battlefield (rulings,
-    // CR 608.2h), so it's checked just before it's destroyed, and the rest happens after, destroyed or not.
-    const destroyMv = /^[Dd]estroy target (?:artifact|creature|artifact or enchantment|artifact or creature|creature or planeswalker)$/.test(s) ? /^If its mana value was (\d+) or less, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
-    if (destroyMv && !/\b(?:it|its|that permanent|that creature)\b/.test(destroyMv[2]!.replace(/"[^"]*"/g, ""))) {
-      const before = ctx.targets.length;
-      const fx = parseOne(s, ctx);
-      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy" || ctx.targets[before]!.kind !== "object") return null;
-      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(destroyMv[1]) }, text: `mana value ${destroyMv[1]} or less` };
-      const then = parseOne(capital(destroyMv[2]!), ctx);
-      if (!then || ctx.targets.length !== before + 1) return null;
-      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
-      si++;
-      continue;
-    }
     // "Destroy target creature. If that creature was green or white, its controller discards a card." (Gloomlance), "If
     // that creature was a Human, ..." (Death's Caress), "If it wasn't attacking, ..." (Prophesied End): the creature as it
     // last existed on the battlefield (CR 608.2h), so it's checked just before it's destroyed, and the rest happens after.
@@ -4101,6 +4103,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push(destroyWas[1] === "wasn't attacking"
         ? { type: "if", cond: { kind: "targetIs", index: before, filter }, effects: structuredClone(fx), otherwise: yes }
         : { type: "if", cond: { kind: "targetIs", index: before, filter }, effects: yes, otherwise: structuredClone(fx) });
+      si++;
+      continue;
+    }
+    // Raze to the Ground: "Destroy target artifact. If its mana value was 1 or less, draw a card.", Extinguish the Light,
+    // Tainted Treats, Seedship Impact, Carnivorous Canopy ("If that permanent's mana value was 3 or less"), Containment Breach ("If its mana value is 2 or
+    // less", even if it wasn't destroyed: rulings): its mana value as it last existed (CR 608.2h), the same before or after.
+    const destroyMv = /^[Dd]estroy target [^.]+$/.test(s) ? /^If (?:its|that (?:permanent|creature|artifact)'s) mana value (?:was|is) (\d+) or less, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (destroyMv && !/\b(?:it|its|that permanent|that creature)\b/.test(destroyMv[2]!.replace(/"[^"]*"/g, ""))) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy" || ctx.targets[before]!.kind !== "object") return null;
+      const then = parseOne(capital(destroyMv[2]!), ctx);
+      if (!then || !then.length || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], manaValue: { max: Number(destroyMv[1]) }, text: `mana value ${destroyMv[1]} or less` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
       si++;
       continue;
     }

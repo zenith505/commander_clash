@@ -861,6 +861,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent (?:has been|was) dealt damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
+  if (/^you've discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", yours: true };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
@@ -887,6 +888,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "opponentCast", colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])] };
   if ((m = /^you have no (land|creature|artifact|enchantment|instant|sorcery|planeswalker) cards in hand$/.exec(text))) return { kind: "noneInHand", filter: { kind: "card", types: [capital(m[1]!)], text: `${m[1]} card` } };
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
+  if ((m = new RegExp(`^you were dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!), you: true };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
   // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.
@@ -906,8 +908,16 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "life", ...{ "greater than or equal to": { min: base }, "greater than": { min: base + 1 }, "less than or equal to": { max: base }, "less than": { max: base - 1 } }[m[1]!] };
   }
   if ((m = new RegExp(`^an opponent has ${NUM} or more poison counters$`).exec(text))) return { kind: "opponentPoison", n: num(m[1]!) };
+  // "Poisoned" is having one or more poison counters (CR 122.1f) (Viridian Betrayers).
+  if (/^an opponent is poisoned$/.test(text)) return { kind: "opponentPoison", n: 1 };
+  if (/^there are no cards in your graveyard$/.test(text)) return { kind: "amount", amount: { count: { kind: "cardsInGraveyard", who: { ref: "you" } } }, max: 0 };
   if ((m = new RegExp(`^an opponent has ${NUM} or more cards in their graveyard$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!) };
   if ((m = new RegExp(`^a graveyard has ${NUM} or more cards in it$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!), anyone: true };
+  // Domestication: "if enchanted creature's power is 4 or greater": the creature it's attached to, as it is now.
+  if ((m = new RegExp(`^enchanted creature's (power|toughness) is ${NUM} or (greater|less)$`).exec(text))) {
+    const r = m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) };
+    return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], [m[1]!]: r, text: `creature with ${m[1]} ${m[2]} or ${m[3]}` } };
+  }
   // "Activate only if ~'s power is 3 or greater" (Kitsa, Otterball Elite): as it is now.
   if ((m = new RegExp(`^(~'s (?:power|toughness)) is ${NUM} or (greater|less)$`).exec(text))) {
     const amount = parseCount(m[1]!, null);
@@ -943,6 +953,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
   if ((m = /^~ has (flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text)))
     return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
+  // Manor Gargoyle: "~ has indestructible as long as it has defender": its keywords as the layers so far left them, so
+  // an effect that takes defender away comes first (CR 613.8a).
+  if ((m = /^it has (defender|flying)$/.exec(text)) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
   // Mistform Wall: "~ has defender as long as it's a Wall": its creature types as layer 4 left them (CR 613.1d, 613.1f).
   if ((m = /^it's an? ([A-Z][a-z]+)$/.exec(text)) && st.affects.kind === "self" && CREATURE_TYPES.has(m[1]!))
     return { kind: "selfIs", filter: { kind: "object", subtypes: [m[1]!], text: m[1]! } };
@@ -1016,6 +1029,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you control exactly one ([a-z]+)$/.exec(text))) {
     const c = parseStaticCondition(`you control a ${m[1]}`, st);
     return c?.kind === "control" && !c.other && c.min === 1 && c.max === undefined ? { ...c, max: 1 } : null;
+  }
+  // Kumena's Speaker: "as long as you control another Merfolk or an Island": either one.
+  if ((m = /^you control another ([A-Z][a-z]+) or an? ([A-Z][a-z]+)$/.exec(text))) {
+    const a = parseStaticCondition(`you control another ${m[1]}`, st);
+    const b = parseStaticCondition(`you control a ${m[2]}`, st);
+    return a && b ? { kind: "anyOf", conds: [a, b] } : null;
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
@@ -1358,6 +1377,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const second = parseStaticMods(m[2]!);
     return first && second ? [...first, ...second] : null;
   }
+  // Sky Tether: "Enchanted creature has defender and loses flying": both in layer 6, by timestamp (CR 613.7).
+  if ((m = /^has (defender|flying|haste|reach|vigilance) and loses (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch)$/.exec(rest)) && m[1] !== m[2]) {
+    const [has, lost] = [parseKeywordList(m[1]!), parseKeywordList(m[2]!)];
+    return has && lost ? [{ kind: "addKeywords", keywords: has }, { kind: "removeKeywords", keywords: lost }] : null;
+  }
   if ((m = /^(?:has|have) (.+)$/.exec(rest))) return parseGrants(m[1]!);
   if (/^can block (?:an additional|any number|up to|\w+ additional)/.test(rest)) {
     const more = parseExtraBlocks(rest);
@@ -1561,7 +1585,15 @@ export function parseStatic(line: string): StaticAbility | null {
  * alone replaces only creature types, and losing all abilities comes before what the same effect grants (layer 6).
  */
 function parseTransform(line: string): StaticAbility | null {
-  const head = /^(Enchanted (?:creature|permanent)|Equipped creature) (.+)$/.exec(line.replace(/\.$/, ""));
+  // The Zendikons: "Enchanted land is a 3/3 black Ooze creature. It's still a land." (Living Terrain: "... creature that's
+  // still a land"): a creature in addition to its other types, keeping its land types (CR 205.1b, rulings); its color is
+  // the one named instead of its others (CR 105.3).
+  const still = /^(Enchanted land is an? [^."]+? creature(?: with [^."]+)?)(?:\. It's still a land| that's still a land)\.?$/.exec(line);
+  if (still) {
+    const st = parseTransform(`${still[1]} in addition to its other types`);
+    return st && { ...st, mods: st.mods.map((m) => (m.kind === "addColors" ? { kind: "setColors", colors: m.colors } : m)), text: line };
+  }
+  const head = /^(Enchanted (?:creature|permanent|artifact|land)|Equipped creature) (.+)$/.exec(line.replace(/\.$/, ""));
   if (!head) return null;
   // "... with base power and toughness 1/1 named Legitimate Businessperson" (Witness Protection): its name too (layer 3).
   const named = /^(.+ is an? [^"]+?) named ([A-Z][A-Za-z' ,-]+)$/.exec(head[2]!);
@@ -1794,6 +1826,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (tax[3] && !amount) return null;
     return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   }
+  // Brainwash: "Enchanted creature can't attack unless its controller pays {3}"; Phyrexian Marauder: "~ can't attack unless
+  // you pay {1} for each +1/+1 counter on it": paid as attackers are declared, whoever it attacks (CR 508.1g-h).
+  const ownTax = /^(Enchanted creature|~) can't attack unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it)?$/.exec(text);
+  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) : / its controller pays /.test(text)))
+    return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n: Number(ownTax[2]), ...(ownTax[3] ? { perPlusOne: true as const } : {}) }], text: line };
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
   const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);
   if (counterTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, perCounter: true, ...(counterTax[1] ? { planeswalkers: true as const } : {}) }], text: line };
@@ -2062,6 +2099,9 @@ function parseLandTypeStatic(text: string, line: string): StaticAbility | null {
   if ((m = /^All (Plains|Islands|Swamps|Mountains|Forests) are (Plains|Islands|Swamps|Mountains|Forests)$/.exec(text)) && m[1] !== m[2])
     return { affects: { kind: "filter", types: ["Land"], subtypes: [BASIC_PLURAL[m[1]!]!] }, mods: [{ kind: "setLandTypes", subtypes: [BASIC_PLURAL[m[2]!]!] }], text: line };
   if ((m = /^Enchanted land is an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { affects: { kind: "attached" }, mods: [{ kind: "setLandTypes", subtypes: [m[1]!] }], text: line };
+  // Lush Growth: "Enchanted land is a Mountain, Forest, and Plains": those three instead of its other land types (CR 305.7).
+  if ((m = /^Enchanted land is an? (Plains|Island|Swamp|Mountain|Forest), (?:an? )?(Plains|Island|Swamp|Mountain|Forest), and (?:an? )?(Plains|Island|Swamp|Mountain|Forest)$/.exec(text)) && new Set(m.slice(1)).size === 3)
+    return { affects: { kind: "attached" }, mods: [{ kind: "setLandTypes", subtypes: [m[1]!, m[2]!, m[3]!] }], text: line };
   // Stormtide Leviathan: "All lands are Islands in addition to their other types", the same.
   if ((m = /^Each land is an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other land types$/.exec(text)) || (m = /^All lands are (Plains|Island|Swamp|Mountain|Forest)s? in addition to their other types$/.exec(text)))
     return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "addTypes", types: [], subtypes: [m[1]!] }], text: line };

@@ -381,6 +381,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       for (const id of chooseSearch(s, pid, pend.cards, pend.cards.length)) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
       return [{ type: "searchLibrary", player: pid, found }];
     }
+    // Foresight: the cards it wants least (as many as it must); "any number of" (Selective Memory): none.
+    if (pend.kind === "searchLibrary" && pend.away) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, pend.min) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];

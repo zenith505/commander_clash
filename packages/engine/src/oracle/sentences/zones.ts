@@ -583,11 +583,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
   // graveyard to your hand" (Praetor's Counsel), "Return all creature cards with power 2 or less from your graveyard to
   // your hand" (Dawn).
-  if ((m = /^[Rr]eturn all (?:(.+?) )?cards( with (?:power|toughness|mana value) \d+ or (?:less|greater))? from your graveyard to your hand$/.exec(s))) {
-    const kinds = (m[1] ?? "").replace(/,? and /g, " or ").replace(/, /g, " or ");
-    const spec = parseTargetPhrase(`${kinds ? `${kinds.split(/\s+/).map(singularWord).join(" ")} ` : ""}card${m[2] ?? ""} from a graveyard`, { chosen: true });
+  // Empty the Catacombs: "Each player returns all creature cards from their graveyard to their hand": the same for each.
+  if ((m = /^(?:[Rr]eturn|(Each player) returns) all (?:(.+?) )?cards( with (?:power|toughness|mana value) \d+ or (?:less|greater))? from (?:your|(their)) graveyard to (?:your|(their)) hand$/.exec(s)) && !m[1] === !m[4] && !m[1] === !m[5]) {
+    const kinds = (m[2] ?? "").replace(/,? and /g, " or ").replace(/, /g, " or ");
+    const spec = parseTargetPhrase(`${kinds ? `${kinds.split(/\s+/).map(singularWord).join(" ")} ` : ""}card${m[3] ?? ""} from a graveyard`, { chosen: true });
     if (spec?.kind !== "card") return null;
-    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1] ? `${m[1]} ` : ""}card${m[2] ?? ""}` }, toHand: true }];
+    return [{ type: "returnAllFromGraveyard", who: { ref: m[1] ? "eachPlayer" : "you" }, filter: { ...spec, text: `${m[2] ? `${m[2]} ` : ""}card${m[3] ?? ""}` }, toHand: true }];
   }
   // "You may put a land card from your hand onto the battlefield (tapped)".
   // Brainstorm: "put two cards from your hand on top of your library in any order", "put a card from your hand on top

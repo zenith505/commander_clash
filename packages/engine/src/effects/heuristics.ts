@@ -58,7 +58,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
       const hurts = ["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut", "damage", "putInLibrary", "toCommandZone"].includes(e.type) || (e.type === "counters" && harmfulCounter(e.counter)) || (e.type === "continuous" && modsAreHarmful(e.mods));
       if (hurts) mark(group.of.index, group.of.n);
     }
-    if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "getRad" || e.type === "exileGraveyard" || e.type === "cantCast" || e.type === "cantPlayLands" || e.type === "exileNamed") && e.who.ref === "target") mark(e.who.index, e.who.n);
+    if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "getRad" || e.type === "exileGraveyard" || e.type === "cantCast" || e.type === "cantPlayLands" || e.type === "exileNamed" || e.type === "skip" || e.type === "noUntapNext") && e.who.ref === "target") mark(e.who.index, e.who.n);
     // "Exile the top X cards of target opponent's library. You may ... cast spells from among" (Gix): an opponent's cards.
     if (e.type === "castFromAmong" && e.who.ref === "target") mark(e.who.index);
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.

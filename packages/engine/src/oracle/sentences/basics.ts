@@ -120,6 +120,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const library = parsePlayer(theirs[1]!.replace(/'s$/, ""), ctx);
     return library ? [{ type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: false, dest: { zone: theirs[3] === "exile it" ? "exile" : "battlefield" }, library }] : null;
   }
+  // Denying Wind: "Search target player's library for up to seven cards and exile them. Then that player shuffles."
+  // Nightmare Incursion: "for up to X cards, where X is the number of Swamps you control, and exile them" (parseBody
+  // moves the "where" to the end); Neverending Torment: "for X cards, where X is ...": as many as there are, up to X (CR
+  // 701.23d), counted as it resolves.
+  const theirMany = new RegExp(`^Search (target opponent's|target player's) library for (up to )?(${NUM}|X) cards and exile them$`).exec(s);
+  if (theirMany && (theirMany[3] !== "X" || ctx.whereX)) {
+    const library = parsePlayer(theirMany[1]!.replace(/'s$/, ""), ctx);
+    return library ? [{ type: "search", n: amt(theirMany[3]!), upTo: !!theirMany[2], reveal: false, dest: { zone: "exile" }, library }] : null;
+  }
   // "Search your library for a number of basic land cards equal to the other result, put them onto the battlefield
   // tapped, then shuffle" (Wild Endeavor): that many, counted as it resolves.
   const howMany = /^Search your library for a number of (.+? cards) equal to (.+?)((?:,| and) (?:put|then) .+)$/i.exec(s);
@@ -364,6 +373,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
   }
+  // Oketra's Last Mercy: "Your life total becomes equal to your starting life total": 40 in Commander (CR 903.7, 119.5).
+  if (/^Your life total becomes equal to your starting life total$/i.test(s)) return [{ type: "setLife", who: { ref: "you" }, n: STARTING_LIFE }];
   // Biorhythm: "Each player's life total becomes the number of creatures they control": each player's own number, all
   // counted before any life total changes (CR 119.5).
   if ((m = /^Each player's life total becomes the number of (creatures) they control$/.exec(s))) {

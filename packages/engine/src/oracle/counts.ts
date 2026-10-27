@@ -403,6 +403,20 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who, filter: { ...spec, text: `${kinds} card` } }) : null;
   }
+  // Death's Approach: "Enchanted creature gets -X/-X, where X is the number of creature cards in its controller's
+  // graveyard": a static ability's, counted for the permanent it affects (whoever controls it now).
+  if (!ctx && (m = /^(.*?)cards? in its controller's graveyard$/i.exec(p))) {
+    const kinds = m[1]!.trim();
+    if (!kinds) return count({ kind: "cardsInGraveyard", who: { ref: "you" }, affectedController: true });
+    const spec = /^[a-z]+$/.test(kinds) ? parseTargetPhrase(`${kinds} card from a graveyard`, { chosen: true }) : null;
+    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${kinds} card` }, affectedController: true }) : null;
+  }
+  // Vile Manifestation: "for each card with cycling in your graveyard": its printed cycling or typecycling (see
+  // parseTargetPhrase's graveyard keywords).
+  if ((m = /^cards? with (cycling) in your graveyard$/i.exec(p))) {
+    const spec = parseTargetPhrase(`card with ${m[1]} from a graveyard`, { chosen: true });
+    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, text: `card with ${m[1]}` } }) : null;
+  }
   // Devotion (CR 700.5): "your devotion to black", "your devotion to black and red".
   if ((m = /^your devotion to (white|blue|black|red|green)(?: and (white|blue|black|red|green))?$/i.exec(p)))
     return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });

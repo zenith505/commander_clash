@@ -433,6 +433,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
   }
+  // Necrobite: "Target creature gains deathtouch until end of turn. Regenerate it.": the target before.
+  if (/^Regenerate it$/.test(s) && ctx.lastObjectTarget !== undefined) return [{ type: "regenerate", what: { ref: "target", index: ctx.lastObjectTarget } }];
   // "Return each card with the most votes or tied for most votes to your hand" (Custodi Squire): cards in your graveyard.
   if (ctx.vote?.among && (m = /^Return (each card with the most votes or tied for most votes) to your hand$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

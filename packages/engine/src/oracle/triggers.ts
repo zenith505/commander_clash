@@ -560,6 +560,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
   // "With power 4, 5, or 6" (Sarkhan's Unsealing) the same way as Kozilek's Unsealing's mana values.
+  // Hallar, the Firefletcher: "Whenever you cast a spell, if that spell was kicked, ...": how it was cast can't change
+  // (CR 603.4), the same as "Whenever you cast a kicked spell".
+  line = line.replace(/^Whenever you cast a spell, if that spell was kicked, /, "Whenever you cast a kicked spell, ");
   const m = CAST_TRIGGER.exec(line.replace(/ with (mana value|power) (\d+), (\d+), or (\d+),/, (all, key: string, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with ${key} ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
@@ -632,13 +635,22 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // mana symbol {X} in the mana cost of the spell (the half cast, for a split card), not another X.
   const xM = !pw && !kwM ? / with (?:\{X\} in its mana cost|a mana cost that contains \{X\})$/.exec(what) : null;
   if (xM) what = what.slice(0, xM.index);
+  // Lullmage's Familiar: "Whenever you cast a kicked spell": its kicker cost was paid as it was cast (CR 702.33d).
+  const kickedM = /^kicked(?: spell)?$/.exec(what);
+  if (kickedM) what = "spell";
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
   const parsed0 = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
   // Firespitter Whelp: "a noncreature or Dragon spell": either kind (TargetSpec.anyOf).
-  const orKind = !parsed0 ? /^(non[a-z]+|[A-Z][a-z]+) or ([A-Z][a-z]+|non[a-z]+)(?: spell)?$/.exec(what) : null;
-  const sides = orKind ? [parseTargetPhrase(`${orKind[1]} spell`), parseTargetPhrase(`${orKind[2]} spell`)] : [];
-  const parsed = orKind && sides.every((x) => x?.kind === "spell" && !x.anyOf) ? { kind: "spell" as const, types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: `${orKind[1]} or ${orKind[2]} spell` } : parsed0;
+  // Mindsparker: "a white or blue instant or sorcery spell": one of those colors and one of those types.
+  const hueKind = !parsed0 ? /^((?:white|blue|black|red|green) or (?:white|blue|black|red|green)) (instant or sorcery)(?: spell)?$/.exec(what) : null;
+  const hue = hueKind ? parseTargetPhrase(`${hueKind[1]} spell`) : null;
+  const kinds = hueKind ? parseTargetPhrase(`${hueKind[2]} spell`) : null;
+  const parsedHue = hue?.kind === "spell" && kinds?.kind === "spell" && hue.colors?.length === 2 && !hue.types?.length ? { ...kinds, colors: hue.colors, text: `${hueKind![1]} ${hueKind![2]} spell` } : null;
+  // Umara Mystic: "an instant, sorcery, or Wizard spell": any one of them.
+  const orKind = !parsed0 ? /^(non[a-z]+|[A-Z][a-z]+) or ([A-Z][a-z]+|non[a-z]+)(?: spell)?$/.exec(what) ?? /^(instant), (sorcery), or ([A-Z][a-z]+)(?: spell)?$/.exec(what) : null;
+  const sides = orKind ? orKind.slice(1).filter(Boolean).map((k) => parseTargetPhrase(`${k} spell`)) : [];
+  const parsed = parsedHue ? parsedHue : orKind && sides.every((x) => x?.kind === "spell" && !x.anyOf) ? { kind: "spell" as const, types: [], notTypes: [], notColors: [], anyOf: sides as TargetSpec[], text: `${orKind.slice(1).filter(Boolean).join(sides.length > 2 ? ", " : " or ").replace(/, ([^,]+)$/, ", or $1")} spell` } : parsed0;
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[4] ? { min: Number(pw[2]), max: Number(pw[4]) } : pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
@@ -677,7 +689,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -2284,7 +2296,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const kwIf = intervening && /^Whenever ~ /.test(intervening[1]!) ? /^it (has|doesn't have) (first strike|double strike|flying|trample|vigilance|deathtouch|lifelink|haste|reach|menace|defender)$/.exec(intervening[2]!) : null;
   const kw = kwIf ? keywordOf(kwIf[2]!) : undefined;
   const kwCond: StaticCondition | null = kwIf && kw ? { kind: "selfIs", filter: { kind: "object", ...(kwIf[1] === "has" ? { keywords: [kw] } : { notKeywords: [kw] }), text: `${kwIf[1] === "has" ? "with" : "without"} ${kwIf[2]}` } } : null;
-  const ifCond = kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // Wall of Resistance: "At the beginning of each end step, if ~ was dealt damage this turn, ...": as it triggers and
+  // resolves (CR 603.4); only a trigger reads it, so no static ability's cache depends on it.
+  const dmgCond: StaticCondition | null = intervening && /^At the beginning of /.test(intervening[1]!) && /^~ was dealt damage this turn$/.test(intervening[2]!) ? { kind: "self", is: "dealtDamageThisTurn" } : null;
+  // Skizzik: "At the beginning of the end step, if ~ wasn't kicked, sacrifice it": as it was cast (CR 702.33d), kept by
+  // the permanent; a copy or one put onto the battlefield wasn't (rulings).
+  const kickCond: StaticCondition | null = intervening && /^At the beginning of /.test(intervening[1]!) && /^~ wasn't kicked$/.test(intervening[2]!) ? { kind: "self", is: "kicked", not: true } : null;
+  // Slayer's Plate: "Whenever equipped creature dies, if it was a Human, ...": the creature as it last existed on the
+  // battlefield (CR 603.10a, 608.2h), as it triggers and resolves (CR 603.4).
+  const diedType = intervening && /^Whenever (?:equipped|enchanted) creature dies$/.test(intervening[1]!) ? /^it was an? ([A-Z][a-z]+)$/.exec(intervening[2]!) : null;
+  const diedTypeCond: StaticCondition | null = diedType && CREATURE_TYPES.has(diedType[1]!) ? { kind: "subjectType", subtype: diedType[1]! } : null;
+  const ifCond = diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

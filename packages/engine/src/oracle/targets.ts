@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 export const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
@@ -236,6 +236,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
+    // Gloom Sower: "Whenever ~ becomes blocked by a creature, that creature's controller loses 2 life": the blocker's.
+    if (i === undefined && ctx.subject && x === "that creature's controller") return { ref: "subjectController" };
     return i !== undefined ? { ref: "targetController", index: i } : null;
   }
   // The Lord of Pain: "another target player", not the one the trigger is about (bound in triggerBody).
@@ -389,7 +391,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   }
   // Hubris: "target creature and all Auras attached to it"; Silence the Believers: "any number of target creatures and all
   // Auras attached to them"; Turn to Slag: "all Equipment attached to that creature" (the target before).
-  const andAttached = /^(.*target creatures?) and all (Auras|Equipment) attached to (?:it|them)$/i.exec(x);
+  // Eaten by Spiders: "target creature with flying and all Equipment attached to that creature" likewise.
+  const andAttached = /^(.*target creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   if ((andAttached || attachedThat) && !cards) {
     const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
@@ -800,7 +803,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // A plural noun is a group; a singular one only after "each" ("each creature", but not "all creature").
   // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word; so is a static
   // ability's subject, "Other Merfolk get +1/+1" (Lord of Atlantis), whose verb is plural.
-  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)));
+  // "Destroy all Plains" (Flashfires): the basic land type is the same word in the plural.
+  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)) || (!!all && w === "Plains"));
   if (!plural && !(all && all[1]!.toLowerCase() === "each")) return null;
   head = words
     .map((w) => PLURAL_TYPES[w.toLowerCase()] ?? (/^[A-Z]/.test(w) && w !== "Plains" && CREATURE_TYPES.has(singular(w)) ? singular(w) : w))

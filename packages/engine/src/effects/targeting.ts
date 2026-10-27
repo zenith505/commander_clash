@@ -426,7 +426,9 @@ export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shr
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     if (controllerOf(s, o) !== pid) continue;
-    const has = abilitiesOf(s, o).youHave;
+    const ab = abilitiesOf(s, o);
+    if (ab.youHaveDuringYourTurn && s.activePlayer !== pid) continue;
+    const has = ab.youHave;
     if (has === "shroud") return "shroud";
     if (has === "hexproof") out = has;
   }

@@ -420,6 +420,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     // Blocking it (CR 509.1h), or attacking and blocked by it, while both are in combat.
     return s.battlefield.map((id) => obj(s, id)).filter((o) => (o.blocking?.includes(me.id) && me.attacking !== undefined) || (me.blocking?.includes(o.id) && o.attacking !== undefined));
   }
+  if (ref.ref === "blockingIt") {
+    const me = ref.subject ? objects(s, { ref: "subject" }, ctx)[0] : objects(s, { ref: "self" }, ctx)[0];
+    // Blocking it (CR 509.1h) while it's attacking.
+    if (!me || me.attacking === undefined) return [];
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.blocking?.includes(me.id));
+  }
   if (ref.ref === "diedDamagedBySelf") {
     const out: GameObject[] = [];
     for (const d of s.turnLog?.diedDamaged ?? []) {
@@ -1242,7 +1248,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "eventGroup" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

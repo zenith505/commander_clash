@@ -328,7 +328,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
   // Gryff's Boon: "Return ~ from your graveyard to the battlefield attached to target creature."
-  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to target creature)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
+  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: with (?:a|two|three) (?:\+1\/\+1|finality) counters? on it)?| attached to target creature)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).
@@ -370,6 +370,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const oneSac = extra.filter((c) => c.kind === "sacrifice");
   if (oneSac.length === 1 && oneSac[0]!.kind === "sacrifice" && oneSac[0]!.n === 1 && oneSac[0]!.filter.types?.length === 1 && oneSac[0]!.filter.types[0] === "Creature")
     effectText = effectText.replace(/^Draw X cards, where X is that creature's power\.$/, "Draw cards equal to the sacrificed creature's power.");
+  // Slogurk, the Overslime: "Remove three +1/+1 counters from ~: Return it to its owner's hand": "it" is ~, the only
+  // object the ability names.
+  if (/^Remove \w+ [^,:]*counters? from ~$/.test(costs)) effectText = effectText.replace(/^Return it to its owner's hand\.$/, "Return ~ to its owner's hand.");
   const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   if (uncopyable) body.uncopyable = true;

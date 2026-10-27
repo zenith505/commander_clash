@@ -941,6 +941,8 @@ export interface DelayedTrigger {
   thisTurn?: number;
   /** `leaves`: only when it dies, a creature put into a graveyard from the battlefield (CR 700.4). */
   dies?: true;
+  /** With `dies`: "When it dies under your control this turn" (Desperate Measures): only while `controller` controlled it as it died. */
+  underControl?: true;
   /**
    * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
    * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7). Also an Aura's
@@ -1358,6 +1360,8 @@ export interface TurnLog {
   leftGraveyardCount?: Partial<Record<PlayerId, number>>;
   /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */
   creaturesToYard?: { owner: PlayerId; token?: true }[];
+  /** The card types, as they last existed, of the permanents put into each owner's graveyard from the battlefield this turn (Kami of Transience). */
+  permanentTypesToYard?: Record<number, string[]>;
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
   creaturesLeft?: Partial<Record<PlayerId, number>>;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */

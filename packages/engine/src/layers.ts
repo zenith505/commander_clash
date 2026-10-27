@@ -179,6 +179,8 @@ export interface Characteristics {
   goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
+  /** Vantress Gargoyle: only at a player with at least this many cards in their graveyard. */
+  attackUnlessYard?: number;
   /** "Can't attack if defending player controls ..." (Mogg Jailer): what the defending player mustn't control. */
   attackIfNot?: TargetSpec[];
   /** "Can't attack unless you control more lands than defending player" (Monstrous Hound). */
@@ -1029,6 +1031,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (!cast) return false;
       return cond.none ? cast.every((n) => n === 0) : cast.some((n) => n >= (cond.onePlayer ?? 1));
     }
+    case "ownTurnAtMost":
+      return s.activePlayer === you && (s.players[you]?.turnsTaken ?? 0) <= cond.n;
+    case "opponentLostLifeLastTurn":
+      return (s.lastTurn?.lostLife ?? []).some((p) => p !== you);
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
@@ -1134,6 +1140,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
   const spec = a.spec && bindChosen(a.spec, s.objects[e.sourceId!]?.chosen);
   for (const [id, c] of chars) {
     if (a.other && id === e.sourceId) continue;
+    if (a.otherThanAttached && id === s.objects[e.sourceId!]?.attachedTo) continue;
     if (!a.types.every((t) => c.types.includes(t))) continue;
     if (a.subtypes?.length && !(c.allCreatureTypes && c.types.includes("Creature")) && !a.subtypes.some((t) => c.subtypes.some((x) => sameCI(x, t)))) continue;
     if (a.colors?.length && !a.colors.some((col) => c.colors.includes(col))) continue;
@@ -1439,6 +1446,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantAttackUnless":
       c.attackUnless.push(m.defenderControls);
+      return;
+    case "cantAttackUnlessDefenderYard":
+      c.attackUnlessYard = Math.max(c.attackUnlessYard ?? 0, m.n);
       return;
     case "cantAttackIf":
       (c.attackIfNot ??= []).push(m.defenderControls);

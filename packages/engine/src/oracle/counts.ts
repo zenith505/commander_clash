@@ -44,9 +44,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Timberpack Wolf: "for each other creature you control named ~", Cleric of the Forward Order: "for each creature you
   // control named ~": the same count.
-  if (each && (m = /^((?:other )?)creature you control named ~$/.exec(p))) return parseCount(`the number of ${m[1]}creatures you control named ~`, ctx);
+  // She-Hulk, Wallbreaker: "Whenever a Hero you control becomes blocked, put a +1/+1 counter on that Hero for each creature
+  // blocking it": the trigger's attacker's blockers as it resolves, like rampage's (CR 702.23b).
+  if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
+  // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
+  // battlefield named ~", any player's.
+  if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);
   // Hare Apparent: "the number of other creatures you control named ~": with the source's name (CR 201.5), as it is now.
-  if ((m = /^(the number of (?:other )?(?:creatures|permanents) you control) named ~$/.exec(p))) {
+  if ((m = /^(the number of (?:other )?(?:creatures|permanents) (?:you control|on the battlefield)) named ~$/.exec(p))) {
     const c = parseCount(m[1]!, ctx);
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
@@ -162,8 +167,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // X, where X is the number of creatures exiled this way" (Sunfall): the same.
   // Kaya's Wrath: "the number of creatures you controlled that were destroyed this way": controlled by you as they last
   // existed on the battlefield (CR 608.2h).
-  if ((m = /^(?:the number of )?([a-z]+) you controlled that were (destroyed|exiled) this way$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${singularWord(m[1]!)} you control`, { chosen: true });
+  // Ceaseless Conflict: "for each nontoken creature you controlled that was destroyed this way": the same, one at a time.
+  if ((m = /^(?:the number of )?([a-z]+s) you controlled that were (destroyed|exiled) this way$/i.exec(p) ?? (each ? /^((?:nontoken )?[a-z]+) you controlled that was (destroyed|exiled) this way$/i.exec(p) : null))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(" ").map(singularWord).join(" ")} you control`, { chosen: true });
     if (spec?.kind !== "object" || spec.controller !== "you") return null;
     return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: `${m[1]!} you controlled` } } };
   }
@@ -530,7 +536,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
   // Ferrafor, Young Yew: "counters among creatures target player controls": that player's.
   // Deepwood Denizen: "for each +1/+1 counter on creatures you control", the same.
-  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
+  // Gleam of Authority: "for each +1/+1 counter on other creatures you control" (an Aura's: other than the enchanted
+  // creature, statics.ts ofAffected); Ascendant Acolyte: "among other creatures you control".
+  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:other )?(?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }

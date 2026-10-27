@@ -104,7 +104,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; /** "Enchanted creature gets +1/+1 for each other creature you control" (Bravado), "Each legendary creature you control gets +1/+1 for each other legendary creature you control" (Heroes' Podium): other than the permanent the static effect is applied to, not the source. */ otherThanAffected?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef; /** "The number of white cards in their hand" (Inquisition): only cards like this. */ filter?: TargetSpec }
   /**
@@ -145,6 +145,10 @@ export type Count =
   | { kind: "cardsExiledThisWay"; filter?: TargetSpec }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
+  /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
+  | { kind: "putThisWay" }
+  /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
+  | { kind: "blockingIt"; subject?: true }
   /** "For each card returned to your hand this way" (Paradoxical Outcome): the cards it returned that you own, still in your hand (a token isn't a card; another player's goes to their hand). */
   | { kind: "returnedToYourHand" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
@@ -358,6 +362,8 @@ export type Count =
   | { kind: "creaturesLeftThisTurn" }
   /** "For each (nontoken) creature put into your graveyard from the battlefield this turn" (Caller of the Claw): its owner's graveyard, whoever controlled it. */
   | { kind: "creaturesToYourGraveyard"; nontoken?: true }
+  /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
+  | { kind: "typeToYourGraveyardThisTurn"; type: string }
   | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
@@ -955,6 +961,8 @@ export type ObjRef =
   | { ref: "diedDamagedBySelf" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
   | { ref: "inCombatWithSelf" }
+  /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
+  | { ref: "blockingIt"; subject?: true }
   /**
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
@@ -1301,6 +1309,8 @@ export type Modification =
   | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
+  /** "Can't attack unless defending player has seven or more cards in their graveyard" (Vantress Gargoyle). */
+  | { kind: "cantAttackUnlessDefenderYard"; n: number }
   /** "Can't attack if defending player controls an untapped creature with power 2 or less" (Mogg Jailer, CR 508.1c). */
   | { kind: "cantAttackIf"; defenderControls: TargetSpec }
   /** "Can't attack unless you control more lands than defending player" (Monstrous Hound): its controller's count against the player it would attack. */
@@ -1379,6 +1389,8 @@ export type Affects =
       /** `enchanted`: the player the source Aura enchants controls them ("creatures enchanted player controls"). */
       controller?: "you" | "opponent" | "enchanted";
       other?: boolean; // "other creatures ..." excludes the source
+      /** "Other creatures you control get -1/-1" on an Aura (Vampirism): excludes the permanent the source is attached to. */
+      otherThanAttached?: true;
       /** Backgrounds' "Commander creatures you own" (CR 903.3): commanders owned by the source's controller. */
       ownedCommanders?: boolean;
       /** Anything more the group says: "with a +1/+1 counter on it", "of the chosen type", "with flying". */
@@ -1704,6 +1716,10 @@ export type StaticCondition =
    * player, rulings): the whole previous turn (GameState.lastTurn).
    */
   | { kind: "castLastTurn"; none?: true; onePlayer?: number }
+  /** "If an opponent lost life last turn" (Feast on the Fallen): during the whole previous turn (GameState.lastTurn). */
+  | { kind: "opponentLostLifeLastTurn" }
+  /** "During your first, second, or third turns of the game" (Serra Avenger): your turn, one of the first `n` you've begun, extra turns too. */
+  | { kind: "ownTurnAtMost"; n: number }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
@@ -2324,7 +2340,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3702,6 +3718,8 @@ export type TriggerEvent =
   /** "Whenever this Vehicle becomes crewed": whenever a crew ability of it resolves (CR 702.122e). */
   | "selfBecomesCrewed"
   | "selfMutates"
+  /** "Whenever a creature you control mutates" (Essence Symbiote): one matching `tappedFilter`, the subject (CR 702.140d). */
+  | "permanentMutates"
   /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
   | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
@@ -4865,7 +4883,7 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
   | { what: "counters"; onPlayer: true; op: "plusOne" }
   /**
@@ -5203,6 +5221,10 @@ export interface CompiledCard {
   noCountersOn?: string[];
   /** Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." (counters.ts countersBanned). */
   opponentsCreaturesNoCounters?: CounterKind;
+  /** Melira, Sylvok Outcast: "Creatures you control can't have -1/-1 counters put on them." (counters.ts countersBanned). */
+  yourCreaturesNoCounters?: CounterKind;
+  /** Melira, Sylvok Outcast: "You can't get poison counters." (counters.ts playerCountersToPut). */
+  noPoisonForYou?: true;
   /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */
   selfNoCounters?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
@@ -5489,6 +5511,8 @@ export interface CompiledCard {
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
+  /** Samut, Tyrant of Naktamun: "Instant and sorcery spells you control have split second" (CR 702.61a): spells of its controller's on the stack that match. */
+  spellsHaveSplitSecond?: TargetSpec[];
   /**
    * "~ (saddles Mounts and) crews Vehicles as though its power were 2 greater" (`n`), "... using its toughness rather
    * than its power" (`toughness`): what it counts for when it's tapped to pay a crew or saddle cost (CR 702.122a,

@@ -236,7 +236,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
-    // Gloom Sower: "Whenever ~ becomes blocked by a creature, that creature's controller loses 2 life": the blocker's.
+    // Gloom Sower, Vicious Battlerager: "Whenever ~ becomes blocked by a creature, that creature's controller loses 2
+    // life": the blocker's, as it last existed (CR 608.2h).
     if (i === undefined && ctx.subject && x === "that creature's controller") return { ref: "subjectController" };
     return i !== undefined ? { ref: "targetController", index: i } : null;
   }
@@ -283,6 +284,14 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
   if (/^(?:all creatures|each creature) blocking or blocked by ~$/i.test(p.trim()) && !ctx.spell) return { ref: "inCombatWithSelf" };
+  // Plague Wight: "Whenever ~ becomes blocked, each creature blocking it gets -1/-1 until end of turn"; Trailblazer's
+  // Torch: "Whenever equipped creature becomes blocked, it deals 2 damage to each creature blocking it": the creatures
+  // blocking that attacker as this resolves (CR 509.1h), none once it has left combat (CR 506.4).
+  const blockingIt = !ctx.spell ? /^each creature blocking (~|it|that creature)$/i.exec(p.trim()) : null;
+  if (blockingIt) {
+    if (blockingIt[1] === "~" || (blockingIt[1] === "it" && ctx.selfIt && !ctx.subject && !ctx.subjectIt)) return { ref: "blockingIt" };
+    return ctx.subject || ctx.subjectIt ? { ref: "blockingIt", subject: true } : null;
+  }
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
@@ -875,6 +884,10 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [{ kind: "object", status: "enchanted", text: "enchanted creature" }, { kind: "object", types: ["Enchantment"], text: "enchantment creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "enchanted creature or enchantment creature") };
   }
+  // Silumgar Assassin: "target creature with power 3 or less an opponent controls": the same as "target creature an
+  // opponent controls with power 3 or less".
+  const withThenCtl = /^((?:target )?[a-z ]*?creature) (with (?:power|toughness|mana value) \d+ or (?:less|greater)) (an opponent controls|you control|you don't control)$/.exec(phrase.trim());
+  if (withThenCtl) return parseTargetPhrase(`${withThenCtl[1]} ${withThenCtl[3]} ${withThenCtl[2]}`, opts);
   // Evaporate: "each white and/or blue creature": either color or both, as "white or blue creature" is (counted once).
   const andOr = /^((?:target |each )?)(white|blue|black|red|green) and\/or (white|blue|black|red|green) (creature|permanent)s?$/.exec(phrase.trim());
   if (andOr) return parseTargetPhrase(`${andOr[1]}${andOr[2]} or ${andOr[3]} ${andOr[4]}`, opts);
@@ -1256,6 +1269,11 @@ export function parseTargetPhrase(
     // cycling too (CR 702.29e; the card data lists "Cycling" with it).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
+  } else if ((m = / with modular( you control)?$/.exec(p))) {
+    // Arcbound Overseer: "each creature you control with modular": modular as the card data lists it (CR 702.43a), on
+    // the battlefield's characteristics (lost with all abilities, layer 6).
+    extra.keywords = ["Modular"];
+    p = p.slice(0, m.index) + (m[1] ?? "");
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");

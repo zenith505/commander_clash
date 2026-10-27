@@ -141,6 +141,9 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Ozolith, the Shattered Spire: "on an artifact or creature you control".
   m = /^If one or more \+1\/\+1 counters would be put on (another|an?) (creature|permanent|artifact or creature)( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature|that permanent) instead\.$/.exec(line);
   if (m) return { what: "counters", counter: "+1/+1", on: m[2] === "artifact or creature" ? "artifactOrCreature" : (m[2] as "creature" | "permanent"), who: m[3] ? "you" : "any", op: m[4] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
+  // Caradora, Heart of Alacria: "on a creature or Vehicle you control" (an artifact subtype, CR 205.3g).
+  if (line === "If one or more +1/+1 counters would be put on a creature or Vehicle you control, that many plus one +1/+1 counters are put on it instead.")
+    return { what: "counters", counter: "+1/+1", on: "creatureOrVehicle", who: "you", op: "plusOne" };
   // Mowu, Loyal Companion: only on itself.
   if (line === "If one or more +1/+1 counters would be put on ~, that many plus one +1/+1 counters are put on it instead.") return { what: "counters", counter: "+1/+1", on: "permanent", who: "any", op: "plusOne", self: true };
   // Mauhúr, Uruk-hai Captain: "on an Army, Goblin, or Orc you control" (creature types, so a changeling counts).

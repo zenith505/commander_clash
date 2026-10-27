@@ -123,6 +123,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
   }
+  // Face of Divinity: "As long as another Aura is attached to enchanted creature, it has first strike and lifelink": an Aura
+  // other than this one, so two or more with it.
+  if ((m = /^As long as another Aura is attached to enchanted creature, it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`Enchanted creature ${m[1]} ${m[2]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "amount", amount: { count: { kind: "attachedToHost", subtypes: ["Aura"] } }, min: 2 } };
+  }
   // The Masamune: "As long as equipped creature is attacking, it has first strike and must be blocked if able": while it's
   // an attacking creature (CR 506.4, 611.3a).
   if ((m = /^As long as (enchanted|equipped) creature is attacking, it (gets|has) (.+)$/.exec(text))) {
@@ -239,6 +246,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
   else if ((m = /^(~ .+?) if (you've committed a crime this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  // Fugitive Droid: "~ can't be blocked if an artifact entered the battlefield under your control this turn": the same.
+  else if ((m = /^(~ can't be blocked) if (an? [a-z]+ entered the battlefield under your control this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   if (!statement || !cond) return null;
   // Theros gods: "As long as your devotion to black is less than five, ~ isn't a creature": it loses the card type
   // creature and its creature types (layer 4, CR 205.3d; rulings). It works even if the God lost all abilities, as layer 4
@@ -419,6 +428,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity), "During turns other than yours, ~ costs {3} more to
   // cast" (Hurkyl's Final Meditation): checked as it's cast (CR 601.2f); a colored reduction takes off that colored mana.
+  // Mental Modulation: "~ costs {1} less to cast during your turn": the same.
+  const trailing = /^~ costs ((?:\{\d+\})?(?:\{[WUBRG]\})*) (less|more) to cast during (your turn|turns other than yours)$/.exec(text);
+  if (trailing) text = `During ${trailing[3]}, ~ costs ${trailing[1]} ${trailing[2]} to cast`;
   if ((m = /^During (your turn|turns other than yours), ~ costs ((?:\{\d+\})?(?:\{[WUBRG]\})*) (less|more) to cast$/.exec(text)) && m[2]) {
     const n = Number(/\{(\d+)\}/.exec(m[2])?.[1] ?? 0);
     const colored = [...m[2].matchAll(/\{([WUBRG])\}/g)].map((x) => x[1] as Color);
@@ -782,6 +794,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
+  if (/^an opponent lost life last turn$/.test(text)) return { kind: "opponentLostLifeLastTurn" };
   if (/^you lost life last turn$/.test(text)) return { kind: "lostLifeLastTurn" };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
@@ -884,6 +897,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
+  // Kami of Transience: "if an enchantment was put into your graveyard from the battlefield this turn".
+  if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) was put into your graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!) } }, min: 1 };
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   // Bloodcrazed Goblin: "unless an opponent has been dealt damage this turn" (bloodthirst's condition, CR 702.54a).
@@ -1021,6 +1036,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
   if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
+  // Faithbound Judge: "if ~ has two or fewer judgment counters on it".
+  if ((m = new RegExp(`^~ has ${NUM} or fewer ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) };
   // Warden of the Inner Sky: "as long as this creature has three or more counters on it": of every kind together.
   if ((m = new RegExp(`^(?:~|it) has ${NUM} or more counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: "*", min: num(m[1]!) };
   // "~ has trample as long as it has ten or more +1/+1 counters on it" (Primordial Hydra).
@@ -1186,6 +1203,14 @@ export function parseAffected(subject: string): Affects | null {
     const first: TargetSpec = either[2] === "snow" ? { kind: "object", supertypes: ["Snow"], text: "snow creature" } : { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` };
     const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
+  }
+  // Cid, Timeless Artificer: "Artifact creatures and Heroes you control": creatures that are artifacts or Heroes, an artifact
+  // Hero once.
+  const artifactOr = /^Artifact creatures and ([A-Z][a-z]+) you control$/.exec(x);
+  if (artifactOr && CREATURE_TYPES.has(singular(artifactOr[1]!))) {
+    const sub = singular(artifactOr[1]!);
+    const anyOf: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact creature" }, { kind: "object", subtypes: [sub], text: `${sub} creature` }];
+    return { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", anyOf, text: `artifact creature or ${sub}` } };
   }
   // Serpent of Yawning Depths: "Krakens, Leviathans, Octopuses, and Serpents you control": creatures of any of those types.
   const typeList = /^((?:[A-Z][a-z]+, )+and [A-Z][a-z]+) you control$/.exec(x);
@@ -1473,6 +1498,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
+  // Vantress Gargoyle: "can't attack unless defending player has seven or more cards in their graveyard".
+  if ((m = new RegExp(`^can't attack unless defending player has ${NUM} or more cards in their graveyard$`).exec(rest))) return [{ kind: "cantAttackUnlessDefenderYard", n: num(m[1]!) }];
   // Scarred Puma: "can't attack unless a black or green creature also attacks": another one, declared with it (rulings,
   // CR 508.1c).
   if ((m = /^can't attack unless (an? .+) also attacks$/.exec(rest))) {
@@ -1596,7 +1623,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Grounded: "Enchanted creature loses flying": in layer 6, by timestamp, so a later effect can give it back (CR 613.7).
-  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch)$/.exec(rest))) {
+  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect)$/.exec(rest))) {
     const k = parseKeywordList(m[1]!);
     return k ? [{ kind: "removeKeywords", keywords: k }] : null;
   }
@@ -1936,6 +1963,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Anti-Venom, Horrifying Healer: "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on
   // ~": that damage's amount, so also when it can't be prevented (then it's dealt too, CR 615.12).
   if (text === "If damage would be dealt to ~, prevent that damage and put that many +1/+1 counters on ~") return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
+  // Panther Habit: "If equipped creature would be dealt damage, prevent that damage and put that many +1/+1 counters on
+  // it": the same for the creature it's attached to.
+  if (/^If (?:equipped|enchanted) creature would be dealt damage, prevent that damage and put that many \+1\/\+1 counters on it$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "preventDamage", to: true, plusOnes: true, thatMany: true }], text: line };
   // Phyrexian Vindicator: "If damage would be dealt to ~, prevent that damage. When damage is prevented this way, ~ deals
   // that much damage to any other target." The prevention's reflexive trigger (CR 603.12), once for each damage event.
   if (/^If damage would be dealt to ~, prevent that damage\. When damage is prevented this way, ~ deals that much damage to any other target$/.test(text)) {
@@ -1980,6 +2010,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
+  // Silumgar Assassin: "Creatures with power greater than ~'s power can't block it" (CR 509.1b).
+  if (/^Creatures with power greater than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByGreaterPower" }], text: line };
   // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)
   if (/^Creatures with power less than ~'s power can't block creatures you control$/.test(text)) return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [{ kind: "cantBeBlockedByLesserPower", than: "source" }], text: line };
   // Bower Passage: "Creatures with flying can't block creatures you control": the same blocking restriction as "creatures
@@ -2026,7 +2058,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;
@@ -2091,7 +2123,7 @@ function parseStaticLine(line: string): StaticAbility | null {
     const per = masterwork ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: each[4]! }, sharesTypeWithAffected: true as const } } : mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : attachedCounters ? { count: { kind: "affectedCounters" as const, counter: ANY_COUNTER } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
-    const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];
+    const [p, t] = [scaleAmount(pt.power, ofAffected(per, affects, m[1]!)), scaleAmount(pt.toughness, ofAffected(per, affects, m[1]!))];
     if (p === null || t === null) return null;
     mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
@@ -2102,6 +2134,26 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // A static ability has no X of its own to choose (CR 107.3).
   return usesX(mods) ? null : { affects, mods, text: line };
+}
+
+/**
+ * "Other" in "for each other ..." of a static ability that affects other permanents: other than the permanent it's
+ * applied to when that one is of the kind counted ("Enchanted creature gets +1/+1 for each other creature you control",
+ * Bravado: an Aura isn't a creature, so the enchanted creature doesn't count itself; "Each legendary creature you
+ * control gets +1/+1 for each other legendary creature you control", Heroes' Podium, which counts itself if it becomes
+ * a legendary creature, rulings; Sliver Legion, rulings). Otherwise other than the source ("Enchanted creature gets
+ * +2/+2 for each other enchantment on the battlefield", Ancestral Mask).
+ */
+function ofAffected(c: AmountExpr, affects: Affects, subject: string): AmountExpr {
+  const k = c.count;
+  if (k.kind !== "permanents" || !k.other || affects.kind === "self") return c;
+  const attached = affects.kind === "attached" ? /^(?:Enchanted|Equipped) (creature|artifact|land)$/.exec(subject) : null;
+  const types = attached ? [capital(attached[1]!)] : affects.kind === "filter" ? [...affects.types, ...(affects.spec?.types ?? [])] : [];
+  const subtypes = affects.kind === "filter" ? (affects.spec?.subtypes ?? []) : [];
+  const ofKind = k.filter.types?.some((x) => types.includes(x)) || k.filter.subtypes?.some((x) => subtypes.includes(x) || (CREATURE_TYPES.has(x) && types.includes("Creature")));
+  if (!ofKind) return c;
+  const { other: _, ...count } = k;
+  return { ...c, count: { ...count, otherThanAffected: true } };
 }
 
 /**

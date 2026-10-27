@@ -22,6 +22,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // modified creatures you control".
   p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
   let m: RegExpExecArray | null;
+  // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
+  if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
+  // Curse of Thirst: "the number of Curses attached to them", them being the enchanted player whose upkeep it is.
+  if (ctx?.eventPlayer && /^the number of Curses attached to (?:them|that player)$/.test(p))
+    return { count: { kind: "permanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Curse"], text: "Curse" }, attachedToPlayer: { ref: "eventPlayer" } } };
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
@@ -60,6 +65,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
   // Outbreak): each creature's own controller's (Count affectedControllerPoison).
   if (each && /^poison counter its controller has$/i.test(p)) return { count: { kind: "affectedControllerPoison" } };
+  // Righteous Authority: "Enchanted creature gets +1/+1 for each card in its controller's hand".
+  if (each && /^card in its controller's hand$/i.test(p)) return { count: { kind: "affectedControllerHand" } };
   // Phyrexian Swarmlord: "for each poison counter your opponents have", together.
   if ((each && /^poison counter your opponents have$/i.test(p)) || /^the number of poison counters your opponents have$/i.test(p)) return { count: { kind: "poison", who: { ref: "eachOpponent" } } };
   // "For each Urza's land you control" (Urza's Workshop): the land type Urza's (CR 205.3i), not a possessive.
@@ -295,6 +302,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
+  if (each && ctx?.afterYourDiscard && /^card discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".
   if (each && (m = /^(non[a-z]+|creature|land|artifact|instant|sorcery|enchantment) card discarded this way$/i.exec(p))) {
     const filter = parseSearchFilter(`${m[1]!.toLowerCase()} card`);
@@ -332,6 +341,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
   if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
   if (each ? /^1 life you(?:'ve| have)? gained this turn$/i.test(p) : /^the (?:total )?amount of life you(?:'ve| have)? gained this turn$/i.test(p)) return count({ kind: "lifeGainedThisTurn" });
+  // Willowdusk, Essence Seer: "the amount of life you gained this turn or the amount of life you lost this turn, whichever
+  // is greater".
+  if (!each && /^the amount of life you gained this turn or the amount of life you lost this turn, whichever is greater$/i.test(p)) return count({ kind: "greaterOf", of: [{ kind: "lifeGainedThisTurn" }, { kind: "lifeLostThisTurn", who: { ref: "you" } }] });
   // Children of Korlis: "the life you've lost this turn", all of it, whatever you gained (rulings).
   if (!each && /^the (?:total )?(?:amount of )?life you(?:'ve| have)? lost this turn$/i.test(p)) return count({ kind: "lifeLostThisTurn", who: { ref: "you" } });
   if (!each && /^the total amount of noncombat damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsNoncombatDamage" });
@@ -364,6 +376,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Cards named ~ in all graveyards" (Kindle), "for each card named ~ in each graveyard" (Rite of Flame), "in your graveyard".
   if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
     return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });
+  // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
+  if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
   if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents') graveyards?$/i.exec(p))) {
@@ -482,7 +496,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // (Hydra Trainer): the counters on those permanents added up.
   // "Counters among artifacts and creatures you control" (Lux Artillery): each permanent that's either, once.
   // Ferrafor, Young Yew: "counters among creatures target player controls": that player's.
-  if ((m = new RegExp(`^(?:${COUNTER} )?counters (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
+  // Deepwood Denizen: "for each +1/+1 counter on creatures you control", the same.
+  if ((m = new RegExp(`^(?:${COUNTER} )?counter${each ? "s?" : "s"} (?:on|among) ((?:creatures|lands|permanents|artifacts|artifacts and creatures|Sagas) (?:you control|target player controls))$`).exec(p))) {
     const c = parseCount(m[2]!.replace(/^artifacts and creatures /, "artifacts or creatures "), ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }
@@ -626,6 +641,7 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
+  if (x === "that card's" && ctx.revealedTop) return { ref: "revealed" };
   if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
   if (x === "that card's") return ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" ? { ref: "target", index: 0 } : null;
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").

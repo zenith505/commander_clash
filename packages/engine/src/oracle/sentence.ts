@@ -270,6 +270,14 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return [{ type: "playerGains", keywords: [], attackTax: { n: Number(m[2]), ...(m[1] ? { planeswalkers: true as const } : {}) } }];
   const whole = parseEveryPlayerZonesSentence(s, ctx);
   if (whole) return whole;
+  // Perennation: "Return target permanent card from your graveyard to the battlefield with a hexproof counter and an
+  // indestructible counter on it": one target, entering with both (CR 614.1c).
+  if ((m = new RegExp(`^(Return target .+ to the battlefield) with an? ${COUNTER} counter and an? ${COUNTER} counter on it$`).exec(s))) {
+    const fx = parseSentence(`${m[1]} with a ${m[2]} counter on it`, ctx);
+    const e = fx?.length === 1 ? fx[0] : undefined;
+    if (e?.type !== "putOntoBattlefield" || e.what.ref !== "target" || e.what.n || !e.counters || counterKind(m[2]!) === counterKind(m[3]!)) return null;
+    return [{ ...e, counters: { ...e.counters, [counterKind(m[3]!)]: 1 } }];
+  }
   const list = parseTargetList(s, ctx);
   if (list !== undefined) return list;
   for (const parse of SENTENCE_PARSERS) {

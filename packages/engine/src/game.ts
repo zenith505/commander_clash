@@ -3266,7 +3266,7 @@ function finishCleanup(s: GameState) {
   for (const q of s.players)
     for (const id of q.exile) {
       const m = obj(s, id).mayPlay;
-      if (m && (m.until === "thisTurn" || (m.until === "nextTurn" && s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
+      if (m && (m.until === "thisTurn" || ((m.until === "nextTurn" || m.until === "duringNextTurn") && s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
     }
   // Abilities that triggered during cleanup (madness, from discarding down to hand size): players get priority, then
   // there's another cleanup step (CR 514.3a).
@@ -3644,6 +3644,12 @@ export function linkedFreeGrant(s: GameState, o: GameObject, pid: PlayerId): num
 const selfCastFromExile = (s: GameState, o: GameObject, pid: PlayerId): boolean =>
   o.zone === "exile" && o.owner === pid && !o.isToken && !o.faceDown && !!compileCard(defOf(s, o)).castFromExile && !isType(defOf(s, o), "Land");
 
+/** A "for as long as you control ~" permission's source is still on the battlefield, that object, under that player's control. */
+export function stillControlsSource(s: GameState, m: NonNullable<GameObject["mayPlay"]>): boolean {
+  const src = m.source && s.objects[m.source.id];
+  return !!src && src.zone === "battlefield" && (src.zoneChanges ?? 0) === m.source!.zc && controllerOf(s, src) === m.player;
+}
+
 /** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
 function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "exile" || o.mayPlay?.player !== pid || o.mayPlay.zc !== (o.zoneChanges ?? 0)) return false;
@@ -3652,6 +3658,10 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.until === "yourNextTurn" && s.activePlayer === pid && s.turn > m.turn) return false;
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
+  // "For as long as you control ~" (Lightning, Security Sergeant): that object, controlled by that player.
+  if (m.until === "whileControlled" && !stillControlsSource(s, m)) return false;
+  // "During your next turn" (Galvanic Relay): not the turn it was exiled (rulings).
+  if (m.until === "duringNextTurn" && !(s.activePlayer === pid && s.turn > m.turn)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
   // Neyali: only during a turn they attacked with a token.
   if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;

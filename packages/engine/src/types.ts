@@ -354,12 +354,14 @@ export interface GameObject {
    * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery. "yourNextTurn": until
    * that player's next turn begins (Three Wishes); "source": while `source` stays on the battlefield (Intet);
    * "yourNextEndStep": until that player's next end step begins (Yasmin Khan). "adventure": a card that went on an
-   * adventure (CR 715.3d), for as long as it stays exiled, but not cast as an Adventure again this way.
+   * adventure (CR 715.3d), for as long as it stays exiled, but not cast as an Adventure again this way. "duringNextTurn":
+   * only during that player's next turn (Galvanic Relay). "whileControlled": while that player controls `source`, ended
+   * for good the first time they don't (Lightning, Security Sergeant).
    */
   mayPlay?: {
     player: PlayerId;
     zc: number;
-    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure";
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled";
     turn: number;
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */

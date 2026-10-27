@@ -378,6 +378,8 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   if (sentence === "Spend this mana only on costs that contain {X}.") return { xCosts: true, text: sentence };
   // Jegantha, the Wellspring: on any cost, but never on generic mana (rulings: a hybrid {2/W} only as its {W}).
   if (sentence === "This mana can't be spent to pay generic mana costs.") return { spells: { kind: "spell", text: "spells" }, abilities: "any", other: true, notGeneric: true, text: sentence };
+  // Thran Turbine: "This mana can't be spent to cast spells": on abilities and other costs only (CR 106.6).
+  if (sentence === "This mana can't be spent to cast spells.") return { abilities: "any", other: true, text: sentence };
   // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).
   const cant = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(sentence);
   if (cant) {

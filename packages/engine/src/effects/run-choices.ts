@@ -607,6 +607,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.flickeredBack ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "damagedThisWayIs"
             ? (s.resolving!.damagedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
+            : e.cond.kind === "playerDamagedThisWay"
+            ? (s.resolving!.playersDamagedThisWay ?? []).length > 0
             : e.cond.kind === "subjectWasAttacking"
             ? ((o) => (o ? o.attacking !== undefined : ctx.lki?.attacking !== undefined))(objects(s, { ref: "subject" }, ctx)[0])
             : e.cond.kind === "causeSpellIs"

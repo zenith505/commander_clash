@@ -262,7 +262,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
   // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"
   // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
-  if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
+  // Gandalf, White Rider: "fifth from the top".
+  if (ctx.selfCard && (m = /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library (third|fifth) from the top$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] as "third" | "fifth" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // "Shuffle target nontoken permanent you control into its owner's library" (Rishadan Pawnshop): it's put into that
   // library, then that library is shuffled (CR 701.24c).
@@ -552,18 +553,23 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card that wasn't put there this way" }, owners: true, notSacrificedThisWay: true }];
   }
   // "Return all creature cards with mana value 2 or less from your graveyard to the battlefield" (Raise the Past).
-  if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
-    m[1] = m[1]!.replace(/ cards( with mana value (?:X|\d+) or less)?$/, "$1");
+  // Fix What's Broken: "Return each artifact and creature card with mana value X from your graveyard to the battlefield":
+  // exactly the X it was cast with (CR 107.3), the same as "all ... cards".
+  const eachX = /^[Rr]eturn each (.+? card with mana value X) from your graveyard to the battlefield$/.exec(s);
+  if (eachX) s = `Return all ${eachX[1]!.replace(/ card with /, " cards with ")} from your graveyard to the battlefield`;
+  if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less| with mana value X)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
+    m[1] = m[1]!.replace(/ cards( with mana value (?:X|\d+) or less| with mana value X)?$/, "$1");
     // "Return all creature and planeswalker cards with mana value X or less from your graveyard to the battlefield"
     // (Ascend from Avernus): the X it was cast with (TargetSpec.xRange).
     const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
     const withN = / with mana value (\d+) or less$/.exec(kinds);
-    const withX = / with mana value X or less$/.exec(kinds) ?? withN;
+    const exactX = / with mana value X$/.exec(kinds);
+    const withX = / with mana value X or less$/.exec(kinds) ?? withN ?? exactX;
     const words = withX ? kinds.slice(0, withX.index) : kinds;
-    const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? ` with mana value ${withN ? withN[1] : "X"} or less` : ""} from a graveyard`, { chosen: true, x: !!withX && !withN });
+    const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? ` with mana value ${withN ? withN[1] : "X"}${exactX ? "" : " or less"}` : ""} from a graveyard`, { chosen: true, x: !!withX && !withN });
     if (withN && spec?.kind === "card" && spec.manaValue?.max !== Number(withN[1])) return null;
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
-    if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== "most" || !ctx.spell)) return null;
+    if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== (exactX ? "exact" : "most") || !ctx.spell)) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
   }
   // Garna, the Bloodflame: "return to your hand all creature cards in your graveyard that were put there from anywhere
@@ -832,10 +838,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what?.ref === "each" ? [{ type: "putInLibrary", what, position: "ownersChoice" }] : null;
   }
   // "Put target creature into its owner's library second from the top" (Bury in Books), "third from the top" (Teferi,
-  // Hero of Dominaria; Shattered Ego's "enchanted creature").
-  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && !/^target spell or /i.test(m[1]!)) {
+  // Hero of Dominaria; Shattered Ego's "enchanted creature"), "fourth from the top" (Lost to Legend).
+  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third|fourth) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && !/^target spell or /i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
-    return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" }] : null;
+    return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {

@@ -165,7 +165,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // means the token itself ("When Smaug dies, ...").
   // Bonny Pall: "create Beau, a legendary blue Ox creature token with "Beau's power and toughness are each equal to ..."":
   // no printed power and toughness, which its characteristic-defining ability sets (CR 604.3).
-  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
+  // Tolsimir, Friend to Wolves: "create Voja, Friend to Elves, a legendary 3/3 ... token": a name with a comma.
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*(?:, [A-Z][\w'-]*(?: (?:the |of the |of |to )?[A-Z][\w'-]*)*)?), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
     if (m[3] === undefined && !/^"[^"]*'s power and toughness are each equal to [^"]+"$/.test(m[6] ?? "")) return null;
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
@@ -336,7 +337,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] === " transformed" ? { transformed: true as const } : {}), ...(m[2] === " tapped" ? { tapped: true as const } : {}), ...(m[4] ? { counter: "+1/+1" as const } : {}) }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
-  if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
+  if ((m = /^Investigate( twice| three times| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] === " three times" ? 3 : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
   // "Investigate once for each opponent who has more cards in hand than you" (Wojek Investigator): counted as it resolves.
   if ((m = /^Investigate (?:once )?for each (.+)$/i.exec(s))) {
     const n = parseCount(m[1]!, ctx, true);

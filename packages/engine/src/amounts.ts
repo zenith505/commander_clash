@@ -139,6 +139,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o ? (s.players[controllerOf(s, o)]?.poison ?? 0) : 0;
     }
+    case "affectedControllerHand": {
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const who = o && view(o)?.controller;
+      return who !== undefined ? (s.players[who]?.hand.length ?? 0) : 0;
+    }
     case "timesAffectedAttacked": {
       // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
@@ -152,6 +157,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const me = c.filter.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const filter = c.filter.named === "~" ? { ...c.filter, named: me?.zone === "battlefield" ? (view(me)?.name ?? defOf(s, me).name) : (ctx.sourceName ?? (me ? defOf(s, me).name : "")) } : bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
+      const onPlayers = c.attachedToPlayer && refPlayers(s, c.attachedToPlayer, ctx);
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;
       // The source's creature types now, or as it last existed (CR 608.2h).
@@ -173,6 +179,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if ((c.other && id === ctx.sourceId) || id === notThis) continue;
+        if (onPlayers && (o.attachedToPlayer === undefined || !onPlayers.includes(o.attachedToPlayer))) continue;
         if (subject && ((id === subject.id && !c.includeSubject) || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
         if (srcTypes && (id === ctx.sourceId || !shareCreatureType(srcTypes, creatureTypesOf(s, o)))) continue;
         if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
@@ -315,6 +322,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const own = () => (src?.zone === "battlefield" ? characteristics(s, src).name : (ctx.sourceName ?? (src ? defOf(s, src).name : "")));
       const filter = c.filter && (c.filter.named === "~" ? { ...c.filter, named: own() } : bindChosen(c.filter, ctx.chosen));
+      if (c.greatestPower) return Math.max(0, ...refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
     }
     case "life":
@@ -361,6 +369,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx);
     case "absDifference":
       return Math.abs(evalCount(s, c.of[0], ctx) - evalCount(s, c.of[1], ctx));
+    case "greaterOf":
+      return Math.max(evalCount(s, c.of[0], ctx), evalCount(s, c.of[1], ctx));
     case "cardsToGraveyardThisTurn":
       return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
     case "chosenCommanderMv":
@@ -646,8 +656,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
-    case "cardsInExile":
-      return s.turnOrder.reduce((n, pid) => n + s.players[pid]!.exile.length, 0);
+    case "cardsInExile": {
+      if (!c.who) return s.turnOrder.reduce((n, pid) => n + s.players[pid]!.exile.length, 0);
+      const fits = (id: ObjectId) => !s.objects[id]!.faceDown && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)));
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
+    }
     case "greatestMvInExile":
       return Math.max(0, ...s.turnOrder.flatMap((pid) => s.players[pid]!.exile.map((id) => (s.objects[id]!.faceDown ? 0 : defMv(defOf(s, s.objects[id]!))))));
     case "greatestManaValue": {
@@ -753,6 +766,8 @@ function describeCount(c: Count): string {
       return `#${c.counter} counters on it`;
     case "affectedManaValue":
       return "its mana value";
+    case "affectedControllerHand":
+      return "cards in its controller's hand";
     case "affectedControllerPoison":
       return "#poison counters its controller has";
     case "cardsInLibrary":
@@ -822,6 +837,7 @@ function describeCount(c: Count): string {
     case "exiledThisWay":
       return `#${c.filter.text} exiled`;
     case "cardsInGraveyard":
+      if (c.greatestPower) return `the greatest power among ${c.filter ? c.filter.text.replace(/^target /, "") : "card"}s in graveyard`;
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":
       return "life";
@@ -865,6 +881,8 @@ function describeCount(c: Count): string {
       return `${describeCount(c.of[0])} - ${describeCount(c.of[1])}`;
     case "absDifference":
       return `|${describeCount(c.of[0])} - ${describeCount(c.of[1])}|`;
+    case "greaterOf":
+      return `max(${describeCount(c.of[0])}, ${describeCount(c.of[1])})`;
     case "cardsToGraveyardThisTurn":
       return "#cards put into that graveyard this turn";
     case "commanderCasts":
@@ -906,7 +924,7 @@ function describeCount(c: Count): string {
     case "greatestMvInExile":
       return "the greatest mana value among cards in exile";
     case "cardsInExile":
-      return "#cards in exile";
+      return c.filter ? `#${c.filter.text}s in exile${c.graveyardToo ? " and graveyard" : ""}` : "#cards in exile";
     case "greatestManaValue":
       return `the ${c.total ? "total mana value of" : "greatest mana value among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "kicked":

@@ -626,6 +626,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
                 if (o?.zone !== "battlefield" && ctx.lki?.subtypes && typeOnly && f.subtypes?.length) return f.subtypes.some((t) => ctx.lki!.subtypes!.includes(t) || (!!ctx.lki!.allCreatureTypes && CREATURE_TYPES.has(t)));
                 return objects(s, { ref: "subject" }, ctx).some((x) => objectMatches(s, f, x, ctx.controller, false));
               })(e.cond.filter)
+            : e.cond.kind === "subjectCardIs"
+            ? objects(s, { ref: "subjectCard" }, ctx).some((o) => printedMatches(e.cond.kind === "subjectCardIs" ? e.cond.filter : ({} as TargetSpec), defOf(s, o)))
             : e.cond.kind === "targetCardWas"
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"

@@ -764,6 +764,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
+  // "It becomes night" (Unnatural Moonrise): CR 731.1.
+  if ((m = /^It becomes (day|night)$/.exec(s))) return [{ type: "becomeDayNight", v: m[1] as "day" | "night" }];
   // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
   if ((m = new RegExp(`^You may play (?:an|up to ${NUM}) additional lands? this turn$`, "i").exec(s))) return [{ type: "extraLandThisTurn", n: m[1] ? num(m[1]) : 1 }];
   // Nahiri's Lithoforming: "You may play X additional lands this turn", the spell's X.
@@ -877,11 +879,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // damage target creature would deal this turn": a prevention effect on that creature until the turn ends (CR 615.1).
   // Redeem: "Prevent all damage that would be dealt this turn to up to two target creatures": the same as "... to up to
   // two target creatures this turn".
-  s = s.replace(/^(Prevent all (?:combat )?damage that would be dealt) this turn to (up to (?:one|two|three) target creatures?)$/i, "$1 to $2 this turn");
+  // Kurbis, Harvest Celebrant: "... this turn to another target creature with a +1/+1 counter on it".
+  s = s.replace(/^(Prevent all (?:combat )?damage that would be dealt) this turn to (up to (?:one|two|three) target creatures?|(?:another )?target creature(?: with an? \S+ counter on it)?)$/i, "$1 to $2 this turn");
   const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
   if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
-    const what = p && /^(~|it|that creature|target .+|up to (?:one|two|three) target creatures?)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    const what = p && /^(~|it|that creature|(?:another )?target .+|up to (?:one|two|three) target creatures?)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
   }
   // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent

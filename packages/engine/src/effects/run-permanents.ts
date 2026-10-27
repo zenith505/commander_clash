@@ -1361,6 +1361,24 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attachEquipmentTo": {
+      const sc = (s.resolving!.scratch ??= {});
+      const hosts = (sc.attachEach ??= objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id));
+      for (; (sc.attachEqAt ?? 0) < hosts.length; sc.attachEqAt = (sc.attachEqAt ?? 0) + 1, sc.attachWhich = undefined) {
+        const host = s.objects[hosts[sc.attachEqAt ?? 0]!];
+        if (!host || host.zone !== "battlefield") continue;
+        const options = s.battlefield.map((x) => obj(s, x)).filter((o) => controllerOf(s, o) === ctx.controller && characteristics(s, o).subtypes.includes("Equipment") && o.attachedTo !== host.id && canAttachTo(s, o, host));
+        if (sc.attachWhich === undefined) {
+          if (!options.length) continue;
+          const choices = [...options.map((o) => o.id), "none"];
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attachWhich", options: choices, labels: choices.map((x) => (x === "none" ? "Don't attach" : defOf(s, obj(s, x)).name)), prompt: `choose an Equipment to attach to ${defOf(s, host).name}, or none` };
+          return "paused";
+        }
+        const me = sc.attachWhich === "none" ? undefined : options.find((o) => o.id === sc.attachWhich);
+        if (me) attachTo(s, me, host);
+      }
+      return;
+    }
     case "attachToRandomOpponent": {
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;

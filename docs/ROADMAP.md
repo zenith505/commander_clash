@@ -1837,6 +1837,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   opponent's choice" in multiplayer); Rapid Fire (rampage is a trigger, not a keyword a creature can gain);
   Parallax Inhibitor (fading counters as a keyword); Matopi Golem, Skeleton Scavengers, Soldevi Sentry and Spiny
   Starfish ("when it regenerates this way": a shield with a rider, and choosing among shields, CR 616.1).
+- Round B19 (harder skipped cards, least played first): clash (CR 701.30) as an event: "Whenever you clash", even
+  when an opponent's spell started it and won it (Entangling Trap, Rebellion of the Flamekin, rulings), "Whenever you
+  clash and win" / "Whenever you win a clash" (Sylvan Echoes, Marvo, Deep Operative with "clash with defending
+  player"); "If you win" riders that name the opponent clashed with or the creature of the spell (Fistful of Force's
+  "an additional +2/+2", Gilt-Leaf Ambush's tokens, Pollen Lullaby, Whirlpool Whelm's "instead", Captivating Glance's
+  "Otherwise, that player gains control"), and "If you win, repeat this process" (Hoarder's Greed); "if ~ dealt damage
+  to an opponent this turn" (Whirling Dervish, Dunerider Outlaw); "hexproof as long as it hasn't dealt damage yet"
+  (Karakyk Guardian, Palladia-Mors, as this object); "Exile/Destroy ~ and target ..." (Wall of Vipers, Hunting Kavu,
+  Giant Trap Door Spider, Mangara of Corondor: the target alone if ~ is gone, rulings) and "target creature without
+  flying that's attacking you" (Snow Fortress, Ice Floe); "If a creature would die this turn, exile it instead", later
+  ones too (Flaying Tendrils, Malicious Malfunction); "Draw a card and reveal it. If it isn't a land card, discard it"
+  (Sindbad, Fa'adiyah Seer); "may draw up to two cards ... gains 2 life for each card less" (Truce, Temporary Truce);
+  "Other creatures they control can't block this turn" after the opponent's choice (Eunuchs' Intrigues, Goblin War
+  Cry); Yawgmoth Demon and Archdemon of Greed ("tap ~ and it deals N damage to you"); Inventive Wingsmith; Touch of the
+  Eternal; Budding Insurgent; Skullknocker Ogre; Charnel Troll ("exile a creature card from your graveyard. If you do
+  ... Otherwise, sacrifice it"); Ether Well; Gore Vassal; "if ~ attacked or blocked this combat" (Kjeldoran Home
+  Guard, that combat only). No new prompt: the clash, "you may" and existing pickers ask. +38 (26,683 with round 186).
+- Skipped there, with reasons: Recross the Paths (its reveal-until-a-land line); Scattering Stroke (mana at your next
+  main phase); Wormfang Newt and Wormfang Turtle ("exile a land you control" and its linked return); Curse Artifact,
+  Mind Whip, Soul Charmer and Nakaya Shade (punishers another player answers); Glittering Lion and Glittering Lynx
+  (losing one static ability until end of turn); Wall of Tombstones and Descendant of Masumaro (upkeep counts set as
+  base toughness or added then removed); Lava Storm (old "X or Y" wording with no mode choice); Eternal Flame and
+  Banshee ("half X, rounded up/down" to two recipients); Homarid and Tidal Influence (tide counters and the "four or
+  more" state trigger); Clockwork Beast, Avian and Swarm ("up to X counters", capped in total).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Exiled Doomsayer (morph cost tax), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
@@ -1866,14 +1890,14 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Blind Seer, Lo and Li, Chisei,
   Withercrown, Throne of Makindi, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
   Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
-  Gomazoa, Mine Worker, Woolly Razorback, Temporary Truce, Information Dealer, Fractalize, Loxodon Lifechanter,
+  Gomazoa, Mine Worker, Woolly Razorback, Information Dealer, Fractalize, Loxodon Lifechanter,
   Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Cinder Strike (blight), Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Blast of Genius, Sparring Dummy, Bloodbond
   March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
-  Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Ice Floe, Heroic Return, Punishing Fire,
+  Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Witch Hunt, Bridge from
   Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex, Martyr of Sands, Corpse Explosion,
   Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.

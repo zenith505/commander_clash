@@ -1,7 +1,7 @@
 # Roadmap
 
-26,154 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,728 of
+26,197 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,729 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -362,8 +362,29 @@ line blocks.
    or lose life during your turn"), Heidegger, Teachings of the Archaics, Scourge of the Skyclaves, Skanos Dragonheart,
    Gloom Ripper, Backlash, Tribute to Hunger, Turn the Earth, Curse of Stalked Prey, Wall of Essence, Eyeblight
    Massacre, Kirri, Of One Mind, Eagle of Deliverance, Tui and La, Carnival of Souls and others), taking the easy ones.
-   Next most played after rank 12,330: the unsupported ones from `npm run popular` past Wall of Essence; the harder ones
-   from ranks 10,640 to 12,330 (above); the harder ones from ranks 10,060 to
+   Out after round 182 (ranks 12,330 to 13,222): Lie in Wait ("that card's power" once the card has moved), City of
+   Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
+   "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins,
+   Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void, In Too Deep, Dollhouse of Horrors, Harald
+   Unites the Elves, Soul Foundry, Peerless Samurai, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
+   Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact, Fear of Infinity, Elderscale Wurm, Cradle of
+   Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
+   Scheming Fence, Oath of Lieges, Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
+   Manipulator, Endless Whispers, Burn from Within, Skyfire Phoenix, Contagion, Gutter Grime, Coffin Queen, Genesis
+   Storm, Grim Return, Infernal Offering, Varolz, Undercellar Sweep, Wave of Vitriol, Martyrdom, Soul-Scar Mage,
+   Remembrance, Spy Network, Dimir Doppelganger, Jailbreak, Inverter of Truth, Immovable Rod, Hypergenesis, Soul
+   Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
+   counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
+   Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection,
+   Bitter Chill, Savage Punch, Arcbound Fiend, Wildgrowth Walker, Consume Spirit, Pestilent Spirit, End Hostilities.
+   Round 182 went down from rank 12,330 to about rank 13,222 (Temporal Cleansing, Deem Inferior, Lost Days, Happy Hogan
+   and Trickster's Stratagem (second from the top or the bottom, the owner's choice), Phyrexian Hydra, Pain
+   Magnification, Gnoll War Band and Furious Spinesplitter (opponents dealt damage this turn), No Witnesses, Skull
+   Storm, Basandra, Stinkdrinker Bandit, Guardian of the Gateless, Angelic Guardian, Simian Sling, Valiant Rescuer,
+   Mortuary, The Final Days, Nature's Revolt, Living Lands, Kormus Bell, Ambush Commander, Invincible Hymn, See Beyond
+   and others), taking the easy ones.
+   Next most played after rank 13,222: the unsupported ones from `npm run popular` past Nature's Revolt; the harder ones
+   from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
@@ -372,7 +393,7 @@ line blocks.
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in rounds 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
@@ -1565,8 +1586,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (cards with cycling), Truce, Nova Flame, Mutiny, Credit Voucher, Crypsis, Mana Short, Spreading Plague, Nullmage and
   Spurnmage Advocate (not parsed yet).
 - Round B11 (ranks about 15,100 up to about 13,200, the easier templates, plus more played cards the same templates
-  cover: Crater Elemental, Island of Wak-Wak, Symmetry Sage, Pieces of the Puzzle, Customs Depot, Dromar, Living Plane,
-  the three Shadowhearts, Sparkshaper Visionary): "other creatures get -2/-2" (every creature but the source); "its
+  cover: Crater Elemental, Island of Wak-Wak, Symmetry Sage, Pieces of the Puzzle, Customs Depot, Dromar, the three
+  Shadowhearts, Sparkshaper Visionary): "other creatures get -2/-2" (every creature but the source); "its
   power plus its toughness"; "2 or the greatest power among Dinosaurs you control, whichever is greater"; "the number
   of different powers among creatures you control"; "has base power 4" (layer 7b); "put any number of / up to three
   ... cards from among them into your hand and the rest into your graveyard"; "Put ~ from your graveyard on top of your
@@ -1579,14 +1600,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   become untapped"; an Equipment's "can't be blocked by more than one creature"; Slivers with provoke; "attacking,
   blocking, or tapped creature"; "tap all lands its controller controls"; Spacecraft; "attacking creatures with
   flying" and "nontoken attacking creature" counts; "If an artifact is destroyed this way, its controller draws a
-  card"; Savage Punch's ferocious +2/+2 before the fight; "shuffle a card from your hand into your library" (the hand
-  picker with a Shuffle in button); "return a land card or Elf card from your graveyard to your hand. If you can't,
+  card"; Savage Punch's ferocious +2/+2 before the fight; "return a land card or Elf card from your graveyard to your hand. If you can't,
   draw a card"; "Untap all Forests and all green creatures"; "Whenever you gain / lose life during your turn"; "if
   another Human died under your control this turn"; "destroy all permanents at the beginning of the next end step";
   "Exchange your graveyard and library"; "the highest life total among all players"; "destroy all artifacts and
-  creatures other than ~"; Invincible Hymn's life total from the library's size; "All Forests / Swamps / lands are N/N
-  (black) creatures that are still lands"; "you may pay {1}. If you do, scry 1, then draw a card" (choices after a
-  payment). +56 (26,154; the three Shadowhearts aren't Commander-legal).
+  creatures other than ~"; "3/3 blue Bird creatures"; "you may pay {1}. If you do, scry 1, then draw a card" (choices
+  after a payment). Round 182 also did See Beyond, Living Lands, Living Plane, Kormus Bell, Nature's Revolt and
+  Invincible Hymn; main's version is kept. +50 (26,197 with round 182; the three Shadowhearts aren't Commander-legal).
 - Skipped there, with reasons: Leitmotif Composer (a named creature's "can't be blocked" should hold for later
   arrivals too), Blossombind (counters can't be put on it, and wither rulings), Skyblade's Boon (an ability that works
   from two zones), Cut Short (a planeswalker that activated an ability this turn), Cleansing Meditation (returning the

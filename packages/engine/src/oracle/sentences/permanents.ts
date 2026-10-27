@@ -1,6 +1,6 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
-import type { AmountExpr, Count, Effect, Modification, ObjRef } from "../../abilities";
+import type { AmountExpr, Count, Effect, Modification, ObjRef, TargetSpec } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "../targets";
 import { addTarget } from "../body";
@@ -220,6 +220,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^Choose up to ${NUM} (creatures|permanents|nonland permanents|artifacts), then destroy the rest$`).exec(s))) {
     const filter = pickFilter(m[2]!.replace(/s$/, ""));
     return filter ? [{ type: "keepDestroyRest", filter: { ...filter, text: m[2]!.replace(/s$/, "") }, n: num(m[1]!) }] : null;
+  }
+  // Fight to the Death: "Destroy all blocking creatures and all blocked creatures": all of them at once (CR 701.8a), each
+  // creature that's either one.
+  if (/^Destroy all blocking creatures and all blocked creatures$/.test(s)) {
+    const anyOf: TargetSpec[] = [{ kind: "object", combat: "blocking", text: "blocking" }, { kind: "object", combat: "blocked", text: "blocked" }];
+    return [{ type: "destroy", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf, text: "all blocking creatures and all blocked creatures" } } }];
   }
   // Steel Hellkite: "Destroy each nonland permanent with mana value X whose controller was dealt combat damage by ~ this
   // turn": whoever controls it now (rulings).
@@ -783,6 +789,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = n && parseObject(m[3]!, ctx);
     return n && what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), n }] : null;
   }
+  // Procrastinate: "Put twice X stun counters on it": 2X of them.
+  if ((m = new RegExp(`^Put twice X ${COUNTER} counters on (.+)$`).exec(s))) {
+    const fx = parseSentence(`Put X ${m[1]} counters on ${m[2]}`, ctx);
+    const e = fx?.length === 1 ? fx[0] : undefined;
+    if (e?.type !== "counters" || typeof e.n !== "object" || !("count" in e.n) || e.n.count.kind !== "x" || e.n.times !== undefined) return null;
+    return [{ ...e, n: { count: { kind: "x" }, times: 2 } }];
+  }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
@@ -863,7 +876,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
-  if ((m = /^Gain control of (that Equipment)( until end of turn)?$/.exec(s)) && ctx.spell) {
+  // Jet's Brainwashing: "If ~ was kicked, gain control of that creature until end of turn": the target before.
+  if ((m = /^Gain control of (that Equipment|that creature)( until end of turn)?$/.exec(s)) && ctx.spell) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }

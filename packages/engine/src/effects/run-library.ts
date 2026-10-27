@@ -559,14 +559,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ids = [...p.hand];
         }
         const cards = ids.filter((id) => p.hand.includes(id));
-        // On the bottom the first pick goes lowest; on top it ends on top.
-        for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
         if (e.shuffle) {
+          // See Beyond: shuffled into the library (with an empty hand, no shuffle: rulings).
+          for (const id of cards) moveObject(s, id, "library", {});
           shuffleLibrary(s, p);
           log(s, `${p.name} shuffles ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand into their library.`);
           done[pid] = true;
           continue;
         }
+        // On the bottom the first pick goes lowest; on top it ends on top.
+        for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
         log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
         done[pid] = true;
       }
@@ -1414,6 +1416,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   for (const id of [...tops].reverse()) moveObject(s, id, "library", { top: true });
   if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
+  if (cycled) ((s.turnLog ??= {}).cycled ??= {})[pid] = (s.turnLog.cycled?.[pid] ?? 0) + ids.length;
   ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }

@@ -506,7 +506,7 @@ export function parseBecomes(text: string): Modification[] | null {
     addColors = m[2] !== "types";
   }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
-  // Kormus Bell: "1/1 black creatures that are still lands", one color too.
+  // Sparkshaper Visionary: "3/3 blue Bird creatures with flying, ...", one color too.
   if ((m = /^(\d+\/\d+ (?:(?:white|blue|black|red|green) )?(?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;

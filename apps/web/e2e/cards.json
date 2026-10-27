@@ -16148,6 +16148,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5f67698a-28db-43cd-aaf1-52371b0b47eb",
+  "name": "Temporal Cleansing",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nThe owner of target nonland permanent puts it into their library second from the top or on the bottom.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Convoke"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cc4f1023-09e4-4f27-8712-be72e9694a80",
   "name": "Tempting Contract",
   "manaCost": "{4}",

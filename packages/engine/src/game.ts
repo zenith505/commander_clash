@@ -5389,8 +5389,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const cantCastIf = abilitiesOf(s, o).opponentsCantCastYourTurnIf;
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer && (!cantCastIf || (o.zone === "battlefield" && staticConditionNow(s, cantCastIf, o.id, controllerOf(s, o)))))
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
-    if (abilitiesOf(s, o).opponentsCantCastDuringCombat && controllerOf(s, o) !== pid && inCombatPhase(s))
-      return `${characteristics(s, o).name}: opponents can't cast spells during combat`;
+    const duringCombat = abilitiesOf(s, o).opponentsCantCastDuringCombat;
+    if (duringCombat && (duringCombat === "all" || controllerOf(s, o) !== pid) && inCombatPhase(s))
+      return `${characteristics(s, o).name}: ${duringCombat === "all" ? "players" : "opponents"} can't cast spells during combat`;
     // Angelic Arbiter: an opponent who declared an attacking creature this turn (rulings).
     if (abilitiesOf(s, o).opponentsWhoAttackedCantCast && o.zone === "battlefield" && controllerOf(s, o) !== pid && player(s, pid).attackedTurn === s.turn)
       return `${characteristics(s, o).name}: opponents who attacked with a creature this turn can't cast spells`;
@@ -7419,7 +7420,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   if (pend.what === "topOrBottom") {
-    if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
+    if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
     (r.scratch ??= {}).topOrBottom = choice;
     continueResolution(s);
     return;

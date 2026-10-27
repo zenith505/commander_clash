@@ -963,7 +963,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value less than or equal to the other result" (TargetSpec.bound): as it resolves.
         const { xRange, ...rest } = bindBound(s, e.filter, amountCtx(s, ctx));
-        const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
+        const x = ctx.x ?? 0;
+        const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
         // "Draw three cards and reveal them": the ones still in hand, which everyone sees (CR 701.20a).
         const drawn = e.drawn ? (s.resolving!.drawnThisWay ?? []).filter((id) => p.hand.includes(id)) : undefined;
         if (drawn?.length) log(s, `${p.name} reveals ${drawn.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
@@ -2315,8 +2316,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.found) {
         sc.found = [];
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
+        // "With mana value X" (Fix What's Broken, Immortal Servitude): exactly X.
         const { xRange, ...rest } = bindChosen(e.filter, ctx.chosen);
-        const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
+        const x = ctx.x ?? 0;
+        const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
@@ -2432,13 +2435,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           position = sc.topOrBottom as "top" | "bottom";
           sc.topOrBottom = undefined;
         }
-        if (position === "second" || position === "third") {
+        if (position === "second" || position === "third" || position === "fourth" || position === "fifth") {
           log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their library ${position} from the top.`);
           moveObject(s, o.id, "library", { top: true });
           // Under the top card or two, if there are; with fewer, it's on the bottom (rulings on Enigma Sphinx, Long-Term
           // Plans). A commander may have gone to the command zone instead.
           const lib = player(s, o.owner).library;
-          if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(position === "second" ? 1 : 2, lib.length - 1), 0, lib.shift()!);
+          if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(["second", "third", "fourth", "fifth"].indexOf(position) + 1, lib.length - 1), 0, lib.shift()!);
           continue;
         }
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
@@ -2859,13 +2862,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.castFilter && !printedMatches(e.castFilter, defOf(s, o))) continue;
         // Nahiri: free only if it's an Equipment card.
         const free = e.free && (!e.freeFor || printedMatches(e.freeFor, defOf(s, o)));
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.until === "whileControlled" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {}), ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.spellFilter ? { castFilter: e.spellFilter } : {}), ...(another ? { untilAnother: another } : {}), ...(free ? { free: true as const } : {}), ...(free && e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (s.resolving) (s.resolving.impulsed ??= []).push(...ids);
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.spellFilter && e.oneOf ? `${/^[aeiou]/i.test(e.spellFilter.text) ? "an" : "a"} ${e.spellFilter.text.replace(/ card$/, "")} spell from among them` : e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.freeFor ? `, ${e.freeFor.text.replace(/ card$/, "")} spells with or without paying their mana costs` : e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.spellFilter && e.oneOf ? `${/^[aeiou]/i.test(e.spellFilter.text) ? "an" : "a"} ${e.spellFilter.text.replace(/ card$/, "")} spell from among them` : e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.freeFor ? `, ${e.freeFor.text.replace(/ card$/, "")} spells with or without paying their mana costs` : e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : e.until === "duringNextTurn" ? " during their next turn" : e.until === "whileControlled" ? ` for as long as they control ${ctx.sourceId ? defOf(s, obj(s, ctx.sourceId)).name : "it"}` : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}.`);
       return;
     }
   }

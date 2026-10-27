@@ -287,7 +287,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
   // "Each creature you control named ~" (Gruff Triplets): with the source's name (CR 201.5), as it last existed if it's gone.
-  const namedSelf = /^(each (?:other )?[a-z]+ you control) named ~$/i.exec(x);
+  // Genasi Enforcers: "Creatures you control named ~ get +1/+0 until end of turn".
+  const namedSelf = /^(each (?:other )?[a-z]+ you control|[a-z]+s you control) named ~$/i.exec(x);
   if (namedSelf) {
     const each = parseObjectNow(namedSelf[1]!, ctx, cards);
     return each?.ref === "each" && each.filter.named === undefined ? { ...each, filter: { ...each.filter, named: "~", text: `${each.filter.text ?? namedSelf[1]} named ~` } } : null;
@@ -407,9 +408,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).
   // Silumgar, the Drifting Death: "creatures defending player controls get -1/-1 until end of turn" (CR 506.2).
-  const of = /^(.+?) (target player|target opponent|that player|defending player) controls\b(.*)$/i.exec(x);
-  const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) ? parseGroup(`${of[1]}${of[3]}`, true) : null;
-  if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller) {
+  // Hurkyl's Recall: "all artifacts target player owns": the ones that player owns (CR 108.3).
+  const of = /^(.+?) (target player|target opponent|that player|defending player) (controls|owns)\b(.*)$/i.exec(x);
+  const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) && (of[3] === "controls" || (/^all /i.test(of[1]!) && !of[4])) ? parseGroup(`${of[1]}${of[4]}`, true) : null;
+  if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller && !ofGroup.filter.owner) {
     const who = of[2]!.toLowerCase();
     let whose: PlayerRef | null = null;
     if (who.startsWith("target ")) {
@@ -418,7 +420,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
       whose = { ref: "target", index };
     } else whose = parsePlayer(who === "defending player" ? who : "that player", ctx);
     if (!whose || (whose.ref === "target" && whose.n)) return null;
-    return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose };
+    return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose, ...(of[3] === "owns" ? { ofOwner: true as const } : {}) };
   }
   // "Put a +1/+1 counter on that creature and each other creature you control that shares a creature type with it"
   // (Holy Frazzle-Cannon): the trigger's creature, and the others as this resolves.
@@ -972,6 +974,12 @@ export function parseTargetPhrase(
     extra.colorCount = two[1] ? "notTwo" : "two";
     p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
   }
+  // Iridian Maelstrom: "each creature that isn't all colors": fewer than all five (CR 105.2).
+  const notAll = !two && / that isn't all colors\b/.exec(p);
+  if (notAll) {
+    extra.colorCount = "notAll";
+    p = p.slice(0, notAll.index) + p.slice(notAll.index + notAll[0].length);
+  }
   // "Spell that wasn't cast from its owner's hand" (Wash Away): a copy was never cast (rulings).
   const notFromHand = / that wasn't cast from its owner's hand$/.exec(p);
   if (notFromHand) {
@@ -1092,7 +1100,7 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|oil) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1303,7 +1311,8 @@ export function parseTargetPhrase(
   if (p.startsWith("attacking or blocking ")) {
     extra.combat = "attackingOrBlocking";
     p = p.slice("attacking or blocking ".length);
-  } else if ((m = /^(attacking|blocking|blocked|unblocked) /.exec(p))) {
+  } else if ((m = /^(unblocked) attacking /.exec(p) ?? /^(attacking|blocking|blocked|unblocked) /.exec(p))) {
+    // "Unblocked attacking Ninjas you control" (Throatseeker): an unblocked creature is an attacking one (CR 509.1h).
     extra.combat = m[1] as "attacking" | "blocking" | "blocked" | "unblocked";
     p = p.slice(m[0].length);
   } else if ((m = /^nonattacking,? nonblocking /.exec(p))) {
@@ -1454,7 +1463,7 @@ export function parseTargetPhrase(
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
         // "Non-Lesson instant and sorcery card" (Iroh, Grand Lotus): a leading "non-" word is for every alternative, as
         // "nonartifact instant or sorcery" is.
-        else if ((alts.length === 1 || (alt === alts[0] && i === 0)) && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson", "Saga"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson"
+        else if ((alts.length === 1 || (alt === alts[0] && i === 0)) && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson", "Saga", "Bolas"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       // "Nonlegendary attacking creature": attacking after a supertype.

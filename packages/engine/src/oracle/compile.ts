@@ -2646,16 +2646,18 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
-    const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
-    if (uncounterable && !/\b(this turn|by)\b/.test(line)) {
+    // Spellbreaker Behemoth: "Creature spells you control with power 5 or greater": the card's power (CR 208.3).
+    const uncounterable = /^(.*?)[Ss]pells( you control)?( with power \d+ or greater)? can't be countered\.$/.exec(line);
+    if (uncounterable && !/\b(this turn|by)\b/.test(line) && (!uncounterable[3] || /^creature $/i.test(uncounterable[1]!))) {
       // Taigam, Ojutai Master: "Instant, sorcery, and Dragon spells you control": each that's one of the card types or has
       // the creature type (TargetSpec.orSubtypes).
       const mixed = /^((?:instant|sorcery|creature|artifact|enchantment), )+and ([A-Z][a-z]+) $/i.exec(uncounterable[1]!);
       const words = (mixed ? uncounterable[1]!.replace(/, and [A-Z][a-z]+ $/, "") : uncounterable[1]!).trim().toLowerCase();
       // "Creature and enchantment spells" (Destiny Spinner): each spell that's either.
-      const filter0 = words ? parseTargetPhrase(`${words.replace(/^([a-z]+) and ([a-z]+)$/, "$1 or $2").replace(/^([a-z]+), ([a-z]+)$/, "$1 or $2")} spell`) : { kind: "spell" as const, text: "spell" };
+      const filter1 = words ? parseTargetPhrase(`${words.replace(/^([a-z]+) and ([a-z]+)$/, "$1 or $2").replace(/^([a-z]+), ([a-z]+)$/, "$1 or $2")} spell`) : { kind: "spell" as const, text: "spell" };
+      const filter0 = uncounterable[3] && filter1 ? { ...filter1, power: { min: Number(/\d+/.exec(uncounterable[3])![0]) } } : filter1;
       const filter = mixed && filter0?.kind === "spell" && filter0.types?.length && CREATURE_TYPES.has(mixed[2]!) ? { ...filter0, orSubtypes: [mixed[2]!] } : mixed ? null : filter0;
-      if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
+      if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells${uncounterable[3] ?? ""}` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
       else out.unsupported.push(raw);
       continue;
     }
@@ -3297,6 +3299,9 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cast ~ and whenever ~ (attacks), (.+)$/.exec(line) ??
       // "When you cast this spell and when this creature dies, create a 0/1 ... Eldrazi Spawn ..." (Eldrazi Repurposer).
       /^When you cast ~ and when ~ (dies), (.+)$/.exec(line) ??
+      // Voice of Resurgence: "Whenever an opponent casts a spell during your turn and when ~ dies, ...": a cast and a death are
+      // never one event.
+      /^(Whenever an opponent casts a spell during your turn) and when ~ dies, (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       // "When ~ enters or is turned face up, ..." (Ponyback Brigade): a face-down permanent has no abilities as it enters (CR 708.2),
@@ -3342,6 +3347,8 @@ export function compile(d: CardDef): CompiledCard {
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
         : /^When you cast ~ and when ~ dies, /.test(line)
         ? [`When you cast ~, ${effect}`, `When ~ dies, ${effect}`]
+        : /^Whenever an opponent casts a spell during your turn and when ~ dies, /.test(line)
+        ? [`${twice[1]}, ${effect}`, `When ~ dies, ${effect}`]
         : /^When you cast/.test(line)
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
@@ -3388,6 +3395,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     const act = parseActivated(line);
     if (act) {
+      // "Sacrifice six creatures named ~" (Shadowborn Apostle): this card's name; a copy has it too (CR 707.2).
+      if (act !== "fail") for (const [i, c] of (act.costs ?? []).entries()) if (c.kind === "sacrifice" && c.filter.named === "~") act.costs![i] = { ...c, filter: { ...c.filter, named: d.name, text: c.filter.text.replace(/~/g, d.name) } };
       if (act === "fail") out.unsupported.push(raw);
       else out.activated.push(bindThisAbility(act, line));
       continue;
@@ -3528,7 +3537,7 @@ export function compile(d: CardDef): CompiledCard {
     if (Array.isArray(v)) return v.some(affectedPoison);
     if (!v || typeof v !== "object") return false;
     if ((v as { type?: string }).type === "continuous" && (v as { what?: { ref?: string } }).what?.ref === "each") return false;
-    return (v as { kind?: string }).kind === "affectedControllerPoison" || Object.values(v).some(affectedPoison);
+    return (v as { kind?: string }).kind === "affectedControllerPoison" || (v as { kind?: string }).kind === "affectedControllerHand" || Object.values(v).some(affectedPoison);
   };
   if (affectedPoison([out.spell, out.triggers, out.activated])) out.unsupported.push("(poison counters of an affected permanent's controller, with no affected permanent)");
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.
@@ -3887,7 +3896,8 @@ function checkCastingLinks(out: CompiledCard) {
   for (const alt of ["surge", "spectacle", "alternative", "madness", "prowl"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
-    const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alts.length > 0;
+    // Madness is a keyword, not an alternative cost of the card's own text (CR 702.35).
+    const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alt === "madness" ? alts.length > 0 || out.madness !== undefined : alts.length > 0;
     if ((altIn(out.spell) || out.triggers.some((t) => t.ifAlt === alt || altIn(t.body))) && !linked) bad = true;
     if (out.triggers.some((t) => t.event !== "selfEnters" && altIn(t.body)) || altIn(out.activated) || altIn(out.statics)) bad = true;
   }

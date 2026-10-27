@@ -165,7 +165,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // means the token itself ("When Smaug dies, ...").
   // Bonny Pall: "create Beau, a legendary blue Ox creature token with "Beau's power and toughness are each equal to ..."":
   // no printed power and toughness, which its characteristic-defining ability sets (CR 604.3).
-  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
+  // Tolsimir, Friend to Wolves: "create Voja, Friend to Elves, a legendary 3/3 ... token": a name with a comma.
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*(?:, [A-Z][\w'-]*(?: (?:the |of the |of |to )?[A-Z][\w'-]*)*)?), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
     if (m[3] === undefined && !/^"[^"]*'s power and toughness are each equal to [^"]+"$/.test(m[6] ?? "")) return null;
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

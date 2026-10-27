@@ -681,6 +681,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "eventPlayerHand":
       if (eventPlayer === undefined) return false;
       return (cond.max === undefined || s.players[eventPlayer]!.hand.length <= cond.max) && (cond.min === undefined || s.players[eventPlayer]!.hand.length >= cond.min);
+    case "eventPlayerPoisoned":
+      return eventPlayer !== undefined && !s.players[eventPlayer]!.lost && (s.players[eventPlayer]!.poison ?? 0) > 0;
     case "eventPlayerOpponent":
       return eventPlayer !== undefined && eventPlayer !== you;
     case "eventPlayerNoRad":
@@ -754,7 +756,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       if (cond.eventPlayer) return eventPlayer !== undefined && eventPlayer !== you && !s.players[eventPlayer]!.lost && measure(eventPlayer) > mine;
       if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
-      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (cond.fewer ? measure(p) < mine : measure(p) > mine));
+      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (cond.fewer ? measure(p) < mine : measure(p) >= mine + (cond.atLeast ?? 1)));
     }
     case "youMostLife":
       return !s.players[you]!.lost && s.turnOrder.every((p) => s.players[p]!.lost || s.players[p]!.life <= s.players[you]!.life);
@@ -962,6 +964,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "descended":
       return (s.descendedThisTurn ?? []).includes(you);
     case "revolt":
+      if (cond.creature) return (s.turnLog?.creaturesLeft?.[you] ?? 0) > 0;
       return (s.permanentLeftThisTurn ?? []).includes(you);
     case "void":
       return !!s.voidThisTurn;
@@ -1675,7 +1678,8 @@ function countSignature(s: GameState): string {
     const p = s.players[pid]!;
     // The mana pool too, for "for each unspent green mana you have" (Omnath, Locus of Mana).
     // The top card of the library too, for "as long as the top card of your library is black" (Vampire Nocturnus).
-    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.library[0] ?? ""},${p.graveyard.length},${Object.values(p.manaPool).join(".")}`);
+    // The exile too, for "instant and sorcery cards you own in exile" (Crackling Drake).
+    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.library[0] ?? ""},${p.graveyard.length},${p.exile.length},${Object.values(p.manaPool).join(".")}`);
   }
   for (const id of s.battlefield) {
     const o = s.objects[id]!;

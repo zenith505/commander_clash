@@ -2,7 +2,7 @@ import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
+import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
@@ -1575,6 +1575,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
+        if (t.cast.yourTurn && you !== s.activePlayer) return false;
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;
         if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
@@ -2019,6 +2020,13 @@ const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : com
  * controller no longer controls that object (CR 603.7). Once the object has left the battlefield it's gone for good.
  */
 export function checkLostControl(s: GameState) {
+  // "You may play that card for as long as you control ~": once you don't, never again, even if you regain control
+  // (rulings on Lightning, Security Sergeant).
+  for (const q of s.players)
+    for (const id of q.exile) {
+      const m = s.objects[id]!.mayPlay;
+      if (m?.until === "whileControlled" && !stillControlsSource(s, m)) s.objects[id]!.mayPlay = undefined;
+    }
   for (const d of [...(s.delayed ?? [])]) {
     if (d.when !== "lostControl") continue;
     // "This turn" is over (Stolen Uniform).

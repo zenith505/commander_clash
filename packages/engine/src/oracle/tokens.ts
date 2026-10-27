@@ -24,6 +24,8 @@ export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
   Mutagen: { name: "Mutagen", colors: [], types: ["Artifact"], subtypes: ["Mutagen"], keywords: [], abilities: "{1}, {T}, Sacrifice this token: Put a +1/+1 counter on target creature. Activate only as a sorcery." },
   Vibranium: { name: "Vibranium", colors: [], types: ["Artifact"], subtypes: ["Vibranium"], keywords: ["Indestructible"], abilities: "{T}: Add {C}. This mana can't be spent to cast a nonartifact spell." },
   Heartwood: { name: "Heartwood", colors: ["R", "G"], types: ["Artifact"], subtypes: ["Heartwood"], keywords: [], abilities: "{T}: Add {R} or {G}." },
+  // CR 111.10d
+  Walker: { name: "Walker", power: 2, toughness: 2, colors: ["B"], types: ["Creature"], subtypes: ["Zombie"], keywords: [] },
 };
 
 /** Role tokens (CR 111.10j-r, 303.7): colorless Aura Role enchantment tokens with enchant creature, created attached to a creature. */

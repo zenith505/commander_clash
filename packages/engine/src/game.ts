@@ -5939,7 +5939,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     if (c.kind === "mill") {
       // Not with fewer cards in the library (CR 701.17b).
-      if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to mill to ${doing}`;
+      if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to ${c.exile ? "exile" : "mill"} to ${doing}`;
       continue;
     }
     if (c.kind === "giveLife") {
@@ -6273,7 +6273,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
       }
     }
-    else if (c.kind === "mill") {
+    else if (c.kind === "mill" && c.exile) {
+      const ids = p.library.slice(0, c.n);
+      log(s, `${p.name} exiles the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library: ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
+      for (const id of ids) moveObject(s, id, "exile");
+    } else if (c.kind === "mill") {
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
       for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });

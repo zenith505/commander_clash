@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, castProblem, planActivate, planTurnFaceUp, turnFaceUpProblem, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { blockProblem, botActions, castProblem, planActivate, planTurnFaceUp, turnFaceUpProblem, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -309,5 +309,208 @@ describe("morph costs that aren't mana (CR 702.37e, 118.8)", () => {
     const up = botActions(s2, ap).find((a) => a.type === "turnFaceUp");
     expect(up).toMatchObject({ objectId: raiders, costs: { discard: [expect.any(String)] } });
     expect([one, two]).toContain((up as { costs: { discard: string[] } }).costs.discard[0]);
+  });
+});
+
+const riverfallMimic = card("Riverfall Mimic", "Creature — Shapeshifter", "{1}{U/R}", { cmc: 2, colors: ["R","U"], power: "2", toughness: "1", oracleText: "Whenever you cast a spell that's both blue and red, this creature has base power and toughness 3/3 until end of turn and can't be blocked this turn." });
+const shorecrasherMimic = card("Shorecrasher Mimic", "Creature — Shapeshifter", "{1}{G/U}", { cmc: 2, colors: ["G","U"], power: "2", toughness: "1", oracleText: "Whenever you cast a spell that's both green and blue, this creature has base power and toughness 5/3 until end of turn and gains trample until end of turn." });
+const woodlurkerMimic = card("Woodlurker Mimic", "Creature — Shapeshifter", "{1}{B/G}", { cmc: 2, colors: ["B","G"], power: "2", toughness: "1", oracleText: "Whenever you cast a spell that's both black and green, this creature has base power and toughness 4/5 until end of turn and gains wither until end of turn. (It deals damage to creatures in the form of -1/-1 counters.)" });
+const battlegateMimic = card("Battlegate Mimic", "Creature — Shapeshifter", "{1}{R/W}", { cmc: 2, colors: ["R","W"], power: "2", toughness: "1", oracleText: "Whenever you cast a spell that's both red and white, this creature has base power and toughness 4/2 until end of turn and gains first strike until end of turn." });
+const nightskyMimic = card("Nightsky Mimic", "Creature — Shapeshifter", "{1}{W/B}", { cmc: 2, colors: ["B","W"], power: "2", toughness: "1", oracleText: "Whenever you cast a spell that's both white and black, this creature has base power and toughness 4/4 until end of turn and gains flying until end of turn." });
+const izzetSpell = () => card("Izzet Trick", "Instant", "{U/R}", { cmc: 1, oracleText: "Draw a card." });
+const blueSpell = () => card("Blue Trick", "Instant", "{U}", { cmc: 1, oracleText: "Draw a card." });
+const simicSpell = () => card("Simic Trick", "Instant", "{G}{U}", { cmc: 2, oracleText: "Draw a card." });
+
+describe("the Mimics: a spell that's both of two colors (CR 105.2, 613.4b)", () => {
+  it("compiles them", () => supported(riverfallMimic, shorecrasherMimic, woodlurkerMimic, battlegateMimic, nightskyMimic));
+
+  it("Riverfall Mimic: a blue and red spell makes it 3/3 and unblockable; a blue one doesn't", () => {
+    const { s: s0, ap, ids } = setup([izzetSpell(), blueSpell()]);
+    const mimic = putOnBattlefield(s0, ap, riverfallMimic);
+    let s = settle(run(s0, planCast(s0, ap, ids[1]!, [], undefined, "auto")));
+    expect([chars(s, mimic).power, chars(s, mimic).toughness]).toEqual([2, 1]);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [], undefined, "auto")));
+    expect([chars(s, mimic).power, chars(s, mimic).toughness]).toEqual([3, 3]);
+    const blocker = putOnBattlefield(s, s.turnOrder.find((p) => p !== ap)!, greenBear());
+    expect(blockProblem(s, s.objects[blocker]!, s.objects[mimic]!)).toMatch(/can't be blocked/);
+    s = passUntil(s, "cleanup");
+    s = passUntil(s, "main1");
+    expect([chars(s, mimic).power, chars(s, mimic).toughness]).toEqual([2, 1]);
+  });
+
+  it("Shorecrasher Mimic: base 5/3 with trample, and a +1/+1 counter still counts (layer 7c after 7b)", () => {
+    const { s: s0, ap, ids } = setup([simicSpell()]);
+    const mimic = putOnBattlefield(s0, ap, shorecrasherMimic);
+    s0.objects[mimic]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect([chars(s, mimic).power, chars(s, mimic).toughness]).toEqual([6, 4]);
+    expect(has(s, mimic, "Trample")).toBe(true);
+  });
+});
+
+const vampireSlayer = card("Vampire Slayer", "Creature — Human Soldier", "{1}{W}", { cmc: 2, power: "2", toughness: "2", oracleText: "Whenever this creature deals damage to a Vampire, destroy that creature." });
+const dinosaurHunter = card("Dinosaur Hunter", "Creature — Human Pirate", "{1}{B}", { cmc: 2, power: "2", toughness: "2", oracleText: "Whenever this creature deals damage to a Dinosaur, destroy that creature." });
+const eastMarkCavalier = card("East-Mark Cavalier", "Creature — Human Knight", "{1}{W}", { cmc: 2, power: "2", toughness: "2", keywords: ["Vigilance"], oracleText: "Vigilance\nWhenever this creature deals damage to a Goblin or Orc, destroy that creature." });
+const spiderSlayer = card("Spider-Slayer, Hatred Honed", "Legendary Artifact Creature — Human Villain", "{2}", { cmc: 2, power: "2", toughness: "1", oracleText: "Whenever Spider-Slayer deals damage to a Spider, destroy that creature.\n{6}, Exile this card from your graveyard: Create two tapped 1/1 colorless Robot artifact creature tokens with flying." });
+const preyUpon = () => card("Prey Upon", "Sorcery", "{G}", { cmc: 1, oracleText: "Target creature you control fights target creature you don't control." });
+
+describe("whenever this deals damage to a creature of a type, destroy it", () => {
+  it("compiles them", () => supported(vampireSlayer, dinosaurHunter, eastMarkCavalier, spiderSlayer));
+
+  it("Vampire Slayer destroys a Vampire it damages, not an Ogre", () => {
+    const { s: s0, ap, ids, opp } = setup([preyUpon(), preyUpon()]);
+    const slayer = putOnBattlefield(s0, ap, vampireSlayer);
+    const vampire = putOnBattlefield(s0, opp, creature("Tough Vampire", "Creature — Vampire", "{3}{B}", 1, 5));
+    const ogre = putOnBattlefield(s0, opp, bigOgre());
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(slayer), tgt(vampire)], undefined, "auto")));
+    expect(zone(s, vampire)).toBe("graveyard");
+    expect(zone(s, slayer)).toBe("battlefield");
+    const other = putOnBattlefield(s, ap, vampireSlayer);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(other), tgt(ogre)], undefined, "auto")));
+    expect(zone(s, ogre)).toBe("battlefield");
+    expect(s.objects[ogre]!.damage).toBe(2);
+  });
+
+  it("East-Mark Cavalier: a Goblin or an Orc", () => {
+    const { s: s0, ap, ids, opp } = setup([preyUpon(), preyUpon()]);
+    const cavalier = putOnBattlefield(s0, ap, eastMarkCavalier);
+    const orc = putOnBattlefield(s0, opp, creature("Tough Orc", "Creature — Orc Warrior", "{3}{B}", 1, 5));
+    const goblin = putOnBattlefield(s0, opp, creature("Tough Goblin", "Creature — Goblin", "{3}{R}", 0, 5));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(cavalier), tgt(orc)], undefined, "auto")));
+    expect(zone(s, orc)).toBe("graveyard");
+    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(cavalier), tgt(goblin)], undefined, "auto")));
+    expect(zone(s, goblin)).toBe("graveyard");
+  });
+});
+
+const primevalForce = card("Primeval Force", "Creature — Elemental", "{2}{G}{G}{G}", { cmc: 5, power: "8", toughness: "8", oracleText: "When this creature enters, sacrifice it unless you sacrifice three Forests." });
+const bullElephant = card("Bull Elephant", "Creature — Elephant", "{3}{G}", { cmc: 4, power: "4", toughness: "4", oracleText: "When this creature enters, sacrifice it unless you return two Forests you control to their owner's hand." });
+const harvestWurm = card("Harvest Wurm", "Creature — Wurm", "{1}{G}", { cmc: 2, power: "3", toughness: "2", oracleText: "When this creature enters, sacrifice it unless you return a basic land card from your graveyard to your hand." });
+const hecatomb = card("Hecatomb", "Enchantment", "{1}{B}{B}", { cmc: 3, oracleText: "When this enchantment enters, sacrifice this enchantment unless you sacrifice four creatures.\nTap an untapped Swamp you control: This enchantment deals 1 damage to any target." });
+const ovinomancer = card("Ovinomancer", "Creature — Human Wizard", "{2}{U}", { cmc: 3, power: "0", toughness: "1", oracleText: "When this creature enters, sacrifice it unless you return three basic lands you control to their owner's hand.\n{T}, Return this creature to its owner's hand: Destroy target creature. It can't be regenerated. That creature's controller creates a 0/1 green Sheep creature token." });
+const jokulmorder = card("Jokulmorder", "Creature — Leviathan", "{4}{U}{U}{U}", { cmc: 7, power: "12", toughness: "12", keywords: ["Trample"], oracleText: "Trample\nThis creature enters tapped.\nWhen this creature enters, sacrifice it unless you sacrifice five lands.\nThis creature doesn't untap during your untap step.\nWhenever you play an Island, you may untap this creature." });
+const isForest = (s: GameState, id: string) => chars(s, id).subtypes.includes("Forest");
+
+describe("sacrifice it unless you sacrifice or return several", () => {
+  it("compiles them", () => supported(primevalForce, bullElephant, harvestWurm, hecatomb, ovinomancer, jokulmorder));
+
+  it("Primeval Force: three Forests sacrificed keep it", () => {
+    const { s: s0, ap, ids } = setup([primevalForce]);
+    const forests = landsOf(s0, ap).filter((l) => isForest(s0, l));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")), { pick: forests });
+    expect(forests.map((f) => zone(s, f))).toEqual(["graveyard", "graveyard", "graveyard"]);
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("Primeval Force: declined, it's sacrificed and the Forests stay", () => {
+    const { s: s0, ap, ids } = setup([primevalForce]);
+    const forests = landsOf(s0, ap).filter((l) => isForest(s0, l));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")), { yes: false });
+    expect(forests.map((f) => zone(s, f))).toEqual(["battlefield", "battlefield", "battlefield"]);
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+
+  it("Hecatomb with only three creatures: none sacrificed, Hecatomb is (all or none, its rulings)", () => {
+    const { s: s0, ap, ids } = setup([hecatomb]);
+    const bears = [0, 1, 2].map(() => putOnBattlefield(s0, ap, greenBear()));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(bears.map((b) => zone(s, b))).toEqual(["battlefield", "battlefield", "battlefield"]);
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+
+  it("Hecatomb with four creatures: all four sacrificed", () => {
+    const { s: s0, ap, ids } = setup([hecatomb]);
+    const bears = [0, 1, 2, 3].map(() => putOnBattlefield(s0, ap, greenBear()));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")), { pick: bears });
+    expect(bears.map((b) => zone(s, b))).toEqual(["graveyard", "graveyard", "graveyard", "graveyard"]);
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("Bull Elephant: two Forests go back to your hand", () => {
+    const { s: s0, ap, ids } = setup([bullElephant]);
+    const forests = landsOf(s0, ap).filter((l) => isForest(s0, l));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")), { pick: forests.slice(0, 2) });
+    expect(forests.slice(0, 2).map((f) => zone(s, f))).toEqual(["hand", "hand"]);
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("Ovinomancer: three basic lands go back to your hand", () => {
+    const { s: s0, ap, ids } = setup([ovinomancer]);
+    const lands = landsOf(s0, ap).slice(0, 3);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")), { pick: lands });
+    expect(lands.map((f) => zone(s, f))).toEqual(["hand", "hand", "hand"]);
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("Harvest Wurm: no basic land card in your graveyard, it's sacrificed", () => {
+    const { s: s0, ap, ids } = setup([harvestWurm]);
+    s0.players[ap]!.graveyard = [];
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+  });
+
+  it("Harvest Wurm: a basic land card from your graveyard returns to your hand", () => {
+    const { s: s0, ap, ids } = setup([harvestWurm]);
+    s0.players[ap]!.graveyard = [];
+    const land = into(s0, ap, card("Forest", "Basic Land — Forest"), "graveyard");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    if (s.pending?.kind === "searchLibrary") s = settle(act(s, { type: "searchLibrary", player: ap, found: [land] }));
+    expect(zone(s, land)).toBe("hand");
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+  });
+
+  it("Jokulmorder: five lands keep it; it enters tapped and playing an Island may untap it", () => {
+    const { s: s0, ap, ids } = setup([jokulmorder]);
+    const isle = into(s0, ap, card("Island", "Basic Land — Island"));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto"));
+    s = settle(s, { pick: landsOf(s, ap).slice(0, 5) });
+    expect(zone(s, ids[0]!)).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.tapped).toBe(true);
+    s = settle(act(s, { type: "playLand", player: ap, objectId: isle }));
+    expect(s.objects[ids[0]!]!.tapped).toBe(false);
+  });
+});
+
+const royalHerbalist = card("Royal Herbalist", "Creature — Human Cleric", "{W}", { cmc: 1, power: "1", toughness: "1", oracleText: "{2}, Exile the top card of your library: You gain 1 life." });
+const arcSlogger = card("Arc-Slogger", "Creature — Beast", "{3}{R}{R}", { cmc: 5, power: "4", toughness: "5", oracleText: "{R}, Exile the top ten cards of your library: This creature deals 2 damage to any target." });
+const whirlingCatapult = card("Whirling Catapult", "Artifact", "{4}", { cmc: 4, oracleText: "{2}, Exile the top two cards of your library: This artifact deals 1 damage to each creature with flying and each player." });
+const seasonedTactician = card("Seasoned Tactician", "Creature — Human Advisor", "{2}{W}", { cmc: 3, power: "1", toughness: "3", oracleText: "{3}, Exile the top four cards of your library: The next time a source of your choice would deal damage to you this turn, prevent that damage." });
+
+describe("exile the top cards of your library as a cost (CR 118.3)", () => {
+  it("compiles them", () => supported(royalHerbalist, arcSlogger, whirlingCatapult, seasonedTactician));
+
+  it("Royal Herbalist: the top card goes to exile, not the graveyard", () => {
+    const { s: s0, ap } = setup([]);
+    const herbalist = putOnBattlefield(s0, ap, royalHerbalist);
+    const top = s0.players[ap]!.library[0]!;
+    const n = s0.players[ap]!.library.length;
+    const s = settle(run(s0, planActivate(s0, ap, herbalist, 0)));
+    expect(zone(s, top)).toBe("exile");
+    expect(s.players[ap]!.library.length).toBe(n - 1);
+    expect(life(s, ap)).toBe(41);
+  });
+
+  it("Royal Herbalist: not with an empty library", () => {
+    const { s: s0, ap } = setup([]);
+    const herbalist = putOnBattlefield(s0, ap, royalHerbalist);
+    s0.players[ap]!.library = [];
+    expect(planActivate(s0, ap, herbalist, 0)).toBeNull();
+  });
+
+  it("Arc-Slogger: ten cards exiled, 2 damage", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const slogger = putOnBattlefield(s0, ap, arcSlogger);
+    const top = s0.players[ap]!.library.slice(0, 10);
+    const s = settle(run(s0, planActivate(s0, ap, slogger, 0, [player(opp)])));
+    expect(top.every((id) => zone(s, id) === "exile")).toBe(true);
+    expect(life(s, opp)).toBe(38);
+  });
+
+  it("Arc-Slogger: not with nine cards left", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const slogger = putOnBattlefield(s0, ap, arcSlogger);
+    s0.players[ap]!.library = s0.players[ap]!.library.slice(0, 9);
+    expect(planActivate(s0, ap, slogger, 0, [player(opp)])).toBeNull();
   });
 });

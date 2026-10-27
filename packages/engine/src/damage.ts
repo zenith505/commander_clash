@@ -445,6 +445,7 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
   if (spec.types?.length && !spec.types.some((t) => src.types.includes(t)) && !spec.orSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.allTypes?.some((t) => !src.types.includes(t)) || spec.notTypes?.some((t) => src.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((c) => src.colors.includes(c))) return false;
+  if (spec.bothColors?.some((c) => !src.colors.includes(c))) return false;
   if (spec.notColors?.some((c) => src.colors.includes(c))) return false;
   const n = src.colors.length;
   if (spec.colorCount && (spec.colorCount === "colorless" ? n !== 0 : spec.colorCount === "monocolored" ? n !== 1 : spec.colorCount === "two" ? n !== 2 : spec.colorCount === "notTwo" ? n === 2 : spec.colorCount === "colored" ? n === 0 : spec.colorCount === "all" ? n < 5 : spec.colorCount === "notAll" ? n >= 5 : n < 2)) return false;

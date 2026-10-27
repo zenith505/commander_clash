@@ -477,6 +477,8 @@ export interface TargetSpec {
   sharesCreatureTypeWithSacrificed?: true;
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
+  /** Each of these colors: "a spell that's both blue and red" (the Mimics). */
+  bothColors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
   colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo" | /** "all colors" (Jenson Carthalion): all five */ "all" | /** "that isn't all colors" (Iridian Maelstrom) */ "notAll";
   supertypes?: string[]; // "basic land", "legendary creature"
@@ -4823,7 +4825,7 @@ export type AdditionalCost =
    * into your graveyard, not payable with fewer cards there (CR 701.17b). It moves cards from a library, so an ability
    * with it isn't a mana ability (CR 605.1a).
    */
-  | { kind: "mill"; n: number }
+  | { kind: "mill"; n: number; /** "Exile the top card of your library" (Royal Herbalist, Arc-Slogger): exiled, not milled; not payable with fewer cards there either. */ exile?: true }
   /**
    * "Remove three counters from among other artifacts, creatures, and planeswalkers you control" (Tekuthal), "Remove two
    * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,

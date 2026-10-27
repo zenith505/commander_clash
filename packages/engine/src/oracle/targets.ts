@@ -1022,6 +1022,12 @@ export function parseTargetPhrase(
     extra.colorCount = two[1] ? "notTwo" : "two";
     p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
   }
+  // The Mimics: "a spell that's both blue and red": it has each of those colors, maybe more (CR 105.2).
+  const both = / that's both (white|blue|black|red|green) and (white|blue|black|red|green)\b/.exec(p);
+  if (both && both[1] !== both[2]) {
+    extra.bothColors = [COLOR_WORDS[both[1]!]!, COLOR_WORDS[both[2]!]!];
+    p = p.slice(0, both.index) + p.slice(both.index + both[0].length);
+  }
   // Iridian Maelstrom: "each creature that isn't all colors": fewer than all five (CR 105.2).
   const notAll = !two && / that isn't all colors\b/.exec(p);
   if (notAll) {

@@ -616,6 +616,12 @@ export function parseUntargetable(t: string): Untargetable | null {
 
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
+  // Blood Baron of Vizkopa: "as long as you have 30 or more life and an opponent has 10 or less life"; Sardian
+  // Cliffstomper: "as long as it's your turn and you control four or more Mountains": both at once.
+  if ((m = /^(it's your turn|you have \w+ or more life) and (.+)$/.exec(text))) {
+    const [a, b] = [parseStaticCondition(m[1]!, st), parseStaticCondition(m[2]!, st)];
+    return a && b ? { kind: "allOf", conds: [a, b] } : null;
+  }
   // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
   if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
@@ -629,6 +635,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
     const amount = parseCount("the number of cards in your graveyard", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
+  }
+  // Shadowborn Demon: "if there are fewer than six creature cards in your graveyard".
+  if ((m = new RegExp(`^there are fewer than ${NUM} (creature|land|artifact|enchantment|instant|sorcery) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);
     return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
@@ -905,6 +916,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
+  // Titan Hunter: "if no creatures died this turn".
+  if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
   // Kami of Transience: "if an enchantment was put into your graveyard from the battlefield this turn".
   if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) was put into your graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!) } }, min: 1 };
@@ -955,6 +968,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };
   // Your life total (CR 119), against a number or your starting life total (CR 903.7).
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
+  // Near-Death Experience: "if you have exactly 1 life".
+  if ((m = /^you have exactly (\d+) life$/.exec(text))) return { kind: "life", min: Number(m[1]), max: Number(m[1]) };
+  // Battle of Wits: "if you have 200 or more cards in your library".
+  if ((m = /^you have (\d+) or more cards in your library$/.exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInLibrary", who: { ref: "you" } } }, min: Number(m[1]) };
   // Bloodghast: "as long as an opponent has 10 or less life" (one still in the game).
   if ((m = /^an opponent has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), opponent: true };
   // Anya, Merciless Angel: "an opponent's life total is less than half their starting life total" (CR 903.7).
@@ -1213,6 +1230,12 @@ export function parseAffected(subject: string): Affects | null {
     const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
   }
+  // Caterwauling Boggart: "Goblins you control and Elementals you control": creatures of either type, a Goblin Elemental once.
+  const twoGroups = /^([A-Z][a-z]+) you control and ([A-Z][a-z]+) you control$/.exec(x);
+  if (twoGroups) {
+    const subtypes = [singular(twoGroups[1]!), singular(twoGroups[2]!)];
+    return subtypes.every((t) => CREATURE_TYPES.has(t)) ? { kind: "filter", types: ["Creature"], subtypes, controller: "you" } : null;
+  }
   // Cid, Timeless Artificer: "Artifact creatures and Heroes you control": creatures that are artifacts or Heroes, an artifact
   // Hero once.
   const artifactOr = /^Artifact creatures and ([A-Z][a-z]+) you control$/.exec(x);
@@ -1327,6 +1350,8 @@ export function parseExtraBlocks(text: string): Modification | null {
   let m: RegExpExecArray | null;
   if (/^can block any number of creatures(?: each combat| this turn)?$/.test(text)) return { kind: "blockAny" };
   if (/^can block an additional creature(?: each combat| this turn)$/.test(text)) return { kind: "blockAdditional", n: 1 };
+  // Hundred-Handed One: "an additional ninety-nine creatures".
+  if (/^can block an additional ninety-nine creatures each combat$/.test(text)) return { kind: "blockAdditional", n: 99 };
   if ((m = new RegExp(`^can block (?:up to )?(?:an additional ${NUM}|${NUM} additional) creatures(?: each combat| this turn)$`).exec(text))) return { kind: "blockAdditional", n: num(m[1] ?? m[2]!) };
   return null;
 }
@@ -1392,7 +1417,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const a = parseStaticMods(m[1]!);
     return a ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }] : null;
   }
-  const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
+  // Captain's Hook: "is a Pirate in addition to its other creature types" says the same (CR 205.1b).
+  const IS = "is an? ([A-Z][a-z]+) in addition to its other (?:creature )?types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[4]!, [m[1]!, m[5]!]);
@@ -1544,6 +1570,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const one = singular(m[1]!);
     return one !== m[1] && CREATURE_TYPES.has(one) ? [{ kind: "cantBlockCreatures", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [one], text: m[1]! } }] : null;
   }
+  // Spectral Grasp: "Enchanted creature can't block creatures you control": "you" is the Aura's controller (made concrete
+  // in layers.ts), whoever controls the enchanted creature (CR 509.1b).
+  if (rest === "can't block creatures you control") return [{ kind: "cantBlockCreatures", filter: { kind: "object", types: ["Creature"], controller: "you", text: "creatures you control" } }];
   // "Can't block creatures with power 2 or greater" (CR 509.1b).
   if ((m = /^can't block creatures with power (\d+) or (greater|less)$/.exec(rest))) {
     const filter = parseTargetPhrase(`creature with power ${m[1]} or ${m[2]}`);
@@ -1815,6 +1844,13 @@ export function parseIsA(phrase: string, only: boolean): Modification[] | null {
 function parseStaticLine(line: string): StaticAbility | null {
   // Song of Serenity: "Creatures that are enchanted can't attack or block" is about enchanted creatures.
   let text = line.replace(/\.$/, "").replace(/^Creatures that are enchanted (?=can't )/, "Enchanted creatures ");
+  // Earth Surge: "Each land gets +2/+2 as long as it's a creature": land creatures, which ones worked out as the effect
+  // applies in layer 7c (CR 613.4c), so lands animated earlier are included.
+  const landSurge = /^Each land (gets [+-]\d+\/[+-]\d+) as long as it's a creature$/.exec(text);
+  if (landSurge) {
+    const st = parseStaticLine(`Land creatures ${landSurge[1]}.`);
+    return st && !st.condition ? { ...st, text: line } : null;
+  }
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
   // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the
@@ -1880,6 +1916,16 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (!CREATURE_TYPES.has(type)) return null;
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", types: ["Creature"], owner: "opponent", text: "creature you control but don't own" } }, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
   }
+  // Hivestone: "Creatures you control are Slivers in addition to their other creature types"; Earl of Squirrel: "Creature
+  // tokens you control are Squirrels ...": a creature type added in layer 4 (CR 205.1b, 613.1d), to whichever creatures
+  // are in the group then.
+  const areAlso = /^(.+?) are ([A-Z][a-z]+) in addition to their other (?:creature )?types$/.exec(text);
+  const areAlsoAffects = areAlso && / have | and /.test(areAlso[1]!) ? null : areAlso && parseAffected(areAlso[1]!);
+  if (areAlso && areAlsoAffects?.kind === "filter" && areAlsoAffects.types.includes("Creature") && !/ cards? /.test(areAlso[1]!)) {
+    const type = singular(areAlso[2]!);
+    if (!CREATURE_TYPES.has(type)) return null;
+    return { affects: areAlsoAffects, mods: [{ kind: "addTypes", types: [], subtypes: [type] }], text: line };
+  }
   // Don Andres, the Renegade: "Each creature you control but don't own gets +2/+2, has menace and deathtouch, and is a
   // Pirate in addition to its other types": layers 4, 6 and 7c, all for the creatures it controls then (layer 2 first).
   const notOwnedMore = /^Each creature you control but don't own (gets [+-]\d+\/[+-]\d+), has ([a-z ]+?),? and is an? ([A-Z][a-z]+) in addition to its other types$/.exec(text);
@@ -1905,6 +1951,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // the battlefield, spells, and permanents are colorless" (layer 5, everywhere: offFieldAll); Thran Lens: "All
   // permanents are colorless".
   if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
+  // Darkest Hour: "All creatures are black": that color instead of their others, in layer 5 (CR 105.3, 613.1e).
+  const allColor = /^All creatures are (white|blue|black|red|green)$/.exec(text);
+  if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };
   if (/^All permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line };
   if (/^All cards that aren't on the battlefield, spells, and permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line, offFieldAll: true };
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };

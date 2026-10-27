@@ -187,6 +187,7 @@ export type TriggerSourceEvent =
   | { type: "becameMonstrous"; id: ObjectId; x: number }
   /** A crew ability of this Vehicle resolved (CR 702.122e). */
   | { type: "crewed"; id: ObjectId }
+  | { type: "crews"; id: ObjectId; vehicle: ObjectId }
   /** A mutating spell merged with this permanent (CR 702.140d). */
   | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
@@ -252,7 +253,7 @@ export type TriggerSourceEvent =
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number }
   /** A card (or token) was put into a graveyard, from any zone. */
-  | { type: "toGraveyard"; id: ObjectId }
+  | { type: "toGraveyard"; id: ObjectId; from?: ZoneName }
   /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
@@ -1143,6 +1144,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "crewed") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesCrewed");
+  } else if (ev.type === "crews") {
+    // "Whenever ~ crews a Vehicle" (CR 702.122d): the creature tapped for the cost, "that Vehicle" the one it crewed.
+    const o = s.objects[ev.id];
+    const vehicle = s.objects[ev.vehicle];
+    if (o?.zone === "battlefield" && vehicle) add(o, controllerOf(s, o), (e) => e === "selfCrewsVehicle", undefined, undefined, vehicle);
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
@@ -1725,7 +1731,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "toGraveyard") {
     // "When ~ is put into a graveyard from anywhere": the card's ability, in the graveyard (CR 603.6c).
     const card = s.objects[ev.id];
-    if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfToGraveyardAnywhere", compileCard(defOf(s, card)).triggers);
+    if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfToGraveyardAnywhere" || (e === "selfToGraveyardFromLibrary" && ev.from === "library"), compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "resolvedToGraveyard") {
     // Haunt on an instant or sorcery: "When this spell is put into a graveyard during its resolution" (CR 702.55a). It
     // triggers in the graveyard, where the card has no controller, so its owner controls it (CR 108.4a, 113.8).
@@ -1822,8 +1828,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
             : (b.what === "leaves" || b.what === "toGraveyard") && died.length
               ? { event: "dies", objs: died.map((m) => ({ o: m.snapshot!, c: m.chars!, controller: m.controller ?? m.owner })) }
               : null;
-        // Zellix: "Whenever a player mills one or more creature cards": once for each player who milled them.
-        if (b.milled && !b.together && !b.each) {
+        // Zellix: "Whenever a player mills one or more creature cards": once for each player who milled them. Tinybones,
+        // Pocket Nuisance: "Whenever a player discards one or more cards", once for each player who discarded.
+        if ((b.milled || b.eachPlayer) && !b.together && !b.each) {
           for (const pid of [...new Set(matched.map((m) => m.owner))]) {
             const theirs = matched.filter((m) => m.owner === pid);
             add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: theirs.length, player: pid, group: theirs.map((m) => ({ id: m.id, zc: m.zc })) });

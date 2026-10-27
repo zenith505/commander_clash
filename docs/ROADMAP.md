@@ -1,7 +1,7 @@
 # Roadmap
 
-26,048 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,726 of
+26,098 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,728 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1534,6 +1534,36 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   aren't equal"); Graceful Reprieve (a dies trigger from a spell); Firemane Angel (a trigger in the graveyard or on the
   battlefield); Deepway Navigator ("attacked with three or more Merfolk"); Patron of the Nezumi (a permanent put into
   an opponent's graveyard).
+- Round B10 (ranks about 17,100 up to about 15,000, the easier templates, plus more played cards the same templates
+  cover: Creeping Chill, Gaea's Blessing, Knight of New
+  Alara, Blessing of the Nephilim, Aysen Crusader, Rakdos's Return, Runebound Wolf): "Creatures you control are
+  Slivers in addition to their other creature types" and "is a Pirate in addition to its other creature types" (layer
+  4); "All creatures are black" (layer 5); "Each land gets +2/+2 as long as it's a creature"; "+1/+1 for each of its
+  colors" (the affected creature's own colors), "for each color among Allies you control", "for each land you control
+  named Wastes", "the number of Mounts and Vehicles / Soldiers and Warriors / Wolves and Werewolves you control";
+  Precipitous Drop's "-5/-5 instead as long as you've completed a dungeon" (a second static for the difference);
+  conditions "it's your turn and you control an Army / four or more Mountains", "you have 30 or more life and an
+  opponent has 10 or less life", "you have exactly 1 life", "200 or more cards in your library", "no creatures died
+  this turn", "fewer than six creature cards in your graveyard"; "Goblins you control and Elementals you control";
+  "can't block creatures you control"; "can block an additional ninety-nine creatures"; Noble Quarry's lure for
+  itself or the creature it enchants; "you may cast spells as though they had flash" while tapped; "Your opponents
+  can't cast blue creature spells"; "When ~ is put into your graveyard from your library" (Narcomoeba, Creeping Chill,
+  Gaea's Blessing); "Whenever this creature crews a Vehicle" (CR 702.122);
+  "Whenever a player discards
+  one or more cards" (once per player); "tap ~ unless you sacrifice another creature"; "target player or
+  planeswalker. That player or that planeswalker's controller discards"; "Then exile that player's graveyard"; "you
+  and another target player each draw a card"; "destroy all Curses attached to you"; "If an artifact is destroyed this
+  way"; "If it was dealt damage this turn"; "Surveil 3 if you have no cards in hand"; "Incubate X twice"; "8/8 Beast
+  that's red, green, and white". +50 (26,098 with rounds 180 and 181, which also did Plague Wight, Battle-Scarred
+  Goblin, Fire Juggler, Wall of Souls, Pious Warrior and Wall of Essence; the merge adds Valentina Allegra de Fontaine).
+- Skipped there, with reasons: Gorm the Great ("must be blocked by two or more" with a partner), Lo and Li (Lesson
+  spells and lifelink), Dennick (graveyard cards that can't be targeted), Captain Mar-Vell ("an opponent cast a
+  spell" condition), Centaur Omenreader (a conditional cost reduction), Hercules (the first damage each turn), Ginger,
+  Queen of Sweets (a token copy of the card Gingerbrute), Light of Judgment ("up to one Equipment attached to it"),
+  Scrib Nibblers (a condition on the exiled top card), Stream of Thought (shuffle up to four cards from graveyards),
+  Mindshrieker (the milled card's mana value), Take Out the Trash ("if you do" after a conditional may), Zenith Flare
+  (cards with cycling), Truce, Nova Flame, Mutiny, Credit Voucher, Crypsis, Mana Short, Spreading Plague, Nullmage and
+  Spurnmage Advocate (not parsed yet).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1571,7 +1601,17 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Withercrown, Throne of Makindi, Brightflame, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
   Spider-Slayer, Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
   Gomazoa, Mine Worker, Woolly Razorback, Temporary Truce, Information Dealer, Fractalize, Loxodon Lifechanter,
-  Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig; then on up from 17,100.
+  Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig.
+  Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
+  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Cinder Strike (blight), Trickster's Talisman,
+  Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Blast of Genius, Sparring Dummy, Bloodbond
+  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
+  Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
+  Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Ice Floe, Heroic Return, Punishing Fire,
+  Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Witch Hunt, Bridge from
+  Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex, Martyr of Sands, Corpse Explosion,
+  Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange; then
+  on up from 15,000.
 
 ## Known gaps (from earlier rounds)
 

@@ -1144,7 +1144,7 @@ export function moveObject(
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), ...(opts.destroyedBy !== undefined ? { destroyedBy: opts.destroyedBy } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
-  if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
+  if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id, from: fromZone });
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner));
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
   if (fromZone === "battlefield" && s.phasedOut?.length) phaseInUntil(s, id, (o.zoneChanges ?? 1) - 1);
@@ -5006,6 +5006,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: Pl
     if (controllerOf(s, o) !== pid) return false;
     // Final-Word Phantom: any spell, during an opponent's end step.
     if (abilitiesOf(s, o).flashInOpponentsEndStep && s.step === "end" && s.activePlayer !== pid) return true;
+    if (abilitiesOf(s, o).flashWhile?.some((c) => staticConditionNow(s, c, id, pid))) return true;
     // Radagast: the first creature spell you cast this turn, those cast before it was on the battlefield counted (rulings).
     const first = (spec: TargetSpec) => printedMatches(spec, d) && !(s.castThisTurn ?? []).some((c) => c.player === pid && printedMatches(spec, s.cards[c.card]!));
     return !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d)) || !!abilitiesOf(s, o).flashForFirst?.some(first);
@@ -6854,6 +6855,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     const what = ab.body.modal ? `${cost}: ${body.text}` : ab.text;
     log(s, `${p.name} activates ${d.name} (${what.replace(/~/g, d.name).replace(/\.$/, "")})${abCost.hasX ? ` with X=${x ?? 0}` : ""}${describeTargets(s, targets)}.`);
   }
+  // Each creature tapped for a crew cost crewed the Vehicle (CR 702.122d), whether or not the ability resolves.
+  if (ab.crew !== undefined && !ab.saddle) for (const c of tapCreatures ?? []) fireEvent(s, { type: "crews", id: c, vehicle: o.id });
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);

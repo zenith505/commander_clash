@@ -2390,7 +2390,8 @@ export function compile(d: CardDef): CompiledCard {
       else (out.cantBeCast ??= []).push({ filter: { ...filter, text: `${noOne[1]!.toLowerCase()} spell${noOne[2] ?? ""}` }, ...(hasX ? { hasX: true as const } : {}), text: line });
       continue;
     }
-    const cantCast = /^(You|Your opponents) can't cast (creature|noncreature) spells\.$/.exec(line);
+    // Llawan, Cephalid Empress: "Your opponents can't cast blue creature spells": the spell's color as it's cast (CR 601.3).
+    const cantCast = /^(You|Your opponents) can't cast ((?:white |blue |black |red |green )?(?:creature|noncreature)) spells\.$/.exec(line);
     if (cantCast) {
       const filter = parseTargetPhrase(`${cantCast[2]} spell`);
       if (filter?.kind !== "spell") out.unsupported.push(raw);
@@ -2430,6 +2431,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "During each opponent's end step, you may cast spells as though they had flash.") {
       out.flashInOpponentsEndStep = true;
+      continue;
+    }
+    // Quicksilver, Speedster: "As long as ~ is tapped, you may cast spells as though they had flash": while the condition
+    // holds as the spell is proposed (CR 702.8a, 601.2).
+    const flashWhile = /^As long as ([^,]+), you may cast spells as though they had flash\.$/.exec(line);
+    const flashCond = flashWhile ? parseStaticCondition(flashWhile[1]!, { affects: { kind: "self" }, mods: [], text: line }) : null;
+    if (flashCond) {
+      (out.flashWhile ??= []).push(flashCond);
       continue;
     }
     // "Any player may cast Sliver spells as though they had flash" (Quick Sliver), "... spells ..." (Tidal Barracuda): every
@@ -3254,6 +3263,21 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Noble Quarry (bestow): "All creatures able to block ~ or enchanted creature do so": itself while it's a creature, the
+    // creature it enchants while it's an Aura (CR 509.1c, 702.103).
+    if (line === "All creatures able to block ~ or enchanted creature do so.") {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line }, { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line });
+      continue;
+    }
+    // Precipitous Drop: "Enchanted creature gets -2/-2. It gets -5/-5 instead as long as you've completed a dungeon": the
+    // difference added by a second static while the condition holds, both in layer 7c (CR 309.7, 613.4c).
+    const instead = /^Enchanted creature gets ([+-])(\d+)\/([+-])(\d+)\. It gets \1(\d+)\/\3(\d+) instead as long as you've completed a dungeon\.$/.exec(line);
+    if (instead) {
+      const sign = (c: string) => (c === "-" ? -1 : 1);
+      const [p0, t0, p1, t1] = [sign(instead[1]!) * Number(instead[2]), sign(instead[3]!) * Number(instead[4]), sign(instead[1]!) * Number(instead[5]), sign(instead[3]!) * Number(instead[6])];
+      out.statics.push({ affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p0, toughness: t0 }], text: line }, { affects: { kind: "attached" }, mods: [{ kind: "modifyPT", power: p1 - p0, toughness: t1 - t0 }], condition: { kind: "completedDungeon" }, text: line });
+      continue;
+    }
     // Multiclass Baldric: "Equipped creature has lifelink if you control a Cleric, deathtouch if you control a Rogue, haste
     // if you control a Warrior, and flying if you control a Wizard": each keyword while its condition holds.
     const byControl = /^Equipped creature has (.+)\.$/.exec(line);
@@ -3613,7 +3637,7 @@ export function compile(d: CardDef): CompiledCard {
     if (Array.isArray(v)) return v.some(affectedPoison);
     if (!v || typeof v !== "object") return false;
     if ((v as { type?: string }).type === "continuous" && (v as { what?: { ref?: string } }).what?.ref === "each") return false;
-    return (v as { kind?: string }).kind === "affectedControllerPoison" || (v as { kind?: string }).kind === "affectedControllerHand" || Object.values(v).some(affectedPoison);
+    return (v as { kind?: string }).kind === "affectedControllerPoison" || (v as { kind?: string }).kind === "affectedControllerHand" || (v as { kind?: string }).kind === "affectedColors" || Object.values(v).some(affectedPoison);
   };
   if (affectedPoison([out.spell, out.triggers, out.activated])) out.unsupported.push("(poison counters of an affected permanent's controller, with no affected permanent)");
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.

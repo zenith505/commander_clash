@@ -124,6 +124,8 @@ export type Count =
   | { kind: "affectedKeywordCount"; keywords: string[] }
   /** "Becomes an artifact creature with power and toughness each equal to its mana value" (Karn, the Great Creator): the permanent the effect is applied to; X in its mana cost is 0 (CR 202.3e). */
   | { kind: "affectedManaValue" }
+  /** "For each of its colors" in a static ability (Civic Saber): the colors of the permanent the effect is applied to. */
+  | { kind: "affectedColors" }
   /** "For each poison counter its controller has" (Phyresis Outbreak): of the affected permanent's controller, counted for each one as the effect is made (rulings). */
   | { kind: "affectedControllerPoison" }
   /** "For each card in its controller's hand" (Righteous Authority): the hand of the affected permanent's controller. */
@@ -538,6 +540,8 @@ export interface TargetSpec {
   attackingWhom?: "eventPlayer" | PlayerId;
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
+  /** "All Curses attached to you" (Witchbane Orb): Auras enchanting the player whose ability or spell this is (CR 303.4). */
+  attachedToYou?: true;
   /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
   putThereThisTurn?: true;
   /** "... that was put there from their library this turn" (Captain N'ghathrod), "... that was milled this turn" (Tato Farmer): GameObject.fromLibraryTurn, milledTurn. */
@@ -3722,6 +3726,8 @@ export type TriggerEvent =
   | "selfBecomesMonstrous"
   /** "Whenever this Vehicle becomes crewed": whenever a crew ability of it resolves (CR 702.122e). */
   | "selfBecomesCrewed"
+  /** "Whenever ~ crews a Vehicle" (CR 702.122d): it was tapped to pay a Vehicle's crew cost; the trigger's subject is that Vehicle. */
+  | "selfCrewsVehicle"
   | "selfMutates"
   /** "Whenever a creature you control mutates" (Essence Symbiote): one matching `tappedFilter`, the subject (CR 702.140d). */
   | "permanentMutates"
@@ -3938,6 +3944,8 @@ export type TriggerEvent =
    * (CR 603.3a), never as a leaves-the-battlefield ability (CR 603.6c).
    */
   | "selfToGraveyardAnywhere"
+  /** "When ~ is put into your graveyard from your library" (Narcomoeba): the same, only from its owner's library. */
+  | "selfToGraveyardFromLibrary"
   /** Haunt on an instant or sorcery (CR 702.55a): "When this spell is put into a graveyard during its resolution". */
   | "selfResolvedToGraveyard"
   /**
@@ -4346,6 +4354,8 @@ export interface BatchTrigger {
   notPlayed?: true;
   /** `toGraveyard` from the library: "Whenever a player mills one or more creature cards" (Zellix), milled ones only (CR 701.17a). */
   milled?: true;
+  /** `discards`: "Whenever a player discards one or more cards" (Tinybones, Pocket Nuisance): once for each player who discarded in the event. */
+  eachPlayer?: true;
   /** With `milled`: once for the whole event, whoever milled them (The Wise Mothman, rulings), not once for each player. */
   together?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
@@ -5656,6 +5666,8 @@ export interface CompiledCard {
    * controller may cast spells like these any time they could cast an instant.
    */
   flashFor?: TargetSpec[];
+  /** "As long as ~ is tapped, you may cast spells as though they had flash" (Quicksilver, Speedster): any spell, while one of these holds. */
+  flashWhile?: StaticCondition[];
   /** "During each opponent's end step, you may cast spells as though they had flash" (Final-Word Phantom, CR 702.8a). */
   flashInOpponentsEndStep?: true;
   /** "Any player may cast Sliver spells as though they had flash" (Quick Sliver, CR 702.8a): every player may, not only its controller. */

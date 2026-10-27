@@ -119,6 +119,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o ? manaValue(parseManaCost(defOf(s, o).manaCost)) : 0;
     }
+    case "affectedColors": {
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      return o ? (view(o)?.colors.length ?? 0) : 0;
+    }
     case "affectedCounters": {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       if (c.counter === ANY_COUNTER) return Object.values(o?.counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0);
@@ -788,6 +792,8 @@ function describeCount(c: Count): string {
       return `#${c.counter} counters on it`;
     case "affectedManaValue":
       return "its mana value";
+    case "affectedColors":
+      return "#its colors";
     case "affectedControllerHand":
       return "cards in its controller's hand";
     case "affectedControllerPoison":

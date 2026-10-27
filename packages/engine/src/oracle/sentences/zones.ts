@@ -343,6 +343,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (m[3] && !m[2]) return null;
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { [m[6]!]: num(m[5]!) } } : {}) }];
   }
+  // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
+  // if it's still there (CR 400.7).
+  if (ctx.selfCard && !ctx.activated && /^[Pp]ut (?:it|~) onto the battlefield$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }];
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
@@ -709,7 +712,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who, hand: true }] : null;
   }
-  if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
+  // Go Blank: "Target player discards two cards. Then exile that player's graveyard.": the target's.
+  if ((m = /^Exile (target player's|target opponent's|that player's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =
       w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" || w === "all opponents'" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s?$/, ""), ctx);

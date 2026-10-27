@@ -923,7 +923,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Skull Rend: "~ deals 2 damage to each opponent. Those players each discard two cards at random.": every opponent.
   text = text.replace(/^(~ deals \d+ damage to each opponent\. )Those players each discard (a card|two cards|three cards) at random\.$/, "$1Each opponent discards $2 at random.");
   // Karma: "~ deals damage to that player equal to the number of Swamps they control": that player's (the trigger's).
-  text = text.replace(/^(~ deals damage to that player equal to the number of [A-Za-z]+) they control\.$/, "$1 that player controls.");
+  // Decimator Web: "Target opponent loses 2 life, gets a poison counter, then mills six cards": in that order.
+  text = text.replace(/^Target opponent loses (\d+) life, gets a poison counter, then mills (\w+) cards\.$/, "Target opponent loses $1 life and gets a poison counter. That player mills $2 cards.");
+  // Tangled Skyline: "you gain 5 life and incubate 5": one, then the other.
+  text = text.replace(/\b([Yy]ou gain \d+ life) and (incubate \d+)\./g, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Plan the Heist: "Surveil 3 if you have no cards in hand. Then draw three cards.": the condition first, the same.
+  text = text.replace(/^(Surveil \d+) if you have no cards in hand\. /, "If you have no cards in hand, $1. ");
+  // Godsire: "Create an 8/8 Beast creature token that's red, green, and white": its colors before its types, the same.
+  text = text.replace(/\b(Create an? \d+\/\d+) ([A-Z][a-z]+) creature token that's ((?:white|blue|black|red|green), (?:white|blue|black|red|green),? and (?:white|blue|black|red|green))\./g, "$1 $3 $2 creature token.");
+  // Michelangelo, On the Scene: "When ~ dies, return ~ to your hand": a card goes only to its owner's hand (CR 400.3).
+  text = text.replace(/^([Rr])eturn ~ to your hand\.$/, "$1eturn ~ to its owner's hand.");
+  // Primal Order: "... the number of nonbasic lands they control", the same.
+  text = text.replace(/^(~ deals damage to that player equal to the number of (?:nonbasic )?[A-Za-z]+) they control\.$/, "$1 that player controls.");
   // Rakdos Ickspitter: "~ deals 1 damage to target creature and that creature's controller loses 1 life": two
   // instructions, in order; the controller as the creature is now or last existed (CR 608.2h).
   text = text.replace(/^(~ deals \d+ damage to target creature) and (that creature's controller loses \d+ life)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
@@ -1003,7 +1014,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // turn.": the other ones are those that aren't Zombies.
   text = text.replace(/^([A-Z][a-z]+)s you control (get [+-]\d+\/[+-]\d+ until end of turn\.) Other creatures you control (get [+-]\d+\/[+-]\d+ until end of turn\.)$/, (all, kind: string, a: string, b: string) => (CREATURE_TYPES.has(kind) ? `${kind}s you control ${a} Non-${kind} creatures you control ${b}` : all));
   // Join Forces: "Untap up to two target creatures. They each get +2/+2 until end of turn.": each of them, as "they get".
-  text = text.replace(/((?:^|\. )(?:Untap|Tap) (?:up to )?(?:two|three) target creatures\.) They each get /, "$1 They get ");
+  // Fancy Footwork: "Untap one or two target creatures. They each get ...": the same.
+  text = text.replace(/((?:^|\. )(?:Untap|Tap) (?:up to |one or )?(?:two|three) target creatures\.) They each get /, "$1 They get ");
   // Balance of Power: "If target opponent has more cards in hand than you, draw cards equal to the difference.": with
   // fewer or as many, the difference is nothing to draw (handMoreThanYou).
   text = text.replace(/^If target opponent has more cards in hand than you, draw cards equal to the difference\.$/, "Draw X cards, where X is the number of cards in target opponent's hand minus the number of cards in your hand.");
@@ -4467,6 +4479,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Sold Out: "Exile target creature. If it was dealt damage this turn, create a Clue token.": whether it was, checked
+    // before it's exiled (an exiled card is a new object, CR 400.7), so as it last existed on the battlefield.
+    const exileHurt = /^[Ee]xile target creature$/.test(s) ? /^If it was dealt damage this turn, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (exileHurt && !/\b(?:it|its|that creature)\b/.test(exileHurt[1]!)) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "exile") return null;
+      const then = parseOne(capital(exileHurt[1]!), ctx);
+      if (!then || !then.length || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], dealtDamageThisTurn: true, text: "dealt damage this turn" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then], otherwise: structuredClone(fx) });
+      si++;
+      continue;
+    }
     // Grey Knight Paragon: "destroy target attacking creature. If that creature is a Demon, exile it instead.": what it is
     // as this resolves (CR 608.2c), one or the other.
     const exileInstead = /^[Dd]estroy target (?:attacking )?creature$/.test(s) ? /^If that creature is an? ([A-Z][a-z]+), exile it instead\.?$/.exec(sentences[si + 1] ?? "") : null;
@@ -6076,7 +6102,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Shredder's Technique: "Destroy target creature or enchantment. If an enchantment was destroyed this way, you lose 2
     // life": destroyed even if a replacement effect put it elsewhere, an enchantment as it last existed (CR 608.2h).
-    const ifTypeDestroyed = /^If an? (artifact|creature|enchantment|land|planeswalker) was destroyed this way, (.+)$/.exec(s);
+    // Smashing Success: "If an artifact is destroyed this way, create a Treasure token": the same.
+    const ifTypeDestroyed = /^If an? (artifact|creature|enchantment|land|planeswalker) (?:was|is) destroyed this way, (.+)$/.exec(s);
     if (ifTypeDestroyed) {
       const prev = effects[effects.length - 1];
       const type = capital(ifTypeDestroyed[1]!);

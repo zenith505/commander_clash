@@ -1378,6 +1378,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   player is the monarch"); Landscaper Colos, Draugr Thought-Thief, Reveka, Hellhole Rats, Unyaro Griffin, Liability,
   Sunken Hope, Mage Hunters' Onslaught, Lure of Prey, Light of Sanction, Enshrouding Mist, Arcades Sabboth, High Seas
   and Aether Storm (each a template not parsed yet).
+- Round B7 (ranks about 23,800 up to about 21,900, template clusters, plus more played cards the same templates cover:
+  Foresight, Relic Crush, Hellion Eruption, Ensoul Artifact, the Zendikons, the Genjus and others): "skips all
+  combat phases of their next turn" (every combat that turn, CR 614.10); "Lands (Creatures and lands) you control /
+  target player controls don't untap during their next untap step", for whatever they control when that step comes;
+  "Target player shuffles their library"; "Search your library for three cards, exile them, then shuffle" (the bot
+  exiles the cards it wants least) and "Search target player's library for (up to) N / X cards and exile them";
+  "Destroy target ... If its (that permanent's) mana value was (is) N or less, ..." on its last known mana value
+  (CR 608.2h); "Destroy target X and up to one other target X"; "Each player returns all creature cards from their
+  graveyard to their hand"; prevention of damage "by creatures it's blocking / blocking it"; "Enchanted land is a 4/2
+  red Beast creature with trample. It's still a land" and "... creature that's still a land" (its color replaced,
+  CR 105.3), "Enchanted artifact is a creature with base power and toughness 5/5"; "Enchant Island ... enchanted
+  Island becomes ..." and "When enchanted Island (land) is put into a graveyard" (the Genjus, Viridian Harvest);
+  "has defender and loses flying"; "Enchanted land is a Mountain, Forest, and Plains"; attack costs on one creature
+  ("can't attack unless its controller pays {3}", "unless you pay {1} for each +1/+1 counter on it", CR 508.1g);
+  "When you discard ~", "When ~ dies and when you discard ~"; "if you've discarded a card this turn"; "Whenever an
+  opponent is dealt noncombat damage"; "Whenever ~ attacks, if it (doesn't) have first strike"; statics that read a
+  keyword now depend on the effects that add or remove it (Manor Gargoyle, CR 613.8a); "another Merfolk or an
+  Island"; "if you were dealt 4 or more damage this turn"; "if enchanted creature's power is 4 or greater"; "as long
+  as there are no cards in your graveyard"; "as long as an opponent is poisoned"; "Sacrifice all creatures you
+  control, then create that many ..."; "Your life total becomes equal to your starting life total"; targets "cards
+  with cycling (mutate) from your graveyard". +73, four of them also done by round 177: +69 (25,641 with round 177).
+- Skipped there, with reasons: Sadistic Sacrament (a kicked search "instead"); Dark Matter Manipulator and Master's
+  Councillors ("for every seven": a divided amount); Ichor Shade (a typed "put into a graveyard this turn" count);
+  Crackling Emergence and Harmonious Emergence (a destroy replacement on the enchanted land); Genju of the Fields (a
+  damage trigger granted until end of turn); Oppressive Rays, Qal Sisma Behemoth, Myr Prototype and Cowed by Wisdom
+  (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid, Gremlin Infestation
+  (each a template not parsed yet); Wall of Shadows ("can't be the target of spells that can target only Walls");
+  Chained Throatseeker ("can't attack unless defending player is poisoned").
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1396,6 +1424,10 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   up", now close), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
   ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Surge of Zeal ("shares a
   color with it"), Sabotage Strategist, Lavabrink Venturer (odd or even).
+  Then up from about 21,900 (not looked at closely yet): Septic Rats, Eaten by Spiders, Burning Hands ("deals 6 damage
+  instead" without "to it"), Laquatus's Creativity, Animate Wall, Volition Reins, Hold for Questioning, Dinrova Horror,
+  Glistening Deluge, Woebringer Demon, Skizzik, Wall of Resistance, Mana Seism, Waiting in the Weeds, Allied
+  Strategies, Dralnu's Crusade, Lord of Tresserhorn, Jaded Response, Ultimate Nullification.
 
 ## Known gaps (from earlier rounds)
 

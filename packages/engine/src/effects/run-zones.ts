@@ -1912,6 +1912,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone !== "battlefield") continue;
           if (me) o.putBy = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
           s.resolving?.created?.push(o.id);
+          // Deathrender: attached if it could be, otherwise it stays unattached (CR 701.3b; rulings).
+          if (e.attachSelf && self) attachTo(s, self, o);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep) {
             const verb = e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice";
@@ -2347,6 +2349,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const entered = ids.filter((id) => obj(s, id).zone === "battlefield");
       // "They gain haste until end of turn" (Wake the Past): the permanents they became.
       (s.resolving!.created ??= []).push(...entered);
+      // Rally the Ancestors: each one exiled when your next upkeep begins, if it's still that object (CR 400.7, 603.7).
+      if (e.exileAtYourNextUpkeep) for (const id of entered) addDelayed(s, "yourNextUpkeep", ctx.controller, obj(s, id), { targets: [], effects: [{ type: "exile", what: { ref: "subject" } }], text: "Exile ~." });
       return;
     }
     case "returnFaceDownExiled": {
@@ -2524,9 +2528,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (first) {
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
-          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : "nextEndStep", ctx.controller, first, {
+          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.haste ? { haste: true as const } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
@@ -2619,6 +2623,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Phelia: "If it entered under your control" (the card it became, CR 400.7), a counter on the source if it's still there.
       const came = sc.returning ?? list.filter((l) => back.some((b) => b.id === l.id));
       sc.returning = undefined;
+      // Obzedat: "It gains haste", for as long as it remains on the battlefield (rulings).
+      if (e.haste)
+        for (const l of came) {
+          const c = s.objects[l.id];
+          if (c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: c.id, duration: "game", affected: [c.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+        }
+      if (e.haste) invalidateCharacteristics(s);
       const me = e.selfCounter && s.objects[e.selfCounter.id];
       if (me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === e.selfCounter!.zc && came.some((l) => { const c = s.objects[l.id]; return c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1 && controllerOf(s, c) === ctx.controller; })) {
         const put = putCounters(s, me, e.selfCounter!.counter, 1);

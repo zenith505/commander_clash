@@ -303,8 +303,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return ctx.targets.length === 2 && creature(a) && creature(b) && a!.controller === "you" && b!.controller === "opponent" ? [{ type: "fight", a: { ref: "target", index: 0 }, b: { ref: "target", index: 1 } }] : null;
   }
   if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
-    const a = parseObject(m[1]!, ctx);
-    const b = a && parseObject(m[2]!, ctx);
+    // "Choose target creature an opponent controls. ... Target creature you control fights that creature" (Time to Feed):
+    // "that creature" is the one named before this sentence's new target.
+    const thatFirst = /^that creature$/i.test(m[2]!) && /\btarget\b/i.test(m[1]!);
+    const b0 = thatFirst ? parseObject(m[2]!, ctx) : undefined;
+    const a = thatFirst && !b0 ? null : parseObject(m[1]!, ctx);
+    const b = a && (b0 ?? parseObject(m[2]!, ctx));
     return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) && !isSeveral(b) ? [{ type: "fight", a, b }] : null;
   }
   // "It deals damage equal to its power to target creature an opponent controls and that creature deals damage equal to
@@ -574,7 +578,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.
   // "Counter target spell that wasn't cast from its owner's hand" (Wash Away).
   // "Counter target spell unless its controller discards their hand" (Perplex): a choice they make as it resolves (CR 118.12).
-  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| cast from a graveyard| with \{X\} in its mana cost)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| cast from a graveyard| with \{X\} in its mana cost| with power or toughness \d+ or less)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
     m.splice(3, 1);
     const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
     const unless = /discards their hand$/.test(s) ? { cost: "{0}", discardHand: true as const } : m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);

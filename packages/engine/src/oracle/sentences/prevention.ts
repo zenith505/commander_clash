@@ -163,7 +163,7 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const t = rest.replace(/ ?\bthis turn\b ?/i, " ").trim();
     const parts = /^(?:to (.+?))?(?: ?by (.+))?$/i.exec(t);
     if (!parts || (!parts[1] && !parts[2])) return undefined;
-    if (parts[1] && /^(~|it|him|her|that creature|those creatures|target .+|up to .+|any target|enchanted .+|equipped .+)$/i.test(parts[1])) return undefined;
+    if (parts[1] && /^(~|it|him|her|that creature|those creatures|(?:another )?target .+|up to .+|any target|enchanted .+|equipped .+)$/i.test(parts[1])) return undefined;
     if (parts[2] && /^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(parts[2])) return undefined;
     const to = parts[1] ? protectedGroup(parts[1]) : undefined;
     const by = parts[2] ? sourceGroup(parts[2]) : undefined;

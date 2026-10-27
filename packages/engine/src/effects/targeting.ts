@@ -139,6 +139,11 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     const [bp, bt] = set ? [set.power, set.toughness] : [c.printedPower, c.printedToughness];
     if (!c.types.includes("Creature") || (bp !== spec.basePtEither && bt !== spec.basePtEither)) return false;
   }
+  if (spec.basePT) {
+    const set = [...c.pt].reverse().find((p) => p.kind === "set");
+    const [bp, bt] = set ? [set.power, set.toughness] : [c.printedPower, c.printedToughness];
+    if (!c.types.includes("Creature") || bp !== spec.basePT[0] || bt !== spec.basePT[1]) return false;
+  }
   if (spec.basePower !== undefined) {
     const set = [...c.pt].reverse().find((p) => p.kind === "set");
     if (!c.types.includes("Creature") || (set ? set.power : c.printedPower) !== spec.basePower) return false;
@@ -350,7 +355,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePower !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
+  if (spec.transformed || spec.faceDown || spec.powerAboveBase || spec.basePtEither !== undefined || spec.basePT || spec.basePower !== undefined || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
   return true;
 }
 
@@ -376,7 +381,11 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
   const d = defOf(s, o);
-  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, ...rest } = spec;
+  // "With power or toughness 2 or less" (Stern Scolding): either one, as it is on the stack (below).
+  const ptEither = isPtAnyOf(spec.anyOf) ? spec.anyOf : undefined;
+  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, notCastFromHand, castFromGraveyard, ...rest0 } = spec;
+  const { anyOf: _anyOf, ...rest1 } = rest0;
+  const rest = ptEither ? rest1 : rest0;
   if (!printedMatches(rest, d)) return false;
   if (notCastFromHand && o.castFrom === "hand" && !o.spellCopy) return false;
   if (castFromGraveyard && (o.castFrom !== "graveyard" || o.spellCopy)) return false;
@@ -396,11 +405,14 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
     const n = pt(key);
     if (n === undefined || !inRange(n, range)) return false;
   }
+  if (ptEither && !ptEither.some((a) => (["power", "toughness"] as const).some((key) => { const n = a[key] && pt(key); return n !== undefined && !!a[key] && inRange(n, a[key]!); }))) return false;
   // Talion: one of them equal to the chosen number; nothing chosen, nothing matches. An X spell's mana value counts its X (CR 202.3e).
   if (equalsChosen && (equals === undefined || !equalsChosen.some((k) => (k === "manaValue" ? spellManaValue(s, item) : pt(k)) === equals))) return false;
   return true;
 }
 
+/** An anyOf that's only "power N or less" / "toughness N or less" (Stern Scolding's "power or toughness 2 or less"). */
+const isPtAnyOf = (anyOf: TargetSpec[] | undefined): anyOf is TargetSpec[] => !!anyOf?.length && anyOf.every((a) => Object.keys(a).every((k) => ["kind", "types", "notTypes", "notColors", "power", "toughness", "text"].includes(k)) && !a.types?.length && !!(a.power || a.toughness));
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
 
 /** What a player gained until end of turn or until their next turn. */
@@ -479,6 +491,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).
     if (spec.manaValue && !inRange(spellManaValue(s, item), spec.manaValue)) return false;
     if (spec.mvAtMostControllersGraveyard && spellManaValue(s, item) > (s.players[item.controller]?.graveyard.length ?? 0)) return false;
+    // Power and toughness as the spell has them on the stack (a characteristic-defining ability works there, CR 604.3).
+    if (spec.power || spec.toughness || isPtAnyOf(spec.anyOf)) return spellMatches(s, spec, item);
     const { manaValue: _mv, ...rest } = spec;
     return printedMatches(rest, defOf(s, obj(s, item.objectId)));
   }

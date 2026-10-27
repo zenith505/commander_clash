@@ -102,6 +102,60 @@ const turnToSlag = card("Turn to Slag", "Sorcery", "{3}{R}{R}", { cmc: 5, oracle
 const blastfireBolt = card("Blastfire Bolt", "Instant", "{5}{R}", { cmc: 6, oracleText: "Blastfire Bolt deals 5 damage to target creature. Destroy all Equipment attached to that creature." });
 const hubris = card("Hubris", "Instant", "{1}{U}", { cmc: 2, oracleText: "Return target creature and all Auras attached to it to their owners' hands." });
 
+// Second batch (real oracle text, Scryfall).
+const eliteInquisitor = card("Elite Inquisitor", "Creature — Human Soldier", "{W}{W}", { cmc: 2, power: "2", toughness: "2", keywords: ["Vigilance","First strike","Protection"], oracleText: "First strike, vigilance\nProtection from Vampires, from Werewolves, and from Zombies" });
+const jabarisBanner = card("Jabari's Banner", "Artifact", "{2}", { cmc: 2, oracleText: "{1}, {T}: Target creature gains flanking until end of turn. (Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn.)" });
+const sidewinderSliver = card("Sidewinder Sliver", "Creature — Sliver", "{W}", { cmc: 1, power: "1", toughness: "1", oracleText: "All Sliver creatures have flanking. (Whenever a creature without flanking blocks a Sliver, the blocking creature gets -1/-1 until end of turn.)" });
+const spareFromEvil = card("Spare from Evil", "Instant", "{1}{W}", { cmc: 2, oracleText: "Creatures you control gain protection from non-Human creatures until end of turn." });
+const synchronizedStrike = card("Synchronized Strike", "Instant", "{2}{G}", { cmc: 3, oracleText: "Untap up to two target creatures. They each get +2/+2 until end of turn." });
+const crumble = card("Crumble", "Instant", "{G}", { cmc: 1, oracleText: "Destroy target artifact. It can't be regenerated. That artifact's controller gains life equal to its mana value." });
+const coercedConfession = card("Coerced Confession", "Sorcery", "{4}{U/B}", { cmc: 5, keywords: ["Mill"], oracleText: "Target player mills four cards. You draw a card for each creature card put into their graveyard this way." });
+const balanceOfPower = card("Balance of Power", "Sorcery", "{3}{U}{U}", { cmc: 5, oracleText: "If target opponent has more cards in hand than you, draw cards equal to the difference." });
+const darkSuspicions = card("Dark Suspicions", "Enchantment", "{2}{B}{B}", { cmc: 4, oracleText: "At the beginning of each opponent's upkeep, that player loses X life, where X is the number of cards in that player's hand minus the number of cards in your hand." });
+const heroicCharge = card("Heroic Charge", "Instant", "{2}{W}{W}", { cmc: 4, keywords: ["Kicker"], oracleText: "Kicker {1}{R} (You may pay an additional {1}{R} as you cast this spell.)\nCreatures you control get +2/+1 until end of turn. If this spell was kicked, those creatures also gain trample until end of turn." });
+const clipWings = card("Clip Wings", "Instant", "{1}{G}", { cmc: 2, oracleText: "Each opponent sacrifices a creature of their choice with flying." });
+const vengefulWarchief = card("Vengeful Warchief", "Creature — Orc Warrior", "{4}{B}", { cmc: 5, power: "4", toughness: "4", oracleText: "Whenever you lose life for the first time each turn, put a +1/+1 counter on this creature. (Damage causes loss of life.)" });
+const steelDromedary = card("Steel Dromedary", "Artifact Creature — Camel", "{3}", { cmc: 3, power: "2", toughness: "2", oracleText: "This creature enters tapped with two +1/+1 counters on it.\nThis creature doesn't untap during your untap step if it has a +1/+1 counter on it.\nAt the beginning of combat on your turn, you may move a +1/+1 counter from this creature onto target creature." });
+const aliriosEnraptured = card("Alirios, Enraptured", "Legendary Creature — Human", "{2}{U}", { cmc: 3, power: "2", toughness: "3", oracleText: "Alirios enters tapped.\nAlirios doesn't untap during your untap step if you control a Reflection.\nWhen Alirios enters, create a 3/2 blue Reflection creature token." });
+const heartmender = card("Heartmender", "Creature — Elemental", "{2}{G/W}{G/W}", { cmc: 4, power: "2", toughness: "2", keywords: ["Persist"], oracleText: "At the beginning of your upkeep, remove a -1/-1 counter from each creature you control.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)" });
+const deathknellBerserker = card("Deathknell Berserker", "Creature — Elf Berserker", "{1}{B}", { cmc: 2, power: "2", toughness: "2", oracleText: "When this creature dies, if its power was 3 or greater, create a 2/2 black Zombie Berserker creature token." });
+const warrenPilferers = card("Warren Pilferers", "Creature — Goblin Rogue", "{4}{B}", { cmc: 5, power: "3", toughness: "3", oracleText: "When this creature enters, return target creature card from your graveyard to your hand. If that card is a Goblin card, this creature gains haste until end of turn." });
+const bonecladNecromancer = card("Boneclad Necromancer", "Creature — Human Wizard", "{3}{B}{B}", { cmc: 5, power: "3", toughness: "3", oracleText: "When this creature enters, you may exile target creature card from a graveyard. If you do, create a 2/2 black Zombie creature token." });
+const predatoryAdvantage = card("Predatory Advantage", "Enchantment", "{3}{R}{G}", { cmc: 5, oracleText: "At the beginning of each opponent's end step, if that player didn't cast a creature spell this turn, create a 2/2 green Lizard creature token." });
+const impatience = card("Impatience", "Enchantment", "{2}{R}", { cmc: 3, oracleText: "At the beginning of each player's end step, if that player didn't cast a spell this turn, this enchantment deals 2 damage to that player." });
+const wranglerOfTheDamned = card("Wrangler of the Damned", "Creature — Human Soldier", "{3}{W}{U}", { cmc: 5, power: "1", toughness: "4", keywords: ["Flash"], oracleText: "Flash\nAt the beginning of your end step, if you haven't cast a spell from your hand this turn, create a 2/2 white Spirit creature token with flying." });
+const twinnedVision = card("Twinned Vision", "Instant", "{1}{U/R}", { cmc: 2, keywords: ["Flashback"], oracleText: "Draw a card. If this spell wasn't cast from your hand, draw two cards instead.\nFlashback—{1}{U/R}{U/R}, Discard a card. (You may cast this card from your graveyard for its flashback cost. Then exile it.)" });
+const carnageInterpreter = card("Carnage Interpreter", "Creature — Devil Detective", "{1}{B/R}{B/R}", { cmc: 3, power: "3", toughness: "3", keywords: ["Investigate"], oracleText: "When this creature enters, discard your hand, then investigate four times. (To investigate, create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nAs long as you have one or fewer cards in hand, this creature gets +2/+2 and has menace." });
+const unagisSpray = card("Unagi's Spray", "Instant", "{U}", { cmc: 1, oracleText: "Target creature gets -4/-0 until end of turn. If you control a Fish, Octopus, Otter, Seal, Serpent, or Whale, draw a card." });
+const revelationOfPower = card("Revelation of Power", "Instant", "{1}{W}", { cmc: 2, oracleText: "Target creature gets +2/+2 until end of turn. If it has a counter on it, it also gains flying and lifelink until end of turn." });
+const oilGorgerTroll = card("Oil-Gorger Troll", "Creature — Phyrexian Troll Warrior", "{3}{G}{G}", { cmc: 5, power: "3", toughness: "4", oracleText: "When this creature enters, you gain 3 life. Then if you control a permanent with an oil counter on it, draw a card." });
+const cinderslashRavager = card("Cinderslash Ravager", "Creature — Phyrexian Warrior", "{4}{R}{G}", { cmc: 6, power: "5", toughness: "5", keywords: ["Vigilance"], oracleText: "This spell costs {1} less to cast for each permanent you control with oil counters on it.\nVigilance\nWhen this creature enters, it deals 1 damage to each creature your opponents control." });
+const pyrophobia = card("Pyrophobia", "Sorcery", "{1}{R}", { cmc: 2, oracleText: "Pyrophobia deals 3 damage to target creature. Cowards can't block this turn." });
+const goblinLocksmith = card("Goblin Locksmith", "Creature — Goblin Rogue", "{1}{R}", { cmc: 2, power: "2", toughness: "1", oracleText: "Whenever this creature attacks, creatures with defender can't block this turn." });
+const blaringCaptain = card("Blaring Captain", "Creature — Azra Warrior", "{3}{B}", { cmc: 4, power: "2", toughness: "2", keywords: ["Partner with","Partner"], oracleText: "Partner with Blaring Recruiter (When this creature enters, target player may put Blaring Recruiter into their hand from their library, then shuffle.)\nWhenever this creature attacks, attacking Warriors get +1/+1 until end of turn." });
+const jacesDefeat = card("Jace's Defeat", "Instant", "{1}{U}", { cmc: 2, keywords: ["Scry"], oracleText: "Counter target blue spell. If it was a Jace planeswalker spell, scry 2." });
+const gideonsDefeat = card("Gideon's Defeat", "Instant", "{W}", { cmc: 1, oracleText: "Exile target white creature that's attacking or blocking. If it was a Gideon planeswalker, you gain 5 life." });
+const attendedHealer = card("Attended Healer", "Creature — Kor Cleric", "{3}{W}", { cmc: 4, power: "2", toughness: "3", oracleText: "Whenever you gain life for the first time each turn, create a 1/1 white Cat creature token.\n{2}{W}: Another target Cleric gains lifelink until end of turn." });
+const bloodAgeGeneral = card("Blood Age General", "Creature — Spirit Warrior", "{1}{R}", { cmc: 2, power: "2", toughness: "2", oracleText: "{T}: Attacking Spirits get +1/+0 until end of turn." });
+const canyonCrab = card("Canyon Crab", "Creature — Crab", "{1}{U}", { cmc: 2, power: "0", toughness: "5", oracleText: "{1}{U}: This creature gets +2/-2 until end of turn.\nAt the beginning of your end step, if you haven't cast a spell from your hand this turn, draw a card, then discard a card." });
+const carrionImp = card("Carrion Imp", "Creature — Imp", "{3}{B}", { cmc: 4, power: "2", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, you may exile target creature card from a graveyard. If you do, you gain 2 life." });
+const clericOfLifesBond = card("Cleric of Life's Bond", "Creature — Vampire Cleric", "{W}{B}", { cmc: 2, power: "2", toughness: "2", oracleText: "Whenever another Cleric you control enters, you gain 1 life.\nWhenever you gain life for the first time each turn, put a +1/+1 counter on this creature." });
+const confirmSuspicions = card("Confirm Suspicions", "Instant", "{3}{U}{U}", { cmc: 5, keywords: ["Investigate"], oracleText: "Counter target spell.\nInvestigate three times. (To investigate, create a Clue token. It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")" });
+const detonate = card("Detonate", "Sorcery", "{X}{R}", { cmc: 1, oracleText: "Destroy target artifact with mana value X. It can't be regenerated. Detonate deals X damage to that artifact's controller." });
+const gontisMachinations = card("Gonti's Machinations", "Enchantment", "{B}", { cmc: 1, oracleText: "Whenever you lose life for the first time each turn, you get {E}. (You get an energy counter. Damage causes loss of life.)\nPay {E}{E}, Sacrifice this enchantment: Each opponent loses 3 life. You gain life equal to the life lost this way." });
+const heroOfOxidRidge = card("Hero of Oxid Ridge", "Creature — Human Knight", "{2}{R}{R}", { cmc: 4, power: "4", toughness: "2", keywords: ["Battle Cry","Haste"], oracleText: "Haste\nBattle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)\nWhenever this creature attacks, creatures with power 1 or less can't block this turn." });
+const jemLightfooteSkyExplorer = card("Jem Lightfoote, Sky Explorer", "Legendary Creature — Human Scout", "{2}{W}{U}", { cmc: 4, power: "3", toughness: "3", keywords: ["Flying","Vigilance"], oracleText: "Flying, vigilance\nAt the beginning of your end step, if you haven't cast a spell from your hand this turn, draw a card." });
+const kuldothaCackler = card("Kuldotha Cackler", "Creature — Phyrexian Hyena", "{2}{R}", { cmc: 3, power: "2", toughness: "3", keywords: ["Trample"], oracleText: "Trample\nWhenever this creature attacks, it gets +X/+0 until end of turn, where X is the number of permanents you control with oil counters on them." });
+const marduWoeReaper = card("Mardu Woe-Reaper", "Creature — Human Warrior", "{W}", { cmc: 1, power: "2", toughness: "1", oracleText: "Whenever this creature or another Warrior you control enters, you may exile target creature card from a graveyard. If you do, you gain 1 life." });
+const mournwillow = card("Mournwillow", "Creature — Plant Skeleton", "{1}{B}{G}", { cmc: 3, power: "3", toughness: "2", keywords: ["Delirium","Haste"], oracleText: "Haste\nDelirium — When this creature enters, if there are four or more card types among cards in your graveyard, creatures with power 2 or less can't block this turn." });
+const patientRebuilding = card("Patient Rebuilding", "Enchantment", "{3}{U}{U}", { cmc: 5, keywords: ["Mill"], oracleText: "At the beginning of your upkeep, target opponent mills three cards, then you draw a card for each land card put into their graveyard this way." });
+const runAfoul = card("Run Afoul", "Instant", "{G}", { cmc: 1, oracleText: "Target opponent sacrifices a creature of their choice with flying." });
+const sance = card("Séance", "Enchantment", "{2}{W}{W}", { cmc: 4, oracleText: "At the beginning of each upkeep, you may exile target creature card from your graveyard. If you do, create a token that's a copy of that card, except it's a Spirit in addition to its other types. Exile it at the beginning of the next end step." });
+const seismicElemental = card("Seismic Elemental", "Creature — Elemental", "{3}{R}{R}", { cmc: 5, power: "4", toughness: "4", oracleText: "When this creature enters, creatures without flying can't block this turn." });
+const smashToSmithereens = card("Smash to Smithereens", "Instant", "{1}{R}", { cmc: 2, oracleText: "Destroy target artifact. Smash to Smithereens deals 3 damage to that artifact's controller." });
+const urabrasksAnointer = card("Urabrask's Anointer", "Artifact Creature — Phyrexian Wizard", "{3}{R}", { cmc: 4, power: "4", toughness: "2", oracleText: "When this creature enters, it deals X damage to any target, where X is the number of permanents you control with oil counters on them." });
+const vanguardSeraph = card("Vanguard Seraph", "Creature — Angel Warrior", "{3}{W}", { cmc: 4, power: "3", toughness: "3", keywords: ["Flying","Surveil"], oracleText: "Flying\nWhenever you gain life for the first time each turn, surveil 1. (Look at the top card of your library. You may put it into your graveyard.)" });
+
 describe("Riders checked as the spell resolves: what the creature or permanent is (CR 608.2c)", () => {
   it("are fully supported", () => supported(rayOfRuin, electrostaticBolt, purifyingDragon, rendingFlame, rayOfEnfeeblement, wakandanRoyalGuard));
 
@@ -364,5 +418,276 @@ describe("Attached permanents: Equipment destroyed with the creature, Auras retu
     expect(zone(s, aura1)).toBe("hand");
     expect(zone(s, aura2)).toBe("hand");
     expect(s.players[ap]!.hand).toContain(aura2);
+  });
+});
+
+const salve = card("Test Salve", "Instant", "{W}", { cmc: 1, oracleText: "You gain 1 life." });
+const murder = card("Test Murder", "Instant", "{B}", { cmc: 1, oracleText: "Destroy target creature." });
+const shock = card("Test Shock", "Instant", "{R}", { cmc: 1, oracleText: "Test Shock deals 2 damage to any target." });
+const testArtifact = (name = "Test Relic", manaCost = "{3}") => card(name, "Artifact", manaCost, { cmc: parseManaCost(manaCost).generic, oracleText: "{T}: You gain 1 life." });
+/** Pass priority until `pid` has it (the stack and step unchanged, as someone else still has to pass). */
+const priorityTo = (s: GameState, pid: PlayerId) => {
+  for (let i = 0; i < 8 && waitingOn(s) !== pid; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+const oiled = (s: GameState, pid: PlayerId, n = 1) => {
+  const id = putOnBattlefield(s, pid, testArtifact("Test Oil Vat"));
+  s.objects[id]!.counters["oil"] = n;
+  invalidateCharacteristics(s);
+  return id;
+};
+
+describe("More of the first batch's templates: protection lists, flanking, two untaps", () => {
+  it("are fully supported", () => supported(eliteInquisitor, jabarisBanner, sidewinderSliver, spareFromEvil, synchronizedStrike));
+
+  it("Elite Inquisitor can't be blocked by a Zombie; Spare from Evil stops non-Humans from blocking", () => {
+    let { s, ap, opp, ids } = setup([spareFromEvil]);
+    const inq = putOnBattlefield(s, ap, eliteInquisitor);
+    const b = putOnBattlefield(s, ap, greenBear());
+    const zombie = putOnBattlefield(s, opp, creature("Test Zombie", "Creature — Zombie", "{1}{B}", 2, 2));
+    const human = putOnBattlefield(s, opp, creature("Test Human", "Creature — Human", "{1}{W}", 2, 2));
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    s = toBlocks(s, ap, [{ attacker: inq, defender: opp }, { attacker: b, defender: opp }]);
+    const o = (id: string) => s.objects[id]!;
+    expect(blockProblem(s, o(zombie), o(inq))).not.toBeNull();
+    expect(blockProblem(s, o(zombie), o(b))).not.toBeNull();
+    expect(blockProblem(s, o(human), o(b))).toBeNull();
+  });
+
+  it("Sidewinder Sliver gives Slivers flanking; Jabari's Banner gives it to a creature until end of turn", () => {
+    let { s, ap } = setup([]);
+    const sl = putOnBattlefield(s, ap, sidewinderSliver);
+    const banner = putOnBattlefield(s, ap, jabarisBanner);
+    const b = putOnBattlefield(s, ap, greenBear());
+    expect(has(s, sl, "Flanking")).toBe(true);
+    expect(has(s, b, "Flanking")).toBe(false);
+    s = settle(run(s, planActivate(s, ap, banner, 0, [tgt(b)])));
+    expect(has(s, b, "Flanking")).toBe(true);
+    s = passUntil(s, "upkeep", next(s, ap));
+    expect(has(s, b, "Flanking")).toBe(false);
+  });
+
+  it("Synchronized Strike untaps two creatures, +2/+2 each", () => {
+    let { s, ap, ids } = setup([synchronizedStrike]);
+    const a = putOnBattlefield(s, ap, greenBear());
+    const b = putOnBattlefield(s, ap, greenBear());
+    s.objects[a]!.tapped = true;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(a), tgt(b)])));
+    expect(s.objects[a]!.tapped).toBe(false);
+    expect([pt(s, a), pt(s, b)]).toEqual(["4/4", "4/4"]);
+  });
+});
+
+describe("What was cast this turn, checked at the end step (CR 603.4)", () => {
+  it("are fully supported", () => supported(impatience, predatoryAdvantage, wranglerOfTheDamned, jemLightfooteSkyExplorer, canyonCrab, twinnedVision));
+
+  it("Impatience deals 2 damage to the active player at their end step only if they cast no spell", () => {
+    for (const cast of [false, true]) {
+      let { s, ap, opp, ids } = setup([salve]);
+      putOnBattlefield(s, opp, impatience);
+      if (cast) s = settle(run(s, planCast(s, ap, ids[0]!)));
+      const life0 = life(s, ap);
+      const oppLife = life(s, opp);
+      s = settle(passUntil(s, "end", ap));
+      expect(life(s, ap)).toBe(life0 - (cast ? 0 : 2));
+      expect(life(s, opp)).toBe(oppLife);
+    }
+  });
+
+  it("Predatory Advantage makes a Lizard at an opponent's end step if they cast no creature spell", () => {
+    for (const what of ["none", "instant", "creature"] as const) {
+      let { s, ap, opp, ids } = setup([salve, greenBear()]);
+      putOnBattlefield(s, opp, predatoryAdvantage);
+      if (what === "instant") s = settle(run(s, planCast(s, ap, ids[0]!)));
+      if (what === "creature") s = settle(run(s, planCast(s, ap, ids[1]!)));
+      s = settle(passUntil(s, "end", ap));
+      const lizards = s.battlefield.filter((id) => s.objects[id]!.controller === opp && types(s, id).includes("Creature") && characteristics(s, s.objects[id]!).subtypes.includes("Lizard"));
+      expect(lizards.length).toBe(what === "creature" ? 0 : 1);
+    }
+  });
+
+  it("Jem Lightfoote draws unless a spell was cast from the hand; Twinned Vision draws two from the graveyard", () => {
+    for (const how of ["none", "hand", "flashback"] as const) {
+      let { s, ap, ids } = setup([twinnedVision]);
+      putOnBattlefield(s, ap, jemLightfooteSkyExplorer);
+      const hand = s.players[ap]!.hand;
+      if (how === "flashback") {
+        hand.splice(hand.indexOf(ids[0]!), 1);
+        s.objects[ids[0]!]!.zone = "graveyard";
+        s.players[ap]!.graveyard.push(ids[0]!);
+      }
+      const hand0 = s.players[ap]!.hand.length;
+      if (how === "hand") s = settle(run(s, planCast(s, ap, ids[0]!)));
+      if (how === "flashback") {
+        const discard = s.players[ap]!.hand[0]!;
+        s = settle(run(s, planCast(s, ap, ids[0]!, [], undefined, "auto", undefined, { via: "flashback", discard: [discard] })));
+        expect(zone(s, ids[0]!)).toBe("exile");
+      }
+      // From the hand: one card cast, one drawn. By flashback: one discarded, two drawn.
+      expect(s.players[ap]!.hand.length - hand0).toBe(how === "none" ? 0 : how === "hand" ? 0 : 1);
+      s = settle(passUntil(s, "end", ap));
+      // Jem: a card unless a spell was cast from the hand.
+      expect(s.players[ap]!.hand.length - hand0).toBe(how === "none" ? 1 : how === "hand" ? 0 : 2);
+    }
+  });
+
+  it("Wrangler of the Damned makes a flying Spirit if you cast no spell from your hand", () => {
+    for (const cast of [false, true]) {
+      let { s, ap, ids } = setup([salve]);
+      putOnBattlefield(s, ap, wranglerOfTheDamned);
+      if (cast) s = settle(run(s, planCast(s, ap, ids[0]!)));
+      s = settle(passUntil(s, "end", ap));
+      const spirits = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Spirit"));
+      expect(spirits.length).toBe(cast ? 0 : 1);
+      if (!cast) expect(has(s, spirits[0]!, "Flying")).toBe(true);
+    }
+  });
+});
+
+describe("The first time you gain or lose life each turn", () => {
+  it("are fully supported", () => supported(vengefulWarchief, attendedHealer, clericOfLifesBond, vanguardSeraph, gontisMachinations));
+
+  it("Vengeful Warchief gets one counter for two losses of life in a turn, another the next turn", () => {
+    let { s, ap, ids } = setup([shock, shock, shock]);
+    const w = putOnBattlefield(s, ap, vengefulWarchief);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [player(ap)])));
+    s = settle(run(s, planCast(s, ap, ids[1]!, [player(ap)])));
+    expect(s.objects[w]!.counters["+1/+1"] ?? 0).toBe(1);
+    s = passUntil(s, "main1", next(s, ap));
+    const nap = s.activePlayer;
+    for (const l of [mountain]) putOnBattlefield(s, ap, l);
+    s = priorityTo(s, nap);
+    s = act(s, { type: "passPriority", player: nap });
+    s = priorityTo(s, ap);
+    s = settle(run(s, planCast(s, ap, ids[2]!, [player(ap)])));
+    expect(s.objects[w]!.counters["+1/+1"] ?? 0).toBe(2);
+  });
+
+  it("Attended Healer makes one Cat and Cleric of Life's Bond gets one counter for two gains of life", () => {
+    let { s, ap, ids } = setup([salve, salve]);
+    const cleric = putOnBattlefield(s, ap, clericOfLifesBond);
+    putOnBattlefield(s, ap, attendedHealer);
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    s = settle(run(s, planCast(s, ap, ids[1]!)));
+    const cats = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Cat"));
+    expect(cats.length).toBe(1);
+    expect(s.objects[cleric]!.counters["+1/+1"] ?? 0).toBe(1);
+  });
+
+  it("Gonti's Machinations gets one energy for two losses of life", () => {
+    let { s, ap, ids } = setup([shock, shock]);
+    putOnBattlefield(s, ap, gontisMachinations);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [player(ap)])));
+    s = settle(run(s, planCast(s, ap, ids[1]!, [player(ap)])));
+    expect(s.players[ap]!.energy ?? 0).toBe(1);
+  });
+});
+
+describe("Riders about the target, the cards moved, and who controlled it", () => {
+  it("are fully supported", () => supported(crumble, smashToSmithereens, detonate, coercedConfession, patientRebuilding, balanceOfPower, darkSuspicions, clipWings, runAfoul, warrenPilferers, deathknellBerserker));
+
+  it("Crumble: the artifact's controller gains life equal to its mana value; Smash to Smithereens deals 3 to them", () => {
+    let { s, ap, opp, ids } = setup([crumble, smashToSmithereens]);
+    const a = putOnBattlefield(s, opp, testArtifact("Test Relic", "{4}"));
+    const b = putOnBattlefield(s, opp, testArtifact("Test Idol", "{2}"));
+    const life0 = life(s, opp);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(a)])));
+    expect(zone(s, a)).toBe("graveyard");
+    expect(life(s, opp)).toBe(life0 + 4);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [tgt(b)])));
+    expect(zone(s, b)).toBe("graveyard");
+    expect(life(s, opp)).toBe(life0 + 4 - 3);
+  });
+
+  it("Detonate destroys an artifact with mana value X and deals X damage to its controller", () => {
+    let { s, ap, opp, ids } = setup([detonate]);
+    const a = putOnBattlefield(s, opp, testArtifact("Test Relic", "{2}"));
+    const b = putOnBattlefield(s, opp, testArtifact("Test Idol", "{3}"));
+    expect(planCast(s, ap, ids[0]!, [tgt(b)], undefined, "auto", 2)).toBeNull();
+    const life0 = life(s, opp);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(a)], undefined, "auto", 2)));
+    expect(zone(s, a)).toBe("graveyard");
+    expect(life(s, opp)).toBe(life0 - 2);
+  });
+
+  it("Coerced Confession draws a card for each creature card milled", () => {
+    let { s, ap, opp, ids } = setup([coercedConfession]);
+    const hand0 = s.players[ap]!.hand.length;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [player(opp)])));
+    const milled = s.players[opp]!.graveyard.filter((id) => types(s, id).includes("Creature")).length;
+    expect(s.players[opp]!.graveyard.length).toBe(4);
+    expect(s.players[ap]!.hand.length).toBe(hand0 - 1 + milled);
+  });
+
+  it("Patient Rebuilding: at your upkeep, the opponent mills three and you draw for each land card", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, patientRebuilding);
+    s = passUntil(s, "upkeep", ap);
+    const hand0 = s.players[ap]!.hand.length;
+    const yard0 = s.players[opp]!.graveyard.length;
+    s = settle(s, { targets: [player(opp)] });
+    const milled = s.players[opp]!.graveyard.slice(yard0);
+    expect(milled.length).toBe(3);
+    expect(s.players[ap]!.hand.length).toBe(hand0 + milled.filter((id) => types(s, id).includes("Land")).length);
+  });
+
+  it("Balance of Power draws the difference only if the opponent has more cards in hand", () => {
+    for (const more of [true, false]) {
+      let { s, ap, opp, ids } = setup([balanceOfPower]);
+      const mine = s.players[ap]!.hand.length - 1;
+      while (s.players[opp]!.hand.length < (more ? mine + 3 : mine)) into(s, opp, greenBear());
+      while (s.players[opp]!.hand.length > (more ? mine + 3 : mine)) s.players[opp]!.hand.pop();
+      s = settle(run(s, planCast(s, ap, ids[0]!, [player(opp)])));
+      expect(s.players[ap]!.hand.length).toBe(mine + (more ? 3 : 0));
+    }
+  });
+
+  it("Dark Suspicions: at each opponent's upkeep they lose the difference between their hand and yours", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, darkSuspicions);
+    const o = next(s, ap);
+    s = passUntil(s, "upkeep", o);
+    const diff = Math.max(0, s.players[o]!.hand.length - s.players[ap]!.hand.length);
+    const life0 = life(s, o);
+    s = settle(s);
+    expect(life(s, o)).toBe(life0 - diff);
+  });
+
+  it("Clip Wings and Run Afoul: a creature with flying is sacrificed, not one without", () => {
+    let { s, ap, opp, ids } = setup([clipWings, runAfoul]);
+    const bird = putOnBattlefield(s, opp, blueBird());
+    const b = putOnBattlefield(s, opp, greenBear());
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(zone(s, bird)).toBe("graveyard");
+    expect(zone(s, b)).toBe("battlefield");
+    const bird2 = putOnBattlefield(s, opp, blueBird());
+    s = settle(run(s, planCast(s, ap, ids[1]!, [player(opp)])));
+    expect(zone(s, bird2)).toBe("graveyard");
+    expect(zone(s, b)).toBe("battlefield");
+  });
+
+  it("Warren Pilferers returns a creature card; with a Goblin card it gains haste", () => {
+    for (const goblin of [true, false]) {
+      let { s, ap, ids } = setup([warrenPilferers]);
+      const c = into(s, ap, goblin ? creature("Test Goblin", "Creature — Goblin", "{R}", 1, 1) : greenBear(), "graveyard");
+      s = run(s, planCast(s, ap, ids[0]!));
+      s = settle(s, { targets: [tgt(c)] });
+      expect(zone(s, c)).toBe("hand");
+      expect(has(s, ids[0]!, "Haste")).toBe(goblin);
+    }
+  });
+
+  it("Deathknell Berserker makes a Zombie Berserker only if its power was 3 or greater", () => {
+    for (const big of [true, false]) {
+      let { s, ap, ids } = setup([murder]);
+      const d = putOnBattlefield(s, ap, deathknellBerserker);
+      if (big) s.objects[d]!.counters["+1/+1"] = 1;
+      invalidateCharacteristics(s);
+      s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(d)])));
+      expect(zone(s, d)).toBe("graveyard");
+      const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken);
+      expect(tokens.length).toBe(big ? 1 : 0);
+      if (big) expect(characteristics(s, s.objects[tokens[0]!]!).subtypes).toEqual(expect.arrayContaining(["Zombie", "Berserker"]));
+    }
   });
 });

@@ -228,6 +228,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "its owner" && ctx.lastObjectTarget === undefined && ctx.subjectIt && !ctx.targets.length) return { ref: "subjectOwner" };
   if (x === "each player other than its controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many) return { ref: "otherThanTargetController", index: ctx.lastObjectTarget };
   if (x === "each of its controller's opponents" && ctx.subjectIt && ctx.lastObjectTarget === undefined) return { ref: "subjectControllerOpponents" };
+  // Crumble: "Destroy target artifact. ... That artifact's controller gains life ...": the target's, as it last existed.
+  const typedCtl = /^that (artifact|enchantment|planeswalker)'s controller$/.exec(x);
+  if (typedCtl && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.many && ctx.targets[ctx.lastObjectTarget]!.types?.length === 1 && ctx.targets[ctx.lastObjectTarget]!.types![0] === capital(typedCtl[1]!)) return { ref: "targetController", index: ctx.lastObjectTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -750,7 +753,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   p = subtypeClause(p);
   const whose = / (you control|your opponents control|an opponent controls|you don't control)\b/i;
   // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
-  const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p);
+  // Blaring Captain: "attacking Warriors get +1/+1 until end of turn": the same, of that creature type.
+  const combatTyped = /^(?:[Aa]ttacking|[Bb]locking) ([A-Z][a-z]+)$/.exec(p);
+  const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p) || (!!combatTyped && /s$/.test(combatTyped[1]!) && CREATURE_TYPES.has(singular(combatTyped[1]!)));
   // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type; "creatures that aren't of
   // the chosen type get -3/-3" (Crippling Fear): every other creature.
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
@@ -1072,7 +1077,7 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|oil) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

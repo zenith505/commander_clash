@@ -22,6 +22,11 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if (/^you control a planeswalker$/.test(text)) return { kind: "control", who: "you", types: ["Planeswalker"], min: 1 };
   // The Roads (Outlaws of Thunder Junction): a permanent with either subtype (CR 205.3).
   if (/^you control a Mount or Vehicle$/.test(text)) return { kind: "control", who: "you", subtypes: ["Mount", "Vehicle"], min: 1 };
+  // Unagi's Spray: "if you control a Fish, Octopus, Otter, Seal, Serpent, or Whale": a permanent with any of them.
+  if ((m = /^you control an? ([A-Z][a-z]+(?: or [A-Z][a-z]+){2,})$/.exec(text))) {
+    const subtypes = m[1]!.split(" or ");
+    if (subtypes.every((t) => CREATURE_TYPES.has(t))) return { kind: "control", who: "you", subtypes, min: 1 };
+  }
   if (/^you control a legendary creature$/.test(text)) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], min: 1 };
   // "Unless you control a legendary green creature" (Argoth, Sanctum of Nature).
   if ((m = /^you control a legendary (white|blue|black|red|green) creature$/.exec(text))) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], colors: [COLOR_WORDS[m[1]!]!], min: 1 };
@@ -67,9 +72,15 @@ export function parseEntersChoice(line: string): EntersChoice | null {
 export function parseConditionalStatic(line: string): StaticAbility | null {
   // Depletion lands: "~ doesn't untap during your untap step if it has a depletion counter on it" is the same as "as
   // long as it has one" (checked as the untap step begins, CR 502.3).
-  const ifCounter = /^~ doesn't untap during your untap step if it has an? ([a-z]+) counter on it\.$/.exec(line);
+  // Steel Dromedary: "if it has a +1/+1 counter on it"; Alirios, Enraptured: "if you control a Reflection".
+  const ifCounter = /^~ doesn't untap during your untap step if it has an? ([a-z]+|\+1\/\+1) counter on it\.$/.exec(line);
   if (ifCounter) {
     const st = parseConditionalStatic(`As long as ~ has a ${ifCounter[1]} counter on it, it doesn't untap during your untap step.`);
+    return st && { ...st, text: line };
+  }
+  const ifControl = /^~ doesn't untap during your untap step if (you control an? [A-Z][a-z]+)\.$/.exec(line);
+  if (ifControl) {
+    const st = parseConditionalStatic(`As long as ${ifControl[1]}, ~ doesn't untap during your untap step.`);
     return st && { ...st, text: line };
   }
   const text = line.replace(/^[A-Z][A-Za-z' -]+(?: \d+)? — /, "").replace(/\.$/, "");
@@ -717,6 +728,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
   // Nightpack Ambusher: "if you didn't cast a spell this turn".
   if (/^you didn't cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true };
+  // Prairie Dog, Wrangler of the Damned: "if you haven't cast a spell from your hand this turn".
+  if (/^you haven't cast a spell from your hand this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, not: true, fromHand: true };
   // Fae Offering: "if you've cast both a creature spell and a noncreature spell this turn": one of each.
   if ((m = /^you've cast both an? ([a-z]+) spell and an? ([a-z]+) spell this turn$/.exec(text))) {
     const a = parseSearchFilter(`${m[1]!} card`);

@@ -293,7 +293,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
   // Dread Summons: "Each player mills X cards. For each creature card put into a graveyard this way, ...": the milled
   // cards that went there (one replaced to go elsewhere doesn't count, rulings).
-  if (each && ctx?.afterAnyMill && (m = /^(.+? card) (?:put into a graveyard this way|milled this way)$/i.exec(p))) {
+  // Coerced Confession: "Target player mills four cards. You draw a card for each creature card put into their graveyard
+  // this way": the same, the cards milled going to their owner's graveyard (CR 701.17a).
+  if (each && ctx?.afterAnyMill && (m = /^(.+? card) (?:put into (?:a|their) graveyard this way|milled this way)$/i.exec(p))) {
     const filter = parseSearchFilter(m[1]!);
     return filter ? count({ kind: "milledThisWay", filter }) : null;
   }
@@ -339,6 +341,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[2]!, ctx);
     const filter = parseSearchFilter(m[1]!.replace(/s$/, ""));
     return who && filter ? count({ kind: "cardsInHand", who, filter }) : null;
+  }
+  // Dark Suspicions: "the number of cards in that player's hand minus the number of cards in your hand", 0 if fewer.
+  if ((m = /^(?:the number of )?cards in (that player's|target opponent's|target player's) hand minus the number of cards in your hand$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: "handMoreThanYou", who });
   }
   // Enemy of Enlightenment: "for each card in your opponents' hands": all of them together.
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });

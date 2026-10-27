@@ -596,6 +596,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("all permanents", ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
   }
+  // Heartmender: "remove a -1/-1 counter from each creature you control": one from each that has one.
+  if ((m = new RegExp(`^Remove (a|all) ${COUNTER} counters? from (each creature you control)$`, "i").exec(s))) {
+    const what = parseObject(m[3]!, ctx);
+    return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : 1 }] : null;
+  }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;

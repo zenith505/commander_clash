@@ -3,7 +3,7 @@
 import type { Effect, TokenSpec } from "../../abilities";
 import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
-import { NUMX, X, amt, singularWord, isGroup, BASIC_TYPES } from "../words";
+import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES } from "../words";
 import { parsePlayer, parseObject, parseKeywordList } from "../targets";
 import { parseSearchFilter } from "../search";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
@@ -334,7 +334,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] === " transformed" ? { transformed: true as const } : {}), ...(m[2] === " tapped" ? { tapped: true as const } : {}), ...(m[4] ? { counter: "+1/+1" as const } : {}) }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
-  if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
+  if ((m = /^Investigate( twice| X times| (?:three|four|five) times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] === " twice" ? 2 : m[1] ? num(m[1].trim().split(" ")[0]!) : 1, token: PREDEFINED_TOKENS.Clue! }];
   // "Investigate once for each opponent who has more cards in hand than you" (Wojek Investigator): counted as it resolves.
   if ((m = /^Investigate (?:once )?for each (.+)$/i.exec(s))) {
     const n = parseCount(m[1]!, ctx, true);

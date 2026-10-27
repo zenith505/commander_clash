@@ -1490,15 +1490,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Pp]ut an? [^.]+? counter on ~) and add ((?:\{[WUBRGC]\})+)\.$/, "$1. Add $2.");
   // "That creature also gains trample until end of turn if you control a creature with power 4 or greater" (Temur Battle
   // Rage): checked as it resolves (CR 608.2c).
-  // Invincible Hymn: "Count the number of cards in your library. Your life total becomes that number.": counted as it
-  // resolves (CR 119.5).
-  text = text.replace(/^Count the number of cards in your library\. Your life total becomes that number\.$/, "Your life total becomes the number of cards in your library.");
   // Grim Giganotosaurus: "destroy all artifacts and creatures other than ~": the same as "all other artifacts and creatures".
   text = text.replace(/^([Dd]estroy) all ([a-z]+s(?: and [a-z]+s)?) other than ~\.$/, "$1 all other $2.");
   // Patron of the Orochi: "Untap all Forests and all green creatures.": each of them (a green Forest creature once).
   text = text.replace(/^Untap all ([A-Z][a-z]+s) and all (white|blue|black|red|green) creatures\.$/, "Untap all $1. Untap all $2 creatures.");
-  // See Beyond: "Draw two cards, then shuffle a card from your hand into your library.": two instructions, in order.
-  text = text.replace(/^Draw (\w+) cards, then shuffle (a|one|two) cards? from your hand into your library\.$/, (all, n, k) => `Draw ${n} cards. Shuffle ${k} card${k === "a" || k === "one" ? "" : "s"} from your hand into your library.`);
   // Savage Punch: "Target creature you control fights target creature you don't control. The creature you control gets
   // +2/+2 until end of turn before it fights if you control a creature with power 4 or greater.": the bonus first,
   // checked as it resolves (CR 608.2c; rulings), then the fight.

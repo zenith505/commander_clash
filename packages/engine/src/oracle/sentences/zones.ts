@@ -620,8 +620,6 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
-  // See Beyond: "Draw two cards, then shuffle a card from your hand into your library."
-  if ((m = new RegExp(`^Shuffle (a|${NUM}) cards? from your hand into your library$`, "i").exec(s))) return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), shuffle: true }];
   // Chimney Imp: "target opponent puts a card from their hand on top of their library"; Sadistic Augermage: "each player
   // puts ..."; Stunted Growth: "Target player chooses three cards from their hand and puts them on top of their library in
   // any order": each from their own hand, chosen as it resolves.
@@ -883,6 +881,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
+  // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
+  // library": the X it was cast with.
+  if ((m = /^Put (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "putInLibrary", what, position: "top", beneath: amt("X") }] : null;
+  }
   // Mortuary: "Whenever a creature is put into your graveyard from the battlefield, put that card on top of your
   // library": the card, if it's still in your graveyard (CR 400.7); yours, so its owner's library.
   if (/^[Pp]ut that card on top of your library$/.test(s) && ctx.subjectLeft) {
@@ -891,12 +895,6 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
   if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
-  // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
-  // library": the X it was cast with.
-  if ((m = /^Put (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
-    const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" && !what.n ? [{ type: "putInLibrary", what, position: "top", beneath: amt("X") }] : null;
-  }
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   // Elven Warhounds: "Whenever ~ becomes blocked by a creature, put that creature on top of its owner's library": the
   // trigger's subject.

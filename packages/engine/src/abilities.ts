@@ -2857,7 +2857,7 @@ export type Effect =
   | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
-  | { type: "handToTop"; n: Amount; bottom?: true; /** "Shuffle a card from your hand into your library" (See Beyond): shuffled in instead; with an empty hand, no shuffle (rulings). */ shuffle?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
+  | { type: "handToTop"; n: Amount; bottom?: true; /** See Beyond: "shuffle a card from your hand into your library". */ shuffle?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
   /** Scroll Rack: any number of cards from the hand exiled face down, that many from the top of the library put into the hand (not drawn), then the exiled cards on top in any order. */
   | { type: "scrollRack" }
   /**

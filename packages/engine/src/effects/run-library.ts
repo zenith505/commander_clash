@@ -584,12 +584,6 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         // On the bottom the first pick goes lowest; on top it ends on top.
         for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
-        if (e.shuffle) {
-          shuffleLibrary(s, p);
-          log(s, `${p.name} shuffles ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand into their library.`);
-          done[pid] = true;
-          continue;
-        }
         log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
         done[pid] = true;
       }

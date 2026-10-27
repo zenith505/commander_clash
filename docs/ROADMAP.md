@@ -1605,8 +1605,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (cards with cycling), Truce, Nova Flame, Mutiny, Credit Voucher, Crypsis, Mana Short, Spreading Plague, Nullmage and
   Spurnmage Advocate (not parsed yet).
 - Round B11 (ranks about 15,100 up to about 13,200, the easier templates, plus more played cards the same templates
-  cover: Crater Elemental, Island of Wak-Wak, Symmetry Sage, Pieces of the Puzzle, Customs Depot, Dromar, Living Plane,
-  the three Shadowhearts, Sparkshaper Visionary): "other creatures get -2/-2" (every creature but the source); "its
+  cover: Crater Elemental, Island of Wak-Wak, Symmetry Sage, Pieces of the Puzzle, Customs Depot, Dromar, the three
+  Shadowhearts, Sparkshaper Visionary): "other creatures get -2/-2" (every creature but the source); "its
   power plus its toughness"; "2 or the greatest power among Dinosaurs you control, whichever is greater"; "the number
   of different powers among creatures you control"; "has base power 4" (layer 7b); "put any number of / up to three
   ... cards from among them into your hand and the rest into your graveyard"; "Put ~ from your graveyard on top of your
@@ -1619,14 +1619,13 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   become untapped"; an Equipment's "can't be blocked by more than one creature"; Slivers with provoke; "attacking,
   blocking, or tapped creature"; "tap all lands its controller controls"; Spacecraft; "attacking creatures with
   flying" and "nontoken attacking creature" counts; "If an artifact is destroyed this way, its controller draws a
-  card"; Savage Punch's ferocious +2/+2 before the fight; "shuffle a card from your hand into your library" (the hand
-  picker with a Shuffle in button); "return a land card or Elf card from your graveyard to your hand. If you can't,
+  card"; Savage Punch's ferocious +2/+2 before the fight; "return a land card or Elf card from your graveyard to your hand. If you can't,
   draw a card"; "Untap all Forests and all green creatures"; "Whenever you gain / lose life during your turn"; "if
   another Human died under your control this turn"; "destroy all permanents at the beginning of the next end step";
   "Exchange your graveyard and library"; "the highest life total among all players"; "destroy all artifacts and
-  creatures other than ~"; Invincible Hymn's life total from the library's size; "All Forests / Swamps / lands are N/N
-  (black) creatures that are still lands"; "you may pay {1}. If you do, scry 1, then draw a card" (choices after a
-  payment). +56 (26,154; the three Shadowhearts aren't Commander-legal).
+  creatures other than ~"; "3/3 blue Bird creatures"; "you may pay {1}. If you do, scry 1, then draw a card" (choices
+  after a payment). Round 182 also did See Beyond, Living Lands, Living Plane, Kormus Bell, Nature's Revolt and
+  Invincible Hymn; main's version is kept. +50 (26,197 with round 182; the three Shadowhearts aren't Commander-legal).
 - Skipped there, with reasons: Leitmotif Composer (a named creature's "can't be blocked" should hold for later
   arrivals too), Blossombind (counters can't be put on it, and wither rulings), Skyblade's Boon (an ability that works
   from two zones), Cut Short (a planeswalker that activated an ability this turn), Cleansing Meditation (returning the

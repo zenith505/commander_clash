@@ -395,8 +395,6 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Repay in Kind: "Each player's life total becomes the lowest life total among all players."
   if (/^Each player's life total becomes the lowest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, lowest: true }];
-  // Invincible Hymn: "Your life total becomes the number of cards in your library" (rewritten from "Count ...").
-  if (/^Your life total becomes the number of cards in your library$/.test(s)) return [{ type: "setLife", who: { ref: "you" }, n: 0, amount: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }];
   // Arbiter of Knollridge: "each player's life total becomes the highest life total among all players": in Commander
   // every player is in range of influence (rulings), each gaining the difference (CR 119.5).
   if (/^[Ee]ach player's life total becomes the highest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, highest: true }];

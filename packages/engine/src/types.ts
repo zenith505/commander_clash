@@ -1356,6 +1356,8 @@ export interface TurnLog {
   leftGraveyard?: PlayerId[];
   /** How many cards left each player's graveyard this turn (Bonecache Overseer's "three or more cards"). */
   leftGraveyardCount?: Partial<Record<PlayerId, number>>;
+  /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */
+  creaturesToYard?: { owner: PlayerId; token?: true }[];
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
   creaturesLeft?: Partial<Record<PlayerId, number>>;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
@@ -2277,6 +2279,8 @@ export interface Resolving {
     auraAsking?: ObjectId;
     /** Effect attachToChosen with `pickOne` (Gilgamesh): the permanent chosen to attach, or "none". */
     attachWhich?: string;
+    /** Effect attachEquipmentTo (Goldwardens' Gambit): the next of `attachEach` to choose an Equipment for. */
+    attachEqAt?: number;
     /** "Choose artifact or enchantment": this instruction has asked its question. */
     asked?: true;
   };

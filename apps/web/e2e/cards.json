@@ -4919,6 +4919,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "da587161-da7e-48ae-8af6-7f02ee71afd8",
+  "name": "Elvish Warrior",
+  "manaCost": "{G}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Elf Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warrior"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "473da1b6-232b-4428-a66d-30262246b47a",
   "name": "Emeria Shepherd",
   "manaCost": "{5}{W}{W}",
@@ -13186,6 +13217,32 @@
   "set": "csp",
   "releasedAt": "2006-07-21",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "563e9574-3f60-4558-88cb-aaf97caa7515",
+  "name": "Resolute Strike",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature gets +2/+2 until end of turn. If it's a Warrior, you may attach an Equipment you control to it.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

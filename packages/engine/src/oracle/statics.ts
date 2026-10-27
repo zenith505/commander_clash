@@ -398,7 +398,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   }
   if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
     const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
-    return filter?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
+    // "If it targets a blue spell" (Mystical Dispute), "a creature spell" (Out of Air): a spell on the stack.
+    return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
   }
   // "The first creature spell you cast each turn costs {2} less to cast", "The second spell you cast each turn ...".
   if ((m = /^The (first|second) (.*?)spell you cast each turn costs \{(\d+)\} less to cast$/.exec(text))) {
@@ -789,6 +790,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you(?: (didn't lose)| lost|'ve lost) life this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, ...(m[1] ? { max: 0 } : { min: 1 }) };
   // "If you gained and lost life this turn" (Lunar Convocation): both, whatever the net change (rulings).
   if (/^you gained and lost life this turn$/.test(text)) return { kind: "allOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
+  // "If you gained or lost life this turn" (Starlit Soothsayer): either one.
+  if (/^you gained or lost life this turn$/.test(text)) return { kind: "anyOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
   // "If you created a token this turn" (Bennie Bracks, Zoologist).
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you sacrificed a Food this turn" (Elanor Gardner).
@@ -930,6 +933,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
   // Bloodghast: "as long as an opponent has 10 or less life" (one still in the game).
   if ((m = /^an opponent has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), opponent: true };
+  // Anya, Merciless Angel: "an opponent's life total is less than half their starting life total" (CR 903.7).
+  if (/^an opponent's life total is less than half their starting life total$/.test(text)) return { kind: "life", max: Math.ceil(STARTING_LIFE / 2) - 1, opponent: true };
   if ((m = /^each player has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), everyone: true };
   if ((m = /^you have at least (\d+) life more than your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1]) };
   if ((m = /^your life total is (greater than or equal to|greater than|less than or equal to|less than) (half )?your starting life total$/.exec(text))) {
@@ -1106,7 +1111,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     // "Three or more tapped Pirates and/or Vehicles" (The Indomitable): each permanent with either subtype.
     const either = /^(tapped )?([A-Z][a-z]+) and\/or ([A-Z][a-z]+)$/.exec(q[4]!);
     const kinds = either ? [singular(either[2]!), singular(either[3]!)] : [];
-    const filter: TargetSpec | null = either ? (kinds.every((k) => CREATURE_TYPES.has(k) || k === "Vehicle") ? { kind: "object", types: [], subtypes: kinds, ...(either[1] ? { tapped: true } : {}), text: q[4]!.toLowerCase() } : null) : pickFilter(q[4]!);
+    // "Seven or more lands and/or Treefolk" (Tend the Sprigs): each permanent that's either.
+    const andOr = either ? null : /^([a-z]+) and\/or ([A-Z][a-z]+)$/.exec(q[4]!);
+    const filter: TargetSpec | null = either ? (kinds.every((k) => CREATURE_TYPES.has(k) || k === "Vehicle") ? { kind: "object", types: [], subtypes: kinds, ...(either[1] ? { tapped: true } : {}), text: q[4]!.toLowerCase() } : null) : andOr ? (CREATURE_TYPES.has(singular(andOr[2]!)) ? pickFilter(`${singular(andOr[1]!)} or ${singular(andOr[2]!)}`) : null) : pickFilter(q[4]!);
     if (!filter) return null;
     if (q[1] === "no") return { kind: "control", who, filter, max: 0 };
     if (q[1] === "another") return { kind: "control", who, filter, min: 1, other: true };

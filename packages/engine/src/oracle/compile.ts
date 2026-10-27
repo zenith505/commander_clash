@@ -550,6 +550,9 @@ export function compile(d: CardDef): CompiledCard {
     let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
     // An instant's or sorcery's ability word ("Spell mastery — If ...", CR 207.2c): no rules meaning either.
     if (isSpell) line = line.replace(SPELL_ABILITY_WORD, "");
+    // Ascendant Acolyte: "~ enters with a +1/+1 counter on it for each +1/+1 counter among other creatures you control":
+    // counted as it enters, when it isn't on the battlefield yet (CR 614.1c), so the same as "among creatures you control".
+    line = line.replace(/^(~ enters with a \+1\/\+1 counter on it for each \+1\/\+1 counter among) other (creatures you control\.)$/, "$1 $2");
     // An ability word (CR 207.2c) or a flavor word (Khârn's "Berzerker — ", CR 207.2d) before a static or replacement
     // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
     // 714.2b) or a modal choice.
@@ -2896,7 +2899,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "~ enters with a number of +1/+1 counters on it equal to ..." is "with X ... counters on it, where X is ...".
-    const aNumber = new RegExp(`^(?:Undergrowth — )?~ enters(?: the battlefield)? with a number of ${COUNTER} counters on (?:it|him|her) equal to (.+)\\.$`).exec(line);
+    const aNumber = new RegExp(`^(?:Undergrowth — )?~ enters(?: the battlefield)? with a number of ${COUNTER} counters on (?:it|him|her|~) equal to (.+)\\.$`).exec(line);
     // "The amount of mana spent to cast it" (Marath): the spell it was, only as it enters from the stack.
     if (aNumber && /^the amount of mana spent to cast (?:it|~)$/.test(aNumber[2]!)) {
       if (out.entersWithCounters) out.unsupported.push(raw);
@@ -3346,6 +3349,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (your commander) enters or attacks, (.+)$/.exec(line) ??
       // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
+      // "Whenever ~ or another nontoken Spirit you control dies or deals combat damage to a player, ..." (Millicent,
+      // Restless Revenant): a death and combat damage are never one event.
+      /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
@@ -3402,6 +3408,8 @@ export function compile(d: CardDef): CompiledCard {
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
+            : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
+              ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];

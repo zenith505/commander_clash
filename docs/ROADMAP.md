@@ -1,7 +1,7 @@
 # Roadmap
 
-25,871 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,724 of
+25,938 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,725 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -311,11 +311,31 @@ line blocks.
    Willowdusk, Gisa's Favorite Shovel, Reality Smasher, Voice of Resurgence, Throatseeker and others), taking the easy
    ones, and further cards sharing their mechanics (Psychic Spiral, Hurkyl's Recall, Perennation, Cemetery
    Recruitment, Carrion Grub, Curse of Thirst).
-   Next most played after rank 10,640: Smoldering Egg, Cryptic Spires, Jadzi, Oracle of Arcavios, Oskar, Rubbish
-   Reclaimer, Strict Proctor, Kadena's Silencer, Alacrian Armory, Deadly Cover-Up, Caller of the Claw, Chandra, Fire
-   Artisan, Obzedat, Ghost Council, Kusari-Gama, Reap, Herald of Amity, Fearless Swashbuckler, Ajani Unyielding,
-   Friendly Rivalry, Invoke Justice, Bess, Soul Nourisher, Mana Breach, The Eagles Are Coming!; the harder ones from
-   ranks 10,060 to 10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
+   Out after round 179: Smoldering Egg (counters equal to the mana spent on another spell), Cryptic Spires (circled
+   colors), Jadzi, Oracle of Arcavios, Oskar, Rubbish Reclaimer, Strict Proctor and Kadena's Silencer (countering
+   triggered abilities), Alacrian Armory, Deadly Cover-Up, Chandra, Fire Artisan (loyalty counters removed),
+   Kusari-Gama, Reap (X targets set by another target), Fearless Swashbuckler ("a Pirate and a Vehicle attacked"),
+   Friendly Rivalry (two differently targeted creatures each dealing damage), Invoke Justice (counters distributed
+   among a target player's creatures), The Eagles Are Coming!, Thief of Blood, Eldrazi Mimic ("base power and
+   toughness become" another's), Arcbound Javelineer ("Remove X counters" as a cost), Wonderscape Sage ("unless that
+   land had a nonbasic land type"), Tajuru Preserver and Sigarda (sacrifice prevention), Pandemonium (another player
+   chooses targets), Curse of Shallow Graves ("that attacking player may"), Namor (blue mana symbols in a cost), Tune
+   Up (a Vehicle becoming an artifact creature with no duration), Bounding Felidar ("for each of those creatures" after
+   counters), Gleam of Authority ("other creatures" there means other than the enchanted creature), Azog, Sengir,
+   Mysterio, Gate to the Aether. Rules bug found (fix first next round): Bravado, Conclave's Blessing and Vampirism
+   ("Enchanted creature gets +1/+1 for each other creature you control") leave out the Aura rather than the enchanted
+   creature, so the enchanted creature counts itself (Count permanents' `other` skips only the source). Round 179 went down from rank 10,640 to about rank 11,250 (Caller of the Claw,
+   Obzedat, Herald of Amity, Ajani Unyielding, Bess, Mana Breach, Nahiri, Heir of the Ancients, Goldwardens' Gambit,
+   Expel from Orazca, Mystical Dispute, Stern Scolding, Roalesk, King Macar, Deathrender, Oathkeeper, Goro-Goro and
+   Satoru, Catapult Fodder, From Father to Son, Besmirch, Sly Instigator, Strategic Betrayal, Wasitora, Millicent,
+   Unnatural Moonrise, Rally the Ancestors, Ever After, Olivia, Mobilized for War, Kurbis, Vile Redeemer and others),
+   taking the easy ones.
+   Next most played after rank 11,250: Tom, Bert, and William, Ich-Tekik, Salvage Splicer, Spellweaver Helix, Ian
+   Malcolm, Chaotician, Panther Habit, New Way Forward, Grenzo, Dungeon Warden, Trove Warden, Trailblazer's Torch, The
+   Nipton Lottery, Emergent Sequence, Vengeful Regrowth, The Seventh Doctor, Lucy MacLean, Gideon Jura, Ceaseless
+   Conflict, Call a Surprise Witness, Relentless Rats, Treacherous Greed, Foggy Swamp Visions; the harder ones from
+   ranks 10,640 to 11,250 (above); the harder ones from ranks 10,060 to
+   10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
@@ -323,7 +343,7 @@ line blocks.
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in rounds 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,
@@ -1443,7 +1463,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   a creature. Put a loyalty counter on it if it's a planeswalker"; "Whenever equipped creature dies, if it was a
   Human"; "create ... if there are two or more creature cards in your graveyard. Otherwise, ..."; "Look at target
   player's hand and choose a card from it. That player discards that card"; "Destroy all creatures except for ~".
-  +86 (25,803 with round 178).
+  +86, three of them also done by round 179: +83 (25,870 with round 179).
 - Skipped there, with reasons: Devour Flesh and Doomgape (the sacrificed creature's toughness, as an effect's
   sacrifice); Laquatus's Creativity ("that many" counted after the draw); Voidpouncer (two kinds of counters);
   Ravaging Riftwurm (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
@@ -1475,7 +1495,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   sacrifice a Food. If you do, ... Otherwise, ..."; Doomgape's "You gain life equal to that creature's toughness";
   "the total life lost by your opponents this turn"; "You gain X life and scry X"; "each player draws two cards, then
   discards a card at random" after a trigger (this also fixes Vile Mutilator, whose second sacrifice was yours instead
-  of each opponent's). +68 (25,871 with round 178).
+  of each opponent's). +68 (25,938 with round 179).
 - Skipped there, with reasons: Sokenzan Smelter ("pay {1} and sacrifice an artifact" as one optional cost); Lethal
   Sting (an additional cost that puts a -1/-1 counter); Heaven's Gate and Touch of Darkness ("one or more target
   creatures"); Urgoros ("discards a card at random. If the player can't"); Searing Blood, Burn Away and A Good Day to

@@ -106,8 +106,10 @@ export function pickFilter(phrase: string): TargetSpec | null {
   const words = phrase.trim().replace(/ you control$/i, "").slice(0, owned ? -owned.length : undefined).split(" ");
   // "a Plains" is already singular; "two creatures" isn't.
   const asIs = words.join(" ") + owned;
-  // "creatures with decayed": the noun before "with" is the plural one.
-  const head = words.indexOf("with") > 0 ? words.indexOf("with") - 1 : words.length - 1;
+  // "creatures with decayed": the noun before "with" is the plural one. "Creatures that each have toughness greater than
+  // their power" (Catapult Fodder): before "that".
+  const cut = words.findIndex((w, i) => i > 0 && (w === "with" || w === "that"));
+  const head = cut > 0 ? cut - 1 : words.length - 1;
   const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === head ? singular(w) : w)).join(" ") + owned;
   const spec = parseTargetPhrase(one);
   if (spec?.kind !== "object" || spec.controller) return null;
@@ -894,6 +896,12 @@ export function parseTargetPhrase(
     const anyOf = [twoKinds[2]!, twoKinds[3]!].map((w) => parseTargetPhrase(`${w} creature`, opts));
     if (anyOf.every((x) => x?.kind === "object" && !x.anyOf)) return { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase()}` };
   }
+  // Bumi Bash: "land creature or nonbasic land": a permanent that's either one, or both.
+  const landOr = /^(target )?(land|artifact) creature or nonbasic land$/.exec(phrase.trim());
+  if (landOr) {
+    const anyOf = [`${landOr[2]} creature`, "nonbasic land"].map((w) => parseTargetPhrase(w, opts));
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase().replace(/^target /, "")}` };
+  }
   // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
   const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
   if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
@@ -1101,7 +1109,9 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
+  p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1187,12 +1197,17 @@ export function parseTargetPhrase(
     extra.basePtEither = Number(m[1]);
     p = p.slice(0, m.index);
   }
+  // "Other creatures you control with base power and toughness 1/1" (Bess, Soul Nourisher).
+  if ((m = / with base power and toughness (\d+)\/(\d+)$/.exec(p))) {
+    extra.basePT = [Number(m[1]), Number(m[2])];
+    p = p.slice(0, m.index);
+  }
   // "Another creature you control with base power 1" (Rapid Augmenter).
   if ((m = / with base power (\d+)$/.exec(p))) {
     extra.basePower = Number(m[1]);
     p = p.slice(0, m.index);
   }
-  if ((m = / with toughness greater than its power$/.exec(p))) {
+  if ((m = / (?:with toughness greater than its power|that each have toughness greater than their power)$/.exec(p))) {
     extra.toughnessAbovePower = true;
     p = p.slice(0, m.index);
   }
@@ -1535,7 +1550,9 @@ export function parseTargetPhrase(
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  // "Creature spell with power or toughness 2 or less" (Stern Scolding): as it is on the stack (see spellMatches).
+  const spellPt = (extra.power || extra.toughness || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf.every((a) => a.power || a.toughness))) && types.length === 1 && types[0] === "Creature";
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC && !spellPt) || ((extra.power || extra.toughness) && !spellPt) || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

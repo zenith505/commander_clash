@@ -250,6 +250,8 @@ export function countersBanned(s: GameState, o: GameObject, kind?: string): bool
   if (o.zone !== "battlefield") return false;
   const types = characteristics(s, o).types;
   if (s.battlefield.some((id) => abilitiesOf(s, s.objects[id]!).noCountersOn?.some((t) => types.includes(t)))) return true;
+  // Tatterkite: "~ can't have counters put on it": none of any kind, by an effect, as a cost or as it enters (rulings).
+  if (abilitiesOf(s, o).selfNoCounters) return true;
   // Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." The ones already there stay;
   // one entering with them gets none, and a cost putting them can't be paid (rulings).
   if (kind === undefined || !types.includes("Creature")) return false;

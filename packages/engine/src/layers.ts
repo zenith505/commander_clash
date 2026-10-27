@@ -206,6 +206,8 @@ export interface Characteristics {
   cantBeSacrificed: boolean;
   /** "Can't be turned face up" (Unable to Scream). */
   cantTurnFaceUp: boolean;
+  /** "Can't transform" (Bound by Moonsilver), nor convert (CR 701.28f). */
+  cantTransform: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
@@ -311,6 +313,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttackOwner: false,
     cantBeSacrificed: false,
     cantTurnFaceUp: false,
+    cantTransform: false,
     cantAttackPlayers: [],
     cantAttackPlayersOnly: [],
     mustBeBlocked: false,
@@ -1020,6 +1023,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "lifeGainedThisTurn":
       return (s.turnLog?.lifeGained?.[you] ?? 0) >= cond.n;
+    case "lostLifeLastTurn":
+      return !!s.lastTurn?.lostLife?.includes(you);
     case "castLastTurn": {
       // With no turn before this one there's no last turn to look at.
       const cast = s.lastTurn?.cast;
@@ -1478,6 +1483,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackSamePlayer":
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
+    case "cantTransform":
     case "attackAsThoughHaste":
     case "mustBlock":
       c[m.kind] = true;

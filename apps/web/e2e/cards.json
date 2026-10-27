@@ -5423,6 +5423,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8841fdb9-0565-4ef5-814c-293c14242741",
+  "name": "Extortion",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at target player's hand and choose up to two cards from it. That player discards those cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e597d8a1-3bbc-4001-b642-f4421447970f",
   "name": "Extract from Darkness",
   "manaCost": "{3}{U}{B}",
@@ -8802,6 +8828,37 @@
   ]
  },
  {
+  "oracleId": "62d1300f-2b76-42b9-8e6c-f920712cd547",
+  "name": "Keeper of the Light",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{W}, {T}: Choose target opponent who has more life than you do as you activate this ability. You gain 3 life.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "exo",
+  "releasedAt": "1998-06-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
   "name": "Khorvath Brightflame",
   "manaCost": "{5}{R}",
@@ -11935,6 +11992,32 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "27a3faa1-4f1a-4581-9e19-9265faa9c10b",
+  "name": "Painful Memories",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at target opponent's hand and choose a card from it. Put that card on top of that player's library.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

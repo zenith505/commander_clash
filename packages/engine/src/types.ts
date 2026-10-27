@@ -1442,7 +1442,8 @@ export interface TurnLog {
    * each source's controller, whether it was a spell, and its subtypes then (Aegar's "if a Giant, Wizard, or spell you
    * controlled dealt damage to it this turn").
    */
-  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[] }[]>;
+  /** `amount`: how much (Burning-Eye Zubera: "if 4 or more damage was dealt to it this turn"). */
+  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[]; amount?: number }[]>;
 }
 
 /**

@@ -3540,6 +3540,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.triggers.push(bindThisAbility(trig, line));
       continue;
     }
+    // The Shards: "{3}, {T} or {W}, {T}: ...": one ability with a choice of costs, either one but not both (rulings; CR
+    // 602.2b, 601.2b), compiled as one ability per cost, the same choice from the menu (as Bloodthorn Flail's equip).
+    const orCost = /^((?:\{[^}]+\})+, \{T\}) or ((?:\{[^}]+\})+, \{T\}): (.+)$/.exec(line);
+    if (orCost) {
+      const acts = [orCost[1]!, orCost[2]!].map((c) => parseActivated(`${c}: ${orCost[3]!}`));
+      if (acts.some((a) => !a || a === "fail")) out.unsupported.push(raw);
+      else for (const a of acts) out.activated.push(bindThisAbility(a as ActivatedAbility, line));
+      continue;
+    }
     const act = parseActivated(line);
     if (act) {
       // "Sacrifice six creatures named ~" (Shadowborn Apostle): this card's name; a copy has it too (CR 707.2).

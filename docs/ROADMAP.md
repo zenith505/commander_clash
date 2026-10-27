@@ -1677,6 +1677,32 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Stalker (a "nonblack, nonland permanent" in an intervening if); Fyndhorn Druid ("if it was blocked this turn" needs
   blocked-this-turn tracking); Lingering Death, Aggression and Insubordination ("that creature" for the enchanted
   creature in a trigger on its controller's step).
+- Round B15 (harder skipped cards, least played first): "Look at target player's hand and choose (up to) two / X cards
+  from it" (Extortion, Mind Warp, Abandon Hope; X cards or as many as there are, CR 609.3), "choose up to X cards,
+  where X is the number of verse counters" (Discordant Dirge, counted as it was sacrificed), "Put that card on top of
+  that player's library" (Painful Memories), "a nonland card with mana value X or less" (Venarian Glimmer); the
+  Keepers' "Choose target opponent who has more life / controls more creatures / has at least two more cards in hand
+  / at least two fewer creature cards in their graveyard than you do as you activate this ability", checked only as
+  the target is chosen (rulings); "target nonblack creature that player controls" and "target land that player
+  controls", checked again as it resolves (Keeper of the Dead, The Fall of Kroog, Yosei); "Counter target spell that
+  targets ~" (Mistfolk); "that spell or ability's controller" (Retromancer, Lava Runner); "becomes the target of an
+  Aura spell / of a spell" (Fugitive Druid, Spectral Prison); "if 4 or more damage was dealt to it this turn" on a dies
+  trigger (the Zuberas); "it loses defender" (Elder Land Wurm, Ageless Sentinels), "if ~ has defender, it loses
+  defender and gains trample" (Guardian of the Ages); protection from snow and from Arcane (Ronom Hulk, Kitsune
+  Riftwalker); "an additional 1 damage to each green creature", dealt at once (Kaervek's Hex; a black-green creature is
+  dealt 1, rulings); "if that player has 5 or less life" (Razor Pendulum); "target creature token, player, or
+  planeswalker" (Coalborn Entity); "Creatures without defender can't block ~ this turn" (Sabertooth Alley Cat); "Tap
+  target untapped creature you control. If you do, it deals damage equal to its power" (Spirit Flare); "Sacrifice two
+  lands and ~" and "Exile two cards from your graveyard and ~" costs (Sandstone Deadfall, Zombie Assassin); "Return ~
+  and another target creature" (Coastal Wizard, Lady Sun); "all Auras attached to target land", "target Aura attached
+  to a land" (Street Sweeper, Savaen Elves); Topple's "greatest power" checked again as it resolves (rulings); Orim's
+  Touch's kicked "prevent the next 4 ... instead"; Elvish Healer's "If it's a green creature, prevent the next 2 damage
+  instead" (checked as it resolves, rulings); the Shards' "{3}, {T} or {W}, {T}" costs (Pearl, Granite, Heartwood and
+  Skeleton Shard). +43 (26,376 with round B14).
+- Skipped there, with reasons: Crystal Shard ("Return target creature to its owner's hand unless its controller pays
+  {1}" isn't parsed); Lifelace and Purelace still (a color change on a spell); Brine Comber (its back face); Browse
+  (exiling the rest of the cards looked at); Gremlin Mine ("up to four" charge counters removed); Agonizing Memories
+  (the two cards' order on the library); Purging Scythe, Pyramids and Dragon Hunter (not looked at in depth yet).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Heart Wolf (Dwarves, a

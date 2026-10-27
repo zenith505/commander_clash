@@ -35,6 +35,8 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // Coalborn Entity: "target creature token, player, or planeswalker": a player, a planeswalker, or a creature that's a token.
+  if (/^target creature token, player, or planeswalker$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], creatureTokens: true, text: p.toLowerCase() }) };
   // All Will Be One, Nicol Bolas, God-Pharaoh: "target opponent, creature an opponent controls, or planeswalker an opponent
   // controls".
   if (/^target opponent, creature an opponent controls, or planeswalker an opponent controls$/i.test(p))
@@ -269,6 +271,16 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // The Keepers: "target opponent who has more life than you do as you activate this ability" (TargetSpec.comparedToYou):
+  // true as it's chosen, whatever happens before it resolves (rulings).
+  const compared = ctx.activated ? /^target opponent who (has more life|controls more creatures|has at least two more cards in hand|has at least two fewer creature cards in their graveyard) than you do as you activate this ability$/.exec(x) : null;
+  if (compared) {
+    const c = compared[1]!;
+    const comparedToYou: NonNullable<TargetSpec["comparedToYou"]> = /life/.test(c) ? { stat: "life", by: 1 } : /creatures$/.test(c) ? { stat: "creatures", by: 1 } : /in hand/.test(c) ? { stat: "hand", by: 2 } : { stat: "creatureCardsInGraveyard", by: 2, fewer: true };
+    const index = addTarget(ctx, { kind: "player", opponent: true, comparedToYou, text: `target opponent who ${c} than you do` });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   if (x === "target player" || x === "target opponent") {
     const index = addTarget(ctx, { kind: "player", opponent: x === "target opponent", text: x });
     ctx.lastPlayerTarget = index;
@@ -422,6 +434,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "target attacking creature and all Equipment attached to it".
   const andAttached = /^(.*target (?:attacking )?creatures?(?: with [a-z ]+?)?) and all (Auras|Equipment) attached to (?:it|them|that creature)$/i.exec(x);
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
+  // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land.
+  const attachedTarget = !cards ? /^all Auras attached to (target land)$/i.exec(x) : null;
+  if (attachedTarget) {
+    const t = parseObjectNow(attachedTarget[1]!, ctx, cards);
+    if (t?.ref !== "target" || t.n) return null;
+    return { ...t, attachedToo: { filter: { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" }, only: true } };
+  }
   if ((andAttached || attachedThat) && !cards) {
     const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
     const filter: TargetSpec = kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" };
@@ -504,6 +523,21 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const spec = parseTargetPhrase(`attacking ${attackingThem[1]!}`, { target: true });
     if (spec?.kind !== "object" || spec.combat !== "attacking" || spec.controller) return null;
     return { ref: "target", index: addTarget(ctx, { ...spec, attackingWhom: "eventPlayer", text: `target ${m[1]!}` }) };
+  }
+  // Topple: "target creature with the greatest power among creatures on the battlefield": one tied for it, as it's chosen
+  // and as it resolves (rulings; CR 608.2b), as a bound of at least that power.
+  if (!cards && /^creature with the greatest power among creatures on the battlefield$/i.test(m[1]!)) {
+    const amount = parseCount("the greatest power among creatures on the battlefield", ctx);
+    if (amount?.count.kind !== "greatestPower") return null;
+    return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], bound: { key: "power", at: "least", amount }, text: `target ${m[1]!}` }) };
+  }
+  // Keeper of the Dead, The Fall of Kroog: "Choose target opponent. Destroy target land that player controls.": controlled
+  // by the player an earlier target chose, as it's chosen and as it resolves (CR 608.2b; TargetSpec.controlledByTarget).
+  const byTarget = !cards && !ctx.eventPlayer && !ctx.defending && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" ? / that player controls$/i.exec(m[1]!) : null;
+  if (byTarget) {
+    const spec = parseTargetPhrase(m[1]!.slice(0, byTarget.index), { target: true });
+    if (spec?.kind !== "object" || spec.controller || spec.xRange || spec.bound) return null;
+    return { ref: "target", index: addTarget(ctx, { ...spec, controlledByTarget: ctx.lastPlayerTarget, text: `target ${m[1]!}` }) };
   }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true });
@@ -606,7 +640,11 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (count === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
-  const [mine1, theirs] = thatPlayerControls(phrase!, ctx);
+  // Yosei, the Morning Star: "target player skips their next untap step. Tap up to five target permanents that player
+  // controls": controlled by that player target (TargetSpec.controlledByTarget).
+  const byTarget = !cards && !ctx.eventPlayer && !ctx.defending && ctx.lastPlayerTarget !== undefined && ctx.targets[ctx.lastPlayerTarget]?.kind === "player" && !ctx.targets[ctx.lastPlayerTarget]!.many ? / that player controls$/i.exec(phrase!) : null;
+  const byIndex = byTarget ? ctx.lastPlayerTarget : undefined;
+  const [mine1, theirs] = thatPlayerControls(byTarget ? phrase!.slice(0, byTarget.index) : phrase!, ctx);
   // Sorin, Lord of Innistrad: "up to three target creatures and/or other planeswalkers": other than the source, which
   // is a planeswalker, unless it's a creature too (rulings).
   const otherWalkers = !other && !another && !ctx.spell && !ctx.targets.length && /^creatures and\/or other planeswalkers$/.test(mine1);
@@ -643,7 +681,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind === "card" ? !!parsed.owner : parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
-  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: parsed.kind === "card" ? parsed.text.replace(/ from a graveyard$/, " from that player's graveyard") : `${parsed.text} that player controls` } : parsed;
+  if (byIndex !== undefined && (parsed.kind !== "object" || parsed.controller)) return null;
+  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: parsed.kind === "card" ? parsed.text.replace(/ from a graveyard$/, " from that player's graveyard") : `${parsed.text} that player controls` } : byIndex !== undefined ? { ...parsed, controlledByTarget: byIndex, text: `${parsed.text} that player controls` } : parsed;
   // One group with a total to each ability: the targets that have it are that group.
   if (total && ctx.targets.some((t) => t.total)) return null;
   if (equalToughness && (total || ctx.targets.some((t) => t.equalToughness))) return null;
@@ -1164,9 +1203,10 @@ export function parseTargetPhrase(
   }
   // "Target Aura attached to a creature" (Crown of the Ages), "Aura or Equipment attached to a creature you control" (Halvar).
   // "Each Aura you control that's attached to a creature" (Sage's Reverie).
-  const attached = / (?:that's |that are )?attached to an? (creature|permanent)( you control)?$/.exec(p);
+  // Savaen Elves: "target Aura attached to a land".
+  const attached = / (?:that's |that are )?attached to an? (creature|permanent|land)( you control)?$/.exec(p);
   if (attached) {
-    extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
+    extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : attached[1] === "land" ? { types: ["Land"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
     p = p.slice(0, attached.index);
   }
   // "creature an opponent controls that was dealt damage this turn"

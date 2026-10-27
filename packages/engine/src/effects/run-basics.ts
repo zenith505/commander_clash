@@ -156,6 +156,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         ...all.flatMap((x) => x.objs.map((o): DamageEvent => ({ src: from, to: { object: o.id }, n: x.n }))),
         ...all.flatMap((x) => x.pids.map((pid): DamageEvent => ({ src: from, to: { player: pid }, n: x.n }))),
       ];
+      // Kaervek's Hex: each recipient's parts as one amount (Effect damage `merge`).
+      if (e.merge) {
+        const byKey = new Map<string, DamageEvent>();
+        for (const ev of events) {
+          const key = "object" in ev.to ? `o${ev.to.object}` : `p${ev.to.player}`;
+          const had = byKey.get(key);
+          if (had) had.n += ev.n;
+          else byKey.set(key, { ...ev });
+        }
+        events = [...byKey.values()];
+      }
       // "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal, worked out
       // before replacement and prevention, is dealt to its controller at the same time (CR 120.4a; rulings).
       if (e.excessToController)

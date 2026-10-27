@@ -17559,6 +17559,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fd6ba826-e7b1-4375-8aaf-c3cd3dc7ba07",
+  "name": "Vex",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell. That spell's controller may draw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dst",
+  "releasedAt": "2004-02-06",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "be8b36ce-52c1-4ca0-9141-4c9a80dca3ea",
   "name": "Victory Chimes",
   "manaCost": "{3}",

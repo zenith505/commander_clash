@@ -182,6 +182,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         : /^that many cards$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own } }
         // Dark Deal: "that many cards minus one", none for a player who discarded one or none (rulings).
         : /^that many cards minus one$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own }, plus: -1 }
+        // Chandra, Flamecaller: "that many cards plus one".
+        : /^that many cards plus one$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own }, plus: 1 }
         : /^cards equal to the greatest number of cards a player discarded this way$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, greatest: true as const } }
         // "Then draw cards equal to your devotion to red" (Clive), counted after the discard (rulings).
         : who.ref === "you" && /^cards equal to your devotion to /i.test(m[2]) ? parseCount(m[2].replace(/^cards equal to /i, ""), ctx)

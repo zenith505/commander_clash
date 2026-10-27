@@ -130,6 +130,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
+  // Bonder's Ornament: "Each player who controls a permanent named ~".
+  if (controlling?.[1] === "permanent named ~") return { ref: "playersControlling", filter: { kind: "object", types: [], notTypes: [], notColors: [], named: "~", text: "permanent named ~" } };
   if (controlling) {
     const spec = parseTargetPhrase(controlling[1]!);
     return spec?.kind === "object" && !spec.controller && !spec.bound ? { ref: "playersControlling", filter: spec } : null;
@@ -699,6 +701,14 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
       { kind: "object", types: ["Creature"], status: "modified", text: "modified creature" },
     ];
     return { filter: { kind: "object", types: ["Enchantment", "Artifact", "Creature"], notTypes: [], notColors: [], anyOf, controller: "you", text: phrase.trim().toLowerCase() }, other: false };
+  }
+  // Zedruu the Greathearted: "permanents you own that your opponents control": owned by you, controlled by another
+  // player (CR 108.3, 108.4).
+  const ownedTheirs = /^(.+?) you own that your opponents control$/.exec(p);
+  if (ownedTheirs) {
+    const base = parseGroup(`${ownedTheirs[1]!} your opponents control`, bare, count);
+    if (!base || base.filter.kind !== "object" || base.filter.owner) return null;
+    return { filter: { ...base.filter, owner: "you", text: phrase.trim().toLowerCase() }, other: base.other };
   }
   // "Each other creature you control that's a token or a Rabbit" (Finneas, Ace Archer): either one (TargetSpec.anyOf).
   const tokenOr = /^((?:all |each )?(?:other )?creatures? you control) that(?:'s| is| are|'re) (?:a )?tokens? or (?:an? )?([A-Z][a-z]+)$/.exec(p);

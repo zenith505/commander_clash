@@ -256,6 +256,8 @@ export type Count =
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
   | { kind: "graveyardCardTypes"; who: PlayerRef }
+  /** "Five or more mana values among cards in your graveyard" (Tainted Indulgence): how many different mana values (CR 202.3). */
+  | { kind: "graveyardManaValues"; who: PlayerRef }
   /**
    * "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). `toughness`: "the greatest
    * toughness among". `whose`: "among creatures they control" (Inscription of Abundance), that player's creatures only.
@@ -1448,6 +1450,12 @@ export type StaticCondition =
    * on the layers being worked out.
    */
   | { kind: "selfIs"; filter: TargetSpec }
+  /**
+   * "As long as the top card of your library is black / a creature card" (Vampire Nocturnus, Mul Daya Channelers): the
+   * card on top of the source's controller's library, as printed (a card in a library has only its printed
+   * characteristics), false with an empty library.
+   */
+  | { kind: "topCardIs"; filter: TargetSpec }
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Draw a card if its power is 3 or greater" about a trigger's subject (Tribute to the World Tree): as it is now, or as it last existed (CR 608.2h). */
@@ -2375,7 +2383,7 @@ export type Effect =
    * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
    * (Resourceful Defense): `n` is ignored, up to all of them, each removed and put on that one (CR 122.5).
    */
-  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef }
+  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef; /** "Any number of +1/+1 counters" (Scrounging Bandar): only these kinds. */ kinds?: CounterKind[] }
   /**
    * Slippery Bogbonder: "Then move any number of counters from among creatures you control onto that creature." Chosen
    * one at a time as it resolves, any kinds, from any of them but `onto` itself (rulings), then moved together (CR 122.5).
@@ -3919,7 +3927,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -4578,7 +4586,8 @@ export type EntersCondition =
   | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; colors?: Color[]; other?: boolean; min?: number; max?: number }
   | { kind: "playerLifeAtMost"; n: number }
   | { kind: "opponents"; min: number }
-  | { kind: "ownTurnAtMost"; n: number };
+  | { kind: "ownTurnAtMost"; n: number }
+  | { kind: "yourTurn" };
 
 /**
  * "As ~ enters, you may pay 2 life / reveal a Dragon card from your hand. If you don't, it enters

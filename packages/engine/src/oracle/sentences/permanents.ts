@@ -260,6 +260,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
+  // Kelsien, the Plague: "When that creature dies this turn, you get an experience counter": a delayed trigger about the
+  // creature it targeted (CR 603.7), for the rest of this turn, with an effect that doesn't refer to that creature.
+  if ((m = /^When that creature dies this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && !ctx.spell && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[1]!)) {
+    const inner = parseSentence(capital(m[1]!), ctx);
+    return inner ? [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: inner, text: m[1]!, thisTurn: true }] : null;
+  }
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
   // doesn't return (rulings).
@@ -564,6 +570,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const from = parseObject(g.from ?? g.self!, ctx);
     const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, "another "), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
+  }
+  // Scrounging Bandar: "you may move any number of +1/+1 counters from ~ onto another target creature": that kind only,
+  // as many as you choose (none is choosing not to) as it resolves.
+  if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto (another target .+)$`).exec(s))) {
+    const to = parseObject(m[2]!, ctx);
+    return to?.ref === "target" && !to.n ? [{ type: "removeAnyCounters", what: { ref: "self" }, n: 0, upTo: true, moveTo: to, kinds: [counterKind(m[1]!)] }] : null;
   }
   // Rikku, Resourceful Guardian: "Move a counter from target creature an opponent controls onto target creature you
   // control": two targets that can't be the same object (their controllers differ), so no "another" is needed.

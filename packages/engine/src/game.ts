@@ -1618,6 +1618,8 @@ export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerI
     // Starting Town: "unless it's your first, second, or third turn of the game".
     case "ownTurnAtMost":
       return s.activePlayer === you && (player(s, you).turnsTaken ?? 0) <= cond.n;
+    case "yourTurn":
+      return s.activePlayer === you;
     case "control": {
       const n = s.battlefield.filter((id) => {
         if (id === self) return false;

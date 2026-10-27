@@ -563,8 +563,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "opponentsControllingNo":
       return opponents(s, ctx.controller).filter((p) => !s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, ref.filter, o, ctx.controller, false); }));
-    case "playersControlling":
-      return apnap(s, livingPlayers(s).filter((p) => s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, ref.filter, o, ctx.controller, false); })));
+    case "playersControlling": {
+      // "A permanent named ~" (Bonder's Ornament): its name now, or as it last existed (CR 201.5, 608.2h).
+      const me = ref.filter.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const filter = ref.filter.named === "~" ? { ...ref.filter, named: me?.zone === "battlefield" ? characteristics(s, me).name : ctx.sourceDef.name } : ref.filter;
+      return apnap(s, livingPlayers(s).filter((p) => s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, filter, o, ctx.controller, false); })));
+    }
     case "opponentsNotDiscarded":
       return opponents(s, ctx.controller).filter((p) => !(s.resolving?.discardedAll ?? []).some((id) => s.objects[id]?.owner === p && printedMatches(ref.filter, defOf(s, s.objects[id]!))));
     case "opponentsLostLife":

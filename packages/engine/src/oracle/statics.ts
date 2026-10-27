@@ -373,6 +373,15 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
     return { costMod: { ...base.costMod, times: c, text: line } };
   }
+  // "Creature spells you cast cost {X} less to cast, where X is the amount of life you gained this turn" (Ezzaroot
+  // Channeler), "Aura and Equipment spells you cast cost {X} less to cast, where X is ~'s power" (Golden-Tail Trainer): {1}
+  // less for each, counted as the spell is cast (CR 601.2f).
+  if ((m = /^(.+ you cast(?: with mana value \d+ or greater)?) cost \{X\} less to cast, where X is (.+)$/.exec(text))) {
+    const base = parseCostChange(`${m[1]} cost {1} less to cast`);
+    const c = parseCount(m[2]!, null);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || !c) return "fail";
+    return { costMod: { ...base.costMod, times: c, text: line } };
+  }
   // Shadow of Mortality: the difference between your starting life total and your life total (CR 103.4, 601.2f).
   if (/^If your life total is less than your starting life total, ~ costs \{X\} less to cast, where X is the difference$/.test(text)) return { less: { count: { kind: "lifeBelowStart" } } };
   if ((m = /^~ costs \{X\} less to cast, where X is (.+)$/.exec(text))) {
@@ -821,6 +830,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // High Score: "if you control a creature with the greatest power among creatures on the battlefield": tied counts too.
   if ((m = /^you control a (creature|artifact) with the greatest (power|toughness|mana value) among (creatures|artifacts) on the battlefield$/.exec(text)) && `${m[1]}s` === m[3])
     return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
+  // Isolated Watchtower: "an opponent controls at least two more lands than you".
+  if ((m = /^an opponent controls at least (two|three|four) more (lands|creatures) than you$/.exec(text))) return { kind: "opponentMore", what: m[2] as "lands" | "creatures", atLeast: num(m[1]!) };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   // "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's player, strictly
@@ -895,7 +906,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
   if ((m = new RegExp(`^an opponent drew ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
   if (/^you descended this turn$/.test(text)) return { kind: "descended" };
-  if (/^a permanent left the battlefield under your control this turn$/.test(text)) return { kind: "revolt" };
+  // "If a permanent you controlled left the battlefield this turn" (Pegasus Guardian): the same (revolt).
+  if (/^a permanent (?:left the battlefield under your control|you controlled left the battlefield) this turn$/.test(text)) return { kind: "revolt" };
+  if (/^a creature left the battlefield under your control this turn$/.test(text)) return { kind: "revolt", creature: true };
   if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };
   // Your life total (CR 119), against a number or your starting life total (CR 903.7).
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
@@ -1112,6 +1125,13 @@ export function parseAffected(subject: string): Affects | null {
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a). Blast-Furnace Hellkite's
   // "Creatures attacking your opponents", the same (rulings).
   if (/^(?:Each creature that's|Creatures) attacking (?:one of )?your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
+  // Lovisa Coldeyes: "Each creature that's a Barbarian, a Warrior, or a Berserker": any player's creature with any of those
+  // creature types, counted once.
+  const thatsA = /^Each creature that's an? ([A-Z][a-z]+), an? ([A-Z][a-z]+), or an? ([A-Z][a-z]+)$/.exec(x);
+  if (thatsA) {
+    const subs = [thatsA[1]!, thatsA[2]!, thatsA[3]!];
+    return subs.every((t) => CREATURE_TYPES.has(t)) ? { kind: "filter", types: ["Creature"], spec: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: subs, text: `creature that's a ${subs.join(", a ")}` } } : null;
+  }
   // "Creatures named Lightning Rager can't attack you ..." (Rite of the Raging Storm): any player's, by their name.
   const named = /^Creatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
   if (named) return { kind: "filter", types: ["Creature"], spec: { kind: "object", named: named[1]!, text: `creature named ${named[1]}` } };
@@ -1512,6 +1532,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const [a, b] = [parseStaticMods(`can't be blocked by ${m[1]}`), parseStaticMods(`can't be blocked by ${m[2]}`)];
     return a?.length === 1 && b?.length === 1 && a[0]!.kind === "cantBeBlockedBy" && b[0]!.kind === "cantBeBlockedBy" ? [...a, ...b] : null;
   }
+  // Azure Fleet Admiral: "can't be blocked by creatures the monarch controls" (CR 509.1b, 725).
+  if (/^can't be blocked by creatures the monarch controls$/.test(rest)) return [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], monarchControls: true, text: "creatures the monarch controls" } }];
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".

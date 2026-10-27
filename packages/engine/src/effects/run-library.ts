@@ -730,6 +730,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
         shuffled.push([pid, ids.length]);
+        if (e.countThisWay && s.resolving) s.resolving.movedLinked = (s.resolving.movedLinked ?? 0) + ids.length;
         log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"}`} into their library.`);
       }
       // Winds of Change: each draws as many as they shuffled into their own library (rulings).
@@ -1227,8 +1228,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Take none" says it's optional; "up to" only reads well with a number.
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
-          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
+          const to = e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
+          const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
         }
@@ -1310,7 +1311,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         shuffleLibrary(s, p); // "Then shuffle" (CR 701.20)
         log(s, `${p.name} shuffles their library.`);
       } else if (e.rest === "graveyard") {
-        if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
+        if (rest.length) log(s, `${p.name} puts ${names(rest)} into ${from === pid ? "their" : `${player(s, from).name}'s`} graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
         // "For each card put into your graveyard this way" (Dihada): those that got there.
         if (s.resolving) s.resolving.movedLinked = rest.filter((id) => s.objects[id]?.zone === "graveyard").length;

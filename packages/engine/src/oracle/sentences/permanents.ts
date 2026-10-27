@@ -414,6 +414,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Regeneration (CR 701.19a)
   // "Regenerate each creature you control" (Golgari Charm): a shield for each, as it resolves (CR 701.19a, 611.2c).
   // "Regenerate all Werewolf creatures you control" (Full Moon's Rise), "each other creature you control" (Dark Dabbling).
+  // Experiment One: "Remove two +1/+1 counters from ~: Regenerate it.": the permanent itself, in its own activated ability.
+  if (/^Regenerate it$/.test(s) && ctx.activated && !ctx.targets.length && !ctx.subject) return [{ type: "regenerate", what: { ref: "self" } }];
   if ((m = /^Regenerate (~|(?:another )?target .+|enchanted creature|equipped creature|each (?:other )?creature you control|all (?:[A-Z][a-z]+ )?creatures you control)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
@@ -422,6 +424,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (ctx.vote?.among && (m = /^Return (each card with the most votes or tied for most votes) to your hand$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
+  }
+  // Hurkyl's Recall: "Return all artifacts target player owns to their hand".
+  if ((m = /^Return (all .+? target player owns) to their hand$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "each" && what.ofOwner ? [{ type: "bounce", what }] : null;
   }
   if ((m = /^Return ((?:all|each) .+?) to (?:their|its) owners?'s? hands?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

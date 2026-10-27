@@ -495,6 +495,10 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
     // Frost Titan: "counter that spell or ability unless its controller pays {2}", as ward does (CR 702.21a).
     const selfTaxed = m[2] && /^counter that spell or ability unless its controller pays (\{\d+\})\.?$/.exec(m[5]!);
     if (selfTaxed) return { event: "selfBecomesTarget", targeted, body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: selfTaxed[1]! } }], text: `counter that spell or ability unless its controller pays ${selfTaxed[1]}.` } };
+    // Reality Smasher: "Whenever ~ becomes the target of a spell an opponent controls, counter that spell unless its
+    // controller discards a card": a card of their choice, as ward's discard is (CR 702.21a).
+    if (!m[2] && m[3] === " an opponent controls" && !m[4] && /^counter that spell unless its controller discards a card\.?$/.test(m[5]!))
+      return { event: "selfBecomesTarget", targeted, body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", discard: 1 } }], text: "counter that spell unless its controller discards a card." } };
     const body = counter ? { targets: [], effects: [{ type: "counterCause" as const }], text: "Counter that spell or ability." } : parseBody(text, { selfIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
     return body ? { event: "selfBecomesTarget", targeted, body } : "fail";
   }
@@ -562,6 +566,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast an instant or sorcery spell during your turn" (Ral, Monsoon Mage): only while you're the active player.
   const duringYours = m[1] === "you" && / during your turn$/.test(what);
   if (duringYours) what = what.replace(/ during your turn$/, "");
+  // "Whenever an opponent casts a spell during your turn" (Voice of Resurgence): only while this ability's controller is
+  // the active player.
+  const duringMine = m[1] === "an opponent" && / during your turn$/.test(what);
+  if (duringMine) what = what.replace(/ during your turn$/, "");
   // "Whenever you cast a spell while ~ is attacking" (Fire Lord Azula): only while it's an attacking creature as the
   // spell is cast.
   const whileAttacking = / while ~ is attacking$/.test(what);
@@ -669,7 +677,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -2025,9 +2033,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "At the beginning of the upkeep of enchanted creature's controller, ~ deals 1 damage to that player": "that player"
   // is that controller, whose upkeep it is; "that creature" is the enchanted creature.
-  const hostUpkeep = /^At the beginning of the upkeep of (enchanted|equipped) creature's controller, (.+)$/.exec(line);
+  // Righteous Authority: "At the beginning of the draw step of enchanted creature's controller, that player draws an
+  // additional card": a trigger, so they just draw one more.
+  const hostUpkeep = /^At the beginning of the (upkeep|draw step) of (enchanted|equipped) creature's controller, (.+)$/.exec(line);
   if (hostUpkeep) {
-    const t = parseTrigger(`At the beginning of each player's upkeep, ${hostUpkeep[2]!.replace(/\bthat creature\b/g, `${hostUpkeep[1]} creature`)}`);
+    const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostUpkeep[3]!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
@@ -2252,6 +2262,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever ~ attacks, if defending player controls more lands than you" (Aerial Surveyor): the player it attacks, or
   // the controller of the planeswalker it attacks (CR 506.2), as it triggers and resolves (rulings).
   const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  // Septic Rats: "Whenever ~ attacks, if defending player is poisoned": the player it attacks (or the planeswalker's
+  // controller, CR 506.2), as it triggers and resolves.
+  const poisonedCond: StaticCondition | null = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) && intervening[2] === "defending player is poisoned" ? { kind: "eventPlayerPoisoned" } : null;
   // "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience), "each
   // opponent's end step, if that player didn't cast a creature spell this turn" (Predatory Advantage): the active
   // player's spells, as it triggers and resolves (CR 603.4).
@@ -2267,7 +2280,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const kwIf = intervening && /^Whenever ~ /.test(intervening[1]!) ? /^it (has|doesn't have) (first strike|double strike|flying|trample|vigilance|deathtouch|lifelink|haste|reach|menace|defender)$/.exec(intervening[2]!) : null;
   const kw = kwIf ? keywordOf(kwIf[2]!) : undefined;
   const kwCond: StaticCondition | null = kwIf && kw ? { kind: "selfIs", filter: { kind: "object", ...(kwIf[1] === "has" ? { keywords: [kw] } : { notKeywords: [kw] }), text: `${kwIf[1] === "has" ? "with" : "without"} ${kwIf[2]}` } } : null;
-  const ifCond = kwCond ? kwCond : putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -2773,11 +2786,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a), "if its surge cost was paid" (702.117a),
       // "if its spectacle cost was paid" (702.137a).
       // "When Spiders-Man enters, if they were cast using web-slinging, ..." (CR 702.188a).
-      let ifAlt: "sneak" | "surge" | "spectacle" | "webSlinging" | "prowl" | undefined;
-      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle|prowl) cost was paid, (.+)$/i.exec(body0) ?? /^if (?:it|he|she|they) (?:was|were) cast using (web-slinging), (.+)$/i.exec(body0);
+      // "If its madness cost was paid" (Grave Scrabbler): cast for its madness cost (CR 702.35b).
+      let ifAlt: "sneak" | "surge" | "spectacle" | "webSlinging" | "prowl" | "madness" | undefined;
+      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle|prowl|madness) cost was paid, (.+)$/i.exec(body0) ?? /^if (?:it|he|she|they) (?:was|were) cast using (web-slinging), (.+)$/i.exec(body0);
       if (altPaid) {
         if (event !== "selfEnters") return "fail" as const;
-        ifAlt = altPaid[1] === "web-slinging" ? "webSlinging" : (altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle" | "prowl");
+        ifAlt = altPaid[1] === "web-slinging" ? "webSlinging" : (altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle" | "prowl" | "madness");
         body0 = altPaid[2]!;
       }
       // "If a source would deal damage ..., it deals that much damage plus 2 instead" (Rankle and Torbran): that "that much"

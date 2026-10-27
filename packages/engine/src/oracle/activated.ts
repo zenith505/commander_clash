@@ -122,8 +122,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source as it entered,
       // bound as the cost is paid (activatedCosts).
       const ofChosen = !andOr && / of the chosen type$/.exec(c[4]!);
-      const head = ofChosen ? pickFilter(c[4]!.slice(0, ofChosen.index)) : null;
-      const filter = ofChosen ? head && { ...head, chosen: "type" as const, text: c[4]! } : pickFilter(andOr ?? c[4]!); // NUM is a group of its own
+      // Shadowborn Apostle: "Sacrifice six creatures named ~": with this card's name (bound in compile, CR 201.5).
+      const namedSelf = !andOr && !ofChosen && / named ~$/.exec(c[4]!);
+      const cut = ofChosen || namedSelf;
+      const head = cut ? pickFilter(c[4]!.slice(0, cut.index)) : null;
+      const filter = ofChosen ? head && { ...head, chosen: "type" as const, text: c[4]! } : namedSelf ? head && { ...head, named: "~", text: c[4]! } : pickFilter(andOr ?? c[4]!); // NUM is a group of its own
       if (!filter || (c[3] && c[1] === "another")) return "fail";
       // "Sacrifice X Squirrels" (Chatterfang): X is announced as it's activated, and is how many (CR 107.3a, 602.2b).
       extra.push({ kind: "sacrifice", filter: c[3] ? { ...filter, text: `other ${andOr ?? c[4]!}` } : filter, n: c[1] === "another" || c[1] === "X" ? (c[1] === "X" ? 0 : 1) : num(c[1]!), ...(c[1] === "another" || c[3] ? { other: true } : {}), ...(c[1] === "X" ? { x: true as const } : {}) });

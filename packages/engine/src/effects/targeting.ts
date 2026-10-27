@@ -14,7 +14,7 @@ import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
-const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : want === "all" ? n >= 5 : n === 0);
+const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : want === "all" ? n >= 5 : want === "notAll" ? n < 5 : n === 0);
 
 /**
  * Does this permanent fit `spec` from `controller`'s point of view, using its current
@@ -124,6 +124,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.notControlledBy !== undefined && c.controller === spec.notControlledBy) return false;
+  if (spec.monarchControls && c.controller !== s.monarch) return false;
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;

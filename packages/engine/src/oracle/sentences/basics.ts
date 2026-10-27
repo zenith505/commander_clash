@@ -751,6 +751,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const n = parseCount(m[1]!, ctx);
     return n && [{ type: "getEnergy", who: { ref: "you" }, n }];
   }
+  // Sentry Bot: "you get {E} for each creature attacking you".
+  if ((m = /^(?:[Yy]ou )?[Gg]et \{E\} for each (.+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx, true);
+    return n && [{ type: "getEnergy", who: { ref: "you" }, n }];
+  }
   // Experience counters (CR 122.1): "you get an experience counter", "... for each player who discarded a card this turn".
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} experience counters?$`).exec(s))) return [{ type: "getExperience", who: { ref: "you" }, n: amt(m[1]!) }];
   if ((m = /^(?:[Yy]ou )?[Gg]et an experience counter for each (.+)$/.exec(s))) {

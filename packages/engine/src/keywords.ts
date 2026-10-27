@@ -146,6 +146,10 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
   if (q === "spells" || q === "permanents that were cast this turn") return `Protection from ${q}`;
   if (q === "ring-bearers") return "Protection from Ring-bearers";
+  // Ronom Hulk: "protection from snow" (snow permanents, spells and abilities from snow sources); Kitsune Riftwalker:
+  // "from Arcane" (Arcane spells, CR 702.16a).
+  if (q === "snow") return "Protection from snow";
+  if (q === "arcane") return "Protection from Arcane";
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
   if (q === "each of that creature's colors") return TARGET_COLORS_PROTECTION;
@@ -245,6 +249,8 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (q === "spells" && src.spell) return true;
     if (q === "permanents that were cast this turn" && src.castThisTurn && !src.spell) return true;
     if (q === "ring-bearers" && src.ringBearer) return true;
+    if (q === "snow" && src.supertypes?.includes("Snow")) return true;
+    if (q === "arcane" && src.subtypes?.includes("Arcane")) return true;
     if ((q === "each color" || q === "all colors") && src.colors.length > 0) return true;
     if (q === "multicolored" && src.colors.length > 1) return true;
     if (q === "monocolored" && src.colors.length === 1) return true;

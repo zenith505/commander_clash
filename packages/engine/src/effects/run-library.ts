@@ -344,13 +344,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (!sc.found) {
-        const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
+        const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
-        if (!cards.length) return;
+        // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
+        const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
+        if (!cards.length || n <= 0) return;
         const kind = e.filter?.text ?? "card";
-        const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : "to exile";
-        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional ? 0 : 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
+        const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : "to exile";
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
@@ -365,7 +369,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           moveObject(s, id, "library");
         }
         if (ids.length) shuffleLibrary(s, p);
-      } else if (e.action === "libraryThird")
+      } else if (e.action === "libraryTop")
+        for (const id of ids) {
+          log(s, `${player(s, ctx.controller).name} puts a card from ${p.name}'s hand on top of their library.`);
+          moveObject(s, id, "library", { top: true });
+        }
+      else if (e.action === "libraryThird")
         for (const id of ids) {
           log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their library third from the top.`);
           moveObject(s, id, "library", { top: true });

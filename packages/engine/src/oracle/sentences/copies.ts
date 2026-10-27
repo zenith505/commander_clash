@@ -36,7 +36,8 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "Choose any number of target opponents" (Call the Coppercoats): players, likewise.
     if (/^any number of target (?:players|opponents)$/.test(m[1]!)) return parsePlayer(m[1]!, ctx) ? [] : null;
     // "Choose target player. Return half the creatures they control ..." (Split the Party): the player later sentences name.
-    if (/^target (?:player|opponent)$/.test(m[1]!)) return parsePlayer(m[1]!, ctx)?.ref === "target" ? [] : null;
+    // The Keepers: "Choose target opponent who has more life than you do as you activate this ability." likewise.
+    if (/^target (?:player|opponent)(?: who .+ as you activate this ability)?$/.test(m[1]!)) return parsePlayer(m[1]!, ctx)?.ref === "target" ? [] : null;
     // "Choose target creature you control and target Equipment" (Stolen Uniform): two targets, in that order.
     const two = /^(target .+?) and (target .+)$/.exec(m[1]!);
     if (two) {

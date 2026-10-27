@@ -1188,9 +1188,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (what && grant?.length && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what, mods: grant, duration: "game" }];
   }
   // Mist Dragon: "~ loses flying. (This effect lasts indefinitely.)" the same.
-  if ((m = /^~ ((?:becomes?|gains?|loses?) .+)$/.exec(s)) && !ctx.spell) {
-    const what = parseObject("~", ctx);
-    const mods = what?.ref === "self" ? parseChanges(m[1]!) : null;
+  // Elder Land Wurm: "When ~ blocks, it loses defender." (rulings: indefinitely) likewise, "it" being ~.
+  if ((m = /^(~|[Ii]t) ((?:becomes?|gains?|loses?) .+)$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1] === "~" ? "~" : "it", ctx);
+    const mods = what?.ref === "self" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "Until your next turn, creatures your opponents control attack each combat if able and attack a player other than you

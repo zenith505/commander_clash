@@ -958,6 +958,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Strength of Night: "If ~ was kicked, Zombie creatures you control get an additional +2/+2 until end of turn": a
   // second pump on top of the first.
   text = text.replace(/(\. If ~ was kicked, [A-Z][a-z]+ creatures you control get) an additional ([+-]\d+\/[+-]\d+ until end of turn\.)$/, "$1 $2");
+  // Ageless Sentinels: "it becomes a Bird Giant, and it loses defender": one change to it, indefinitely (rulings).
+  text = text.replace(/^(it|~) becomes an? ([A-Z][a-z]+(?: [A-Z][a-z]+)?), and it loses defender\.$/, "$1 becomes a $2 and loses defender.");
+  // Sabertooth Alley Cat: "Creatures without defender can't block ~ this turn": the same as "~ can't be blocked by creatures
+  // without defender this turn", the blockers' keywords as blocks are declared (CR 509.1b).
+  text = text.replace(/(^|\. )Creatures (with(?:out)? [a-z]+) can't block ~ this turn\./, "$1~ can't be blocked by creatures $2 this turn.");
+  // The Fall of Kroog: "~ deals 3 damage to that player and 1 damage to each creature they control": "they" being that player.
+  text = text.replace(/(~ deals \d+ damage to that player and \d+ damage to each creature) they control\./, "$1 that player controls.");
   // Thoughtcutter Agent: "Target player loses 1 life and reveals their hand": two instructions, in order.
   text = text.replace(/^(Target (?:player|opponent) loses \d+ life) and reveals their hand\.$/, "$1. That player reveals their hand.");
   // Rookie Mistake: "Until end of turn, target creature gets +0/+2 and another target creature gets -2/-0": each until end
@@ -1029,6 +1036,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Seer's Vision: "Look at target player's hand and choose a card from it. That player discards that card.": as "reveals
   // their hand. You choose ...", the hand seen only by you.
   text = text.replace(/(^|\. )(Look at target (?:player|opponent)'s hand) and choose (an? [a-z ]*?card) from it\. That player discards that card\./, "$1$2. You choose $3 from it. That player discards that card.");
+  // Extortion, Mind Warp: "Look at target player's hand and choose up to two / X cards from it. That player discards those
+  // cards."; Painful Memories: "... choose a card from it. Put that card on top of that player's library.": the same way.
+  text = text.replace(/^(Look at target (?:player|opponent)'s hand) and choose ((?:up to )?(?:two|three|X) cards) from it(, where X is [^.]+)?\. That player discards those cards\.$/, "$1. You choose $2 from it$3. That player discards those cards.");
+  text = text.replace(/^(Look at target (?:player|opponent)'s hand) and choose a card from it\. Put that card on top of that player's library\.$/, "$1. You choose a card from it. Put that card on top of that player's library.");
   // Winterthorn Blessing: "Tap up to one target creature you don't control, and that creature doesn't untap during its
   // controller's next untap step": two instructions about the same creature.
   text = text.replace(/(^|\. )(Tap up to one target creature you don't control), and that creature (doesn't untap during its controller's next untap step)\./, "$1$2. It $3.");
@@ -1667,6 +1678,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Energy Tap: "Tap target untapped creature you control. If you do, add ...": its only target is untapped as long as
   // it's legal, so when the spell resolves the creature is always tapped (CR 608.2b).
   text = text.replace(/^Tap target untapped creature you control\. If you do, add /, "Tap target untapped creature you control. Add ");
+  // Spirit Flare: "... If you do, it deals damage equal to its power to target attacking or blocking creature ...": the same,
+  // and with either target illegal it deals no damage (rulings).
+  text = text.replace(/^Tap target untapped creature you control\. If you do, it deals damage equal to its power to (target [^.]+)\.$/, "Tap target untapped creature you control. It deals damage equal to its power to $1.");
   // Mirko, Obsessive Theorist: "target creature card with power less than ~'s": than ~'s power.
   text = text.replace(/\bwith (power|toughness) (less|greater) than ~'s(?! power| toughness)\b/g, "with $1 $2 than ~'s $1");
   // Conflux: "Search your library for a white card, ... and a green card. Reveal those cards, put them into your hand,
@@ -4563,6 +4577,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Elvish Healer: "Prevent the next 1 damage that would be dealt to any target this turn. If it's a green creature, prevent
+    // the next 2 damage instead.": the target as it resolves.
+    const shieldIf = /^Prevent the next (\d+) damage that would be dealt to any target this turn$/.exec(s);
+    const shieldMore = shieldIf ? /^If it's an? (white|blue|black|red|green) creature, prevent the next (\d+) damage instead\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (shieldIf && shieldMore) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      const filter = parseTargetPhrase(`${shieldMore[1]} creature`);
+      if (fx?.length !== 1 || fx[0]!.type !== "preventNext" || filter?.kind !== "object" || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [{ ...fx[0]!, n: Number(shieldMore[2]) }], otherwise: fx });
+      si++;
+      continue;
+    }
     // Wretched Banquet: "Destroy target creature if it has the least power or is tied for least power among creatures on
     // the battlefield": any creature may be the target; its power is checked as it resolves (rulings).
     const leastIf = /^(Destroy target creature) if it has the least power or is tied for least power among creatures on the battlefield$/.exec(s);
@@ -5031,18 +5058,51 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Hand disruption: "Target opponent reveals their hand. You choose a nonland card from it. That player discards
     // that card." Another player picks the card (CR 701.9b), among those that match.
-    const choose = /^You choose an? (.+?) from it( with mana value \d+ or (?:less|greater))?( and exile that card)?$/.exec(s);
+    // "You choose up to two / X cards from it. That player discards those cards." (Extortion, Mind Warp): that many.
+    // Kaervek's Hex: "~ deals 1 damage to each nonblack creature and an additional 1 damage to each green creature": one
+    // amount to each creature, both parts added up (rulings: a black and green creature is dealt 1), all at once.
+    const additional = /^~ deals (\d+) damage to (each [^,]+?) and an additional \1 damage to (each [^,]+)$/.exec(s);
+    if (additional) {
+      const first = parseOne(`~ deals ${additional[1]} damage to ${additional[2]}`, ctx);
+      const second = parseOne(`~ deals ${additional[1]} damage to ${additional[3]}`, ctx);
+      const [a, b] = [first?.[0], second?.[0]];
+      if (first?.length !== 1 || second?.length !== 1 || a?.type !== "damage" || b?.type !== "damage" || a.also || b.also || a.to.ref !== "each" || b.to.ref !== "each") return null;
+      effects.push({ ...a, also: [b.to], merge: true });
+      continue;
+    }
+    // Discordant Dirge: "where X is the number of verse counters on ~": counted as it resolves (CR 107.3c, 608.2h).
+    const chooseN = /^You choose (up to )?(two|three|X) cards from it(?:, where X is (.+))?$/.exec(s);
+    if (chooseN) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "lookAtHand" || (!prev.reveal && !/^Look at target (?:player|opponent)'s hand$/.test(sentences[si - 1] ?? ""))) return null;
+      const where = chooseN[3] ? parseCount(chooseN[3], ctx) : undefined;
+      if (where === null || !/^That player discards those cards\.?$/.test(sentences[si + 1] ?? "") || (chooseN[2] === "X" && !ctx.spell && !where) || (where && chooseN[2] !== "X")) return null;
+      effects.push({ type: "takeFromHand", who: prev.who, action: "discard", n: where ?? (chooseN[2] === "X" ? X : num(chooseN[2]!)), ...(chooseN[1] ? { upTo: true as const } : {}) });
+      si++;
+      continue;
+    }
+    const choose = /^You choose an? (.+?) from it( with mana value (?:\d+|X) or (?:less|greater))?( and exile that card)?$/.exec(s);
     if (choose) {
       const prev = effects[effects.length - 1];
       // Seer's Vision: "Look at target player's hand. You choose a card from it": seen only by you.
-      if (prev?.type !== "lookAtHand" || (!prev.reveal && sentences[si - 1] !== "Look at target player's hand")) return null;
+      if (prev?.type !== "lookAtHand" || (!prev.reveal && !/^Look at target (?:player|opponent)'s hand$/.test(sentences[si - 1] ?? ""))) return null;
+      // Painful Memories: "Put that card on top of that player's library."
+      if (!choose[2] && !choose[3] && /^Put that card on top of that player's library\.?$/.test(sentences[si + 1] ?? "")) {
+        const filter = parseSearchFilter(choose[1]!);
+        if (filter === null) return null;
+        effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: "libraryTop" });
+        si++;
+        continue;
+      }
+      // Venarian Glimmer: "with mana value X or less": the X it was cast with (CR 107.3a), bound as it resolves.
+      if (/\bX\b/.test(choose[2] ?? "") && !ctx.spell) return null;
       // Lost Hours: "That player puts that card into their library third from the top."
       const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?|That player puts that card into their library third from the top|That player shuffles that card into their library)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!then) return null;
       // "Exile that card until ~ leaves the battlefield" (Kitesail Freebooter, CR 610.3): only an ability of a permanent.
       const until = typeof then !== "string" && !!then[1];
       if (until && opts.spell) return null;
-      const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`);
+      const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`, (t) => (t === "X" ? X : null));
       if (filter === null) return null;
       effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : typeof then !== "string" && /third from the top/.test(then[0]) ? "libraryThird" : typeof then !== "string" && /shuffles/.test(then[0]) ? "shuffleIn" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
       if (!choose[3]) si++;
@@ -8562,6 +8622,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;
     return { effects: [{ ...prev, amount: amt(more[1]!) }], instead };
+  }
+  // Orim's Touch: "Prevent the next 2 damage that would be dealt to any target this turn. If ~ was kicked, prevent the next
+  // 4 damage that would be dealt to that permanent or player this turn instead": the same shield, bigger.
+  const morePrevented = instead ? /^prevent the next (\d+) damage that would be dealt to that permanent or player this turn$/i.exec(t) : null;
+  if (morePrevented) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "preventNext" || prev.to.ref !== "anyTarget" || prev.divided) return null;
+    return { effects: [{ ...prev, n: Number(morePrevented[1]) }], instead };
   }
   // "~ deals 7 damage divided as you choose among one, two, or three targets. If at least seven red mana was spent to cast
   // ~, instead ~ deals 7 damage to each of those permanents and/or players" (Sundering Stroke): the damage is still

@@ -210,6 +210,10 @@ export interface Characteristics {
   cantTurnFaceUp: boolean;
   /** "Can't transform" (Bound by Moonsilver), nor convert (CR 701.28f). */
   cantTransform: boolean;
+  /** "Can't crew Vehicles" (Revoke Privileges). */
+  cantCrew: boolean;
+  /** "Can't be equipped" (Goblin Brawler). */
+  cantBeEquipped: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   /** "Creatures can't attack you" (Blazing Archon): these players, but not their planeswalkers. */
@@ -316,6 +320,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeSacrificed: false,
     cantTurnFaceUp: false,
     cantTransform: false,
+    cantCrew: false,
+    cantBeEquipped: false,
     cantAttackPlayers: [],
     cantAttackPlayersOnly: [],
     mustBeBlocked: false,
@@ -766,7 +772,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       if (cond.kind === "youMost") {
         const mine = measure(you);
-        return !s.players[you]!.lost && s.turnOrder.every((p) => p === you || s.players[p]!.lost || measure(p) < mine);
+        return !s.players[you]!.lost && s.turnOrder.every((p) => p === you || s.players[p]!.lost || (cond.fewer ? measure(p) > mine : measure(p) < mine));
       }
       const mine = measure(you);
       if (cond.subjectController) {
@@ -902,7 +908,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) return !!chars.get(sub.id)?.types.includes(cond.type);
       const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
-      return !!lk && lk.zc === subjectZc && !!lk.types?.includes(cond.type);
+      return !!lk && lk.zc === subjectZc && !!lk.source?.types.includes(cond.type);
     }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
@@ -1525,6 +1531,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeSacrificed":
     case "cantTurnFaceUp":
     case "cantTransform":
+    case "cantCrew":
+    case "cantBeEquipped":
     case "attackAsThoughHaste":
     case "mustBlock":
       c[m.kind] = true;

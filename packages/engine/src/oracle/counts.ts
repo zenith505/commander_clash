@@ -438,6 +438,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });
   // Realm Seekers: "the total number of cards in all players' hands", every player's added up.
   if (/^cards? in all players' hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachPlayer" } });
+  // Flunk: "the number of cards in that creature's controller's hand": the targeted creature's controller as this resolves.
+  if (/^cards? in that creature's controller's hand$/i.test(p) && ctx) {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    return t?.kind === "object" && !t.many && t.types?.includes("Creature") ? count({ kind: "cardsInHand", who: { ref: "targetController", index: i } }) : null;
+  }
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });

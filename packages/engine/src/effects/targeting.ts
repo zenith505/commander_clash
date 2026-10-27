@@ -39,6 +39,16 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
     .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
+/** Radiance: the other permanents matching `group.filter` that share at least one color with `t` now (CR 105.2). */
+export function sharingAColor(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sharesColor"]>, controller: PlayerId): GameObject[] {
+  if (t.zone !== "battlefield") return [];
+  const colors = characteristics(s, t).colors;
+  if (!colors.length) return [];
+  return s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => o.id !== t.id && characteristics(s, o).colors.some((c) => colors.includes(c)) && objectMatches(s, group.filter, o, controller, false));
+}
+
 /** Is `o` attacking `pid` or a planeswalker `pid` controls now (CR 506.3)? Not a battle. */
 function attacksYouOrYourPlaneswalker(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.attacking === undefined) return false;
@@ -116,6 +126,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "notAttacking" && o.attacking !== undefined) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
+  if (spec.combat === "blockedThisTurn" && o.blockedTurn !== s.turn) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;

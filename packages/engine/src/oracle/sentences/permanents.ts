@@ -395,6 +395,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef = { ref: "target", index: i };
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
+  // Disarm: "Unattach all Equipment from target creature": they stay on the battlefield, attached to nothing (CR 701.3d).
+  if ((m = /^Unattach all Equipment from (target creature)$/.exec(s))) {
+    const what = parseObject(`all Equipment attached to ${m[1]}`, ctx);
+    return what ? [{ type: "unattach", what }] : null;
+  }
   // "~ assigns no combat damage this turn" (CR 510.1): the Laccoliths, Ophidian.
   if ((m = /^(.+?) assigns no combat damage this (turn|combat)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -402,10 +407,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Bontu's Last Reckoning: "Lands you control don't untap during your next untap step"; Mana Vapors: "Lands target player
   // controls don't untap during their next untap step"; Exhaustion: "Creatures and lands target opponent controls ...":
-  // whatever of those that player controls when that step comes, also ones they got since (Mana Vapors rulings).
-  if ((m = /^(Lands|Creatures and lands) (you control|target player controls|target opponent controls) don't untap during (your|their) next untap step$/.exec(s)) && (m[2] === "you control") === (m[3] === "your")) {
+  // whatever of those that player controls when that step comes, also ones they got since (Mana Vapors rulings). Misstep:
+  // "Creatures target player controls don't untap during that player's next untap step" (also ones that entered since, rulings).
+  if ((m = /^(Lands|Creatures|Creatures and lands) (you control|target player controls|target opponent controls) don't untap during (your|their|that player's) next untap step$/.exec(s)) && (m[2] === "you control") === (m[3] === "your")) {
     const who = m[2] === "you control" ? { ref: "you" as const } : parsePlayer(m[2]!.replace(/ controls$/, ""), ctx);
-    return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : ["Creature", "Land"] }] : null;
+    return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : m[1] === "Creatures" ? ["Creature"] : ["Creature", "Land"] }] : null;
   }
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {

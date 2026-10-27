@@ -4470,11 +4470,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Tribute to Hunger: "Target opponent sacrifices a creature of their choice. You gain life equal to that creature's
-    // toughness": the creature sacrificed, as it last existed (CR 608.2h); if none was, no life (rulings).
-    const sacGain = /^You gain life equal to that creature's (power|toughness)$/.exec(s);
+    // toughness": the creature sacrificed, as it last existed (CR 608.2h); if none was, no life (rulings). Twisted Justice:
+    // "You draw cards equal to that creature's power" likewise.
+    const sacGain = /^You (gain life|draw cards) equal to that creature's (power|toughness)$/.exec(s);
     const sacked = effects[effects.length - 1];
     if (sacGain && sacked?.type === "pick" && sacked.action === "sacrifice" && sacked.n === 1 && sacked.who.ref === "target" && sacked.filter.kind === "object" && sacked.filter.types?.join() === "Creature") {
-      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: sacGain[1] as "power" | "toughness", of: { ref: "sacrificed" } } } }] });
+      const n = { count: { kind: sacGain[2] as "power" | "toughness", of: { ref: "sacrificed" as const } } };
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [sacGain[1] === "gain life" ? { type: "gainLife", who: { ref: "you" }, n } : { type: "draw", who: { ref: "you" }, n }] });
       continue;
     }
     // Dominus of Fealty: "you may gain control of target permanent until end of turn. If you do, untap it and it gains
@@ -5180,6 +5182,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const index = addTarget(ctx, { kind: "player", opponent: yourLook[2] === "target opponent", text: yourLook[2]! });
       ctx.lastPlayerTarget = index;
       effects.push({ type: "dig", n: num(yourLook[1]!), count: 1, upTo: false, required: true, into: "libraryTop", rest: "graveyard", reveal: false, library: { ref: "target", index } });
+      si++;
+      continue;
+    }
+    // Eye Spy: "Look at the top card of target player's library. You may put that card into their graveyard.": you choose
+    // (it's not surveil, CR 701.25, as only the controller of the library surveils).
+    const oneLook = !dig && /^[Ll]ook at the top card of (target player|target opponent)'s library$/.exec(s);
+    if (oneLook && /^You may put that card into (?:their|that player's) graveyard\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: oneLook[1] === "target opponent", text: oneLook[1]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n: 1, count: 1, upTo: true, into: "graveyard", rest: "keep", reveal: false, library: { ref: "target", index } });
       si++;
       continue;
     }
@@ -6105,7 +6117,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     })();
     if (later && laterAt) {
       const ex = laterAt.into[laterAt.at] as Extract<Effect, { type: "exile" }>;
-      if (ex.until || ex.linked || (ex.what.ref === "target" && ex.what.sameName) || (ex.what.ref !== "target" && ex.what.ref !== "each" && ex.what.ref !== "self")) return null;
+      if (ex.until || ex.linked || (ex.what.ref === "target" && (ex.what.sameName || ex.what.sharesColor)) || (ex.what.ref !== "target" && ex.what.ref !== "each" && ex.what.ref !== "self")) return null;
       const under = (later[2] ?? later[4]) === "your" ? "you" : "owner";
       const counter = later[5] ?? later[7];
       // "Return that card to the battlefield under its owner's control at the beginning of that player's next end step"
@@ -8928,6 +8940,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
+    // Rally the Righteous: "Untap target creature and each other creature that shares a color with it. Those creatures get
+    // +2/+0 until end of turn": the same ones (untapping changes no colors).
+    if (last?.type === "untap" && last.what.ref === "target" && last.what.sharesColor) ctx.lastGroup = last.what;
     // "Double the power of each other creature you control until end of turn. Those creatures gain vigilance" (Rhonas).
     if (last?.type === "doublePT" && last.what.ref === "each") ctx.lastGroup = last.what;
     // Thundermaw Hellkite: "deals 1 damage to each creature with flying your opponents control. Tap those creatures": the

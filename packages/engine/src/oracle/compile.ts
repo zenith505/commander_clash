@@ -491,6 +491,9 @@ export function compile(d: CardDef): CompiledCard {
       // Tithe Taker: "During your turn, spells your opponents cast cost {1} more to cast and abilities your opponents
       // activate cost {1} more to activate unless they're mana abilities": two cost increases (CR 601.2f, 602.2b).
       .replace(/^During your turn, spells your opponents cast cost (\{\d+\}) more to cast and abilities your opponents activate cost \1 more to activate unless they're mana abilities\.$/m, "During your turn, spells your opponents cast cost $1 more to cast.\nDuring your turn, abilities your opponents activate cost $1 more to activate unless they're mana abilities.")
+      // Intercessor's Arrest: "Enchanted permanent can't attack, block, or crew Vehicles. Its activated abilities can't be
+      // activated unless they're mana abilities.": the same as Bound in Gold's one sentence.
+      .replace(/^(Enchanted (?:creature|permanent) can't attack, block, or crew Vehicles)\. Its activated abilities can't be activated unless they're mana abilities\.$/m, "$1, and its activated abilities can't be activated unless they're mana abilities.")
       // Kothophed, Soul Hoarder: "a permanent owned by another player": every other player is an opponent (CR 102.3).
       .replace(/^Whenever a permanent owned by another player is put into a graveyard from the battlefield, /m, "Whenever a permanent an opponent owns is put into a graveyard from the battlefield, ")
       // Death Tyrant: "Whenever an attacking creature you control or a blocking creature an opponent controls dies, ...":
@@ -3314,16 +3317,18 @@ export function compile(d: CardDef): CompiledCard {
     // is that, the other while it isn't, each checked continuously (CR 611.3a).
     // Relic Axe: "Equipped creature gets +1/+1. If it's a Warrior, it gets +2/+1 instead." is the same, for Equipment.
     const insteadIf = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+)\. If it's (an? [A-Z][a-z]+), it gets ([+-]\d+\/[+-]\d+) instead\.$/.exec(line);
-    // Bonds of Faith: "Enchanted creature gets +2/+2 as long as it's a Human. Otherwise, it can't attack or block."
+    // Bonds of Faith: "Enchanted creature gets +2/+2 as long as it's a Human. Otherwise, it can't attack or block."; Tahngarth's
+    // Rage: "Enchanted creature gets +3/+0 as long as it's attacking. Otherwise, it gets -2/-1."
     const boonLine = insteadIf ? `${insteadIf[1]} creature gets ${insteadIf[4]} as long as it's ${insteadIf[3]}. Otherwise, it gets ${insteadIf[2]}.` : line;
-    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it (gets [+-]\d+\/[+-]\d+|can't attack or block)\.$/.exec(boonLine);
+    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact|attacking)\. Otherwise, it (gets [+-]\d+\/[+-]\d+|can't attack or block)\.$/.exec(boonLine);
     if (boon) boon.splice(1, 1);
     if (boon) {
       const w = boon[2]!;
-      const yes: TargetSpec | null = COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[w]!], text: `${w} creature` }
+      // Tahngarth's Rage: "as long as it's attacking" (CR 506.4), checked continuously like the rest.
+      const yes: TargetSpec | null = w === "attacking" ? { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[w]!], text: `${w} creature` }
         : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], allTypes: [capital(w.slice(3))], text: `${w.slice(3)} creature` }
         : CREATURE_TYPES.has(w.replace(/^an? /, "")) ? { kind: "object", types: ["Creature"], subtypes: [w.replace(/^an? /, "")], text: `${w.replace(/^an? /, "")} creature` } : null;
-      const no: TargetSpec | null = !yes ? null : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], notColors: [COLOR_WORDS[w]!], text: `non${w} creature` }
+      const no: TargetSpec | null = !yes ? null : w === "attacking" ? { kind: "object", types: ["Creature"], combat: "notAttacking", text: "nonattacking creature" } : COLOR_WORDS[w] ? { kind: "object", types: ["Creature"], notColors: [COLOR_WORDS[w]!], text: `non${w} creature` }
         : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], notTypes: [capital(w.slice(3))], text: `non${w.slice(3)} creature` }
         : { kind: "object", types: ["Creature"], notSubtypes: [w.replace(/^an? /, "")], text: `non-${w.replace(/^an? /, "")} creature` };
       const who = /^Equipped /.test(boonLine) ? "Equipped" : "Enchanted";

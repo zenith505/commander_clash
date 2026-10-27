@@ -545,7 +545,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -687,6 +687,8 @@ export interface TargetSpec {
    */
   differentManaValues?: true;
   differentManaValueFrom?: number[];
+  /** "X target cards from a single graveyard" (Rats' Feast): on the `many` entry until it's made into its targets, which then get `sameGraveyardAs`. */
+  singleGraveyard?: true;
   /**
    * "Any number of target artifacts with total mana value 6 or less", "up to two target creature cards with total power
    * 10 or less": with the other targets that have it, the targets chosen add up to no more than `max` (CR 601.2c), or
@@ -907,6 +909,12 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * Radiance: "target creature and each other creature that shares a color with it" (Wojek Siren): also every other
+       * permanent matching `filter` that has at least one of the target's colors as this resolves; a colorless target
+       * shares a color with nothing, and none are affected if the target is illegal (rulings, CR 608.2b).
+       */
+      sharesColor?: { filter: TargetSpec };
       /**
        * "Return target creature and all Auras attached to it" (Hubris): also each permanent matching `filter` attached to
        * the target as this resolves (none if the target is illegal, CR 608.2b). `only`: "Destroy all Equipment attached to
@@ -1411,6 +1419,10 @@ export type Modification =
   | { kind: "cantTurnFaceUp" }
   /** "Can't transform" (Bound by Moonsilver): nor convert (CR 701.28f), not even by day and night (run-permanents.ts transformPermanent). */
   | { kind: "cantTransform" }
+  /** "Can't crew Vehicles" (Revoke Privileges): it can't be tapped to pay a crew cost (CR 702.122a). */
+  | { kind: "cantCrew" }
+  /** "~ can't be equipped" (Goblin Brawler): Equipment can't become attached to it (CR 701.3b) and becomes unattached (704.5n). */
+  | { kind: "cantBeEquipped" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this" }
   | { kind: "allMustBlock"; /** "All Walls able to block ~ do so" (Marble Priest): only blockers that fit this (CR 509.1c). */ by?: TargetSpec }
@@ -1587,7 +1599,7 @@ export type StaticCondition =
   /** "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's event player. */
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
   /** "As long as you have more cards in hand than each opponent" (Okina Nightwatch): strictly more than each opponent still in the game. */
-  | { kind: "youMost"; what: "lands" | "creatures" | "life" | "hand" }
+  | { kind: "youMost"; what: "lands" | "creatures" | "life" | "hand"; /** "You control fewer creatures than each opponent" (Even the Odds): strictly fewer than each opponent in the game. */ fewer?: true }
   /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
   /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
@@ -2186,7 +2198,7 @@ export type Effect =
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
    */
-  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" }
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand. */ n?: number; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.

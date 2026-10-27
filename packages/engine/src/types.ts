@@ -414,6 +414,8 @@ export interface GameObject {
   /** How many times it has attacked in turn `turn` ("creatures that attacked this turn", Moraug), as this object (CR 400.7). */
   /** The turns it attacked in, latest last, as this object (CR 400.7), for "if it attacked during your last turn" (Giant Turtle); a few kept. */
   attackedTurns?: number[];
+  /** The turn it was last declared as a blocker (CR 509.1), as this object (CR 400.7): "creature that blocked this turn". */
+  blockedTurn?: number;
   attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
   /**
    * The turn it last could have been declared as an attacker, as this object (CR 508.1a): it was one of the active

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, pt, putOnBattlefield, scry, setup, swamp } from "./helpers";
-import { blockProblem, spellCost, characteristics, compileCard, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planCast, planMana, splitSecondOnStack, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { attackProblem, blockProblem, spellCost, characteristics, compileCard, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planCast, planMana, splitSecondOnStack, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { countersBanned, putCounters, putPlayerCounters } from "../src/counters";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -128,11 +128,14 @@ const zardaThePowerPrincess = card("Zarda, the Power Princess", "Legendary Creat
 const daruStinger = card("Daru Stinger", "Creature — Soldier", "{3}{W}", {cmc: 4,"power":"1","toughness":"1","keywords":["Amplify"],"oracleText":"Amplify 1 (As this creature enters, put a +1/+1 counter on it for each Soldier card you reveal in your hand.)\n{T}: This creature deals damage equal to the number of +1/+1 counters on it to target attacking or blocking creature."});
 const kjeldoranJavelineer = card("Kjeldoran Javelineer", "Creature — Human Soldier", "{W}", {cmc: 1,"power":"1","toughness":"2","keywords":["Cumulative upkeep"],"oracleText":"Cumulative upkeep {1} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\n{T}: This creature deals damage equal to the number of age counters on it to target attacking or blocking creature."});
 const gemrazer = card("Gemrazer", "Creature — Beast", "{3}{G}", {cmc: 4,"power":"4","toughness":"4","keywords":["Reach","Mutate","Trample"],"oracleText":"Mutate {1}{G}{G} (If you cast this spell for its mutate cost, put it over or under target non-Human creature you own. They mutate into the creature on top plus all abilities from under it.)\nReach, trample\nWhenever this creature mutates, destroy target artifact or enchantment an opponent controls."});
+const vantressGargoyle = card("Vantress Gargoyle", "Artifact Creature — Gargoyle", "{1}{U}", {cmc: 2,"power":"5","toughness":"4","keywords":["Flying","Mill"],"oracleText":"Flying\nThis creature can't attack unless defending player has seven or more cards in their graveyard.\nThis creature can't block unless you have four or more cards in hand.\n{T}: Each player mills a card."});
+const aetherSnap = card("Aether Snap", "Sorcery", "{3}{B}{B}", {cmc: 5,"oracleText":"Remove all counters from all permanents and exile all tokens."});
+const serraAvenger = card("Serra Avenger", "Creature — Angel", "{W}{W}", {cmc: 2,"power":"3","toughness":"3","keywords":["Flying","Vigilance"],"oracleText":"You can't cast Serra Avenger during your first, second, or third turns of the game.\nFlying, vigilance"});
 const egon = scry("modal_dfc", [{"name":"Egon, God of Death","mana_cost":"{2}{B}","type_line":"Legendary Creature — God","oracle_text":"Deathtouch\nAt the beginning of your upkeep, exile two cards from your graveyard. If you can't, sacrifice Egon and draw a card.","power":"6","toughness":"6"},{"name":"Throne of Death","mana_cost":"{B}","type_line":"Legendary Artifact","oracle_text":"At the beginning of your upkeep, mill a card.\n{2}{B}, {T}, Exile a creature card from your graveyard: Draw a card."}], {"keywords":["Mill","Deathtouch"]});
 const faithboundJudge = scry("transform", [{"name":"Faithbound Judge","mana_cost":"{1}{W}{W}","type_line":"Creature — Spirit Soldier","oracle_text":"Defender, flying, vigilance\nAt the beginning of your upkeep, if this creature has two or fewer judgment counters on it, put a judgment counter on it.\nAs long as this creature has three or more judgment counters on it, it can attack as though it didn't have defender.\nDisturb {5}{W}{W}","power":"4","toughness":"4"},{"name":"Sinner's Judgment","mana_cost":"","type_line":"Enchantment — Aura Curse","oracle_text":"Enchant player\nAt the beginning of your upkeep, put a judgment counter on this Aura. Then if there are three or more judgment counters on it, enchanted player loses the game.\nIf Sinner's Judgment would be put into a graveyard from anywhere, exile it instead.","color_indicator":["W"]}], {"keywords":["Flying","Vigilance","Transform","Enchant","Defender","Disturb"]});
 
 describe("round 180", () => {
-  it("all compile", () => supported(anointWithAffliction, arcboundOverseer, armageddonClock, assembledAlphas, avariceAmulet, battlescarredGoblin, callASurpriseWitness, captainAmericaTeamLeader, captainAmericaUnbowed, caradoraHeartOfAlacria, ceaselessConflict, cidTimelessArtificer, darksteelAngel, desperateMeasures, draconicDestiny, dualsunTechnique, essenceSymbiote, faceOfDivinity, feastOnTheFallen, fireJuggler, fugitiveDroid, gloomSower, goblinCadets, hawkeyeTrickShot, heraldOfIlharg, hiddenDragonslayer, ichtekikSalvageSplicer, kamiOfTransience, lightmineField, lightningReaver, markOfSakiko, maskOfTheSchemer, meglonoth, meliraSylvokOutcast, mentalModulation, milesTailsPrower, nessianBoar, pantherHabit, parkHeightsMaverick, plagueWight, prismariApprentice, raphaelNinjaDestroyer, relentlessRats, relentlessXatm092, retrofittedTransmogrant, returnUponTheTide, sakikoMotherOfSummer, samutTyrantOfNaktamun, sevenDwarves, shehulkWallbreaker, silkwrap, silumgarAssassin, sleeperAgent, slogurkTheOverslime, theThingBenGrimm, tideShaper, trailblazersTorch, treacherousPitdweller, vengefulRegrowth, viciousBattlerager, zardaThePowerPrincess, daruStinger, kjeldoranJavelineer, egon, faithboundJudge));
+  it("all compile", () => supported(anointWithAffliction, arcboundOverseer, armageddonClock, assembledAlphas, avariceAmulet, battlescarredGoblin, callASurpriseWitness, captainAmericaTeamLeader, captainAmericaUnbowed, caradoraHeartOfAlacria, ceaselessConflict, cidTimelessArtificer, darksteelAngel, desperateMeasures, draconicDestiny, dualsunTechnique, essenceSymbiote, faceOfDivinity, feastOnTheFallen, fireJuggler, fugitiveDroid, gloomSower, goblinCadets, hawkeyeTrickShot, heraldOfIlharg, hiddenDragonslayer, ichtekikSalvageSplicer, kamiOfTransience, lightmineField, lightningReaver, markOfSakiko, maskOfTheSchemer, meglonoth, meliraSylvokOutcast, mentalModulation, milesTailsPrower, nessianBoar, pantherHabit, parkHeightsMaverick, plagueWight, prismariApprentice, raphaelNinjaDestroyer, relentlessRats, relentlessXatm092, retrofittedTransmogrant, returnUponTheTide, sakikoMotherOfSummer, samutTyrantOfNaktamun, sevenDwarves, shehulkWallbreaker, silkwrap, silumgarAssassin, sleeperAgent, slogurkTheOverslime, theThingBenGrimm, tideShaper, trailblazersTorch, treacherousPitdweller, vengefulRegrowth, viciousBattlerager, zardaThePowerPrincess, daruStinger, kjeldoranJavelineer, vantressGargoyle, aetherSnap, serraAvenger, egon, faithboundJudge));
 
   it("Anoint with Affliction: exiles a creature with mana value 3 or less, or any creature of a player with three poison counters", () => {
     const { s: s0, ap, ids, opp } = setup([anointWithAffliction, anointWithAffliction, anointWithAffliction]);
@@ -569,5 +572,34 @@ describe("round 180", () => {
     const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(thing)])));
     expect(counters(s, ich)).toBe(1);
     expect(counters(s, golem)).toBe(1);
+  });
+
+  it("Vantress Gargoyle can attack only a player with seven or more cards in their graveyard", () => {
+    const { s, ap, opp } = setup([]);
+    const g = putOnBattlefield(s, ap, vantressGargoyle);
+    expect(attackProblem(s, s.objects[g]!, opp)).toMatch(/seven|7/);
+    for (let i = 0; i < 7; i++) into(s, opp, bear(), "graveyard");
+    expect(attackProblem(s, s.objects[g]!, opp)).toBeNull();
+  });
+
+  it("Aether Snap: every permanent loses its counters and the tokens are exiled", () => {
+    const { s: s0, ap, ids, opp } = setup([aetherSnap]);
+    const a = putOnBattlefield(s0, ap, bear());
+    s0.objects[a]!.counters["+1/+1"] = 2;
+    const b = putOnBattlefield(s0, opp, bear());
+    s0.objects[b]!.counters["-1/-1"] = 1;
+    const tok = putOnBattlefield(s0, opp, bear());
+    s0.objects[tok]!.isToken = true;
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect([counters(s, a), counters(s, b, "-1/-1")]).toEqual([0, 0]);
+    expect(s.battlefield).not.toContain(tok);
+  });
+
+  it("Serra Avenger can't be cast during your first three turns", () => {
+    const { s, ap, ids } = setup([serraAvenger]);
+    s.players[ap]!.turnsTaken = 3;
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+    s.players[ap]!.turnsTaken = 4;
+    expect(planCast(s, ap, ids[0]!)).not.toBeNull();
   });
 });

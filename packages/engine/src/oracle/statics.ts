@@ -1472,6 +1472,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
+  // Vantress Gargoyle: "can't attack unless defending player has seven or more cards in their graveyard".
+  if ((m = new RegExp(`^can't attack unless defending player has ${NUM} or more cards in their graveyard$`).exec(rest))) return [{ kind: "cantAttackUnlessDefenderYard", n: num(m[1]!) }];
   // Scarred Puma: "can't attack unless a black or green creature also attacks": another one, declared with it (rulings,
   // CR 508.1c).
   if ((m = /^can't attack unless (an? .+) also attacks$/.exec(rest))) {

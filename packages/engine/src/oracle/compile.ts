@@ -2624,6 +2624,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Cast this spell only during combat", "... only during your end step", "... only during the declare attackers step
     // and only if you've been attacked this step" (CR 506.8, 601.3).
+    // Serra Avenger: "You can't cast ~ during your first, second, or third turns of the game" (CR 601.3).
+    if (line === "You can't cast ~ during your first, second, or third turns of the game." && !out.castOnly) {
+      out.castOnly = { kind: "not", cond: { kind: "ownTurnAtMost", n: 3 } };
+      continue;
+    }
     // "You can't cast ~ unless an opponent lost life this turn" (Rakdos, Lord of Riots): the same as "cast ~ only if" (CR 601.3).
     const cantUnless = /^You can't cast ~ unless ([^.]+)\.$/.exec(line);
     const castOnly = cantUnless ? ([line, `if ${cantUnless[1]}`] as unknown as RegExpExecArray) : /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);

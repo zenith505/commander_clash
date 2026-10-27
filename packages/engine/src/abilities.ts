@@ -1307,6 +1307,8 @@ export type Modification =
   | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
+  /** "Can't attack unless defending player has seven or more cards in their graveyard" (Vantress Gargoyle). */
+  | { kind: "cantAttackUnlessDefenderYard"; n: number }
   /** "Can't attack if defending player controls an untapped creature with power 2 or less" (Mogg Jailer, CR 508.1c). */
   | { kind: "cantAttackIf"; defenderControls: TargetSpec }
   /** "Can't attack unless you control more lands than defending player" (Monstrous Hound): its controller's count against the player it would attack. */
@@ -1710,6 +1712,8 @@ export type StaticCondition =
   | { kind: "castLastTurn"; none?: true; onePlayer?: number }
   /** "If an opponent lost life last turn" (Feast on the Fallen): during the whole previous turn (GameState.lastTurn). */
   | { kind: "opponentLostLifeLastTurn" }
+  /** "During your first, second, or third turns of the game" (Serra Avenger): your turn, one of the first `n` you've begun, extra turns too. */
+  | { kind: "ownTurnAtMost"; n: number }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).

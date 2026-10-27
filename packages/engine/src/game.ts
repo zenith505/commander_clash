@@ -8089,7 +8089,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
       !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
-      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).attackUnlessYard || characteristics(s, o).attackIfNot?.length || characteristics(s, o).attackUnlessMore?.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackPlayersOnly.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -8190,6 +8190,7 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack unless defending player controls ${f.text}`;
+  if (c.attackUnlessYard && player(s, defender).graveyard.length < c.attackUnlessYard) return `${c.name} can't attack unless defending player has ${c.attackUnlessYard} or more cards in their graveyard`; // CR 508.1c
   for (const f of c.attackIfNot ?? [])
     if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack while defending player controls ${f.text}`;

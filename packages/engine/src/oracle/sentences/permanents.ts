@@ -583,6 +583,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
+  // Aether Snap: "Remove all counters from all permanents": from each of them at once.
+  if (/^Remove all counters from all permanents$/i.test(s)) return [{ type: "removeAllCounters", what: { ref: "each", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }];
   // "Move all counters from target creature onto another target creature" (CR 122.5).
   // The Ozolith: "move all counters from ~ onto target creature" (rulings: all of them or none).
   if ((m = /^Move all counters from (target .+?|~) onto ((?:another )?target .+)$/i.exec(s)) && (m[1] === "~") === !/^another /i.test(m[2]!)) {

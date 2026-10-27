@@ -2322,6 +2322,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "bouncedThisWay", subtype: bounced[1]!, another: true }, effects: inner });
       continue;
     }
+    // Egon, God of Death: "exile two cards from your graveyard. If you can't, sacrifice ~ and draw a card": with fewer than
+    // two there, none are exiled and the rest happens instead (rulings).
+    const yardExile = new RegExp(`^[Ee]xile ${NUM} cards from your graveyard$`).exec(s);
+    const yardCant = yardExile && /^If you can't, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (yardExile && yardCant && num(yardExile[1]!) > 1) {
+      const before = ctx.targets.length;
+      const exile = parseOne(capital(s), ctx);
+      const inner = parseOne(capital(yardCant[1]!), ctx);
+      const yard = parseCount("the number of cards in your graveyard", ctx);
+      if (!exile || !inner || !yard || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: yard, min: num(yardExile[1]!) }, effects: exile, otherwise: inner });
+      si++;
+      continue;
+    }
     // "Sacrifice a creature. If you can't, sacrifice ~." (Eldrazi Monument): you must if you can, so only when none was.
     // "That player sacrifices a creature of their choice. If the player can't, you create a ... token" (Wasitora): the
     // same, for that one player.

@@ -232,6 +232,11 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
       invalidateCharacteristics(s);
     }
     const by = putterNow ?? controllerOf(s, o);
+    // "If you put a counter on a creature this turn" (Lasting Tarfire): whoever put them (CR 122.6, 120.3d).
+    if (o.zone === "battlefield" && characteristics(s, o).types.includes("Creature") && !(s.turnLog?.creatureCounterPutters ?? []).includes(by)) {
+      ((s.turnLog ??= {}).creatureCounterPutters ??= []).push(by);
+      invalidateCharacteristics(s);
+    }
     if (kind === "+1/+1" && o.zone === "battlefield") {
       ((s.turnLog ??= {}).plusOnes ??= []).push({ by, controller: controllerOf(s, o), creature: characteristics(s, o).types.includes("Creature"), id: o.id, zc: o.zoneChanges ?? 0, n: m });
       invalidateCharacteristics(s); // "as long as you've put one or more +1/+1 counters on a creature this turn"

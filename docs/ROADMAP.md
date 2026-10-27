@@ -1,7 +1,7 @@
 # Roadmap
 
-26,352 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,753 of
+26,384 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,776 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -419,6 +419,21 @@ line blocks.
    your control last turn), Mindblade Render (combat damage dealt by a Warrior), Killing Wave (each creature's controller
    pays life or sacrifices it), Dreadhound (a creature card put into a graveyard from a library), Indoraptor (bloodthirst
    X), Werewolf Pack Leader ("isn't a Human").
+   Round 185 went on from the top: "if it's not that player's turn" (Price of Glory), cards "put there from the
+   battlefield this turn" returned (Faith's Reward, Second Sunrise, Thrilling Encore, Gerrard's Hourglass Pendant,
+   Gleancrawler, No Rest for the Wicked, Twilight Shepherd, Gerrard, Weatherlight Hero), "{3}, {T} or {U}, {T}" (the
+   Shards, the same code as Lane B's round B15, plus Crystal Shard and Erratic Portal's "return ... unless its
+   controller pays"), Gavel of the Righteous (equip by removing a counter), Fire Nation Turret, Blood Tribute (life
+   lost this way: what the life total actually lost), Wand of the Worldsoul (the next spell has convoke), Enhanced
+   Surveillance, Erdwal Illuminator (the first investigate each turn), "if you put a counter on a creature this turn"
+   (Lasting Tarfire, Lord Jyscal Guado), Duskmantle Guildmage (a delayed "whenever a card is put into an opponent's
+   graveyard"), Strong (life from radiation), Energybending, Gran-Gran, granted "spells your opponents cast that target
+   ~ cost more" (Jubilant Skybonder, Callaphe), Reverse the Polarity, Corrupted Crossroads (mana for devoid spells),
+   Shadow, Mysterious Assassin.
+   Out after round 185 (looked at, not done): Liesa, Shroud of Dusk (commander tax paid as 2 life each time), Font of
+   Agonies (no event for paying life), Angel of Jubilation and Yasharn (which costs pay life or sacrifice, every cost
+   path audited), Whirlwind Denial (one payment prompt per spell and ability), Crucible of the Spirit Dragon (X mana in
+   any combination).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

@@ -81,6 +81,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you untap one or more permanents during your untap step, (.+)$/, "youUntapInUntapStep"],
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
+  [/^Whenever you investigate, (.+)$/, "youInvestigate"],
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
@@ -778,6 +779,13 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
   }
   // Vengeful Warchief: "Whenever you lose life for the first time each turn, ...": your first life loss this turn,
   // whoever's turn it is (counting losses before it was on the battlefield).
+  // Erdwal Illuminator: "Whenever you investigate for the first time each turn, ...", counting investigations before it
+  // was on the battlefield.
+  const firstInvestigate = /^Whenever you investigate for the first time each turn, (.+)$/.exec(line);
+  if (firstInvestigate) {
+    const body = parseBody(firstInvestigate[1]!);
+    return body ? { event: "youInvestigate", firstEachTurn: true, body } : "fail";
+  }
   const first = /^Whenever you (gain|lose) life for the first time each turn, (.+)$/.exec(line);
   if (first) {
     const body = parseBody(first[2]!, {});
@@ -2363,7 +2371,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
-  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$|'s not their turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
+  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$|'s not (?:their|that player's) turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });

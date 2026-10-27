@@ -436,8 +436,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "nextSpellImprovise":
-      player(s, ctx.controller).nextSpellImprovise = s.turn;
-      log(s, `${src}: the next spell ${player(s, ctx.controller).name} casts this turn has improvise.`);
+      if (e.convoke) player(s, ctx.controller).nextSpellConvoke = s.turn;
+      else player(s, ctx.controller).nextSpellImprovise = s.turn;
+      log(s, `${src}: the next spell ${player(s, ctx.controller).name} casts this turn has ${e.convoke ? "convoke" : "improvise"}.`);
       return;
     case "nextCast": {
       const item = s.resolving?.item;

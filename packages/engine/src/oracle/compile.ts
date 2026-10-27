@@ -1896,6 +1896,19 @@ export function compile(d: CardDef): CompiledCard {
       out.playersDrawOnce = true;
       continue;
     }
+    // Enhanced Surveillance: the extra cards looked at are surveilled too (rulings). Looking at them is optional, but a
+    // player who looks can put each of them back on top in the same order, so they're always looked at here.
+    const surveilMore = new RegExp(`^You may look at an additional ${NUM} cards each time you surveil\\.$`).exec(line);
+    if (surveilMore) {
+      out.surveilMore = (out.surveilMore ?? 0) + num(surveilMore[1]!);
+      continue;
+    }
+    // Strong, the Brutish Thespian: the radiation trigger's life loss becomes a gain (CR 728.1, 614.1a; rulings: the
+    // milling and the rad counters removed stay the same).
+    if (line === "You gain life rather than lose life from radiation.") {
+      out.radiationGains = true;
+      continue;
+    }
     // Bloodletter of Aclazotz (CR 614.1a): life lost to damage too (CR 120.3a), and life paid (CR 119.4).
     if (line === "If an opponent would lose life during your turn, they lose twice that much life instead.") {
       out.opponentsLoseDouble = true;
@@ -3156,11 +3169,13 @@ export function compile(d: CardDef): CompiledCard {
     const equipCost = /^Equip—(.+?)\.( Activate only once each turn\.)?$/.exec(line);
     // "Equip—Pay {3} or discard a card." (Bloodthorn Flail): one equip ability with a choice of costs, made as it's
     // activated (CR 602.2b, 601.2b). It's compiled as one equip ability per cost, which is the same choice from the menu.
-    const equipOr = equipCost && !equipCost[2] ? /^Pay ((?:\{[^}]+\})+) or (discard (?:a|one) card)$/.exec(equipCost[1]!) : null;
+    // "Equip—Pay {3} or remove a counter from this Equipment." (Gavel of the Righteous): a counter of any kind.
+    const equipOr = equipCost && !equipCost[2] ? /^Pay ((?:\{[^}]+\})+) or (discard (?:a|one) card|remove a counter from ~)$/.exec(equipCost[1]!) : null;
     if (equipOr && d.subtypes.includes("Equipment")) {
-      const acts = [equipOr[1]!, "Discard a card"].map((c) => parseActivated(`${c}: Attach ~ to target creature you control. Activate only as a sorcery.`));
+      const other = equipOr[2]!.charAt(0).toUpperCase() + equipOr[2]!.slice(1).replace(/^Discard one/, "Discard a");
+      const acts = [equipOr[1]!, other].map((c) => parseActivated(`${c}: Attach ~ to target creature you control. Activate only as a sorcery.`));
       if (acts.some((a) => !a || a === "fail")) out.unsupported.push(raw);
-      else acts.forEach((a, i) => out.activated.push({ ...(a as ActivatedAbility), text: i === 0 ? `Equip—Pay ${equipOr[1]!}.` : "Equip—Discard a card.", equip: true }));
+      else acts.forEach((a, i) => out.activated.push({ ...(a as ActivatedAbility), text: i === 0 ? `Equip—Pay ${equipOr[1]!}.` : `Equip—${other}.`, equip: true }));
       continue;
     }
     if ((equipQ || equipCost) && d.subtypes.includes("Equipment")) {
@@ -3244,6 +3259,14 @@ export function compile(d: CardDef): CompiledCard {
         out.costMods = [...(out.costMods ?? []), { ...c.costMod, text: line }];
         (out.flashForFirst ??= []).push({ ...spec, text: `${firstFlash[2]}spells` });
       }
+      continue;
+    }
+    // Gran-Gran: "Noncreature spells you cast cost {1} less to cast as long as there are three or more Lesson cards in your
+    // graveyard": one cost change, only while that's true as the cost is determined (CR 601.2f, 611.3a).
+    const costWhile = /^(.+ cost \{\d+\} (?:less|more) to cast) as long as (.+)\.$/.exec(line);
+    if (costWhile) {
+      const cond = parseStaticCondition(costWhile[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || !conditionalAbility(d, `${costWhile[1]}.`, out, cond)) out.unsupported.push(raw);
       continue;
     }
     const cost = parseCostChange(line);
@@ -3566,6 +3589,15 @@ export function compile(d: CardDef): CompiledCard {
     if (trig) {
       if (trig === "fail") out.unsupported.push(raw);
       else out.triggers.push(bindThisAbility(trig, line));
+      continue;
+    }
+    // The Shards: "{3}, {T} or {W}, {T}: ...": one ability with a choice of costs, either one but not both (rulings; CR
+    // 602.2b, 601.2b), compiled as one ability per cost, the same choice from the menu (as Bloodthorn Flail's equip).
+    const orCost = /^((?:\{[^}]+\})+, \{T\}) or ((?:\{[^}]+\})+, \{T\}): (.+)$/.exec(line);
+    if (orCost) {
+      const acts = [orCost[1]!, orCost[2]!].map((c) => parseActivated(`${c}: ${orCost[3]!}`));
+      if (acts.some((a) => !a || a === "fail")) out.unsupported.push(raw);
+      else for (const a of acts) out.activated.push(bindThisAbility(a as ActivatedAbility, line));
       continue;
     }
     const act = parseActivated(line);

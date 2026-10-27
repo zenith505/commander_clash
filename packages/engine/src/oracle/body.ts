@@ -243,6 +243,14 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
+  // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn, that player loses 1
+  // life": once for each card (CR 603.7b), not a token (rulings), each opponent's.
+  const toYard = /^Whenever a card is put into an opponent's graveyard from anywhere this turn, (.+)$/.exec(s);
+  if (toYard) {
+    const trigger = parseTrigger(`Whenever a card is put into an opponent's graveyard from anywhere, ${[toYard[1]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "batch" || trigger.batch?.what !== "toGraveyard" || !trigger.batch.each || Object.keys(trigger).some((k) => k !== "batch" && !FLOATING_KEYS.has(k)) || Object.keys(trigger.batch).some((k) => !["what", "whose", "each"].includes(k))) return null;
+    return { type: "floatingTrigger", trigger, until: "endOfTurn" };
+  }
   // Noxious Assault: "Whenever a creature blocks this turn, its controller gets a poison counter" (CR 603.7b).
   const blocks = /^Whenever (an? creature(?: you control| an opponent controls)?) blocks this turn, (.+)$/.exec(s);
   if (blocks) return floatingTrigger(`This turn, whenever ${blocks[1]!} blocks, ${blocks[2]!}`, after, ctx);
@@ -5382,6 +5390,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "kicked" }, effects: [], otherwise: fx });
       continue;
     }
+    // Blood Tribute: "Target opponent loses half their life, rounded up. If ~ was kicked, you gain life equal to the life
+    // lost this way": whether it was kicked was settled as it was cast (CR 702.33e), so it's the same loss, drained or not.
+    if (/^If ~ was kicked, you gain life equal to the life lost this way$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "loseLife" || last.drain) return null;
+      effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "kicked" }, effects: [{ ...last, drain: true }], otherwise: [last] });
+      continue;
+    }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
     const kicked = /^If (?:~|it) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/.exec(s);
     if (kicked) {
@@ -7205,7 +7221,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // (Disciple of Freyalise): the sacrificed creature as it last existed (CR 608.2h), its power and nothing else.
       const sacPick = mustSac || (ifDid[1] === "do" && prev.type === "may" && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice");
       const all = `${ifDid[2]!}${where ? `, where X is ${where[2]!}` : ""}`;
-      const sacIt = sacPick && /\b(?:that|the sacrificed) creature's (?:power|toughness|mana value)\b/.test(all) && !/\bthat creature(?!'s (?:power|toughness|mana value)\b)/.test(all) && !ctx.sacrificedIt;
+      // Shadow, Mysterious Assassin: "... sacrifice another nonland permanent. If you do, ... the mana value of the sacrificed
+      // permanent", the same.
+      const sacIt = sacPick && /\b(?:that creature|the sacrificed (?:creature|permanent))'s (?:power|toughness|mana value)\b|\b(?:power|toughness|mana value) of the sacrificed (?:creature|permanent)\b/.test(all) && !/\bthat creature(?!'s (?:power|toughness|mana value)\b)/.test(all) && !ctx.sacrificedIt;
       if (sacIt) ctx.sacrificedIt = true;
       // Party Thrasher: "If you do, exile the top two cards of your library, then choose one of them. You may play that
       // card this turn." The permission is about the card chosen, so it depends on the discard too.
@@ -8685,6 +8703,14 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   if (getsDeals) {
     const first = parseOne(getsDeals[1]!, ctx);
     const second = first && parseOne(`~ ${getsDeals[2]}`, ctx);
+    return first && second ? [...first, ...second] : null;
+  }
+  // Shadow, Mysterious Assassin: "draw two cards and each opponent loses life equal to the mana value of the sacrificed
+  // permanent": both, in order.
+  const drawLose = fx ? null : /^([Dd]raw (?:a card|[a-z]+ cards)) and (each opponent loses life equal to .+)$/.exec(s);
+  if (drawLose) {
+    const first = parseOne(drawLose[1]!, ctx);
+    const second = first && parseOne(capital(drawLose[2]!), ctx);
     return first && second ? [...first, ...second] : null;
   }
   // "You may put a land card from your graveyard onto the battlefield tapped" (Wreck and Rebuild): the same as returning it.

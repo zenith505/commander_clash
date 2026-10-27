@@ -446,7 +446,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const r = s.resolving!;
       const arranged = r.scratch?.arranged;
       if (!arranged) {
-        const n = amountNow(s, e.n, ctx);
+        let n = amountNow(s, e.n, ctx);
+        // Enhanced Surveillance: more cards in a surveil of one or more (CR 701.25c: surveil 0 isn't surveilling).
+        if (e.type === "surveil" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).surveilMore ?? 0;
         const cards = p.library.slice(0, n);
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).

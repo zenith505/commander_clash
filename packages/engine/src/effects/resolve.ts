@@ -329,6 +329,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       if (ctx.legal[i] && t?.kind === "object" && !(ref.notYours && controllerOf(s, obj(s, t.id)) === ctx.controller)) out.push(obj(s, t.id));
     }
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
+    if (ref.attachedToo) {
+      const hosts = new Set(out.map((o) => o.id));
+      const attached = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo !== undefined && hosts.has(o.attachedTo) && objectMatches(s, ref.attachedToo!.filter, o, ctx.controller, false));
+      if (ref.attachedToo.only) return attached;
+      out.push(...attached.filter((o) => !hosts.has(o.id)));
+    }
     if (ref.andSelf) {
       const me = objects(s, { ref: "self" }, ctx)[0];
       if (me && !out.includes(me)) out.unshift(me);

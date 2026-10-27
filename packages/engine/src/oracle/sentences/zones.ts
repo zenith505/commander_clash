@@ -993,10 +993,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // power as blockers are declared (rulings).
   // Awe for the Guilds: "Monocolored creatures can't block this turn", each creature's colors as blockers are declared.
   if (/^Monocolored creatures can't block this turn$/.test(s)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], colorCount: "monocolored", text: "monocolored creatures" } }];
-  if ((m = /^Creatures( without flying| with power \d+ or less)? can't block this turn$/.exec(s))) {
+  // Goblin Locksmith: "creatures with defender can't block this turn".
+  if ((m = /^[Cc]reatures( without flying| with power \d+ or less| with defender)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
   }
+  // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.
+  if ((m = /^([A-Z][a-z]+)s can't block this turn$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], text: `${m[1]}s` } }];
   // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until
   // the turn ends.
   if ((m = /^(.+?) must be blocked (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

@@ -45,8 +45,9 @@ describe("groups of permanents", () => {
   it("compiles the templates", () => {
     supported(tranquility, vengeance, evacuation, earthquake, ceratok, plagueEngineer, heart, dominance, melody, mare, instruments);
     expect(compileCard(vengeance).spell!.effects[0]).toMatchObject({ type: "destroy", what: { ref: "each", filter: { types: ["Artifact", "Creature", "Enchantment"] } } });
-    // "Other creatures you control" in a spell means other than the Zombies it just named: not modeled.
-    expect(isFullySupported(oketra)).toBe(false);
+    // "Other creatures you control" in a spell means other than the Zombies it just named: the non-Zombie ones (Lane B
+    // round 6, tested in laneb-round6.test.ts).
+    expect(isFullySupported(oketra)).toBe(true);
   });
 
   it('"Destroy all artifacts, creatures, and enchantments" leaves lands and players alone', () => {

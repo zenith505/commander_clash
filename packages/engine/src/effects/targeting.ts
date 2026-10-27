@@ -288,7 +288,7 @@ export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): Sou
     return withCastThisTurn(s, o, item ? { ...c, manaValue: spellManaValue(s, item) } : c);
   }
   const d = cardId ? s.cards[cardId] : undefined;
-  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, manaValue: defMv(d) } : { colors: [] };
+  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, supertypes: d.supertypes, name: d.name, manaValue: defMv(d) } : { colors: [] };
 }
 
 /**

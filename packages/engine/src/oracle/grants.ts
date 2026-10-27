@@ -176,6 +176,13 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
+    // Flanking is a triggered ability too, each instance triggering on its own (CR 702.25a-b): "Enchanted creature gets
+    // +1/+1 and has flanking" (Agility). It's also a keyword, for a blocker's "creature without flanking".
+    if (/^flanking$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Flanking" });
+      kws.push("Flanking");
+      continue;
+    }
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
     if (/^(?:persist|undying)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });

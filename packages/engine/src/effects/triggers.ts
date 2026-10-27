@@ -896,7 +896,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       // Cat Collector: "for the first time during each of your turns".
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first) && (!t.orLoseLife || s.activePlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // "Whenever you gain life this turn, ..." (Vizkopa Guildmage): a delayed trigger of its controller's (CR 603.7b, d).
@@ -1002,7 +1002,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }, undefined, undefined, undefined, undefined, undefined, undefined, { lifeBatch: ev.batch, lifeEach: { [ev.player]: ev.amount } });
       if (you !== ev.player)
         add(o, you, (e, t) => e === "opponentsLoseLife" && !s.triggerQueue.some((q) => q.sourceId === o.id && q.event?.lifeBatch !== undefined && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text), undefined, undefined, undefined, undefined, undefined, undefined, { ...(ev.batch !== undefined ? { lifeBatch: ev.batch } : {}) });
-      else add(o, you, (e, t) => e === "youLoseLife" && (!t.firstEachTurn || !!ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      else add(o, you, (e, t) => (e === "youLoseLife" && (!t.firstEachTurn || !!ev.first)) || (e === "youGainLife" && !!t.orLoseLife && s.activePlayer === you), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
   } else if (ev.type === "playerDealtDamage") {
@@ -1420,6 +1420,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
+      // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature": anyone's, as it deals the damage.
+      if (ev.combat)
+        for (const id of s.battlefield) {
+          const w = obj(s, id);
+          const wc = controllerOf(s, w);
+          add(w, wc, (e, t) => e === "creatureDealsCombatDamageToCreature" && !!t.dealer && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, hit, undefined, undefined, undefined, info);
+        }
     }
   } else if (ev.type === "spellDealtDamage") {
     // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in
@@ -1466,7 +1473,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage" || (e === "selfIsDealtNoncombatDamage" && !ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage" || (e === "selfIsDealtNoncombatDamage" && !ev.combat) || (e === "selfIsDealtCombatDamage" && !!ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
       for (const id of s.battlefield) {
@@ -1508,7 +1515,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
-    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
+    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)) && !(t.toOpponent && ev.player === dealerBy) && !(t.toEnchanted && w.attachedToPlayer !== ev.player), undefined, undefined, o, undefined, undefined, undefined, info);
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
     // "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature, to an opponent of
     // the watcher's controller (its own controller's watchers saw it above).
@@ -1516,7 +1523,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const wc = controllerOf(s, w);
       // Brood Sliver's "to a player": to the watcher's controller too.
-      if (wc !== dealerBy) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && !(t.toOpponent && ev.player === wc) && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      if (wc !== dealerBy) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && !(t.toOpponent && ev.player === wc) && !(t.toEnchanted && w.attachedToPlayer !== ev.player) && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
     }
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Whenever a Vehicle you control deals combat damage to a player, you may return this card from your graveyard to

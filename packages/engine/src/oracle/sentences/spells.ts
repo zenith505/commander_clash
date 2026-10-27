@@ -404,6 +404,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       const to = parseDamageRecipient(m[2]!, ctx);
       return to ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
     }
+    // Backlash: "Tap target untapped creature. That creature deals damage equal to its power to its controller": damage
+    // from that creature, its power as this resolves, to whoever controls it then (CR 608.2c); none if it's illegal.
+    if (a?.ref === "target" && !a.n && /^its controller$/i.test(m[2]!)) {
+      const to = parseDamageRecipient(m[2]!, ctx);
+      return to && "ref" in to && to.ref === "targetController" && to.index === a.index ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
+    }
     const b = a && parseObject(m[2]!, ctx);
     return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) ? [{ type: "bite", a, b }] : null;
   }

@@ -56,6 +56,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
   [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
   [/^Whenever ~ is dealt noncombat damage, (.+)$/, "selfIsDealtNoncombatDamage"],
+  [/^Whenever ~ is dealt combat damage, (.+)$/, "selfIsDealtCombatDamage"],
   // "Whenever a source deals damage to ~, that source's controller ..." (Phyrexian Obliterator): once for each source
   // that deals it damage at the same time; "that source's controller" is that player (rulings).
   [/^Whenever a source deals damage to ~, (.+)$/, "selfDealtDamageBySource"],
@@ -138,7 +139,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfBecomesMonstrous", "selfMutates",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfMutates",
   "selfBecomesUntapped", "selfBecomesCrewed",
 ];
 
@@ -735,6 +736,13 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
     const body = parseBody(first[2]!, {});
     return body ? { event: first[1] === "gain" ? "youGainLife" : "youLoseLife", firstEachTurn: true, body } : "fail";
   }
+  // Moonstone Harbinger: "Whenever you gain or lose life during your turn, ...": either event, on your turn only.
+  const either = /^Whenever you gain or lose life during your turn, (.+)$/.exec(line);
+  if (either) {
+    if (/\b(?:that much|that many|X)\b/.test(either[1]!)) return "fail";
+    const body = parseBody(either[1]!, {});
+    return body ? { event: "youGainLife", orLoseLife: true, body } : "fail";
+  }
   const m = /^Whenever an opponent loses life for the first time during each of their turns, (.+)$/.exec(line);
   if (!m) return null;
   const body = parseBody(m[1]!, { eventPlayer: true });
@@ -952,6 +960,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
   }
+  // Curse of Stalked Prey: "Whenever a creature deals combat damage to enchanted player, put a +1/+1 counter on that
+  // creature": anyone's creature, the enchanted player's own too (rulings).
+  const toEnch = /^Whenever a creature deals combat damage to enchanted player, (.+)$/.exec(line);
+  if (toEnch) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(toEnch[1]!)) return "fail";
+    const body = parseBody(toEnch[1]!, { subjectIt: true, eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toEnchanted: true };
+  }
   // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
   // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.
   const anySliver = /^Whenever a ([A-Z][a-z]+) deals combat damage to a player, (.+)$/.exec(line);
@@ -960,6 +977,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(anySliver[2]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [anySliver[1]!], text: anySliver[1]! }, anyone: true }, body };
+  }
+  // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature, destroy that creature. It can't be regenerated.":
+  // anyone's Sliver; "that creature" is the creature dealt the damage.
+  const toCreature = /^Whenever a ([A-Z][a-z]+) deals combat damage to a creature, (.+)$/.exec(line);
+  if (toCreature && CREATURE_TYPES.has(toCreature[1]!)) {
+    if (/\b(?:its controller|that player|defending player|that much|that many|X)\b/i.test(toCreature[2]!)) return "fail";
+    const body = parseBody(toCreature[2]!, { subjectIt: true });
+    if (!body) return "fail";
+    return { event: "creatureDealsCombatDamageToCreature", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [toCreature[1]!], text: toCreature[1]! }, anyone: true }, body };
   }
   // "Whenever a creature you control deals combat damage during your turn, put that many +1/+1 counters on it" (Quilled
   // Greatwurm): to anything, all its combat damage of the step at once (CR 510.2), "that many" being that total.
@@ -1324,9 +1350,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
   // "Look at the top five cards of your library. You may reveal a creature card from among them and put it into your
-  // hand." (Horn of the Mark) too.
+  // hand." (Horn of the Mark) too, and "a Hero card ... put that card into your hand" (Director Nick Fury).
   // Cosmic Cube: "Look at the top six cards of your library. You may cast a spell from among them ..." too.
-  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? [a-z ]+ card from among them and put it into your hand|You may cast a spell from among them [^.]+)\./;
+  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five|six) cards of your library\. (?:Put (?:one|two) of them [^.]+|You may reveal an? (?:[a-z ]+|[A-Z][a-z]+) card from among them and put (?:it|that card) into your hand|You may cast a spell from among them [^.]+)\./;
   // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
   const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
   // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next
@@ -2861,7 +2887,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));

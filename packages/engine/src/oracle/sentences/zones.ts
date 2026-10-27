@@ -283,7 +283,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Target player shuffles up to three target cards from their graveyard into their library" (Memory's Journey, Quandrix
   // Command): cards in that player's graveyard (TargetSpec.inGraveyardOfTarget); that player shuffles their library even
   // when every card target has become illegal, as long as the player is still a legal target (rulings on Quandrix Command).
-  if ((m = /^Target player shuffles (up to (?:one|two|three|four|five)) target cards from their graveyard into their library$/.exec(s))) {
+  // Loaming Shaman: "target player shuffles any number of target cards from their graveyard into their library" too.
+  if ((m = /^[Tt]arget player shuffles (up to (?:one|two|three|four|five)|any number of) target cards from their graveyard into their library$/.exec(s))) {
     const who = parsePlayer("target player", ctx);
     const pi = ctx.targets.length - 1;
     const first = ctx.targets.length;
@@ -291,6 +292,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!what || what.ref !== "target" || ctx.targets[pi]?.kind !== "player") return null;
     for (let i = first; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, inGraveyardOfTarget: pi, text: "target card from that player's graveyard" };
     return [{ type: "shuffleIntoLibrary", what, who: who! }];
+  }
+  // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
+  // libraries." (body.ts reads it as this): each card into its owner's library, each library shuffled once (rulings, CR
+  // 701.24c).
+  if ((m = /^Shuffle (up to (?:one|two|three|four|five)|any number of) target cards from graveyards into their owners' libraries$/.exec(s))) {
+    const what = parseCardTarget(`${m[1]} target cards from graveyards`, ctx);
+    return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what }] : null;
   }
   // Teferi, Temporal Pilgrim: "Then they shuffle each nonland permanent they control into its owner's library", "they"
   // being the target opponent: each of them goes into its owner's library, then each of those libraries is shuffled (CR
@@ -1069,7 +1077,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "~ can't be blocked this turn except by snow creatures" (Rime Transfusion), "can't be blocked by Walls this turn": the
   // static ability's evasion (CR 509.1b), until end of turn.
-  if ((m = /^(.+?) can't be blocked (this turn except by .+|by .+? this turn)$/i.exec(s))) {
+  // Kick in the Door: "That creature gains haste until end of turn and can't be blocked by Walls this turn" is both
+  // changes at once (sentences/permanents.ts).
+  if ((m = /^(?!.* until end of turn and )(.+?) can't be blocked (this turn except by .+|by .+? this turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     // The Black Gate: "... by creatures that player controls this turn", the player chosen as it resolves.
     if (m[2] === "by creatures that player controls this turn")

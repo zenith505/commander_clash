@@ -619,6 +619,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
   if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  // Of One Mind: "if you control a Human creature and a non-Human creature": two different creatures, since none can be
+  // both.
+  if ((m = /^you control an? ([A-Z][a-z]+) creature and an? non-([A-Z][a-z]+) creature$/.exec(text)) && m[1] === m[2]) {
+    const a = parseStaticCondition(`you control a ${m[1]} creature`, st);
+    const b = parseStaticCondition(`you control a non-${m[1]} creature`, st);
+    return a && b ? { kind: "allOf", conds: [a, b] } : null;
+  }
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
     const amount = parseCount("the number of cards in your graveyard", null);
@@ -854,6 +861,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
   // Isolated Watchtower: "an opponent controls at least two more lands than you".
   if ((m = /^an opponent controls at least (two|three|four) more (lands|creatures) than you$/.exec(text))) return { kind: "opponentMore", what: m[2] as "lands" | "creatures", atLeast: num(m[1]!) };
+  // Teachings of the Archaics: "an opponent has at least four more cards in hand than you".
+  if ((m = /^an opponent has at least (two|three|four) more cards in hand than you$/.exec(text))) return { kind: "opponentMore", what: "hand", atLeast: num(m[1]!) };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   // Timely Reinforcements: "if you have less life than an opponent", "if you control fewer creatures than an opponent":

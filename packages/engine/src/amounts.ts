@@ -178,7 +178,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.sameNameAsAffected && !affectedName) return 0;
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
-        if ((c.other && id === ctx.sourceId) || id === notThis) continue;
+        if ((c.other && id === ctx.sourceId) || id === notThis || (c.otherThanAffected && id === ctx.affected)) continue;
         if (onPlayers && (o.attachedToPlayer === undefined || !onPlayers.includes(o.attachedToPlayer))) continue;
         if (subject && ((id === subject.id && !c.includeSubject) || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
         if (srcTypes && (id === ctx.sourceId || !shareCreatureType(srcTypes, creatureTypesOf(s, o)))) continue;
@@ -762,7 +762,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}`;
     case "cardsInHand":
       return "#cards in hand";
     case "handMoreThanYou":

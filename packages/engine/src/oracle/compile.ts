@@ -3558,6 +3558,15 @@ export function compile(d: CardDef): CompiledCard {
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))
     out.unsupported.push("(attached to enchanted creature, but it isn't an Aura enchanting a creature)");
+  // Vampirism: "Other creatures you control get -1/-1" on an Aura that enchants a creature, or on an Equipment: it isn't a
+  // creature itself, so "other" is other than the creature it's attached to.
+  if (!d.types.includes("Creature") && (d.subtypes.includes("Equipment") || (d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.length === 1 && out.enchant.types[0] === "Creature")))
+    out.statics = out.statics.map((st) => {
+      const a = st.affects;
+      if (a.kind !== "filter" || !a.other || !(a.types.includes("Creature") || a.spec?.types?.includes("Creature"))) return st;
+      const { other: _, ...rest } = a;
+      return { ...st, affects: { ...rest, otherThanAttached: true } };
+    });
   // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled; "attached to
   // target creature" (Gryff's Boon) needs none.
   if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield" && e.attachToTarget === undefined))) out.unsupported.push("(an Aura returning itself to the battlefield)");

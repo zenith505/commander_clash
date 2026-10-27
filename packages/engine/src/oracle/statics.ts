@@ -2055,7 +2055,7 @@ function parseStaticLine(line: string): StaticAbility | null {
     const per = masterwork ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: each[4]! }, sharesTypeWithAffected: true as const } } : mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : attachedCounters ? { count: { kind: "affectedCounters" as const, counter: ANY_COUNTER } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
-    const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];
+    const [p, t] = [scaleAmount(pt.power, ofAffected(per, affects, m[1]!)), scaleAmount(pt.toughness, ofAffected(per, affects, m[1]!))];
     if (p === null || t === null) return null;
     mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
@@ -2066,6 +2066,26 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // A static ability has no X of its own to choose (CR 107.3).
   return usesX(mods) ? null : { affects, mods, text: line };
+}
+
+/**
+ * "Other" in "for each other ..." of a static ability that affects other permanents: other than the permanent it's
+ * applied to when that one is of the kind counted ("Enchanted creature gets +1/+1 for each other creature you control",
+ * Bravado: an Aura isn't a creature, so the enchanted creature doesn't count itself; "Each legendary creature you
+ * control gets +1/+1 for each other legendary creature you control", Heroes' Podium, which counts itself if it becomes
+ * a legendary creature, rulings; Sliver Legion, rulings). Otherwise other than the source ("Enchanted creature gets
+ * +2/+2 for each other enchantment on the battlefield", Ancestral Mask).
+ */
+function ofAffected(c: AmountExpr, affects: Affects, subject: string): AmountExpr {
+  const k = c.count;
+  if (k.kind !== "permanents" || !k.other || affects.kind === "self") return c;
+  const attached = affects.kind === "attached" ? /^(?:Enchanted|Equipped) (creature|artifact|land)$/.exec(subject) : null;
+  const types = attached ? [capital(attached[1]!)] : affects.kind === "filter" ? [...affects.types, ...(affects.spec?.types ?? [])] : [];
+  const subtypes = affects.kind === "filter" ? (affects.spec?.subtypes ?? []) : [];
+  const ofKind = k.filter.types?.some((x) => types.includes(x)) || k.filter.subtypes?.some((x) => subtypes.includes(x) || (CREATURE_TYPES.has(x) && types.includes("Creature")));
+  if (!ofKind) return c;
+  const { other: _, ...count } = k;
+  return { ...c, count: { ...count, otherThanAffected: true } };
 }
 
 /**

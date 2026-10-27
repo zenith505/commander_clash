@@ -1112,6 +1112,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
   const spec = a.spec && bindChosen(a.spec, s.objects[e.sourceId!]?.chosen);
   for (const [id, c] of chars) {
     if (a.other && id === e.sourceId) continue;
+    if (a.otherThanAttached && id === s.objects[e.sourceId!]?.attachedTo) continue;
     if (!a.types.every((t) => c.types.includes(t))) continue;
     if (a.subtypes?.length && !(c.allCreatureTypes && c.types.includes("Creature")) && !a.subtypes.some((t) => c.subtypes.some((x) => sameCI(x, t)))) continue;
     if (a.colors?.length && !a.colors.some((col) => c.colors.includes(col))) continue;

@@ -836,6 +836,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
       // "Whenever a creature blocks this turn, ..." (Noxious Assault): a delayed trigger (CR 603.7b).
       if (event === "creatureBlocks") fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === event && fits(t, o, ctrl), triggers, undefined, o));
+      // Righteous Indignation: "Whenever a creature blocks a black or red creature": once for each one it blocks (CR 509.3b).
+      for (const a of o.blocking ?? []) {
+        const at = s.objects[a];
+        if (at) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && fits(t, o, controllerOf(s, w)) && !!t.blockFilter && objectMatches(s, t.blockFilter, at, controllerOf(s, w), false), undefined, undefined, o);
+      }
     }
     // Neyith of the Dire Hunt: once if one or more creatures its controller controls became blocked (rulings).
     for (const w of watchers) {
@@ -855,7 +860,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (o.blocking) {
         // Blocking several creatures, "blocks" still triggers once; "blocks a creature" once for each (CR 509.3a-b).
         // "Blocks one or more black creatures" (Rashka the Slayer): once, if any of them is one.
-        const anyBlocked = (t: TriggeredAbility) => !t.blockFilter || o.blocking!.some((a) => !!s.objects[a] && objectMatches(s, t.blockFilter!, s.objects[a]!, you, false));
+        // Lairwatch Giant: "blocks two or more creatures".
+        const anyBlocked = (t: TriggeredAbility) => (!t.blockFilter || o.blocking!.some((a) => !!s.objects[a] && objectMatches(s, t.blockFilter!, s.objects[a]!, you, false))) && (!t.blocksAtLeast || o.blocking!.length >= t.blocksAtLeast);
         add(o, you, (e, t) => (e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks") && anyBlocked(t));
         addHosted(o, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
         for (const a of o.blocking) {

@@ -209,6 +209,12 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const fx = parseSentence(`${combat[1]} until end of turn`, ctx);
     return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
+  // Yuan Shao's Infantry: "~ can't be blocked this combat": the same, for the combat going on (CR 506.1, 511.3).
+  const thisCombat = /^(~|it|that creature) can't be blocked this combat$/i.exec(s);
+  if (thisCombat) {
+    const fx = parseSentence(`${thisCombat[1]} can't be blocked this turn`, ctx);
+    return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
+  }
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
   // Take the Bait: "Untap all attacking creatures and goad them": the same creatures, untapped then goaded (CR 701.15a).
@@ -397,7 +403,9 @@ function basePT(p: string, t: string): [Amount, Amount] | null {
  * Frog with base power and toughness 1/1", "becomes a 3/3 Elemental creature", ...
  */
 export function parseChanges(text: string): Modification[] | null {
-  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns?|can attack) )/i);
+  // "Becomes black, gets +1/-1, and gains "..."" (Defiling Tears), "becomes an Angel, gets +3/+3, and gains flying and
+  // lifelink" (Paragon of the Amesha): a list of changes.
+  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns? |can attack |gets? [+-]|gains? ))/i);
   const out: Modification[] = [];
   for (const part of parts) {
     const p = part.trim();
@@ -438,6 +446,8 @@ export function parseChanges(text: string): Modification[] | null {
     }
     // Turtle-Duck: "has base power 4" (layer 7b, CR 613.4b), its toughness left alone.
     else if ((m = /^(?:has|have) base power (\d+)$/i.exec(p))) out.push({ kind: "setPower", power: Number(m[1]) });
+    // Chariot of the Sun: "has base toughness 1" (layer 7b), its power left alone.
+    else if ((m = /^(?:has|have) base toughness (\d+)$/i.exec(p))) out.push({ kind: "setToughness", toughness: Number(m[1]) });
     // Doran (CR 510.1a as modified) and defender (CR 702.3b), for a while.
     else if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/i.test(p)) out.push({ kind: "assignsToughness" });
     else if (/^can attack (?:this turn )?as though (?:it|they) didn't have defender$/i.test(p)) out.push({ kind: "attackDespiteDefender" });
@@ -485,6 +495,8 @@ export function parseBecomes(text: string): Modification[] | null {
     return [m[1] ? { kind: "addTypes", types: [], subtypes: [CHOSEN_TYPE] } : { kind: "setSubtypes", subtypes: [CHOSEN_TYPE] }];
   // "Becomes a Dinosaur in addition to its other creature types" (Allosaurus Shepherd): a creature type added (CR 205.1b).
   if ((m = /^an? ([A-Z][a-z]+) in addition to its other creature types$/.exec(rest)) && CREATURE_TYPES.has(m[1]!)) return [{ kind: "addTypes", types: [], subtypes: [m[1]!] }];
+  // Indigo Faerie: "becomes blue in addition to its other colors" (layer 5, CR 105.3): it keeps its colors.
+  if ((m = /^(white|blue|black|red|green) in addition to its other colors$/i.exec(rest))) return [{ kind: "addColors", colors: [COLOR_WORDS[m[1]!.toLowerCase()]!] }];
   // Just a color: "becomes black", "becomes blue and red"
   if (/^(white|blue|black|red|green|colorless)( and (white|blue|black|red|green))*$/i.test(rest)) {
     return [{ kind: "setColors", colors: rest.split(/ and /).map((w) => COLOR_WORDS[w.toLowerCase()]).filter((c): c is Color => !!c) }];

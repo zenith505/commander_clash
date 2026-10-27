@@ -859,6 +859,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
     if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
+    if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;

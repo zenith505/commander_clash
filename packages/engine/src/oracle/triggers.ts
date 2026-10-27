@@ -481,6 +481,23 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: blocks ? "creatureBlocks" : "creatureBecomesBlocked", body, subjectFilter: { ...filter, ...(blocks ? {} : { controller: "you" as const }), text: blocks ? other[2]! : `${other[2]} you control` } };
   }
+  // Lairwatch Giant: "Whenever ~ blocks two or more creatures": as blockers are declared, once (CR 509.3a, 509.1). Nothing
+  // here makes a creature block more creatures later.
+  const blocksMany = /^Whenever ~ blocks (two|three) or more creatures, (.+)$/.exec(line);
+  if (blocksMany) {
+    const body = parseBody(blocksMany[2]!, { selfIt: true });
+    return body ? { event: "selfBlocks", body, blocksAtLeast: num(blocksMany[1]!) } : "fail";
+  }
+  // Righteous Indignation: "Whenever a creature blocks a black or red creature, the blocking creature gets +1/+1 until end
+  // of turn": once for each such creature it blocks (CR 509.3c), "the blocking creature" the blocker.
+  const blocksA = /^Whenever (an?) (creature(?: you control)?) blocks (an? [^,]+? creature), (.+)$/.exec(line);
+  if (blocksA) {
+    const filter = parseTargetPhrase(blocksA[2]!);
+    const attacker = parseTargetPhrase(blocksA[3]!.replace(/^an? /, ""));
+    if (filter?.kind !== "object" || attacker?.kind !== "object" || attacker.controller || /\b(?:it|its|that creature)\b/.test(blocksA[4]!)) return "fail";
+    const body = parseBody(blocksA[4]!.replace(/\bthe blocking creature\b/g, "it"), { subjectIt: true });
+    return body ? { event: "creatureBlocksCreature", body, subjectFilter: { ...filter, text: blocksA[2]! }, blockFilter: { ...attacker, text: blocksA[3]! } } : "fail";
+  }
   // "Whenever ~ crews a Vehicle, that Vehicle gains haste until end of turn" (Speedway Fanatic): it crews one when it's
   // tapped to pay its crew cost (CR 702.122d), "that Vehicle" the one crewed, once for each crew ability.
   const crews = /^Whenever ~ crews a Vehicle, (.+)$/.exec(line);
@@ -1871,6 +1888,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Electryte: "Whenever ~ deals combat damage to defending player": the only player an attacking creature can deal
+    // combat damage to is the one it attacks (CR 506.2, 510.1), and a blocking one deals it to no player.
+    .replace(/^Whenever ~ deals combat damage to defending player, /, "Whenever ~ deals combat damage to a player, ")
     .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ")
     // Risona, Asari Commander: "Whenever combat damage is dealt to you": only creatures deal combat damage (CR 510.1), once
     // for each combat damage step; "if it doesn't have an indestructible counter on it" after "Whenever ~ deals ...": ~.
@@ -2162,9 +2182,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // is that controller, whose upkeep it is; "that creature" is the enchanted creature.
   // Righteous Authority: "At the beginning of the draw step of enchanted creature's controller, that player draws an
   // additional card": a trigger, so they just draw one more.
-  const hostUpkeep = /^At the beginning of the (upkeep|draw step) of (enchanted|equipped) creature's controller, (.+)$/.exec(line);
-  if (hostUpkeep) {
-    const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostUpkeep[3]!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
+  // Numbing Dose: "enchanted permanent's controller"; Feedback: "enchanted enchantment's controller": the same, whatever
+  // the Aura enchants.
+  const hostUpkeep = /^At the beginning of the (upkeep|draw step|end step) of (enchanted|equipped) (creature|permanent|enchantment|artifact|land)'s controller, (.+)$/.exec(line);
+  if (hostUpkeep && (hostUpkeep[3] === "creature" || (hostUpkeep[2] === "enchanted" && !/\bthat \w+\b/.test(hostUpkeep[4]!.replace(/\bthat player\b/g, ""))))) {
+    const t = parseTrigger(`At the beginning of each player's ${hostUpkeep[1]}, ${hostUpkeep[4]!.replace(/\bthat creature\b/g, `${hostUpkeep[2]} creature`).replace(/^that player draws an additional card\.$/, "that player draws a card.")}`);
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
@@ -2178,8 +2200,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
   // "Whenever this token and at least one other creature token attack" (Valor's Reach Tag Team): other tokens.
   // "Whenever ~ and at least one other creature attack" (Sokka, Lateral Strategist).
-  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures?|other creature tokens?|[A-Z][a-z]+) attack, (.+)$/.exec(line);
+  // Paired Tactician: "Whenever ~ and at least one other Warrior attack": the same.
+  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures?|other creature tokens?|[A-Z][a-z]+|other [A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {
+    battalion[2] = battalion[2]!.replace(/^other (?=[A-Z])/, "");
     const tokens = /^other creature tokens?$/.test(battalion[2]!);
     if (tokens) return ((t) => (t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), withOthersToken: true as const } : "fail"))(parseTrigger(`Whenever ~ attacks, ${battalion[3]}`));
     const type = /^other creatures?$/.test(battalion[2]!) ? undefined : battalion[2]!;
@@ -2424,7 +2448,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // it triggers and resolves (CR 603.4), as it last existed if it's gone.
   const subjSize = intervening && /^Whenever (?:a|another) (?:nontoken )?creature (?:you control )?enters$/.test(intervening[1]!) ? /^that creature is (\d+)\/(\d+)$/.exec(intervening[2]!) : null;
   const subjSizeCond: StaticCondition | null = subjSize ? { kind: "allOf", conds: [{ kind: "subjectPT", stat: "power", min: Number(subjSize[1]), max: Number(subjSize[1]) }, { kind: "subjectPT", stat: "toughness", min: Number(subjSize[2]), max: Number(subjSize[2]) }] } : null;
-  const ifCond = subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "At the beginning of each player's upkeep, if that player controls a Plains" (Spiritual Sanctuary), "if there are four
+  // or more basic land types among lands that player controls" (Mask of Intolerance): the active player's, as it triggers
+  // and resolves (CR 603.4).
+  const eachStep = intervening && /^At the beginning of each player's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? intervening[2]! : null;
+  const thatControls = eachStep ? /^that player controls (an? .+)$/.exec(eachStep) : null;
+  const thatControlsCond = thatControls ? parseStaticCondition(`you control ${thatControls[1]}`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+  const thatTypes = eachStep ? new RegExp(`^there are ${NUM} or more basic land types among lands that player controls$`).exec(eachStep) : null;
+  const activeCond: StaticCondition | null = thatControlsCond?.kind === "control" && thatControlsCond.who === "you" && !thatControlsCond.other ? { ...thatControlsCond, who: "eventPlayer" } : thatTypes ? { kind: "amount", amount: { count: { kind: "basicLandTypes", whose: { ref: "eventPlayer" } } }, min: num(thatTypes[1]!) } : null;
+  const ifCond = activeCond ? activeCond : subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -2927,7 +2959,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // at the beginning of the next end step" (Nine-Lives Familiar): an intervening if (CR 603.4) on the creature as it
       // last existed (CR 603.10a), and the counters it comes back with counted from that too.
       let ifHadCounter: string | undefined;
-      const hadKind = /^if it had an? ([a-z]+) counter on it, (.+)$/.exec(body0);
+      // Promising Duskmage: "if it had a +1/+1 counter on it".
+      const hadKind = /^if it had an? ([a-z]+|\+1\/\+1|-1\/-1) counter on it, (.+)$/.exec(body0);
       if (hadKind) {
         if (event !== "selfDies") return "fail" as const;
         ifHadCounter = hadKind[1]!;

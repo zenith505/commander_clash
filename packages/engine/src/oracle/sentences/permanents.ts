@@ -447,6 +447,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Regenerate all Werewolf creatures you control" (Full Moon's Rise), "each other creature you control" (Dark Dabbling).
   // Experiment One: "Remove two +1/+1 counters from ~: Regenerate it.": the permanent itself, in its own activated ability.
   if (/^Regenerate it$/.test(s) && ctx.activated && !ctx.targets.length && !ctx.subject) return [{ type: "regenerate", what: { ref: "self" } }];
+  // Duskworker: "Whenever ~ becomes blocked, regenerate it.": ~ itself, in its own trigger.
+  if (/^[Rr]egenerate it$/.test(s) && ctx.selfIt && !ctx.subjectIt && !ctx.targets.length && !ctx.subject) return [{ type: "regenerate", what: { ref: "self" } }];
   if ((m = /^Regenerate (~|(?:another )?target .+|enchanted creature|equipped creature|each (?:other )?creature you control|all (?:[A-Z][a-z]+ )?creatures you control)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
@@ -1177,7 +1179,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const grant = what?.ref === "target" && !what.n ? parseGrants(m[2]!) : null;
     if (what && grant?.length && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what, mods: grant, duration: "game" }];
   }
-  if ((m = /^~ ((?:becomes?|gains?) .+)$/.exec(s)) && !ctx.spell) {
+  // Mist Dragon: "~ loses flying. (This effect lasts indefinitely.)" the same.
+  if ((m = /^~ ((?:becomes?|gains?|loses?) .+)$/.exec(s)) && !ctx.spell) {
     const what = parseObject("~", ctx);
     const mods = what?.ref === "self" ? parseChanges(m[1]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];

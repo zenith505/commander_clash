@@ -1,6 +1,6 @@
 # Roadmap
 
-26,352 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+26,398 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,753 of
 9,979 (87%).
 
@@ -1689,15 +1689,39 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   counter); Floral Spuzzem, Kukemssa Pirates, Goblin Vandal and Rysorian Badger ("If you do" after destroying, gaining
   control of or exiling a target); Cosmic Horror ("if ~ is destroyed this way"); Electrozoa (energy at the first main
   phase).
+- Round B14 (harder skipped cards, least played first): "destroy target creature if it has the least power" checked as
+  it resolves (Wretched Banquet); Unforge's damage to the creature the Equipment was attached to as it was destroyed
+  (rulings); "Remove a -1/-1 counter ... If you do" (Woeleecher); "in excess of" counts (Superior Numbers); "that
+  Wall's mana value to the Wall's controller" (Word of Blasting); "Whenever a creature blocks a black or red creature",
+  once for each one it blocks (Righteous Indignation, CR 509.3b); "blocks two or more creatures" (Lairwatch Giant);
+  "Whenever a creature blocks this turn" in a spell (Battle Cry, Mage Hunters' Onslaught); each player's upkeep with
+  "if that player controls" (Spiritual Sanctuary) or "four or more basic land types among lands that player controls"
+  (Mask of Intolerance), snow lands (Cold Snap); "the upkeep of enchanted land's / enchantment's / artifact's /
+  permanent's controller" and "enchanted artifact's controller" (Cursed Land, Feedback, Warp Artifact, Numbing Dose,
+  Power Taint, Gremlin Infestation); "target player who attacked this turn" (Fire and Brimstone); "all Equipment
+  attached to it" on an attacking creature (Soul Nova); "All creatures with flying able to block ~ do so" (Talruum
+  Piper); "can't be blocked if you've cast a historic spell this turn" (Relic Runner); "attacks alone, it can't be
+  blocked this combat" (Yuan Shao's Infantry, Ma Chao); "deals combat damage to defending player" (Electryte);
+  "Whenever ~ and at least one other Warrior attack" (Paired Tactician); "if it had a +1/+1 counter on it" (Promising
+  Duskmage); "you may untap target tapped creature an opponent controls. If you do, untap ~" (Soldevi Golem); "has base
+  toughness" (Chariot of the Sun), "becomes blue in addition to its other colors" (Indigo Faerie), "becomes black, gets
+  ..., and gains" (Defiling Tears), "an additional +2/+2" (Strength of Night); Burning Palm Efreet, Thoughtcutter
+  Agent, Rookie Mistake, Stinging Vitriol, Ral's Staticaster, Saprazzan Outrigger, Duskworker, Sawtooth Thresher, Mist
+  Dragon, Psychic Allergy, Paragon of the Amesha, Dragonsoul Knight, Jump Scare, Wings of Velis Vel, Sash and
+  Waistcoat. +46 (26,398 with round 184).
+- Skipped there, with reasons: Icy Prison ("unless any player pays {3}": the bots would pay to keep an opponent's
+  creature exiled); Hail Storm (its damage to attackers and to you and your creatures is one event, not two); Urborg
+  Stalker (a "nonblack, nonland permanent" in an intervening if); Fyndhorn Druid ("if it was blocked this turn" needs
+  blocked-this-turn tracking); Lingering Death, Aggression and Insubordination ("that creature" for the enchanted
+  creature in a trigger on its controller's step).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Heart Wolf (Dwarves, a
   delayed leaves trigger), Exiled Doomsayer (morph cost tax), Treacherous Vampire and Rotting Giant (sacrifice unless
   you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
-  the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of Blasting, Tribal Golem, Forethought
-  Amulet; Unforge, Reign of Terror ("for each creature that died this way"), Duskworker, Saprazzan Outrigger, Steeling
-  Stance (forecast), Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Burning Palm
-  Efreet, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
+  the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Tribal Golem, Forethought
+  Amulet; Reign of Terror ("for each creature that died this way"), Steeling
+  Stance (forecast), Exalted Dragon, Qal Sisma Behemoth, Stabilizer, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a

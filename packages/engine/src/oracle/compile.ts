@@ -3562,6 +3562,12 @@ export function compile(d: CardDef): CompiledCard {
       else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));
       continue;
     }
+    // Battle Cry: "Untap all white creatures you control.\nWhenever a creature blocks this turn, ...": a delayed trigger
+    // the spell sets up (CR 603.7a), its own paragraph part of the spell's text.
+    if (isSpell && spellLines.length && /^Whenever [^,]+ this turn, /.test(line)) {
+      spellLines.push(line);
+      continue;
+    }
     const trig = parseTrigger(line);
     if (trig) {
       if (trig === "fail") out.unsupported.push(raw);

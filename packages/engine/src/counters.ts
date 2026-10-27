@@ -73,7 +73,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const putter = putterNow ?? owner;
   const { types, subtypes, allCreatureTypes } = characteristics(s, o);
   const isCreature = types.includes("Creature");
-  const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet")));
+  const fits = (on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact")) || (on === "creatureSpacecraftOrPlanet" && (subtypes.includes("Spacecraft") || subtypes.includes("Planet"))) || (on === "creatureOrVehicle" && subtypes.includes("Vehicle"));
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
       if (mod.what !== "counters" || "onPlayer" in mod) return false;

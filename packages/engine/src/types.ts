@@ -1360,6 +1360,8 @@ export interface TurnLog {
   leftGraveyardCount?: Partial<Record<PlayerId, number>>;
   /** Each creature put into a graveyard from the battlefield this turn: its owner's graveyard, and whether it was a token (Caller of the Claw, Fresh Meat). */
   creaturesToYard?: { owner: PlayerId; token?: true }[];
+  /** The card types, as they last existed, of the permanents put into each owner's graveyard from the battlefield this turn (Kami of Transience). */
+  permanentTypesToYard?: Record<number, string[]>;
   /** How many creatures each player controlled that left the battlefield this turn (Kutzil's Flanker). */
   creaturesLeft?: Partial<Record<PlayerId, number>>;
   /** +1/+1 counters put on permanents this turn: who put them, who controlled the permanent and whether it was a creature then (Iridescent Hornbeetle, Sigardian Paladin rulings). */
@@ -1724,7 +1726,7 @@ export interface GameState {
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */
   dayNight?: "day" | "night";
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
-  lastTurn?: { active: PlayerId; cast: number[] };
+  lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it. */ lostLife?: PlayerId[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */

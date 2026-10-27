@@ -1116,6 +1116,10 @@ export function moveObject(
   // "Put into your graveyard from the battlefield": its owner's graveyard (CR 404.2), a token too (CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) ((s.turnLog ??= {}).creaturesToYard ??= []).push({ owner: o.owner, ...(o.isToken ? { token: true as const } : {}) });
   if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
+  if (fromZone === "battlefield" && to === "graveyard") {
+    const mine = (((s.turnLog ??= {}).permanentTypesToYard ??= {})[o.owner] ??= []);
+    for (const t of last.types) if (!mine.includes(t)) mine.push(t);
+  }
   // Cards put into each player's graveyard from anywhere this turn (Fraying Sanity), by owner; a token isn't a card.
   if (to === "graveyard" && o.zone === "graveyard" && fromZone !== "graveyard" && !o.isToken) (s.cardsToGraveyardThisTurn ??= {})[o.owner] = (s.cardsToGraveyardThisTurn?.[o.owner] ?? 0) + 1;
   if (fromZone === "battlefield") {
@@ -2799,7 +2803,11 @@ export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers
 function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
-  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length) };
+  // Also who lost life in it (Feast on the Fallen, CR 119.3).
+  if (!skipping) {
+    const lost = s.players.filter((p) => (s.turnLog?.lifeLost?.[p.id] ?? 0) > 0).map((p) => p.id);
+    s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(lost.length ? { lostLife: lost } : {}) };
+  }
   // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
   // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
   const controlled = s.controlledTurn;

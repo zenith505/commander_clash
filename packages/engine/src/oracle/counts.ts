@@ -167,8 +167,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // X, where X is the number of creatures exiled this way" (Sunfall): the same.
   // Kaya's Wrath: "the number of creatures you controlled that were destroyed this way": controlled by you as they last
   // existed on the battlefield (CR 608.2h).
-  if ((m = /^(?:the number of )?([a-z]+) you controlled that were (destroyed|exiled) this way$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${singularWord(m[1]!)} you control`, { chosen: true });
+  // Ceaseless Conflict: "for each nontoken creature you controlled that was destroyed this way": the same, one at a time.
+  if ((m = /^(?:the number of )?([a-z]+s) you controlled that were (destroyed|exiled) this way$/i.exec(p) ?? (each ? /^((?:nontoken )?[a-z]+) you controlled that was (destroyed|exiled) this way$/i.exec(p) : null))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(" ").map(singularWord).join(" ")} you control`, { chosen: true });
     if (spec?.kind !== "object" || spec.controller !== "you") return null;
     return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: `${m[1]!} you controlled` } } };
   }

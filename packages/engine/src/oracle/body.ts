@@ -946,6 +946,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Prize Pig: "put that many ribbon counters on ~. Then if there are three or more ribbon counters on ~, remove those
   // counters and untap it": all of them, whether or not it's tapped (rulings).
   text = text.replace(/^([Pp]ut (?:that many|X) ([a-z]+) counters on ~\.) Then if there are ([a-z]+) or more \2 counters on ~, remove those counters and untap it\.$/, "$1 If there are $3 or more $2 counters on ~, remove all $2 counters from ~ and untap ~.");
+  // Sinner's Judgment: "put a judgment counter on this Aura. Then if there are three or more judgment counters on it,
+  // enchanted player loses the game": "it" is ~.
+  text = text.replace(/([Pp]ut an? ([a-z]+) counter on ~\.) Then if there are ([a-z]+) or more \2 counters on it, (?!remove )/, "$1 Then if there are $3 or more $2 counters on ~, ");
   // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
   // ability": the same check of ~'s counters as it resolves.
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
@@ -4073,6 +4076,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
       continue;
     }
+    // Miles "Tails" Prower: "Whenever a Vehicle you control enters, draw a card if it has flying. Otherwise, put a flying
+    // counter on it.": the permanent as it is when this resolves (CR 608.2c), or as it last existed (608.2h).
+    const subjectHas = ctx.subjectIt && !effects.length ? /^(.+) if it has (flying|first strike|trample|haste|vigilance|reach|lifelink|deathtouch|menace)$/.exec(s) : null;
+    const subjectElse = subjectHas && /^Otherwise, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (subjectHas && subjectElse && si + 2 === sentences.length) {
+      const before = ctx.targets.length;
+      const yes = parseSentence(capital(subjectHas[1]!), ctx);
+      const no = parseSentence(capital(subjectElse[1]!), ctx);
+      if (!yes || !no || ctx.targets.length !== before) return null;
+      const kw = subjectHas[2]!.split(" ").map(capital).join(" ");
+      effects.push({ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], keywords: [kw], text: `with ${subjectHas[2]}` } }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
     // Aunt May: "Whenever another creature you control enters, you gain 1 life. If it's a Spider, put a +1/+1 counter on
     // it.": the creature as it is when this resolves (CR 608.2c), or as it last existed (608.2h).
     const subjectIs = ctx.subjectIt && !subjectType && effects.length ? /^If it's an? ([A-Z][a-z]+), ([a-z].+)$/.exec(s) : null;
@@ -4968,6 +4985,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
       const upTo = (n: string): Effect => ({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], manaValue: { max: Number(n) }, text: `creature with mana value ${n} or less` } }, effects: [{ type: "destroy", what: { ref: "target", index } }] });
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "revolt" } }, effects: [upTo(pushRevolt[1]!)], otherwise: [upTo(push[1]!)] });
+      si++;
+      continue;
+    }
+    // Anoint with Affliction: "Exile target creature if it has mana value 3 or less. Corrupted — Exile that creature
+    // instead if its controller has three or more poison counters": either one, checked as it resolves (rulings).
+    const anoint = /^Exile target creature if it has mana value (\d+) or less$/.exec(s);
+    const corrupted = anoint && /^Exile that creature instead if its controller has (one|two|three|four|five|\d+) or more poison counters\.?$/.exec(sentences[si + 1] ?? "");
+    if (anoint && corrupted && ctx.spell) {
+      const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
+      const exile: Effect = { type: "exile", what: { ref: "target", index } };
+      const small: Effect = { type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], manaValue: { max: Number(anoint[1]) }, text: `creature with mana value ${anoint[1]} or less` } }, effects: [structuredClone(exile)] };
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "poison", who: { ref: "targetController", index } } }, min: num(corrupted[1]!) }, effects: [exile], otherwise: [small] });
       si++;
       continue;
     }

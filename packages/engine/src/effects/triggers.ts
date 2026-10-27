@@ -1150,6 +1150,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever this creature mutates" (CR 702.140d): an ability of the merged permanent, from any of its components.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfMutates");
+    // "Whenever a creature you control mutates" (Essence Symbiote): the merged creature is the subject.
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentMutates" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
     // An X in its morph or disguise cost is the X its own abilities use (CR 702.37f, 702.168e).
@@ -1230,7 +1236,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const watcher = controllerOf(s, o);
         // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
         // Any player's attack (Norn's Decree): "the attacking player".
-        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length, group } : anyone ? { player: ev.controller } : undefined;
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length, group } : anyone ? { player: ev.controller, ...(ev.type === "groupAttack" ? { group } : {}) } : undefined;
         // "Whenever one or more creatures attack one of your opponents" (Frontier Warmonger): once for each of the
         // watcher's opponents attacked, about the creatures attacking them (CR 508.3e).
         if (t.attacksOpponent) {

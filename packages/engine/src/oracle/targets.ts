@@ -881,6 +881,10 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [{ kind: "object", status: "enchanted", text: "enchanted creature" }, { kind: "object", types: ["Enchantment"], text: "enchantment creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "enchanted creature or enchantment creature") };
   }
+  // Silumgar Assassin: "target creature with power 3 or less an opponent controls": the same as "target creature an
+  // opponent controls with power 3 or less".
+  const withThenCtl = /^((?:target )?[a-z ]*?creature) (with (?:power|toughness|mana value) \d+ or (?:less|greater)) (an opponent controls|you control|you don't control)$/.exec(phrase.trim());
+  if (withThenCtl) return parseTargetPhrase(`${withThenCtl[1]} ${withThenCtl[3]} ${withThenCtl[2]}`, opts);
   // Evaporate: "each white and/or blue creature": either color or both, as "white or blue creature" is (counted once).
   const andOr = /^((?:target |each )?)(white|blue|black|red|green) and\/or (white|blue|black|red|green) (creature|permanent)s?$/.exec(phrase.trim());
   if (andOr) return parseTargetPhrase(`${andOr[1]}${andOr[2]} or ${andOr[3]} ${andOr[4]}`, opts);

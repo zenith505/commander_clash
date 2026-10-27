@@ -352,6 +352,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
     case "creaturesLeftThisTurn":
       return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
+    case "typeToYourGraveyardThisTurn":
+      return s.turnLog?.permanentTypesToYard?.[ctx.controller]?.includes(c.type) ? 1 : 0;
     case "creaturesToYourGraveyard":
       return (s.turnLog?.creaturesToYard ?? []).filter((d) => d.owner === ctx.controller && !(c.nontoken && d.token)).length;
     case "diedThisTurn":
@@ -876,6 +878,8 @@ function describeCount(c: Count): string {
       return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
+    case "typeToYourGraveyardThisTurn":
+      return `an ${c.type.toLowerCase()} put into your graveyard from the battlefield this turn`;
     case "creaturesToYourGraveyard":
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":

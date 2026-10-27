@@ -121,6 +121,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
   }
+  // Face of Divinity: "As long as another Aura is attached to enchanted creature, it has first strike and lifelink": an Aura
+  // other than this one, so two or more with it.
+  if ((m = /^As long as another Aura is attached to enchanted creature, it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`Enchanted creature ${m[1]} ${m[2]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "amount", amount: { count: { kind: "attachedToHost", subtypes: ["Aura"] } }, min: 2 } };
+  }
   // The Masamune: "As long as equipped creature is attacking, it has first strike and must be blocked if able": while it's
   // an attacking creature (CR 506.4, 611.3a).
   if ((m = /^As long as (enchanted|equipped) creature is attacking, it (gets|has) (.+)$/.exec(text))) {
@@ -782,6 +789,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
+  if (/^an opponent lost life last turn$/.test(text)) return { kind: "opponentLostLifeLastTurn" };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
   // "If you didn't lose life this turn" (Luminarch Ascension), "if you lost life this turn".
@@ -874,6 +882,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
+  // Kami of Transience: "if an enchantment was put into your graveyard from the battlefield this turn".
+  if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) was put into your graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!) } }, min: 1 };
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   // Bloodcrazed Goblin: "unless an opponent has been dealt damage this turn" (bloodthirst's condition, CR 702.54a).
@@ -1007,6 +1017,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
   if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
+  // Faithbound Judge: "if ~ has two or fewer judgment counters on it".
+  if ((m = new RegExp(`^~ has ${NUM} or fewer ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) };
   // Warden of the Inner Sky: "as long as this creature has three or more counters on it": of every kind together.
   if ((m = new RegExp(`^(?:~|it) has ${NUM} or more counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: "*", min: num(m[1]!) };
   // "~ has trample as long as it has ten or more +1/+1 counters on it" (Primordial Hydra).
@@ -1960,6 +1972,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
+  // Silumgar Assassin: "Creatures with power greater than ~'s power can't block it" (CR 509.1b).
+  if (/^Creatures with power greater than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByGreaterPower" }], text: line };
   // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)
   if (/^Creatures with power less than ~'s power can't block creatures you control$/.test(text)) return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [{ kind: "cantBeBlockedByLesserPower", than: "source" }], text: line };
   // Bower Passage: "Creatures with flying can't block creatures you control": the same blocking restriction as "creatures

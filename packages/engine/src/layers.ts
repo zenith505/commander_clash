@@ -1013,6 +1013,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (!cast) return false;
       return cond.none ? cast.every((n) => n === 0) : cast.some((n) => n >= (cond.onePlayer ?? 1));
     }
+    case "opponentLostLifeLastTurn":
+      return (s.lastTurn?.lostLife ?? []).some((p) => p !== you);
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {

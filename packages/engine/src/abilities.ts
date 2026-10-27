@@ -362,6 +362,8 @@ export type Count =
   | { kind: "creaturesLeftThisTurn" }
   /** "For each (nontoken) creature put into your graveyard from the battlefield this turn" (Caller of the Claw): its owner's graveyard, whoever controlled it. */
   | { kind: "creaturesToYourGraveyard"; nontoken?: true }
+  /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
+  | { kind: "typeToYourGraveyardThisTurn"; type: string }
   | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
@@ -1704,6 +1706,8 @@ export type StaticCondition =
    * player, rulings): the whole previous turn (GameState.lastTurn).
    */
   | { kind: "castLastTurn"; none?: true; onePlayer?: number }
+  /** "If an opponent lost life last turn" (Feast on the Fallen): during the whole previous turn (GameState.lastTurn). */
+  | { kind: "opponentLostLifeLastTurn" }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
@@ -3702,6 +3706,8 @@ export type TriggerEvent =
   /** "Whenever this Vehicle becomes crewed": whenever a crew ability of it resolves (CR 702.122e). */
   | "selfBecomesCrewed"
   | "selfMutates"
+  /** "Whenever a creature you control mutates" (Essence Symbiote): one matching `tappedFilter`, the subject (CR 702.140d). */
+  | "permanentMutates"
   /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
   | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
@@ -4865,7 +4871,7 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet" | "creatureOrVehicle"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean; /** "On an Army, Goblin, or Orc you control" (Mauhúr): only a permanent with one of these subtypes. */ subtypes?: string[]; /** "Would be put on ~" (Mowu): only the source. */ self?: true }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
   | { what: "counters"; onPlayer: true; op: "plusOne" }
   /**

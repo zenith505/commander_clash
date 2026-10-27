@@ -12,7 +12,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals, relatedOk, printedMatches } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEffect, runDiceEffect } from "./run-dice";
@@ -337,6 +337,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       if (ctx.legal[i] && t?.kind === "object" && !(ref.notYours && controllerOf(s, obj(s, t.id)) === ctx.controller)) out.push(obj(s, t.id));
     }
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
+    if (ref.sharesColor && out[0]) out.push(...sharingAColor(s, out[0], ref.sharesColor, ctx.controller));
     if (ref.attachedToo) {
       const hosts = new Set(out.map((o) => o.id));
       const attached = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo !== undefined && hosts.has(o.attachedTo) && objectMatches(s, ref.attachedToo!.filter, o, ctx.controller, false));
@@ -416,7 +417,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "revealed") {
     const rv = s.resolving?.revealed;
     const o = rv && s.objects[rv.id];
-    return o && o.zone === "library" && (o.zoneChanges ?? 0) === rv.zc ? [o] : [];
+    // A card revealed at random from a hand stays there (Planeswalker's Mirth).
+    return o && (o.zone === "library" || o.zone === "hand") && (o.zoneChanges ?? 0) === rv.zc ? [o] : [];
   }
   if (ref.ref === "affected")
     return (s.resolving?.affected ?? []).map((a) => s.objects[a.id]).filter((o): o is GameObject => o?.zone === "battlefield" && (o.zoneChanges ?? 0) === s.resolving!.affected!.find((a) => a.id === o.id)!.zc);

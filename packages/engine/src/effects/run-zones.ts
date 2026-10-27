@@ -2108,6 +2108,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, ctx.controller);
       const pool = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, s.objects[id]!)));
       if (!pool.length) return;
+      // Make a Wish: "two cards at random", chosen as it resolves (rulings), one of them if that's all there is.
+      if (e.n && e.n > 1 && e.dest === "hand") {
+        const left = [...pool];
+        const picked: string[] = [];
+        while (left.length && picked.length < e.n) picked.push(left.splice(Math.floor(nextRandom(s) * left.length), 1)[0]!);
+        log(s, `${src} returns ${picked.map((id) => defOf(s, obj(s, id)).name).join(" and ")}, chosen at random, from ${p.name}'s graveyard to their hand.`);
+        for (const id of picked) moveObject(s, id, "hand");
+        return;
+      }
       const o = obj(s, pool[Math.floor(nextRandom(s) * pool.length)]!);
       const d = defOf(s, o);
       if (e.dest === "hand") {

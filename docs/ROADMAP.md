@@ -1,6 +1,6 @@
 # Roadmap
 
-25,998 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+26,048 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,726 of
 9,979 (87%).
 
@@ -339,17 +339,31 @@ line blocks.
    the top card of your library any time"), Wernog, Jinxed Choker, Fall of the Impostor (the greatest power among a
    target opponent's creatures), Eligeth (scry replaced by draw), The Astonishing Ant-Man ("remove any number of
    counters" as a cost), Power Surge (untapped lands at the start of the turn), Jace, Cunning Castaway, Curse of
-   Vengeance, Shaile ("entered under your control this turn"), Ugin's Conjurant, Tales of the Ancestors. Round 180
+   Vengeance, Shaile ("entered under your control this turn"), Tales of the Ancestors. Round 180
    fixed "other" in Auras' and group statics (Bravado, Conclave's Blessing, Vampirism, Heroes' Podium, Sliver Legion:
    other than the permanent it affects; Daru Stinger and Kjeldoran Javelineer counted their target's counters) and went
    down from rank 11,250 to about rank 11,770 (Anoint with Affliction, Ceaseless Conflict, Desperate Measures, Egon,
    Faithbound Judge, Feast on the Fallen, Kami of Transience, Lightmine Field, Mark of Sakiko, Miles "Tails" Prower,
    Caradora, Melira, Samut, She-Hulk, Herald of Ilharg, Vengeful Regrowth, Panther Habit, Tide Shaper, Essence
    Symbiote, Mask of the Schemer, Vantress Gargoyle, Aether Snap, Serra Avenger and others), taking the easy ones.
-   Next most played after rank 11,770: Gloom Ripper, Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow
-   Marauder, Gorex, the Tombshell, Flamescroll Celebrant, Jacob Hauken, Flourishing Bloom-Kin, Pit Automaton, Pyxis of
-   Pandemonium, Guile, Jaya, Fiery Negotiator, Urge to Feed, Skanos Dragonheart, Fumble; the harder ones from ranks
-   10,640 to 11,770 (above); the harder ones from ranks 10,060 to
+   Out after round 181: Horrid Shadowspinner (the number discarded is fixed as you choose to draw), Luminate Primordial
+   ("that player gains life equal to its power", per target), Old Man Willow ("another creature or a token" to
+   sacrifice), Terrifying Presence, Delirium, Heroic Feast, Fated Clash, Rent Is Due, Avengers Assemble!, Chocobo Camp,
+   Transcendence, Fumble, Goblin Assassin, Kasmina, Enigma Sage, Codie, Vociferous Codex, Jetfire, Hollow Marauder,
+   Gorex, the Tombshell, Council's Deliberation, Lumbering Megasloth, Braids's Frightful Return, Awakening of
+   Vitu-Ghazi, Quiet Speculation, Breaking of the Fellowship, Amareth, Stoic Farmer, See the Unwritten, Razorlash
+   Transmogrant, Auntie Blyte, Nimble Trapfinder, Willie Lumpkin, Ajani Unrelenting, Kitt Kanto, Ellie, Azor, Oko the
+   Ringleader, Fiery Annihilation, Spell Crumple; past rank 12,200: Academy Loremaster, Cait, Celebrate the Harvest,
+   Cephalid Constable, Choice of Damnations, Cut Propulsion and Wisecrack ("deals damage to itself equal to its
+   power"), Evin, Ghired (populate tapped and attacking), Last-Ditch Effort, Misfortune Teller, Peer Pressure, Reckless
+   Blaze, Resplendent Marshal, Sporogenic Infection, Ward of Bones. Round 181 went down from rank 11,770 to about rank
+   12,330 (Ugin's Conjurant and Polukranos, Unchained (damage prevented by removing +1/+1 counters), Hinder (top or
+   bottom of the library), Urge to Feed, Mogg Infestation, Toxin Sliver, Moonstone Harbinger and Wax-Wane Witness ("gain
+   or lose life during your turn"), Heidegger, Teachings of the Archaics, Scourge of the Skyclaves, Skanos Dragonheart,
+   Gloom Ripper, Backlash, Tribute to Hunger, Turn the Earth, Curse of Stalked Prey, Wall of Essence, Eyeblight
+   Massacre, Kirri, Of One Mind, Eagle of Deliverance, Tui and La, Carnival of Souls and others), taking the easy ones.
+   Next most played after rank 12,330: the unsupported ones from `npm run popular` past Wall of Essence; the harder ones
+   from ranks 10,640 to 12,330 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
    7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
@@ -358,7 +372,7 @@ line blocks.
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
    the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
-   Ula's Temple; the ones skipped in rounds 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
+   Ula's Temple; the ones skipped in rounds 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
    God of Mischief, Katsumasa, the Animator, Slagstone Refinery, Inalla, Archmage Ritualist, Threats Undetected,

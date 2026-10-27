@@ -366,9 +366,11 @@ export function normalizeSelf(d: CardDef): string {
   // A plural name ("The Sackville-Bagginses", "The Notary Hobbits") too.
   if (/ (?:and|&) /.test(comma) || /^The [^,]+[a-z]s$/.test(d.name)) {
     const third = (v: string) => (v === "die" ? "dies" : `${v}s`);
-    t = t.replace(/~ (attack|enter|deal|block|die|get)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
+    t = t.replace(/~ (attack|enter|deal|block|die|get|become)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
     // The Notary Hobbits: "When ~ enter, if they're not a token, create two tokens that are copies of them": ~ itself.
     t = t.replace(/(When ~ enters, if )they're( not a token, create [^.]+ copies of )them\b/g, "$1it's$2it");
+    // Tui and La, Moon and Ocean: "Whenever ~ become untapped, put a +1/+1 counter on them": on ~ itself.
+    t = t.replace(/(Whenever ~ becomes (?:tapped|untapped), put an? [^.]+? counters? on )them\./g, "$1~.");
   }
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in

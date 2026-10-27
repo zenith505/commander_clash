@@ -3701,6 +3701,7 @@ export type TriggerEvent =
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "selfIsDealtNoncombatDamage" // "Whenever ~ is dealt noncombat damage" (Smaug the Impenetrable): the same, for damage other than combat damage
+  | "selfIsDealtCombatDamage" // "Whenever ~ is dealt combat damage" (Wall of Essence): the same, for combat damage only
   /** "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject; see TriggeredAbility.dealtFilter. */
   | "permanentIsDealtDamage"
   | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
@@ -4293,6 +4294,8 @@ export interface TriggeredAbility {
   firstUpkeep?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
+  /** "Deals combat damage to enchanted player" (Curse of Stalked Prey): the player this Aura enchants. */
+  toEnchanted?: true;
   /** Its X is the number of times its permanent was kicked (Marshal's Anthem), not the spell's X. */
   xKicked?: true;
   /** "Deals combat damage to a player who controls more lands than you" (Cartographer's Hawk): checked as it triggers. */

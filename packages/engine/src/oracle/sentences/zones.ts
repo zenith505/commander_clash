@@ -293,6 +293,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     for (let i = first; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, inGraveyardOfTarget: pi, text: "target card from that player's graveyard" };
     return [{ type: "shuffleIntoLibrary", what, who: who! }];
   }
+  // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
+  // libraries." (body.ts reads it as this): each card into its owner's library, each library shuffled once (rulings, CR
+  // 701.24c).
+  if ((m = /^Shuffle (up to (?:one|two|three|four|five)|any number of) target cards from graveyards into their owners' libraries$/.exec(s))) {
+    const what = parseCardTarget(`${m[1]} target cards from graveyards`, ctx);
+    return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what }] : null;
+  }
   // Teferi, Temporal Pilgrim: "Then they shuffle each nonland permanent they control into its owner's library", "they"
   // being the target opponent: each of them goes into its owner's library, then each of those libraries is shuffled (CR
   // 701.24c).

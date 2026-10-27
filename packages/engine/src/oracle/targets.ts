@@ -798,7 +798,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // "Creatures with no counters on them get -2/-2 until end of turn" (Hazardous Conditions): every one, as it resolves.
   const twoHues = /^(white|blue|black|red|green) creatures and (white|blue|black|red|green) creatures$/i.exec(p);
   if (twoHues) p = `${twoHues[1]} or ${twoHues[2]} creatures`;
-  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p) || /^creatures with no counters on them$/i.test(p);
+  // "Non-Elf creatures get -2/-2 until end of turn" (Eyeblight Massacre): every creature that isn't an Elf.
+  const nonType = /^non-([a-z]+) creatures$/i.exec(p);
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -1186,7 +1188,8 @@ export function parseTargetPhrase(
     owner = gy[1] === "your" ? "you" : gy[1] === "a" || !gy[1] ? undefined : "opponent";
     // Thor, God of Thunder: "target Equipment, instant, or sorcery card from your graveyard": a card of any one of them.
     const listed = phrase.trim().replace(/^target /i, "").replace(/ (?:from|in) (?:your|a|an opponent's) graveyard$/, "");
-    const list = /^([A-Z][a-z]+), ([a-z]+), or ([a-z]+) card$/.exec(listed);
+    // Kirri, Talented Sprout: "target Plant, Treefolk, or land card from your graveyard" too.
+    const list = /^([A-Z][a-z]+), ([A-Za-z]+), or ([a-z]+) card$/.exec(listed);
     if (list && (opts.target || /^target /i.test(phrase.trim())) && !Object.keys(extra).length) {
       const anyOf = [list[1], list[2], list[3]].map((w) => parseTargetPhrase(`${w} card from your graveyard`));
       if (anyOf.some((f) => f?.kind !== "card")) return null;

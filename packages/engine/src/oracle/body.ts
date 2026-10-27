@@ -1016,6 +1016,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // of those Vampires." Tapping none is the "may" (CR 608.2d); the counters go on the ones tapped.
   text = text.replace(/(^|\. )You may tap any number of untapped ([A-Z][a-z]+ creatures) you control\. If you do, put an? (\+1\/\+1) counter on each of those ([A-Z][a-z]+s)\./, (all, lead: string, what: string, c: string, those: string) =>
     what.startsWith(those.replace(/s$/, " ")) ? `${lead}You may tap any number of untapped ${what} you control. Put a ${c} counter on each permanent tapped this way.` : all);
+  // Turn the Earth: "Choose up to three target cards in graveyards. The owners of those cards shuffle them into their
+  // libraries.": one instruction.
+  text = text.replace(/(^|\. )Choose (up to (?:one|two|three|four|five)|any number of) target cards in graveyards\. The owners of those cards shuffle them into their libraries\./, "$1Shuffle $2 target cards from graveyards into their owners' libraries.");
+  // Carnival of Souls: "you lose 1 life and add {B}": two instructions, in order.
+  text = text.replace(/(^|\. )[Yy]ou lose (\d+) life and add ((?:\{[WUBRGC]\})+)\./, "$1You lose $2 life. Add $3.");
+  // Gran Pulse Ochu: "Until end of turn, ~ gets +1/+1 for each permanent card in your graveyard": the usual order.
+  text = text.replace(/(^|\. )Until end of turn, ~ gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1~ gets $2 until end of turn for each $3.");
   // Ent's Fury: "Then that creature gets +1/+1 until end of turn and fights target creature you don't control": two
   // instructions about the same creature, in order.
   text = text.replace(/(^|\. )(Then that creature|That creature) gets ([+-]\d+\/[+-]\d+) until end of turn and fights (target creature [^.]+)\./, "$1$2 gets $3 until end of turn. That creature fights $4.");
@@ -4288,6 +4295,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "causeSpellIs", filter: { ...filter, kind: "card" } }, effects: [{ type: "counters", what: prev.what, counter: "+1/+1", n: 1 }] });
       continue;
     }
+    // Tribute to Hunger: "Target opponent sacrifices a creature of their choice. You gain life equal to that creature's
+    // toughness": the creature sacrificed, as it last existed (CR 608.2h); if none was, no life (rulings).
+    const sacGain = /^You gain life equal to that creature's (power|toughness)$/.exec(s);
+    const sacked = effects[effects.length - 1];
+    if (sacGain && sacked?.type === "pick" && sacked.action === "sacrifice" && sacked.n === 1 && sacked.who.ref === "target" && sacked.filter.kind === "object" && sacked.filter.types?.join() === "Creature") {
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: sacGain[1] as "power" | "toughness", of: { ref: "sacrificed" } } } }] });
+      continue;
+    }
     // Dominus of Fealty: "you may gain control of target permanent until end of turn. If you do, untap it and it gains
     // haste until end of turn": both only if you did (rulings), about that target.
     if (s === "If you do, untap it and it gains haste until end of turn") {
@@ -4603,6 +4618,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (last?.type !== "continuous" || last.what.ref !== "target" || last.what.n || ctx.targets[last.what.index]?.kind !== "object") return null;
       const index = last.what.index;
       effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], power: { max: Number(powerThen[1]) }, text: `power ${powerThen[1]} or less` } }, effects: [{ type: "destroy", what: { ref: "target", index } }] });
+      continue;
+    }
+    // Eagle of Deliverance: "Put an indestructible counter on another target creature you control. Draw a card if that
+    // creature's power is 2 or less.": its power as this resolves (CR 608.2c).
+    const drawIfPower = /^Draw a card if that creature's power is (\d+) or less$/.exec(s);
+    const drawAbout = effects[effects.length - 1];
+    if (drawIfPower && (drawAbout?.type === "continuous" || drawAbout?.type === "counters") && drawAbout.what.ref === "target" && !drawAbout.what.n && ctx.targets[drawAbout.what.index]?.kind === "object") {
+      const index = (drawAbout.what as { index: number }).index;
+      effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], power: { max: Number(drawIfPower[1]) }, text: `power ${drawIfPower[1]} or less` } }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] });
       continue;
     }
     // Compleat Devotion: "Target creature you control gets +2/+2 until end of turn. If that creature has toxic, draw a

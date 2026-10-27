@@ -912,7 +912,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     const o = item.objectId ? s.objects[item.objectId] : undefined;
     const sc = (s.resolving!.scratch ??= {});
     if (o && !o.spellCopy && !sc.topOrBottom) {
-      s.pending = { kind: "chooseOption", player: ctx.controller, source: by, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], about: o.id, prompt: `put ${defOf(s, o).name} on the top or bottom of ${player(s, o.owner).name}'s library?` };
+      s.pending = { kind: "chooseOption", player: ctx.controller, source: by, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], about: o.id, prompt: `put ${defOf(s, o).name} on the top or bottom of ${o.owner === ctx.controller ? "your" : `${player(s, o.owner).name}'s`} library?` };
       return "paused";
     }
     bottom = sc.topOrBottom === "bottom";

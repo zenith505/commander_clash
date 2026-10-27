@@ -56,6 +56,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
   [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
   [/^Whenever ~ is dealt noncombat damage, (.+)$/, "selfIsDealtNoncombatDamage"],
+  [/^Whenever ~ is dealt combat damage, (.+)$/, "selfIsDealtCombatDamage"],
   // "Whenever a source deals damage to ~, that source's controller ..." (Phyrexian Obliterator): once for each source
   // that deals it damage at the same time; "that source's controller" is that player (rulings).
   [/^Whenever a source deals damage to ~, (.+)$/, "selfDealtDamageBySource"],
@@ -138,7 +139,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfBecomesMonstrous", "selfMutates",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfIsDealtNoncombatDamage", "selfIsDealtCombatDamage", "selfBecomesMonstrous", "selfMutates",
   "selfBecomesUntapped", "selfBecomesCrewed",
 ];
 
@@ -958,6 +959,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(any[1]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
+  }
+  // Curse of Stalked Prey: "Whenever a creature deals combat damage to enchanted player, put a +1/+1 counter on that
+  // creature": anyone's creature, the enchanted player's own too (rulings).
+  const toEnch = /^Whenever a creature deals combat damage to enchanted player, (.+)$/.exec(line);
+  if (toEnch) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(toEnch[1]!)) return "fail";
+    const body = parseBody(toEnch[1]!, { subjectIt: true, eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toEnchanted: true };
   }
   // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
   // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.
@@ -2877,7 +2887,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));

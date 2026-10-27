@@ -432,7 +432,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "turnFaceUp":
       requireNoPending(s);
-      turnFaceUp(s, p, action.objectId, action.way, action.x);
+      turnFaceUp(s, p, action.objectId, action.way, action.x, action.costs);
       break;
     case "suspend":
       requireNoPending(s);
@@ -5605,6 +5605,7 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
   const name = kickerName(k);
   if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
+  if (k.extraCosts) return `, kicked (${k.text})`;
   if (k.multi || k.costs.length === 1) return kicks.length === 1 ? ", kicked" : `, kicked${times}`;
   return `, kicked with ${kicks.map((i) => k.costs[i]).join(" and ")}`;
 }
@@ -5814,7 +5815,7 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor" | "kicks"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -5831,7 +5832,7 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   const permit = s && choices?.via === "turnPermission" ? castPermit(s, choices.objectId, d, x, choices.permit, pid) : undefined;
   // The Defilers: the life chosen to pay for each one (CR 601.2b); castProblem checks each one applies.
   const defilerLife = s ? (choices?.lifeFor ?? []).reduce((n, id) => n + Math.max(0, ...((s.objects[id] && s.objects[id]!.zone === "battlefield" ? abilitiesOf(s, s.objects[id]!).costMods : undefined) ?? []).map((m) => m.payLife ?? 0)), 0) : 0;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(choices?.kicks?.includes(0) ? (compileCard(d).kicker?.extraCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -5941,7 +5942,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     if (c.kind === "mill") {
       // Not with fewer cards in the library (CR 701.17b).
-      if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to mill to ${doing}`;
+      if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to ${c.exile ? "exile" : "mill"} to ${doing}`;
       continue;
     }
     if (c.kind === "giveLife") {
@@ -6275,7 +6276,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
       }
     }
-    else if (c.kind === "mill") {
+    else if (c.kind === "mill" && c.exile) {
+      const ids = p.library.slice(0, c.n);
+      log(s, `${p.name} exiles the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library: ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
+      for (const id of ids) moveObject(s, id, "exile");
+    } else if (c.kind === "mill") {
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
       for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
@@ -9829,9 +9834,9 @@ function plotCard(s: GameState, p: Player, id: ObjectId) {
  * abilities (rulings). A manifested instant or sorcery stays face down (CR 701.40g). An {X} in the mana cost is 0:
  * its controller chooses X (CR 107.3d), and it would mean nothing on the battlefield (CR 107.3g).
  */
-export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; cost: string }[] {
+export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string }[] {
   if (!o.faceDown) return [];
-  const ways: { kind: FaceDownKind; cost: string }[] = [];
+  const ways: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string }[] = [];
   const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
   if (fd) ways.push(fd);
   if (o.faceDown === "manifest" || o.faceDown === "cloak") {
@@ -9845,7 +9850,7 @@ export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; c
  * Why `pid` can't turn this permanent face up right now (the `way`-th of faceUpWays), or null (with the mana in
  * their pool). It's a special action, any time they have priority (CR 116.2b).
  */
-export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way = 0, x = 0): string | null {
+export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way = 0, x = 0, costs?: CostChoices): string | null {
   const o = s.objects[id];
   if (!o || o.zone !== "battlefield" || !o.faceDown) return "that isn't a face-down permanent";
   if (controllerOf(s, o) !== pid) return "you don't control that permanent";
@@ -9856,6 +9861,10 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   const fd = ways[way];
   if (!fd) return "it can't be turned face up that way";
   if (!Number.isInteger(x) || x < 0 || (x > 0 && !parseManaCost(fd.cost).hasX)) return "that isn't a value of X for it";
+  // "Morph—Pay 5 life", "Morph—Sacrifice two Mountains" (CR 702.37e, 118.8): paid as it's turned face up; without the
+  // choices, only whether it could be.
+  const cp = fd.costs ? extraCostProblem(s, pid, o, fd.costs, costs, "turn it face up") : costs && Object.keys(costs).length ? "it has no costs to choose" : null;
+  if (cp) return cp;
   const cost = faceUpManaCost(fd.cost, x);
   if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to turn it face up (${cost})`;
   return null;
@@ -9867,13 +9876,18 @@ export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s
 /** A morph or disguise cost with its {X} as the X chosen (CR 107.3d): "{X}{3}{W}" with X 2 is "{2}{3}{W}". */
 export const faceUpManaCost = (cost: string, x = 0) => cost.replace(/\{X\}/g, x ? `{${x}}` : "") || "{0}";
 
-function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0) {
-  const problem = turnFaceUpProblem(s, p.id, id, way, x);
+function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs?: CostChoices) {
+  const problem = turnFaceUpProblem(s, p.id, id, way, x, costs);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const fd = faceUpWays(s, o)[way]!;
-  spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
-  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${defOf(s, { ...o, faceDown: undefined }).name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x);
+  // What pays it is chosen as it's paid (as for abilities, activateAbility): no skipping a cost by not saying.
+  if (fd.costs?.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError("choose what to pay its morph cost with");
+  // The whole cost is shown, then paid (CR 702.37e); the permanent is turned face up after.
+  const name = defOf(s, { ...o, faceDown: undefined }).name;
+  if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
+  else spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x);
   s.passedInSuccession = [];
 }
 

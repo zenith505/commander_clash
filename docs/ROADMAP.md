@@ -1,7 +1,7 @@
 # Roadmap
 
-26,229 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,934 of 4,988 (98%), top 10,000: 8,739 of
+26,277 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,934 of 4,988 (98%), top 10,000: 8,740 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1635,6 +1635,19 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   power against a count), Uphill Battle ("played" creatures), End Hostilities (permanents attached to creatures),
   Eiganjo Uprising ("X minus one" tokens), Consume Spirit ("Spend only black mana on X"), Energy Field, Ill-Gotten
   Gains, Recall, Pyretic Rebirth, Viashino Heretic and Suffer the Past (not parsed yet).
+- Round B12 (the lanes have met; the harder templates earlier rounds skipped, least played first): kicker costs that
+  aren't mana ("Kicker—Sacrifice two lands", "Pay 3 life", "Return a creature you control to its owner's hand",
+  "{2}{R}, Sacrifice a land"; CR 702.33a, 118.8), echo that isn't mana ("Echo—Sacrifice two lands", "Discard a card"),
+  eternalize with "Discard a card", morph costs that aren't mana (pay life, discard, reveal a colored card, sacrifice
+  or return permanents; CR 702.37e) with a picker in the UI and bot support; the Mimics ("a spell that's both blue and
+  red", base power and toughness plus an ability until end of turn); "Whenever ~ deals damage to a Vampire / a Goblin
+  or Orc, destroy that creature"; "sacrifice it unless you sacrifice three Forests / four creatures / five lands",
+  "unless you return two Forests / three basic lands you control to their owner's hand" (all or none, Hecatomb's
+  rulings), "unless you return a basic land card from your graveyard to your hand"; "Whenever you play an Island";
+  "Exile the top ten cards of your library" as a cost. +48 (26,245 with round B11).
+- Skipped there, with reasons: Drake Familiar (returns any player's enchantment), Storm Elemental (a condition on the
+  exiled card), Gift of Doom, Dralnu's Pet, Pollen Remedy, Chocobo Kick, Blood Tribute, Thought Lash and Phyrexian
+  Devourer (their other lines aren't parsed yet).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1645,7 +1658,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Blasting, Tribal Golem, Forethought Amulet; Unforge, Reign of Terror ("for each creature that died this way"),
   Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Vaporous
   Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling Stance (forecast),
-  Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Skizzik Surger, Burning Palm Efreet, Smoke Teller
+  Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Burning Palm Efreet, Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
@@ -1670,7 +1683,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mondo Gecko, Baru, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
   Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Blind Seer, Lo and Li, Chisei, Merfolk Spy,
   Withercrown, Throne of Makindi, Brightflame, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
-  Spider-Slayer, Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
+  Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
   Gomazoa, Mine Worker, Woolly Razorback, Temporary Truce, Information Dealer, Fractalize, Loxodon Lifechanter,
   Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported

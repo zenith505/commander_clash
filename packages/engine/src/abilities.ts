@@ -483,6 +483,8 @@ export interface TargetSpec {
   sharesCreatureTypeWithSacrificed?: true;
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
+  /** Each of these colors: "a spell that's both blue and red" (the Mimics). */
+  bothColors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
   colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo" | /** "all colors" (Jenson Carthalion): all five */ "all" | /** "that isn't all colors" (Iridian Maelstrom) */ "notAll";
   supertypes?: string[]; // "basic land", "legendary creature"
@@ -4837,7 +4839,7 @@ export type AdditionalCost =
    * into your graveyard, not payable with fewer cards there (CR 701.17b). It moves cards from a library, so an ability
    * with it isn't a mana ability (CR 605.1a).
    */
-  | { kind: "mill"; n: number }
+  | { kind: "mill"; n: number; /** "Exile the top card of your library" (Royal Herbalist, Arc-Slogger): exiled, not milled; not payable with fewer cards there either. */ exile?: true }
   /**
    * "Remove three counters from among other artifacts, creatures, and planeswalkers you control" (Tekuthal), "Remove two
    * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,
@@ -5855,6 +5857,13 @@ export interface CompiledCard {
      */
     waterbend?: number;
     required?: true;
+    /**
+     * "Kicker—Sacrifice two lands.", "Kicker—{2}{R}, Sacrifice a land." (CR 702.33a, 118.8): the kicker cost's parts that
+     * aren't mana (its one cost's mana, if any, is `costs[0]`), paid with the spell's other costs when it's kicked;
+     * `text` says the whole cost.
+     */
+    extraCosts?: AdditionalCost[];
+    text?: string;
   };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
@@ -5960,7 +5969,8 @@ export interface CompiledCard {
   /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */
   assist?: true;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */
-  faceDownCast?: { kind: FaceDownKind; cost: string };
+  /** `costs`: "Morph—Pay 5 life." (CR 702.37a, 118.8), a morph cost that isn't mana (`cost` is "" then); `text` says it. */
+  faceDownCast?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string };
   /** Hooded Hydra: "As ~ is turned face up, put five +1/+1 counters on it" (a replacement, CR 614.1e), however it's turned face up (rulings). */
   faceUpCounters?: { counter: string; n: number };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */

@@ -44,7 +44,8 @@ describe("casting face down", () => {
     expect(compileCard(angel).faceDownCast).toEqual({ kind: "morph", cost: "{2}{W}{W}" });
     expect(compileCard(mega).faceDownCast).toEqual({ kind: "megamorph", cost: "{1}{G}" });
     expect(compileCard(seer).triggers.map((t) => t.event)).toEqual(["selfEnters", "selfTurnedFaceUp"]);
-    expect(isFullySupported(card("Reveal Morph", "Creature — Bird", "{U}", { power: "1", toughness: "1", oracleText: "Morph—Reveal a blue card in your hand." }))).toBe(false);
+    expect(isFullySupported(card("Reveal Morph", "Creature — Bird", "{U}", { power: "1", toughness: "1", oracleText: "Morph—Reveal a blue card in your hand." }))).toBe(true); // since Lane B round B12
+    expect(isFullySupported(card("Graveyard Morph", "Creature — Bird", "{U}", { power: "1", toughness: "1", oracleText: "Morph—Exile a card from your graveyard." }))).toBe(false);
   });
 
   it("a face-down spell costs {3} and is a nameless, colorless 2/2 with no abilities", () => {

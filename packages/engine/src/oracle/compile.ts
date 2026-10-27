@@ -1318,6 +1318,15 @@ export function compile(d: CardDef): CompiledCard {
     // Kicker (CR 702.33a-c): "Kicker {2}{R}", "Kicker {1}{U} and/or {2}{B}", "Multikicker {1}{G}".
     // "Kicker {X}. X can't be 0." (Thieving Skydiver, Verdeloth): one kicker cost with X, on a card with no other X; X is
     // chosen as it's cast when it's kicked, else it's 0 (CR 107.3a, 601.2b).
+    // "Kicker—Sacrifice two lands.", "Kicker—{2}{R}, Sacrifice a land.", "Kicker—Pay 3 life." (CR 702.33a, 118.8): a kicker
+    // cost that isn't (only) mana, its other parts paid with the spell's other costs when it's kicked (CR 601.2h).
+    const kickerOther = /^Kicker—(?:((?:\{[^}]+\})+), )?([A-Z][^{}]+?)\.?$/.exec(line);
+    if (kickerOther) {
+      const extraCosts = kickerOther[2]!.split(/, (?=[A-Z])/).map((t) => parseAdditionalCost(t.replace(/^./, (c) => c.toLowerCase())));
+      if (out.kicker || (kickerOther[1] && !plainMana(kickerOther[1])) || extraCosts.some((c) => !c || c.kind === "revealHand" || c.kind === "forage")) out.unsupported.push(raw);
+      else out.kicker = { costs: [kickerOther[1] ?? ""], extraCosts: extraCosts as AdditionalCost[], text: [kickerOther[1], kickerOther[2]!.replace(/^./, (c) => c.toLowerCase())].filter(Boolean).join(", ") };
+      continue;
+    }
     const kicker = /^(Multikicker|Kicker) ((?:\{[^}]+\})+)(?: and\/or ((?:\{[^}]+\})+))?(\. X can't be 0\.)?$/.exec(line);
     if (kicker) {
       const costs = [kicker[2]!, ...(kicker[3] ? [kicker[3]] : [])];

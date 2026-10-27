@@ -2377,7 +2377,7 @@ export type Action =
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
-  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number; /** The X chosen for an {X} in the cost (CR 107.3d), "Disguise {X}{3}{W}". */ x?: number }
+  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number; /** The X chosen for an {X} in the cost (CR 107.3d), "Disguise {X}{3}{W}". */ x?: number; /** What pays a morph cost that isn't mana ("Morph—Sacrifice two Mountains"). */ costs?: CostChoices }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
   | { type: "payUnless"; player: PlayerId; pay: boolean; /** Waterbend (CR 701.67a): untapped artifacts and creatures tapped to pay {1} each of the cost. */ tap?: ObjectId[] }
   | { type: "concede"; player: PlayerId };

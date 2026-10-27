@@ -679,6 +679,20 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The Lairs: "sacrifice it unless you return a non-Lair land you control to its owner's hand". Returning one keeps it;
   // with none to return, it's sacrificed. Quickling: "unless you return another creature you control".
+  // Bull Elephant: "unless you return two Forests you control to their owner's hand", Ovinomancer's "three basic lands":
+  // all of them, or it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you return (two|three) (.+?) you control to their owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(singular(m[3]!));
+    if (!filter || / or |,/.test(m[3]!)) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: num(m[2]!), action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} ${m[3]} you control to their owner's hand to keep ~` }];
+  }
+  // Harvest Wurm: "unless you return a basic land card from your graveyard to your hand": with none there, it's sacrificed;
+  // without ~, it can still be done (rulings).
+  if ((m = /^[Ss]acrifice (~|it) unless you (return an? .+? card from your graveyard to your hand)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const back = parseSentence(capital(m[2]!), ctx);
+    if (back?.length !== 1 || back[0]!.type !== "chooseFromGraveyard") return null;
+    return [{ type: "may", effects: back, otherwise: [sacrificeSelf], keep: true, text: `${capital(m[2]!)} to keep ~` }];
+  }
   if ((m = /^[Ss]acrifice (~|it) unless you return (an? .+?|another .+?) you control to its owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const another = /^another /.test(m[2]!);
     const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
@@ -708,12 +722,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Cosmic Larva: "... unless you sacrifice two lands" likewise.
   // Demonlord of Ashmouth: "exile it unless you sacrifice another creature": exiled instead of sacrificed.
   // Apocalypse Demon: "tap ~ unless you sacrifice another creature": tapped instead.
-  if ((m = /^([Ss]acrifice|[Ee]xile|[Tt]ap) (~|it) unless you sacrifice (an? .+?|another .+?|two [A-Z][a-z]+s|two lands)$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
-    const two = /^two /.test(m[3]!);
-    const filter = pickFilter(two ? singular(m[3]!.slice(4)) : m[3]!.replace(/^(?:an?|another) /, ""));
+  // Primeval Force: "... unless you sacrifice three Forests", Hecatomb's "four creatures", Jokulmorder's "five lands": all of
+  // them or none (Hecatomb's rulings).
+  if ((m = /^([Ss]acrifice|[Ee]xile|[Tt]ap) (~|it) unless you sacrifice (an? .+?|another .+?|(?:two|three|four|five) (?:[A-Z][a-z]+s|lands|creatures))$/.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const many = /^(two|three|four|five) /.exec(m[3]!);
+    const filter = pickFilter(many ? singular(m[3]!.slice(many[0].length)) : m[3]!.replace(/^(?:an?|another) /, ""));
     if (!filter || / or |,/.test(m[3]!)) return null;
     const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : /^tap/i.test(m[1]!) ? { type: "tap", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } };
-    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: two ? 2 : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: many ? num(many[1]!) : 1, action: "sacrifice" }], otherwise: [away], keep: true, text: `Sacrifice ${m[3]} to keep ~${/^tap/i.test(m[1]!) ? " untapped" : ""}` }];
   }
   // Bandit's Talent: "draw an additional card for each opponent who has one or fewer cards in hand" (in your draw step).
   if ((m = /^(.*?\b[Dd]raws?) an additional card for each (.+)$/.exec(s))) return parseSentence(`${m[1]} a card for each ${m[2]}`, ctx);

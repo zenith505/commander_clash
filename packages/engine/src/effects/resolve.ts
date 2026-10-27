@@ -458,6 +458,17 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     }
     return host?.zone === "battlefield" ? [host] : [];
   }
+  if (ref.ref === "targetHost") {
+    // Unforge: the permanent the target Equipment is attached to, or was attached to as it was destroyed (rulings).
+    const t = ctx.targets[ref.index];
+    if (!ctx.legal[ref.index] || t?.kind !== "object") return [];
+    const me = s.objects[t.id];
+    const here = me?.zone === "battlefield" && (t.zc === undefined || (me.zoneChanges ?? 0) === t.zc);
+    const lk = !here ? s.lastKnown?.[t.id] : undefined;
+    const was = here ? (me!.attachedTo ? { id: me!.attachedTo, zc: s.objects[me!.attachedTo]?.zoneChanges ?? 0 } : undefined) : lk && lk.zc === t.zc ? lk.attachedTo : undefined;
+    const host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
+    return host?.zone === "battlefield" ? [host] : [];
+  }
   if (ref.ref === "subject") {
     // Only while it's still the same object on the battlefield (CR 400.7).
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -1271,7 +1282,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "eventGroup" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "eventGroup" || to.ref === "targetHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

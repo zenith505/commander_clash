@@ -834,7 +834,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
       // "Whenever a creature blocks this turn, ..." (Noxious Assault): a delayed trigger (CR 603.7b).
       if (event === "creatureBlocks") fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === event && fits(t, o, ctrl), triggers, undefined, o));
-      // Righteous Indignation: "Whenever a creature blocks a black or red creature": once for each one it blocks.
+      // Righteous Indignation: "Whenever a creature blocks a black or red creature": once for each one it blocks (CR 509.3b).
       for (const a of o.blocking ?? []) {
         const at = s.objects[a];
         if (at) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === "creatureBlocksCreature" && fits(t, o, controllerOf(s, w)) && !!t.blockFilter && objectMatches(s, t.blockFilter, at, controllerOf(s, w), false), undefined, undefined, o);

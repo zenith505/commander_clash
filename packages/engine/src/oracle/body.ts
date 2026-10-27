@@ -312,6 +312,9 @@ const checkableMay = (e: Effect): boolean =>
   (e.type === "exile" && e.what.ref === "subjectCard") ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
+  // Soldevi Golem: "You may untap target tapped creature an opponent controls. If you do, untap ~.": only a target still
+  // there and tapped.
+  (e.type === "untap" && e.what.ref === "target" && !("n" in e.what && e.what.n)) ||
   // "You may remove a hit counter from a card that player owns in exile. If you do, ..." (Mari): only with one there.
   e.type === "removeExiledCounter" ||
   // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
@@ -946,6 +949,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Stinging Vitriol: "That player reveals their hand. You choose a nonland card from it. They discard that card.": the
   // same as "... That player discards that card.", "they" being that player.
   text = text.replace(/(\. That player reveals their hand\. You choose an? (?:[a-z]+ )?card from it\.) They discard that card\.$/, "$1 That player discards that card.");
+  // Ral's Staticaster: "~ gets +1/+0 for each card in your hand until end of turn": the usual order, counted as it
+  // resolves (rulings).
+  text = text.replace(/(^|\. )(~ gets [+-]\d+\/[+-]\d+) for each ([^.]+?) until end of turn\./, "$1$2 until end of turn for each $3.");
+  // Saprazzan Outrigger: "When ~ attacks or blocks, put it on top of its owner's library at end of combat": ~ itself.
+  text = text.replace(/^put it on top of its owner's library at end of combat\.$/, "put ~ on top of its owner's library at end of combat.");
   // Burning Palm Efreet: "~ deals 2 damage to target creature with flying and that creature loses flying until end of
   // turn": two instructions, in order.
   text = text.replace(/^(~ deals \d+ damage to target creature with flying) and (that creature loses flying until end of turn)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
@@ -4493,6 +4501,32 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(s, ctx);
       if (!fx || fx.length !== 1 || fx[0]!.type !== "putOntoBattlefield") return null;
       effects.push(...fx, { type: "damage", amount: { count: { kind: "power", of: { ref: "created" } } }, to: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "each other creature" }, notCreated: true }, by: "created" });
+      si++;
+      continue;
+    }
+    // Unforge: "Destroy target Equipment. If that Equipment was attached to a creature, ~ deals 2 damage to that creature.":
+    // the creature it was attached to as it was destroyed (rulings), as that creature is now.
+    const unforge = /^Destroy target Equipment$/.test(s) ? /^If that Equipment was attached to a creature, ~ deals (\d+) damage to that creature\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (unforge) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || ctx.targets.length !== before + 1) return null;
+      const host: ObjRef = { ref: "targetHost", index: before };
+      effects.push(...fx, { type: "damage", amount: Number(unforge[1]), to: host });
+      si++;
+      continue;
+    }
+    // Woeleecher: "Remove a -1/-1 counter from target creature. If you do, you gain 2 life.": a counter is removed only
+    // if it has one, so the life only then.
+    const removeThen = /^Remove an? (-1\/-1|\+1\/\+1) counter from target creature$/.exec(s);
+    const removeDid = removeThen ? /^If you do, (you gain \d+ life)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (removeThen && removeDid) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      const then = fx && parseOne(capital(removeDid[1]!), ctx);
+      if (!fx || !then || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], counter: removeThen[1]!, text: `with a ${removeThen[1]} counter on it` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [...fx, ...then] });
       si++;
       continue;
     }

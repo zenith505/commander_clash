@@ -956,6 +956,8 @@ export type ObjRef =
   | { ref: "allCreatures"; controller?: "you" | "opponent"; other?: boolean; attacking?: boolean }
   /** "Enchanted creature", "equipped creature": the permanent the source is attached to, while it's still that source. */
   | { ref: "attached" }
+  /** "If that Equipment was attached to a creature, ... to that creature" (Unforge): what target `index` is attached to, or was as it left the battlefield (rulings, CR 608.2h). */
+  | { ref: "targetHost"; index: number }
   /** Joint Assault's "if it's paired with a creature, that creature": what target `index` is paired with as this resolves (CR 702.95b). */
   | { ref: "pairedWithTarget"; index: number }
   /** "all creatures", "each artifact and enchantment", "other creatures you control": every permanent that matches, not targeted. */

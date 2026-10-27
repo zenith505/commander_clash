@@ -99,6 +99,8 @@ function refPlayers(s: GameState, ref: PlayerRef, ctx: AmountCtx): PlayerId[] {
   if (ref.ref === "you") return [ctx.controller];
   if (ref.ref === "eachPlayer") return s.turnOrder.filter((id) => !s.players[id]!.lost);
   if (ref.ref === "eachOpponent") return s.turnOrder.filter((id) => id !== ctx.controller && !s.players[id]!.lost);
+  // "Among lands that player controls" in an intervening if (Mask of Intolerance): the trigger's player.
+  if (ref.ref === "eventPlayer") return ctx.event?.player !== undefined ? [ctx.event.player] : [];
   return [];
 }
 

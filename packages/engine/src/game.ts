@@ -2872,6 +2872,10 @@ function startNextTurn(s: GameState, skipping = false) {
   // "Until your next turn, whenever ...": those end as that turn begins (CR 603.7b, 611.2b, 800.4m).
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
+  // "Until your next turn, if a source would deal damage to you, ..." (Lightning, Army of One; Morningtide's Light): those
+  // end as that turn begins too, not only for the turn itself (CR 611.2b).
+  s.damageMods = s.damageMods?.filter((r) => !(r.until === "yourNextTurn" && began.has(r.you)));
+  if (!s.damageMods?.length) s.damageMods = undefined;
   // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
   s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));

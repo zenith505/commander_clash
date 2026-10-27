@@ -4811,9 +4811,10 @@ export interface ManaTrigger {
    * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
    * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
    * any type that land produced" (picking one of them if it made several, rulings on Mana Flare). The mana has none
-   * of the riders of the mana that permanent made (rulings on Mana Flare).
+   * of the riders of the mana that permanent made (rulings on Mana Flare). Fixed mana with `times` is that mana once
+   * for each ("an additional {G} for each Elf on the battlefield", Elvish Guidance), counted as it resolves.
    */
-  adds: { kind: "fixed"; mana: ManaType[] } | { kind: "anyColor"; n: number } | { kind: "chosenColor" } | { kind: "produced" };
+  adds: { kind: "fixed"; mana: ManaType[]; times?: Amount } | { kind: "anyColor"; n: number } | { kind: "chosenColor" } | { kind: "produced" };
 }
 
 /**

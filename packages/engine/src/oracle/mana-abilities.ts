@@ -248,7 +248,11 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   if (filter?.kind !== "object" || filter.controller || filter.chosen || filter.tapped || filter.combat) return "fail";
   out.filter = { ...filter, text: what };
   if (/^(\{[WUBRGC]\})+$/.test(adds)) out.adds = { kind: "fixed", mana: [...adds.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1] as ManaType) };
-  else if (adds === "one mana of any color") out.adds = { kind: "anyColor", n: 1 };
+  else if ((m = /^((?:\{[WUBRGC]\})+) for each (.+)$/.exec(adds))) {
+    const times = parseCount(m[2]!, null, true);
+    if (!times) return "fail";
+    out.adds = { kind: "fixed", mana: [...m[1]!.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1] as ManaType), times };
+  } else if (adds === "one mana of any color") out.adds = { kind: "anyColor", n: 1 };
   else if (adds === "two mana in any combination of colors") out.adds = { kind: "anyColor", n: 2 };
   else if (adds === "one mana of the chosen color" || (adds === "one mana of that color" && out.ofChosen)) out.adds = { kind: "chosenColor" };
   else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && (what.endsWith(m[1]!) || (named && m[1] === "land" && what === "land"))) out.adds = { kind: "produced" };

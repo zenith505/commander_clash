@@ -1062,6 +1062,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, o) !== ev.player) continue;
       add(o, ev.player, (e, t) => (e === "ringTemptsYou" && (!t.ifOtherBearer || (ev.chosen !== undefined && ev.chosen !== o.id))) || (e === "youChooseRingBearer" && ev.chosen !== undefined));
     }
+    // Ringwraiths: "When the Ring tempts you, return ~ from your graveyard to your hand" works from its owner's graveyard.
+    fromGraveyards((o, owner) => owner === ev.player && add(o, ev.player, (e, t) => e === "ringTemptsYou" && !t.ifOtherBearer));
   } else if (ev.type === "tapped") {
     // "Whenever ~ becomes tapped", "whenever enchanted land becomes tapped", "whenever a Dwarf you control becomes
     // tapped" (the tapped permanent is the subject: "put a wind counter on it").

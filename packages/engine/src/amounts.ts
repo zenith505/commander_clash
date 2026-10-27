@@ -4,7 +4,7 @@
 // A resolving spell or ability works its numbers out once, as it does what it says (CR 608.2h);
 // a static ability's numbers are worked out again whenever characteristics are (CR 611.3a).
 
-import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
+import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
@@ -708,7 +708,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "cardsInExile": {
       if (!c.who) return s.turnOrder.reduce((n, pid) => n + s.players[pid]!.exile.length, 0);
-      const fits = (id: ObjectId) => !s.objects[id]!.faceDown && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)));
+      // "Named ~" (Slime Against Humanity): the source's name.
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const named = (f: TargetSpec): TargetSpec => (f.named === "~" ? { ...f, named: ctx.sourceName ?? (src ? defOf(s, src).name : "") } : f);
+      const filter = c.filter && { ...named(c.filter), ...(c.filter.anyOf ? { anyOf: c.filter.anyOf.map(named) } : {}) };
+      const fits = (id: ObjectId) => !s.objects[id]!.faceDown && (!filter || printedMatches(filter, defOf(s, s.objects[id]!)));
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
     }
     case "greatestMvInExile":

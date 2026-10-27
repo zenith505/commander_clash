@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { botActions, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ManaType, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -83,7 +83,16 @@ const wolverineBestThereIs = card("Wolverine, Best There Is", "Legendary Creatur
 const growth = card("Test Growth", "Instant", "{G}", { cmc: 1, oracleText: "Put a +1/+1 counter on target creature." });
 const fight = card("Test Fight", "Sorcery", "{G}", { cmc: 1, oracleText: "Target creature you control fights target creature you don't control." });
 
-const ALL = [lotusVale, scorchedRuins, balduvianTradingPost, soldeviExcavations, gattaAndLuzzu, mBakuJabariChieftain, saplingOfColfenor, extinctionEvent, mutinousMassacre, twinsOfDiscord, zimonesHypothesis, thanosTheMadTitan, gollumRiddleMaster, ashlingsPrerogative, gixsCommand, starscream, thunderousVelocipede, kiboUktabiPrince, botanicalBrawler, wolverineBestThereIs];
+const elvishGuidance = card("Elvish Guidance", "Enchantment — Aura", "{2}{G}", {"cmc":3,"keywords":["Enchant"],"oracleText":"Enchant land\nWhenever enchanted land is tapped for mana, its controller adds an additional {G} for each Elf on the battlefield.","colors":["G"],"layout":"normal"});
+const ringwraiths = card("Ringwraiths", "Creature — Wraith Knight", "{4}{B}{B}", {"cmc":6,"power":"5","toughness":"5","oracleText":"When this creature enters, target creature an opponent controls gets -3/-3 until end of turn. If that creature is legendary, its controller loses 3 life.\nWhen the Ring tempts you, return this card from your graveyard to your hand.","colors":["B"],"layout":"normal"});
+const slimeAgainstHumanity = card("Slime Against Humanity", "Sorcery", "{2}{G}", {"cmc":3,"oracleText":"Create a 0/0 green Ooze creature token with trample. Put X +1/+1 counters on it, where X is two plus the total number of cards you own in exile and in your graveyard that are Oozes or are named Slime Against Humanity.\nA deck can have any number of cards named Slime Against Humanity.","colors":["G"],"layout":"normal"});
+const morningtidesLight = card("Morningtide's Light", "Sorcery", "{3}{W}", {"cmc":4,"oracleText":"Exile any number of target creatures. At the beginning of the next end step, return those cards to the battlefield tapped under their owners' control.\nUntil your next turn, prevent all damage that would be dealt to you.\nExile Morningtide's Light.","colors":["W"],"layout":"normal"});
+const birthdayEscape = card("Birthday Escape", "Sorcery", "{U}", { cmc: 1, oracleText: "Draw a card. The Ring tempts you." });
+const elf = (name = "Test Elf") => card(name, "Creature — Elf", "{G}", { cmc: 1, power: "1", toughness: "1", colors: ["G"] });
+const tapFor = (pid: PlayerId, id: ObjectId, mana: ManaType): Action => ({ type: "activateMana", player: pid, objectId: id, mana });
+const pool = (s: GameState, pid: PlayerId) => Object.entries(s.players[pid]!.manaPool).flatMap(([m, n]) => Array<string>(n).fill(m)).join("");
+
+const ALL = [lotusVale, scorchedRuins, balduvianTradingPost, soldeviExcavations, gattaAndLuzzu, mBakuJabariChieftain, saplingOfColfenor, extinctionEvent, mutinousMassacre, twinsOfDiscord, zimonesHypothesis, thanosTheMadTitan, gollumRiddleMaster, ashlingsPrerogative, gixsCommand, starscream, thunderousVelocipede, kiboUktabiPrince, botanicalBrawler, wolverineBestThereIs, elvishGuidance, ringwraiths, slimeAgainstHumanity, morningtidesLight];
 
 describe("round 188", () => {
   it("all compile", () => supported(...ALL));
@@ -406,5 +415,94 @@ describe("round 188", () => {
     expect(life(s, opp)).toBe(life0 - 6);
     s = resolveAll(passUntil(s, "end", ap));
     expect(counters(s, w)).toBe(1);
+  });
+
+  it("Elvish Guidance: the enchanted land adds an additional {G} for each Elf on the battlefield, anyone's", () => {
+    const { s: s0, ap, opp } = setup([]);
+    tapAllBut(s0, ap, []);
+    const f = putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    const eg = putOnBattlefield(s0, ap, elvishGuidance);
+    s0.objects[eg]!.attachedTo = f;
+    invalidateCharacteristics(s0);
+    expect(pool(act(s0, tapFor(ap, f, "G")), ap)).toBe("G");
+    // Two Elves: one yours, one an opponent's.
+    putOnBattlefield(s0, ap, elf());
+    putOnBattlefield(s0, opp, elf("Their Elf"));
+    const s = act(s0, tapFor(ap, f, "G"));
+    expect(pool(s, ap)).toBe("GGG");
+  });
+
+  it("Ringwraiths: when the Ring tempts you, it returns from your graveyard to your hand", () => {
+    let { s, ap, ids } = setup([birthdayEscape]);
+    const rw = into(s, ap, ringwraiths, "graveyard");
+    s.players[ap]!.manaPool = { W: 0, U: 1, B: 0, R: 0, G: 0, C: 0 } as never;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.players[ap]!.ring).toMatchObject({ tempted: 1 });
+    expect(zone(s, rw)).toBe("hand");
+  });
+
+  it("Ringwraiths enters: target opponent's creature gets -3/-3, and a legendary one's controller loses 3 life", () => {
+    let { s, ap, opp } = setup([]);
+    const legend = putOnBattlefield(s, opp, card("Test Legend", "Legendary Creature — Human", "{3}", { cmc: 3, power: "4", toughness: "4" }));
+    const rw = into(s, ap, ringwraiths, "hand");
+    s.players[ap]!.manaPool = { W: 0, U: 0, B: 6, R: 0, G: 0, C: 0 } as never;
+    s = choose(resolveAll(run(s, planCast(s, ap, rw))), [tgt(legend)]);
+    expect(pt(s, legend)).toEqual([1, 1]);
+    expect(life(s, opp)).toBe(37);
+  });
+
+  it("Slime Against Humanity counts your Oozes and Slimes in exile and in your graveyard, face up, plus two", () => {
+    let { s, ap, ids, opp } = setup([slimeAgainstHumanity]);
+    const ooze = card("Test Ooze", "Creature — Ooze", "{G}", { cmc: 1, power: "1", toughness: "1", colors: ["G"] });
+    into(s, ap, slimeAgainstHumanity, "graveyard");
+    into(s, ap, ooze, "graveyard");
+    const exiled = into(s, ap, slimeAgainstHumanity, "graveyard");
+    s.players[ap]!.graveyard.splice(s.players[ap]!.graveyard.indexOf(exiled), 1);
+    s.objects[exiled]!.zone = "exile";
+    s.players[ap]!.exile.push(exiled);
+    const down = into(s, ap, ooze, "graveyard");
+    s.players[ap]!.graveyard.splice(s.players[ap]!.graveyard.indexOf(down), 1);
+    Object.assign(s.objects[down]!, { zone: "exile", faceDown: true });
+    s.players[ap]!.exile.push(down);
+    into(s, opp, ooze, "graveyard");
+    into(s, ap, bear(), "graveyard");
+    s.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 3, C: 0 } as never;
+    const before = new Set(s.battlefield);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    const token = s.battlefield.find((id) => !before.has(id))!;
+    expect(characteristics(s, s.objects[token]!).subtypes).toEqual(["Ooze"]);
+    // 2 + the Slime and the Ooze in your graveyard + the face-up Slime in exile; not the one being cast (rulings).
+    expect(counters(s, token)).toBe(5);
+    expect(pt(s, token)).toEqual([5, 5]);
+  });
+
+  it("Morningtide's Light exiles creatures until the next end step, prevents damage to you until your next turn, and exiles itself", () => {
+    let { s, ap, ids, opp } = setup([morningtidesLight]);
+    const mine = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear({ name: "Their Bear" }));
+    s.players[ap]!.manaPool = { W: 1, U: 0, B: 0, R: 0, G: 3, C: 0 } as never;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!, [tgt(mine), tgt(theirs)])));
+    expect([zone(s, mine), zone(s, theirs), zone(s, ids[0]!)]).toEqual(["exile", "exile", "exile"]);
+    s = resolveAll(passUntil(s, "end", ap));
+    const back = s.battlefield.filter((id) => ["Grizzly Bears", "Their Bear"].includes(s.cards[s.objects[id]!.cardId]!.name));
+    expect(back.map((id) => [controllerOf(s, s.objects[id]!), s.objects[id]!.tapped]).sort()).toEqual([[ap, true], [opp, true]].sort());
+    // An opponent's attack the next turn deals you nothing.
+    const nextP = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!;
+    s = passUntil(s, "main1", nextP);
+    const life0 = life(s, ap);
+    const atk = putOnBattlefield(s, nextP, bear({ name: "Attacker" }));
+    s = act(passUntil(s, "declareAttackers", nextP), { type: "declareAttackers", player: nextP, attacks: [{ attacker: atk, defender: ap }] });
+    s = resolveAll(passUntil(s, "combatDamage", nextP));
+    expect(life(s, ap)).toBe(life0);
+    // Your next turn: it's over.
+    s = passUntil(s, "main1", ap);
+    s.objects[ids[0]!]!.zone = "exile";
+    const shockId = into(s, opp, shock, "hand");
+    s.players[opp]!.manaPool = { W: 0, U: 0, B: 0, R: 1, G: 0, C: 0 } as never;
+    s = passUntil(s, "main1", opp);
+    s.players[opp]!.manaPool = { W: 0, U: 0, B: 0, R: 1, G: 0, C: 0 } as never;
+    const l1 = life(s, ap);
+    s = resolveAll(run(s, planCast(s, opp, shockId, [player(ap)])));
+    expect(life(s, ap)).toBe(l1 - 2);
   });
 });

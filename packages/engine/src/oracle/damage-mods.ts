@@ -243,8 +243,10 @@ function parsePreventionMod(text: string, line: string): StaticAbility | null {
 export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null | undefined {
   let t = text.replace(/\.$/, "");
   let until: "yourNextTurn" | undefined;
-  const u = /^[Uu]ntil your next turn, (if .+|each time target .+)$/.exec(t);
-  if (u) [until, t] = ["yourNextTurn", u[1]!.replace(/^each/, "Each")];
+  // Morningtide's Light: "Until your next turn, prevent all damage that would be dealt to you" is the same as "if a
+  // source would deal damage to you, prevent that damage" for that long (as Glacial Chasm's static, CR 615.1a).
+  const u = /^[Uu]ntil your next turn, (if .+|each time target .+|prevent all damage that would be dealt to you)$/.exec(t);
+  if (u) [until, t] = ["yourNextTurn", u[1]!.replace(/^each/, "Each").replace(/^prevent all damage that would be dealt to you$/, "if a source would deal damage to you, prevent that damage")];
   // "The next time a source of your choice would deal damage to you this turn, prevent half that damage, rounded down"
   // (Dark Sphere); "the next time that creature would deal combat damage this turn, it deals double that damage
   // instead" (Impulsive Maneuvers): the next damage event only.
@@ -261,7 +263,7 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
   }
   // "That source deals that damage to you instead" (Jade Monolith) is a redirection (prevention.ts), not an amount.
   if (/, (?:it|that source) deals that damage to .+ instead$/.test(t)) return undefined;
-  if (!/would deal (?:combat |noncombat )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t)) return undefined;
+  if (!/would deal (?:combat |noncombat )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t) && !(until && t === "if a source would deal damage to you, prevent that damage")) return undefined;
   if (!until) {
     if (!/ this turn(?=,| to )/.test(t)) return undefined;
     t = t.replace(/ this turn(?=,| to )/, "");

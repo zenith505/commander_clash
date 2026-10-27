@@ -17,6 +17,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
   // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
+  // Katilda, Dawnhart Martyr: "the number of permanents you control that are Spirits and/or enchantments": each that's
+  // one or the other, counted once, as "Spirits or enchantments you control" is.
+  p = p.replace(/^the number of permanents you control that are ([A-Z][a-z]+s) or (enchantments|artifacts)$/, "the number of $1 or $2 you control");
   // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
   p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|that card|~)$/, "$2's $1");
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
@@ -32,6 +35,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
+  // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
+  // value once (CR 202.3).
+  if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
   // Curse of Thirst: "the number of Curses attached to them", them being the enchanted player whose upkeep it is.
   if (ctx?.eventPlayer && /^the number of Curses attached to (?:them|that player)$/.test(p))
     return { count: { kind: "permanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Curse"], text: "Curse" }, attachedToPlayer: { ref: "eventPlayer" } } };
@@ -341,6 +347,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the number of )?opponents? who controls? more creatures than you$/i.test(p)) return count({ kind: "players", opponents: true, moreCreaturesThanYou: true });
   // Surveyor's Scope: "the number of players who control at least two more lands than you", counted as it resolves.
   if (each && (m = /^players? who controls? at least (one|two|three) more lands? than you$/i.exec(p))) return count({ kind: "players", moreLandsThanYou: num(m[1]!) });
+  // Oreskos Explorer: "the number of players who control more lands than you" (at least one more), counted as it resolves.
+  if (each && /^players? who controls? more lands than you$/i.test(p)) return count({ kind: "players", moreLandsThanYou: 1 });
   // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.
   // Anya, Merciless Angel: "for each opponent whose life total is less than half their starting life total" (CR 903.7:
   // 40 in Commander).

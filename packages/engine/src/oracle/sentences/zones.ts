@@ -110,6 +110,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
   if (/^[Pp]ut your commander into your hand from the command zone$/.test(s)) return [{ type: "commanderToHand" }];
+  // Campfire: "Put all commanders you own from the command zone and from your graveyard into your hand".
+  if (/^[Pp]ut all commanders you own from the command zone and from your graveyard into your hand$/.test(s)) return [{ type: "commandersToHand" }];
   if (/^[Cc]hoose a commander you own on the battlefield or in the command zone$/.test(s)) return [{ type: "chooseOwnCommander" }];
   // Geode Golem: the pending free cast is the "may" (it can be declined).
   if (/^[Yy]ou may cast your commander from the command zone without paying its mana cost$/.test(s)) return [{ type: "castCommanderFree" }];
@@ -869,6 +871,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1] ?? m[2]!, ctx);
     const counter = m[5] ?? m[6];
     return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}), ...(m[7] ? { attachSelf: true as const } : {}) }] : null;
+  }
+  // Pre-War Formalwear: "return target creature card with mana value 3 or less from your graveyard to the battlefield and
+  // attach ~ to it": the permanent it became, if ~ is still on the battlefield and can be attached to it; otherwise ~
+  // stays where it is (CR 701.3b; rulings).
+  if ((m = /^([Rr]eturn target .+? from your graveyard to the battlefield) and attach ~ to it$/.exec(s)) && !ctx.spell) {
+    const inner = parseZonesSentence(m[1]!, ctx);
+    const e = inner?.length === 1 ? inner[0]! : undefined;
+    return e?.type === "putOntoBattlefield" && e.what.ref === "target" && !e.what.n && ctx.targets[e.what.index]?.kind === "card" ? [{ ...e, attachSelf: true }] : null;
   }
   // "... on the bottom of your library in any order" (Bow of Nylea): in the order the targets were chosen, which the
   // controller picks (CR 401.4).

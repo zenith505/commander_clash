@@ -278,7 +278,7 @@ export type Count =
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
   | { kind: "graveyardCardTypes"; who: PlayerRef }
   /** "Five or more mana values among cards in your graveyard" (Tainted Indulgence): how many different mana values (CR 202.3). */
-  | { kind: "graveyardManaValues"; who: PlayerRef }
+  | { kind: "graveyardManaValues"; who: PlayerRef; /** "Each different mana value among instant and sorcery cards in your graveyard" (Eris, Roar of the Storm): only these cards. */ filter?: TargetSpec }
   /**
    * "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). `toughness`: "the greatest
    * toughness among". `whose`: "among creatures they control" (Inscription of Abundance), that player's creatures only.
@@ -1528,7 +1528,7 @@ export type StaticCondition =
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
   | { kind: "subjectDealtExcess" }
   /** "If that creature has a +1/+1 counter on it" (Marcus, Mutant Mayor): the trigger's subject, or as it last existed. */
-  | { kind: "subjectCounter"; counter: CounterKind }
+  | { kind: "subjectCounter"; counter: CounterKind; /** "If that creature has three or more +1/+1 counters on it" (Hadana's Climb): at least this many (default 1). */ min?: number }
   /**
    * Guardian Project: "if it doesn't have the same name as another creature you control or a creature card in your
    * graveyard", about the creature that entered. A face-down creature has no name (CR 708.2), so it shares none (rulings).
@@ -1925,6 +1925,8 @@ export type Effect =
   | { type: "drawUpTo"; who: PlayerRef; n: number }
   /** "Put your commander into your hand from the command zone" (Command Beacon): one of yours there, chosen with two (rulings). */
   | { type: "commanderToHand" }
+  /** "Put all commanders you own from the command zone and from your graveyard into your hand" (Campfire, CR 903.3). */
+  | { type: "commandersToHand" }
   /**
    * Orzhov Advokist: "each player may put two +1/+1 counters on a creature they control. If a player does, creatures that
    * player controls can't attack you or planeswalkers you control until your next turn." Chosen in turn order from its
@@ -3072,6 +3074,11 @@ export type Effect =
       ifCostCardName?: true;
       /** "When you cast this spell, ... counter ~" (Brain Gorgers): the spell that triggered it, not a target (`index` -1). */
       cause?: true;
+      /**
+       * "If a permanent's ability is countered this way, destroy that permanent" (Green Slime), "... activated abilities of
+       * that permanent can't be activated this turn" (Trickbind): an ability countered, its source still the permanent it was.
+       */
+      thenSource?: "destroy" | "cantActivate";
     }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
@@ -3833,6 +3840,8 @@ export type TriggerEvent =
   | "selfCountersPut"
   /** "When ~ becomes monstrous" (CR 701.37b). */
   | "selfBecomesMonstrous"
+  /** "Whenever ~ evolves" (Watchful Radstag): its evolve ability resolved and put one or more +1/+1 counters on it (CR 702.100d). */
+  | "selfEvolves"
   /** "Whenever ~ phases in" (Warping Wurm), "Whenever ~ phases out" (Teferi's Imp, looking back in time, CR 603.10b): directly or indirectly (CR 702.26g). */
   | "selfPhasesIn"
   | "selfPhasesOut"
@@ -4344,6 +4353,8 @@ export interface TriggeredAbility {
    * again as it resolves (CR 603.4).
    */
   ifEvolves?: boolean;
+  /** "Whenever a creature you control explores a land card" (Nicanzil, Current Conductor): what the explore revealed, as it was revealed (rulings). */
+  explored?: "land" | "nonland";
   /** For the "one or more" events: what has to be among them ("one or more Rogues you control"). */
   group?: TargetSpec;
   /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */

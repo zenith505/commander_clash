@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
+import { castProblem, destroyPermanent, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { bindChosen, isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
@@ -821,8 +821,21 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
       }
       const spellObj = e.suspend ? s.stack.find((x) => x.id === t.id && x.kind === "spell")?.objectId : undefined;
+      const countered = e.thenSource ? s.stack.find((x) => x.id === t.id) : undefined;
       const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
+      // Green Slime, Trickbind: a permanent's ability countered (gone from the stack), its source still on the battlefield as
+      // the object it was (CR 400.7); a card's ability in another zone isn't a permanent's.
+      const by = countered?.kind === "ability" && countered.sourceId && !s.stack.some((x) => x.id === t.id) ? s.objects[countered.sourceId] : undefined;
+      if (by && by.zone === "battlefield" && (countered!.sourceZc === undefined || (by.zoneChanges ?? 0) === countered!.sourceZc)) {
+        if (e.thenSource === "destroy") destroyPermanent(s, by, `${src} destroys ${defOf(s, by).name}.`, false, ctx.controller);
+        else {
+          // Its activated abilities, mana abilities too, until end of turn (rulings on Trickbind).
+          s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "endOfTurn", affected: [by.id], mods: [{ kind: "cantActivate" }] });
+          invalidateCharacteristics(s);
+          log(s, `${defOf(s, by).name}'s activated abilities can't be activated this turn.`);
+        }
+      }
       // Delay: the card it was, countered and exiled this way (a copy has ceased to exist, CR 707.10a).
       const o = spellObj ? s.objects[spellObj] : undefined;
       if (e.suspend && o?.zone === "exile" && !s.stack.some((x) => x.id === t.id)) suspendExiled(s, o, e.suspend);

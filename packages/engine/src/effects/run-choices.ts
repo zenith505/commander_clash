@@ -680,6 +680,8 @@ function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetS
     return !!item && item.kind === "spell" && spellMatches(s, filter, item);
   }
   if (t.kind !== "object") return false;
+  // "If that creature is another Hero" (Wakandan Royal Guard): not the source itself.
+  if (filter.notSource && t.id === ctx.sourceId) return false;
   const o = objects(s, { ref: "target", index }, ctx)[0];
   if (o?.zone === "battlefield") return objectMatches(s, filter, o, ctx.controller, false);
   const card = s.objects[t.id];

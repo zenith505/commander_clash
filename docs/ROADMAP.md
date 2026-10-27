@@ -1,6 +1,6 @@
 # Roadmap
 
-25,498 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+25,572 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,720 of
 9,979 (87%).
 
@@ -1347,6 +1347,37 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Their Wake, Rix Maadi Guildmage, Dragon Hunter, Will of the All-Hunter, Foe-liage, Inflame and Executioner's Swing
   (each needs a check not modeled: which creatures were dealt damage this turn, "if it's blocking", Dragons as
   though reach, lands entering during your turn).
+- Round B6 (ranks about 25,250 up to about 23,800, template clusters, plus more played cards the same templates cover:
+  Smash to Smithereens, Detonate, Vanguard Seraph, Attended Healer, Séance, Jem Lightfoote and others): riders checked
+  as the spell resolves ("If it's an artifact creature / that creature is a Zombie, ... instead", "also deals 2 damage
+  to that permanent's controller", "If that creature is white, it gets -4/-4 instead", "another Hero", "If it has a
+  counter on it", "If it was a Jace planeswalker spell", "If it was a Gideon planeswalker" as it last existed, CR
+  608.2h); targets "creature, Vehicle, or nonbasic land" and "that artifact's controller"; "target creature and all
+  Auras attached to it", "Destroy all Equipment attached to that creature"; protection lists ("from blue, from black,
+  and from red", from Vampires/Werewolves/Zombies), "protection from legendary creatures / non-Spirit creatures";
+  granted flanking and artifact landwalk; "Zombies you control get ... Other creatures you control get ...";
+  "Until end of turn, target creature gets ... and other creatures you control get ..."; "They each get"; a pump with
+  no duration (CR 611.2a); "That spell's controller may draw a card"; "Counter target spell and ~ deals 3 damage";
+  "Counter target spell that targets a player"; "the first time each turn" you gain or lose life; end-step checks "if
+  that player didn't cast a (creature) spell this turn" (the active player's) and "if you haven't cast a spell from
+  your hand this turn"; "If ~ wasn't cast from your hand, ... instead" (true of a copy); "you may exile target creature
+  card from a graveyard. If you do, ..."; "cards in that player's hand minus the number of cards in your hand";
+  "for each creature (land) card put into their graveyard this way"; "sacrifices a creature of their choice with
+  flying"; "If that card is a Goblin card"; "if its power was 3 or greater" on dying; "doesn't untap ... if it has a
+  +1/+1 counter on it / if you control a Reflection"; "remove a -1/-1 counter from each creature you control";
+  oil counters; "investigate four times"; "If you control a Fish, Octopus, Otter, Seal, Serpent, or Whale";
+  "Cowards (creatures with defender) can't block this turn"; "attacking Warriors get +1/+1". +74 (25,572 with round 177).
+- Skipped there, with reasons: Silence the Believers ("any number of target creatures and all Auras attached to
+  them"); Mark of Eviction and Deathless Knight (triggers from the battlefield back to the hand or the graveyard);
+  Prairie Dog (a counter replacement until end of turn); Kazandu Stomper ("up to two lands you control": a pick with
+  "up to"); Vicious Offering (a kicker cost that isn't mana); Nissa's Defeat (its target phrase); Chandra's Defeat
+  ("if that permanent is a Chandra planeswalker, you may discard a card. If you do, ..."); Prohibit, Expel the
+  Unworthy and Agonizing Demise (kicked riders not parsed yet); Morgue Burst ("the power of the card returned this
+  way"); Sudden Insight ("each different mana value among nonland cards in your graveyard"); Doomsday Specter ("The
+  player discards that card"); Alaborn Zealot ("destroy both creatures"); Crown-Hunter Hireling ("unless defending
+  player is the monarch"); Landscaper Colos, Draugr Thought-Thief, Reveka, Hellhole Rats, Unyaro Griffin, Liability,
+  Sunken Hope, Mage Hunters' Onslaught, Lure of Prey, Light of Sanction, Enshrouding Mist, Arcades Sabboth, High Seas
+  and Aether Storm (each a template not parsed yet).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon

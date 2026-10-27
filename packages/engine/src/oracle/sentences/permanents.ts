@@ -600,6 +600,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("all permanents", ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[1]!), n: "all" }] : null;
   }
+  // Heartmender: "remove a -1/-1 counter from each creature you control": one from each that has one.
+  if ((m = new RegExp(`^Remove (a|all) ${COUNTER} counters? from (each creature you control)$`, "i").exec(s))) {
+    const what = parseObject(m[3]!, ctx);
+    return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : 1 }] : null;
+  }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
@@ -977,6 +982,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || (x.kind === "addAbility" && what.ref === "created"))) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
+  // Riding the Dilu Horse: "Target creature gets +2/+2 and gains horsemanship.": no duration, so for as long as it stays
+  // on the battlefield (CR 611.2a, rulings).
+  if ((m = /^([Tt]arget creature) (gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)?)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
+    if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || x.kind === "modifyPT")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // Chance for Glory: "Creatures you control gain indestructible": the creatures there as it resolves (CR 611.2c), for as
   // long as each stays on the battlefield (CR 611.2a).

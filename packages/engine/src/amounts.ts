@@ -223,6 +223,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (c.filter ? s.players[pid]!.hand.filter((id) => printedMatches(c.filter!, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     case "cardsInLibrary":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
+    case "handMoreThanYou": {
+      const theirs = refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
+      return Math.max(0, theirs - s.players[ctx.controller]!.hand.length);
+    }
     case "greatestPowerExiled":
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "exiledPowerOf": {
@@ -745,6 +749,8 @@ function describeCount(c: Count): string {
       return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}`;
     case "cardsInHand":
       return "#cards in hand";
+    case "handMoreThanYou":
+      return "#cards in their hand minus yours";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
     case "affectedKeywordCount":

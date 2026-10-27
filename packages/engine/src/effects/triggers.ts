@@ -895,7 +895,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       // Cat Collector: "for the first time during each of your turns".
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // "Whenever you gain life this turn, ..." (Vizkopa Guildmage): a delayed trigger of its controller's (CR 603.7b, d).
@@ -1001,7 +1001,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }, undefined, undefined, undefined, undefined, undefined, undefined, { lifeBatch: ev.batch, lifeEach: { [ev.player]: ev.amount } });
       if (you !== ev.player)
         add(o, you, (e, t) => e === "opponentsLoseLife" && !s.triggerQueue.some((q) => q.sourceId === o.id && q.event?.lifeBatch !== undefined && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text), undefined, undefined, undefined, undefined, undefined, undefined, { ...(ev.batch !== undefined ? { lifeBatch: ev.batch } : {}) });
-      else add(o, you, (e) => e === "youLoseLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      else add(o, you, (e, t) => e === "youLoseLife" && (!t.firstEachTurn || !!ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
   } else if (ev.type === "playerDealtDamage") {

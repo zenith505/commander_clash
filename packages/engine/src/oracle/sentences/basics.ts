@@ -195,6 +195,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer("defending player", ctx);
     return who && [{ type: "eachMay", who, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] }];
   }
+  // Vex: "Counter target spell. That spell's controller may draw a card.": that player decides, countered or not (its
+  // controller as it last was, CR 608.2h).
+  if (/^That spell's controller may draw a card$/.test(s) && ctx.targets[ctx.targets.length - 1]?.kind === "spell") {
+    const who = parsePlayer("that spell's controller", ctx);
+    return who?.ref === "targetController" ? [{ type: "eachMay", who, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] }] : null;
+  }
   // Brood Sliver: "its controller may create a 1/1 colorless Sliver creature token": the creature's controller decides,
   // and the token is theirs.
   if ((ctx.subjectIt || ctx.subject) && (m = /^[Ii]ts controller may create (.+)$/.exec(s))) {

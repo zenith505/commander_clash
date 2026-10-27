@@ -705,6 +705,13 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
     const body = parseBody(gain[1]!, {});
     return body ? { event: "youGainLife", firstOnTheirTurn: true, body } : "fail";
   }
+  // Vengeful Warchief: "Whenever you lose life for the first time each turn, ...": your first life loss this turn,
+  // whoever's turn it is (counting losses before it was on the battlefield).
+  const first = /^Whenever you (gain|lose) life for the first time each turn, (.+)$/.exec(line);
+  if (first) {
+    const body = parseBody(first[2]!, {});
+    return body ? { event: first[1] === "gain" ? "youGainLife" : "youLoseLife", firstEachTurn: true, body } : "fail";
+  }
   const m = /^Whenever an opponent loses life for the first time during each of their turns, (.+)$/.exec(line);
   if (!m) return null;
   const body = parseBody(m[1]!, { eventPlayer: true });
@@ -766,7 +773,8 @@ const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or i
 function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Iron Apprentice: "When ~ dies, if it had counters on it, put those counters on target creature you control.": an
   // intervening if on ~ as it last existed (CR 603.4, 603.10a), the same as "~ or another creature" about ~ alone.
-  const selfHad = /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+)$/.exec(line);
+  // Deathknell Berserker: "When ~ dies, if its power was 3 or greater, ...": the same, its power as it last existed.
+  const selfHad = /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+)$/.exec(line);
   if (selfHad) {
     const t = parseDiesTrigger(`When ~ or another creature dies, ${selfHad[1]}`);
     if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
@@ -2238,7 +2246,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever ~ attacks, if defending player controls more lands than you" (Aerial Surveyor): the player it attacks, or
   // the controller of the planeswalker it attacks (CR 506.2), as it triggers and resolves (rulings).
   const defMore = intervening && /^Whenever ~ attacks$/.test(intervening[1]!) ? /^defending player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
-  const moreCond: StaticCondition | null = thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: defMore[1] as "lands" | "creatures", eventPlayer: true } : null;
+  // "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience), "each
+  // opponent's end step, if that player didn't cast a creature spell this turn" (Predatory Advantage): the active
+  // player's spells, as it triggers and resolves (CR 603.4).
+  const activeCast = intervening && /^At the beginning of each (?:opponent|player)'s end step$/.test(intervening[1]!) ? /^that player didn't cast an? (creature )?spell this turn$/.exec(intervening[2]!) : null;
+  const castCond: StaticCondition | null = activeCast ? { kind: "castCount", n: 1, filter: activeCast[1] ? parseSearchFilter("creature card")! : { kind: "card", text: "spell" }, not: true, activePlayer: true } : null;
+  const moreCond: StaticCondition | null = castCond ? castCond : thatMore ? { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true } : activeMore ? { kind: "opponentMore", what: activeMore[1] as "lands" | "creatures", activePlayer: true } : defMore ? { kind: "opponentMore", what: defMore[1] as "lands" | "creatures", eventPlayer: true } : null;
   // Deathbringer Regent: "When ~ enters, if you cast it from your hand and there are five or more other creatures on the
   // battlefield": both, the first about how it entered (see ifCastFromHand).
   const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast it from your hand and (.+)$/.exec(intervening[2]!) : null;

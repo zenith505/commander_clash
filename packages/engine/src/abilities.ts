@@ -107,6 +107,11 @@ export type Count =
   | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef; /** "The number of white cards in their hand" (Inquisition): only cards like this. */ filter?: TargetSpec }
+  /**
+   * "The number of cards in that player's hand minus the number of cards in your hand" (Dark Suspicions), "draw cards
+   * equal to the difference" if they have more (Balance of Power): never below 0 (CR 107.1b).
+   */
+  | { kind: "handMoreThanYou"; who: PlayerRef }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
   | { kind: "timesAffectedAttacked" }
   /** "Creatures you don't control get -1/-1 for each slime counter on them" (Toxrill): each affected object's own counters. */
@@ -842,6 +847,12 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * "Return target creature and all Auras attached to it" (Hubris): also each permanent matching `filter` attached to
+       * the target as this resolves (none if the target is illegal, CR 608.2b). `only`: "Destroy all Equipment attached to
+       * that creature" (Turn to Slag): just those.
+       */
+      attachedToo?: { filter: TargetSpec; only?: true };
       /** "~ and that creature each get +2/+0" (Gogo, Mysterious Mime): the source too, while it's still that permanent. */
       andSelf?: true;
       /** "Each of those creatures you don't control" (Lost in the Maze): only the targets another player controls as it resolves. */
@@ -1663,7 +1674,7 @@ export type StaticCondition =
   /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
   | { kind: "noncombatByColor"; color: Color; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
-  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true }
+  | { kind: "castCount"; n: number; filter: TargetSpec; /** "If you didn't cast a spell this turn" (Nightpack Ambusher): fewer than `n`. */ not?: true; /** "If you haven't cast a spell from your hand this turn" (Prairie Dog): only spells cast from a hand. */ fromHand?: true; /** "At the beginning of each player's end step, if that player didn't cast a spell this turn" (Impatience): the active player's spells. */ activePlayer?: true }
   /** "There are five colors among permanents you control" (CR 105.2). */
   | { kind: "colorsAmong"; n: number }
   /** "You've gained 5 or more life this turn": in total. */
@@ -3922,6 +3933,8 @@ export interface TriggeredAbility {
   /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn.
    * For "youGainLife": "for the first time during each of your turns" (Cat Collector): your first life gain this turn, on your turn. */
   firstOnTheirTurn?: true;
+  /** For "youGainLife" and "youLoseLife": "for the first time each turn" (Vengeful Warchief): your first such event this turn, anyone's turn. */
+  firstEachTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */

@@ -154,6 +154,14 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
   // that would be dealt to players this turn" (Defend the Hearth), "... to you and creatures you control this turn by
   // creatures" (Eerie Interference): a rule of the game until the turn ends, so also for permanents that arrive later
   // (CR 611.2c). One about a target or ~ is a prevention effect on that object (basics.ts).
+  // Stonewise Fortifier: "Prevent all damage that would be dealt to ~ by target creature this turn"; Kry Shield: "Prevent
+  // all damage that would be dealt this turn by target creature you control": that creature as a source (CR 615.1), for
+  // as long as it's that object.
+  if ((m = /^Prevent all damage that would be dealt (?:to (~) )?(?:this turn )?by target (creature(?: you control)?)(?: this turn)?$/.exec(s)) && /this turn/.test(s)) {
+    const spec = parseTargetPhrase(m[2]!);
+    if (spec?.kind !== "object") return null;
+    return rule({ by: { target: { ref: "target", index: addTarget(ctx, spec) } }, ...(m[1] ? { to: { target: { ref: "self" } } } : {}) });
+  }
   // "Prevent all damage that would be dealt by target instant or sorcery spell this turn" (Hidden Retreat): as Hallow.
   if ((m = /^Prevent all damage that would be dealt by target ((?:instant or sorcery )?spell) this turn$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

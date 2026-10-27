@@ -181,6 +181,8 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
   [/^becomes untapped, (.+)$/, "selfBecomesUntapped", {}],
   [/^is dealt damage, (.+)$/, "selfIsDealtDamage", { thatMuch: true }],
+  // Fatal Mutation: "When enchanted creature is turned face up, destroy it" (CR 708.8: it doesn't enter again).
+  [/^is turned face up, (.+)$/, "selfTurnedFaceUp", {}],
 ];
 
 /**
@@ -1355,6 +1357,12 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
+  } else if ((m = /^Whenever (two|three) or more creatures your opponents control attack, (~ can't block this combat)\.?$/.exec(line))) {
+    // Flummoxed Cyclops: an opponent's attack with two or more creatures (with no teams, each other player is an opponent,
+    // CR 102.3), once for the declaration; the attackers leaving later don't matter (rulings).
+    const body = parseBody(m[2]!, {});
+    if (!body) return "fail";
+    return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
   } else if ((m = /^Whenever another player attacks with (two|three|four|five) or more creatures, they draw a card if none of those creatures attacked you\.?$/.exec(line))) {
     // Firemane Commando: another player's attack, all of their attackers counted; they draw unless one of those creatures
     // attacked you (not your planeswalkers or battles), as they were declared (rulings).
@@ -2533,7 +2541,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // triggers only on its controller's opponents' turns; "that player" is the active player.
   // "At the beginning of combat on each opponent's turn, tap target creature that player controls" (Citadel Siege, CR 507.1).
   // "Each other player's" (Well of Ideas): with no teams, every other player is an opponent (CR 102.3).
-  const oppStep = /^At the beginning of each (?:opponent|other player)'s (upkeep|draw step|end step), (.+)$/.exec(line) ?? /^At the beginning of (combat) on each opponent's turn, (.+)$/.exec(line);
+  // Discordant Spirit: "At the beginning of each end step, if it's an opponent's turn, ...": the same (whose turn it is
+  // can't change before it resolves).
+  const oppStep = /^At the beginning of each (?:opponent|other player)'s (upkeep|draw step|end step), (.+)$/.exec(line) ?? /^At the beginning of (combat) on each opponent's turn, (.+)$/.exec(line) ?? /^At the beginning of each (upkeep|end step), if it's an opponent's turn, (.+)$/.exec(line);
   if (oppStep) {
     const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : oppStep[1] === "combat" ? "eachBeginCombat" : "eachEndStep";
     // "They lose 2 life", "~ deals 2 damage to them": that player.
@@ -3049,6 +3059,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifNotBlocking = true;
         body0 = notBlocking[1]!;
       }
+      // Fyndhorn Druid: "When ~ dies, if it was blocked this turn, ...": as it last existed (CR 603.10a), blocked once
+      // blockers were declared for it, even if they left since (CR 509.1h).
+      let ifBlockedThisTurn = false;
+      const blockedM = /^if it was blocked this turn, (.+)$/i.exec(body0);
+      if (blockedM) {
+        if (event !== "selfDies") return "fail" as const;
+        ifBlockedThisTurn = true;
+        body0 = blockedM[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -3147,7 +3166,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

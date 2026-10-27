@@ -285,7 +285,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
-        const hand = player(s, pid).hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        const all = player(s, pid).hand;
+        // Hint of Insanity: only those sharing a name with another card in that hand.
+        const twice = (id: ObjectId) => !e.nameTwice || all.some((x) => x !== id && sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name));
+        const hand = all.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && twice(id));
         if (e.downToFewest) {
           if (hand.length > fewest && fewest > 0) {
             s.pending = { kind: "discard", player: pid, count: hand.length - fewest, source: src };

@@ -1380,7 +1380,7 @@ export type Modification =
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   | { kind: "maxOneBlocker" }
   /** "Its activated abilities can't be activated" (Arrest), mana abilities included (CR 605.1a) unless `exceptMana`. */
-  | { kind: "cantActivate"; exceptMana?: true }
+  | { kind: "cantActivate"; exceptMana?: true; /** Serra Bestiary: "its activated abilities with {T} in their costs", mana abilities too (rulings). */ tapCost?: true }
   /** "Can't be blocked except by three or more creatures" (CR 509.1b; menace is the same with two, 702.111b). */
   | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
@@ -1402,6 +1402,8 @@ export type Modification =
   | { kind: "cantBeBlockedByGreaterPower" }
   /** Spitfire Handler: "can't block creatures with power greater than ~'s power" (CR 509.1b). */
   | { kind: "cantBlockGreaterPower" }
+  /** Ironclaw Curse: "can't block creatures with power equal to or greater than the enchanted creature's toughness" (CR 509.1b). */
+  | { kind: "cantBlockPowerAtLeastToughness" }
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
   | { kind: "cantAttackAlone" }
   /** "Can only attack alone" (Master of Cruelties): if it attacks, it's the only creature declared as an attacker (CR 506.5). */
@@ -1827,7 +1829,7 @@ export type StaticCondition =
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   /** "If a card left your graveyard this turn" (Gau, Feral Youth). */
   | { kind: "cardLeftYourGraveyard"; /** "If three or more cards left your graveyard this turn" (Bonecache Overseer). */ n?: number }
-  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color }
+  | { kind: "castAnother"; /** "If you've cast another spell this turn, draw a card" (Slick Sequence): as the spell resolves, other than itself (rulings). */ resolving?: true; /** "Enters with ... unless you've cast another red spell this turn" (Hotheaded Giant): as it enters, other than itself if it was cast (rulings). */ entering?: true; /** "Another black spell" (Soul Reap): of that color as it was cast. */ color?: Color }
   /**
    * Prowl (CR 702.76a): a player was dealt combat damage this turn by a source that, as it dealt it, was under your control
    * and had any of this spell's creature types.
@@ -2902,7 +2904,7 @@ export type Effect =
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true } // CR 701.9
   /** CR 701.22, by the controller, or `who` ("target player scries X", Kozilek's Command). */
   | { type: "scry"; n: Amount; who?: PlayerRef }
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
@@ -3113,7 +3115,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G"; /** "You may pay any amount of life" (Necrodominance): X life, up to the life the player could pay (CR 119.4). */ life?: true; /** "You may pay any amount of {E}" (Galvanic Discharge): X energy, up to the energy the player has (CR 107.14). */ energy?: true }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /** "Unless you pay {1} for each card in your hand" (Megatherium): `pay` that many times, counted as it resolves. */ payTimes?: Amount; /** "Unless you pay its mana cost" (Pendrell Flux): the source's mana cost as it resolves, X as 0 (unpayable with none, CR 118.6). */ payManaCost?: true; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -4332,6 +4334,8 @@ export interface TriggeredAbility {
   ifNotToken?: true;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
   ifNotBlocking?: true;
+  /** Fyndhorn Druid: "When ~ dies, if it was blocked this turn": it became blocked this turn as that object (CR 509.1h, 603.10a). */
+  ifBlockedThisTurn?: true;
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
   ownGraveyard?: true;
   /**
@@ -5376,6 +5380,8 @@ export interface CompiledCard {
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
    */
   opponentsCantActivateYourTurn?: true;
+  /** Stabilizer: "Players can't cycle cards." No cycling ability (landcycling and the like too, CR 702.29f) can be activated. */
+  noCycling?: true;
   /**
    * "Stun counters can't be removed from permanents your opponents control." (Fear of Sleep Paralysis): counters of this
    * kind stay on its controller's opponents' permanents, nor are they moved off them (rulings); see countersStay.

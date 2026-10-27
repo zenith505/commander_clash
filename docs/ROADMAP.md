@@ -1,8 +1,8 @@
 # Roadmap
 
-26,469 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,776 of
-9,979 (87%).
+26,617 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,809 of
+9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -434,6 +434,26 @@ line blocks.
    Agonies (no event for paying life), Angel of Jubilation and Yasharn (which costs pay life or sacrifice, every cost
    path audited), Whirlwind Denial (one payment prompt per spell and ability), Crucible of the Spirit Dragon (X mana in
    any combination).
+   Round 186 went on from the top: "become ... in addition to their other types" for other permanents (Tangletrove
+   Kelp's Clues, Vihaan's Treasures, Shadow Puppeteers' "red Dragon with base power and toughness 4/4", Nissa of
+   Shadowed Boughs' +1), Katilda ("Spirits and/or enchantments", and her Rising Dawn), "players who control more lands
+   than you" (Oreskos Explorer), "the number of cards looked at while scrying this way" (Elvish Mariner, Elrond),
+   Equipment that's attached as it brings a creature (Pre-War Formalwear, Fractal Harness, Field-Tested Frying Pan),
+   "the amount of life you gained" kept as the ability resolves (Frying Pan, Hurska Sweet-Tooth, The Archimandrite's
+   trigger), Red Death, "whenever ~ evolves" (Watchful Radstag, Renegade Krasis), Eris (different mana values among
+   instants and sorceries), Soldevi Adnate ("black or artifact creature"), Varchild, Hadana's Climb ("two or more
+   counters" conditions, also Urdnan), Dowsing Device ("Then transform ~ if ..."), countering abilities from a kind of
+   source and what happens to that permanent (Green Slime, Trickbind, Rust, Brown Ouphe, Nimble Obstructionist),
+   Campfire (commanders from the command zone and graveyard to hand), Radiant Destiny, Lifecraft Engine (crewed
+   Vehicles are the chosen type), Nicanzil ("explores a land card" / "a nonland card"), Mayael's Aria (each condition
+   after its instruction, checked in turn), Commodore Guff, Sigarda's Summons, Prismatic Undercurrents.
+   Out after round 186 (looked at, not done): Interdimensional Web Watch (mana spendable only on spells cast from
+   exile: a spell's ManaUse doesn't know its zone, as for Mm'menon), Dawn-Blessed Pennant (a target "of the chosen
+   type" isn't known as targets are chosen), Barrow-Blade ("that creature loses all abilities" for a blocker or
+   blocked creature), Ironsoul Enforcer ("~ or a commander you control attacks alone"), Smirking Spelljacker (exile
+   target spell, cast it later), Koll, the Forgemaster ("if it was enchanted or equipped" as it died), Sorceress's
+   Schemes ("an exiled card with flashback you own" as a target), Fumiko the Lowblood (bushido X, counted as it
+   resolves), Archon of Coronation (damage that doesn't cause life loss).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1788,7 +1808,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Stormchaser Chimera); "When that creature leaves the battlefield this turn, sacrifice ~" (Kjeldoran Elite Guard,
   Heart Wolf); a land becomes a basic land type with no duration or until ~ leaves (Cyclopean Giant, Thelonite Monk,
   Graceful Antelope) and "a Plains or an Island" (Tundra Kavu); Lobotomy and Shimian Specter (a card chosen from a
-  revealed hand names the cards exiled). +39 (26,584).
+  revealed hand names the cards exiled). +39 (26,617 with round 186).
 - Skipped there, with reasons: Flanking Licid (old wording, "Summon Licid"); Phantasmal Mount (a delayed trigger of ~
   that must also find its target); Kjeldoran Guard ("defending player" in multiplayer); Lifelace and the other Laces (a
   color change on a spell); Govern the Guildless (forecast and "monocolored"); Gaea's Liege (a conditional

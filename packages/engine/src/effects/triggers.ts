@@ -193,7 +193,9 @@ export type TriggerSourceEvent =
   | { type: "crewed"; id: ObjectId }
   | { type: "crews"; id: ObjectId; vehicle: ObjectId }
   /** A permanent explored (CR 701.44b), `controller` controlling it then or as it last existed (701.44c). */
-  | { type: "explored"; id: ObjectId; controller: PlayerId }
+  | { type: "explored"; id: ObjectId; controller: PlayerId; /** The card it revealed was a land card or not; unset with none revealed. */ revealed?: "land" | "nonland" }
+  /** Its evolve ability put one or more +1/+1 counters on it (CR 702.100d). */
+  | { type: "evolved"; id: ObjectId }
   /** A mutating spell merged with this permanent (CR 702.140d). */
   | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
@@ -1186,6 +1188,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
+  } else if (ev.type === "evolved") {
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfEvolves");
   } else if (ev.type === "explored") {
     // "Whenever a creature you control explores" (Wildgrowth Walker): even one that has left the battlefield (rulings),
     // a creature as it last existed there (CR 701.44c).
@@ -1194,7 +1199,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o && creature)
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.controller) add(w, ev.controller, (e) => e === "creatureYouControlExplores", undefined, undefined, o);
+        if (controllerOf(s, w) === ev.controller) add(w, ev.controller, (e, t) => e === "creatureYouControlExplores" && (!t.explored || t.explored === ev.revealed), undefined, undefined, o);
       }
   } else if (ev.type === "mutates") {
     // "Whenever this creature mutates" (CR 702.140d): an ability of the merged permanent, from any of its components.

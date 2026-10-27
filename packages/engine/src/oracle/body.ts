@@ -1562,9 +1562,6 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
-  // Patron of the Orochi: "Untap all Forests and all green creatures": each of them once, whichever group it's in (an
-  // untapped permanent can't untap again), so one group after the other is the same.
-  text = text.replace(/(^|\. )Untap all (Plains|Islands|Swamps|Mountains|Forests) and all ((?:white|blue|black|red|green) creatures)\./, "$1Untap all $2. Untap all $3.");
   // Insurrection: "Untap all creatures and gain control of them until end of turn. They gain haste until end of turn.":
   // the same creatures throughout (rulings), those there as it resolves (CR 611.2c).
   text = text.replace(/^Untap all creatures and gain control of them until end of turn\. They gain haste until end of turn\.$/, "Untap all creatures. Gain control of all creatures until end of turn. All creatures gain haste until end of turn.");

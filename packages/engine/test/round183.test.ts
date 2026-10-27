@@ -75,7 +75,6 @@ const guardianOfTazeem = card("Guardian of Tazeem", "Creature — Sphinx", "{3}{
 const kothTheGeomancer = card("Koth, the Geomancer", "Legendary Creature — Human Warrior", "{2}{R}", {cmc: 3,"power":"3","toughness":"2","keywords":["Reach","Landfall"],"oracleText":"Reach\nLandfall — Whenever a land you control enters, Koth deals 1 damage to each opponent. If that land is a Mountain, add {R}."});
 const duskmantleSeer = card("Duskmantle Seer", "Creature — Vampire Wizard", "{2}{U}{B}", {cmc: 4,"power":"4","toughness":"4","keywords":["Flying"],"oracleText":"Flying\nAt the beginning of your upkeep, each player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand.","colors":["B","U"]});
 const axgardArtisan = card("Axgard Artisan", "Creature — Dwarf Artificer", "{1}{R}", {cmc: 2,"power":"2","toughness":"1","keywords":["Treasure"],"oracleText":"Whenever one or more +1/+1 counters are put on this creature for the first time each turn, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")"});
-const patronOfTheOrochi = card("Patron of the Orochi", "Legendary Creature — Spirit", "{6}{G}{G}", {cmc: 8,"power":"7","toughness":"7","keywords":["Offering"],"oracleText":"Snake offering (You may cast this spell any time you could cast an instant by sacrificing a Snake and paying the difference in mana costs between this and the sacrificed Snake. Mana cost includes color.)\n{T}: Untap all Forests and all green creatures. Activate only once each turn."});
 const ludevicNecroalchemist = card("Ludevic, Necro-Alchemist", "Legendary Creature — Human Wizard", "{1}{U}{R}", {cmc: 3,"power":"1","toughness":"4","keywords":["Partner"],"oracleText":"At the beginning of each player's end step, that player may draw a card if a player other than you lost life this turn.\nPartner (You can have two commanders if both have partner.)","colors":["R","U"]});
 const unravel = card("Unravel", "Instant", "{1}{U}{U}", {cmc: 3,"oracleText":"Counter target spell. If the amount of mana spent to cast that spell was less than its mana value, you draw a card."});
 const virulentWound = card("Virulent Wound", "Instant", "{B}", {cmc: 1,"oracleText":"Put a -1/-1 counter on target creature. When that creature dies this turn, its controller gets a poison counter."});
@@ -96,8 +95,15 @@ const skyfisherSpider = card("Skyfisher Spider", "Creature — Spider", "{2}{B}{
 const sirensRuse = card("Siren's Ruse", "Instant", "{1}{U}", {cmc: 2,"oracleText":"Exile target creature you control, then return that card to the battlefield under its owner's control. If a Pirate was exiled this way, draw a card."});
 const getawayGlamer = card("Getaway Glamer", "Instant", "{W}", {cmc: 1,"keywords":["Spree"],"oracleText":"Spree (Choose one or more additional costs.)\n+ {1} — Exile target nontoken creature. Return it to the battlefield under its owner's control at the beginning of the next end step.\n+ {2} — Destroy target creature if no other creature has greater power."});
 
+const shadowedCaravel = card("Shadowed Caravel", "Artifact — Vehicle", "{2}", {cmc: 2,"power":"2","toughness":"2","keywords":["Crew","Explore"],"oracleText":"Whenever a creature you control explores, put a +1/+1 counter on this Vehicle.\nCrew 2 (Tap any number of creatures you control with total power 2 or more: This Vehicle becomes an artifact creature until end of turn.)"});
+const merfolkCavediver = card("Merfolk Cave-Diver", "Creature — Merfolk Scout", "{2}{U}", {cmc: 3,"power":"2","toughness":"4","keywords":["Explore"],"oracleText":"Whenever a creature you control explores, this creature gets +1/+0 until end of turn and can't be blocked this turn."});
+const lurkingChupacabra = card("Lurking Chupacabra", "Creature — Beast Horror", "{3}{B}", {cmc: 4,"power":"2","toughness":"3","keywords":["Explore"],"oracleText":"Whenever a creature you control explores, target creature an opponent controls gets -2/-2 until end of turn."});
+const lieInWait = card("Lie in Wait", "Sorcery", "{B}{G}{U}", {cmc: 3,"oracleText":"Return target creature card from your graveyard to your hand. Lie in Wait deals damage equal to that card's power to target creature.","colors":["B","G","U"]});
+const evieFrye = card("Evie Frye", "Legendary Creature — Human Assassin", "{1}{U}", {cmc: 2,"power":"2","toughness":"1","keywords":["Partner with","Partner"],"oracleText":"Partner with Jacob Frye (When this creature enters, target player may put Jacob into their hand from their library, then shuffle.)\n{1}, {T}: Draw a card, then discard a card. When you discard a creature card this way, target creature you control can't be blocked this turn."});
+const endOfTheHunt = card("End of the Hunt", "Sorcery", "{1}{B}", {cmc: 2,"oracleText":"Target opponent exiles a creature or planeswalker they control with the greatest mana value among creatures and planeswalkers they control."});
+
 describe("round 183", () => {
-  it("all compile", () => supported(rhinoBarrelingBrute, wildgrowthWalker, glacialDragonhunt, pyreticRebirth, guardianOfTazeem, kothTheGeomancer, duskmantleSeer, axgardArtisan, patronOfTheOrochi, ludevicNecroalchemist, unravel, virulentWound, ashlingTheExtinguisher, blotOut, predatoryImpetus, crackInTime, longFengGrandSecretariat, risonaAsariCommander, structuralAssault, thrillingDiscovery, lanternOfInsight, mathemagics, spiritOfTheLabyrinth, dosanTheFallingLeaf, skyfisherSpider, sirensRuse, getawayGlamer));
+  it("all compile", () => supported(rhinoBarrelingBrute, wildgrowthWalker, glacialDragonhunt, pyreticRebirth, guardianOfTazeem, kothTheGeomancer, duskmantleSeer, axgardArtisan, ludevicNecroalchemist, unravel, virulentWound, ashlingTheExtinguisher, blotOut, predatoryImpetus, crackInTime, longFengGrandSecretariat, risonaAsariCommander, structuralAssault, thrillingDiscovery, lanternOfInsight, mathemagics, spiritOfTheLabyrinth, dosanTheFallingLeaf, skyfisherSpider, sirensRuse, getawayGlamer, shadowedCaravel, merfolkCavediver, lurkingChupacabra, lieInWait, evieFrye, endOfTheHunt));
 
   it("Rhino, Barreling Brute: draws on attack only after a spell with mana value 4 or greater this turn", () => {
     for (const [spell, draws] of [[three, 0], [four, 1]] as const) {
@@ -210,19 +216,6 @@ describe("round 183", () => {
     expect(named(s, ap, "Treasure")).toHaveLength(1);
     s = resolveAll(run(s, planCast(s, ap, ids[2]!, [tgt(a)])));
     expect(named(s, ap, "Treasure")).toHaveLength(1);
-  });
-
-  it("Patron of the Orochi: untaps all Forests and all green creatures, anyone's", () => {
-    const { s: s0, ap, opp } = setup([]);
-    const p = putOnBattlefield(s0, ap, patronOfTheOrochi);
-    const f = putOnBattlefield(s0, opp, forestCard);
-    const g = putOnBattlefield(s0, opp, bear());
-    const m = putOnBattlefield(s0, ap, mountainCard);
-    const r = putOnBattlefield(s0, ap, elk);
-    for (const id of [f, g, m, r]) s0.objects[id]!.tapped = true;
-    let s = resolveAll(run(s0, planActivate(s0, ap, p, 0)));
-    expect([f, g, m, r].map((id) => s.objects[id]!.tapped)).toEqual([false, false, true, true]);
-    expect(planActivate(s, ap, p, 0)).toBeNull();
   });
 
   it("Ludevic, Necro-Alchemist: the active player may draw only if a player other than you lost life this turn", () => {
@@ -465,5 +458,23 @@ describe("round 183", () => {
       const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(b)], [1])));
       expect(zone(s, b), String(bigger)).toBe(dies ? "graveyard" : "battlefield");
     }
+  });
+
+  it("Lie in Wait: returns the card, then damage equal to its power", () => {
+    const { s: s0, ap, ids, opp } = setup([lieInWait]);
+    const r = into(s0, ap, big, "graveyard");
+    const g = putOnBattlefield(s0, opp, card("Test Wall", "Creature — Wall", "{2}", { cmc: 2, power: "0", toughness: "5" }));
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(r), tgt(g)])));
+    expect(zone(s, r)).toBe("hand");
+    expect(zone(s, g)).toBe("graveyard");
+  });
+
+  it("Lurking Chupacabra: a creature you control explores, -2/-2 to an opponent's creature", () => {
+    const { s: s0, ap, ids, opp } = setup([scout]);
+    putOnBattlefield(s0, ap, lurkingChupacabra);
+    const b = putOnBattlefield(s0, opp, bear());
+    into(s0, ap, forestCard, "library");
+    const s = choose(resolveAll(run(s0, planCast(s0, ap, ids[0]!))), [tgt(b)]);
+    expect(zone(s, b)).toBe("graveyard");
   });
 });

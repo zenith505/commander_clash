@@ -1,7 +1,7 @@
 # Roadmap
 
-26,147 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,729 of
+26,229 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,934 of 4,988 (98%), top 10,000: 8,739 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -362,7 +362,7 @@ line blocks.
    or lose life during your turn"), Heidegger, Teachings of the Archaics, Scourge of the Skyclaves, Skanos Dragonheart,
    Gloom Ripper, Backlash, Tribute to Hunger, Turn the Earth, Curse of Stalked Prey, Wall of Essence, Eyeblight
    Massacre, Kirri, Of One Mind, Eagle of Deliverance, Tui and La, Carnival of Souls and others), taking the easy ones.
-   Out after round 182 (ranks 12,330 to 13,222): Lie in Wait ("that card's power" once the card has moved), City of
+   Out after round 182 (ranks 12,330 to 13,222): City of
    Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins,
    Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void, In Too Deep, Dollhouse of Horrors, Harald
@@ -376,14 +376,33 @@ line blocks.
    Transfer and the rest of the 222 still unsupported in that range; past it: Phytohydra (damage replaced by +1/+1
    counters even when it can't be prevented, which needs its controller's order against prevention shields), Intimidation
    Bolt ("other creatures can't attack": other than the target), Fade Away, Viashino Heretic, Dazzling Reflection,
-   Bitter Chill, Savage Punch, Arcbound Fiend, Wildgrowth Walker, Consume Spirit, Pestilent Spirit, End Hostilities.
+   Arcbound Fiend, Consume Spirit, Pestilent Spirit, End Hostilities.
    Round 182 went down from rank 12,330 to about rank 13,222 (Temporal Cleansing, Deem Inferior, Lost Days, Happy Hogan
    and Trickster's Stratagem (second from the top or the bottom, the owner's choice), Phyrexian Hydra, Pain
    Magnification, Gnoll War Band and Furious Spinesplitter (opponents dealt damage this turn), No Witnesses, Skull
    Storm, Basandra, Stinkdrinker Bandit, Guardian of the Gateless, Angelic Guardian, Simian Sling, Valiant Rescuer,
    Mortuary, The Final Days, Nature's Revolt, Living Lands, Kormus Bell, Ambush Commander, Invincible Hymn, See Beyond
    and others), taking the easy ones.
-   Next most played after rank 13,222: the unsupported ones from `npm run popular` past Nature's Revolt; the harder ones
+   Round 183 (the lanes met at about rank 13,200, so every card left is one a round skipped) went back to the top of
+   `npm run popular` for harder ones: Rhino, Barreling Brute (a spell with mana value 4 or greater cast this turn),
+   Wildgrowth Walker, Lurking Chupacabra, Merfolk Cave-Diver and Shadowed Caravel ("whenever a creature you control
+   explores"), Glacial Dragonhunt and Evie Frye ("when you discard a nonland card this way"), Pyretic Rebirth and Lie in
+   Wait ("that card's" value after it moved), Guardian of Tazeem and Koth ("if that land is an Island"), Duskmantle Seer,
+   Axgard Artisan (the first time a kind of counter is put on it each turn), Ludevic, Necro-Alchemist, Unravel (less
+   mana spent than its mana value), Virulent Wound (its controller as it died gets the poison counter), Ashling, the
+   Extinguisher, Blot Out and End of the Hunt, Predatory Impetus, Crack in Time, Long Feng, Risona, Structural Assault
+   (artifacts put into graveyards this turn), Thrilling Discovery ("discard two cards. If you do"), Lantern of Insight,
+   Mathemagics (2ˣ), Spirit of the Labyrinth, Dosan the Falling Leaf, Skyfisher Spider, Siren's Ruse ("if a Pirate was
+   exiled this way") and Getaway Glamer ("if no other creature has greater power").
+   Out after round 183 (looked at, not done): Karazikar, Encroaching Mycosynth and Biotransference (types of cards in
+   every zone), Hushbringer, Within Range (each opponent's own count of creatures attacking them), Elturel Survivors (a
+   static count of the defending player's lands), Thieves' Tools (a static that depends on the equipped creature's
+   power), Shelinda, Yevon Acolyte (the entered creature's power once it has left), Shadowgrange Archfiend (the
+   greatest power among creatures sacrificed this way), Old One Eye (a trigger from the graveyard), Phyrexian Soulgorger
+   (cumulative upkeep that sacrifices creatures), Tangled Colony (damage dealt to it this turn), Erebos's Intervention
+   (up to twice X targets), Judge Unworthy (scry, then reveal, then damage).
+   Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
+   the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector

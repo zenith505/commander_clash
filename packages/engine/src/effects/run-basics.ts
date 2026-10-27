@@ -45,6 +45,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const words = { untap: "untap step", draw: "draw step", combat: "combat phase", turn: "turn" }[e.skip];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        if (e.wholeTurn) {
+          (p.skips ??= []).push({ what: e.skip, wholeTurn: true });
+          log(s, `${p.name} will skip all combat phases of their next turn.`);
+          continue;
+        }
         for (let i = 0; i < e.n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
         log(s, `${p.name} will skip their next ${e.n > 1 ? `${e.n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
       }

@@ -863,6 +863,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),
           ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}),
+          ...(e.away && agent === undefined ? { away: true as const } : {}),
         };
         return "paused";
       }

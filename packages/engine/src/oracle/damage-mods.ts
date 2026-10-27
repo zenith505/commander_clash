@@ -58,6 +58,7 @@ function parseBy(t: string, attached: boolean): { by: DamageMod["by"]; attached:
   if (/^(?:equipped|enchanted) creature$/.test(t)) return { by: { self: true }, attached: true };
   if (t === "another creature" && attached) return { by: { other: true, filters: [{ spec: { kind: "object", types: ["Creature"], text: "creature" } }] }, attached };
   if (t === "a source" || t === "any source") return { by: undefined, attached };
+  if ((t === "a creature ~ is blocking" || t === "a creature blocking ~") && !attached) return { by: { filters: [{ spec: { kind: "object", types: ["Creature"], text: "creature" } }], combatWithHolder: t === "a creature blocking ~" ? "blocking" : "blocked" }, attached };
   const other = /^another /.test(t);
   const body = t.replace(/^(?:another|an?|any) /, "");
   // "a red or artifact source you control" (Mechanized Warfare), "a red instant or sorcery spell you control or a red
@@ -127,6 +128,9 @@ export function parseDamageMod(line: string): StaticAbility | null {
     // with first strike" (Tresserhorn Skyknight), "... by Walls" (Marble Priest): sources as they deal it (CR 609.7b).
     .replace(/^Prevent all (combat )?damage that would be dealt to ~ by creatures with (first strike)$/, "If a creature with $2 would deal $1damage to ~, prevent that damage")
     .replace(/^Prevent all (combat )?damage that would be dealt to ~ by (enchanted creature|Wall)s$/, "If a $2 would deal $1damage to ~, prevent that damage")
+    // Wall of Vapor: "Prevent all damage that would be dealt to ~ by creatures it's blocking"; Armored Transport: "... combat
+    // damage ... by creatures blocking it": those in combat with it as the damage would be dealt (CR 509.1g, 609.7b).
+    .replace(/^Prevent all (combat )?damage that would be dealt to ~ by creatures (it's blocking|blocking it)$/, (_, c: string | undefined, w: string) => `If a creature ${w === "it's blocking" ? "~ is blocking" : "blocking ~"} would deal ${c ?? ""}damage to ~, prevent that damage`)
     // Collective Inferno: "Double all damage that sources you control of the chosen type would deal" is the same, for each
     // source (CR 614.1a).
     .replace(/^Double all damage that sources you control of the chosen type would deal$/, "If a source of the chosen type you control would deal damage, it deals double that damage instead")

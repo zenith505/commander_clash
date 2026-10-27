@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
-import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
+import { COUNTER, differenceInHand, keywordOf, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { ANY_COUNTER } from "../abilities";
@@ -105,6 +105,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? you're dealt combat damage, (.+)$/, "youAreDealtCombatDamage"],
   [/^Whenever damage that would be dealt to you is prevented, (.+)$/, "youDamagePrevented"],
   [/^Whenever an opponent is dealt damage, (.+)$/, "opponentIsDealtDamage"],
+  [/^Whenever an opponent is dealt noncombat damage, (.+)$/, "opponentIsDealtNoncombatDamage"],
   [/^Whenever enchanted player is dealt damage, (.+)$/, "enchantedPlayerDealtDamage"],
   // Sower of Discord, with "As ~ enters, choose two players" (checked in compile.ts).
   [/^Whenever damage is dealt to one of the chosen players, (.+)$/, "chosenPlayerDealtDamage"],
@@ -771,7 +772,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
   // Curator's Ward: "When enchanted permanent leaves the battlefield, if it was historic, ...": to any zone (CR 603.6c),
   // historic as it last existed (CR 603.10a, 700.6).
-  const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile|leaves the battlefield), (.+)$/.exec(line);
+  // The Zendikons: "When enchanted land dies"; Tezzeret's Touch: "When enchanted artifact is put into a graveyard": from
+  // the battlefield, the same as dying (CR 700.4), whatever it is then.
+  const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent|land|artifact) (dies|is put into a graveyard|dies or is put into exile|leaves the battlefield), (.+)$/.exec(line);
+  if (attachedM?.[3] === "is put into a graveyard") attachedM[3] = "dies";
+  if (attachedM && (attachedM[2] === "land" || attachedM[2] === "artifact") && (attachedM[1] !== "enchanted" || attachedM[3] !== "dies")) return "fail";
   const attached = attachedM && [attachedM[0], attachedM[1]!, attachedM[4]!];
   // Scrap Trawler: "Whenever ~ dies or another artifact you control is put into a graveyard from the battlefield": ~ is an
   // artifact, and dying is being put into a graveyard from the battlefield (CR 700.4), so the same as "~ or another".
@@ -2128,8 +2133,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
   const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
-  // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
-  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
+  // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
+  // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
+  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
     if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
     // A milled-cards batch (Infesting Radroach) is watched from graveyards too (see the batch event in effects/triggers.ts).
@@ -2240,7 +2246,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // battlefield": both, the first about how it entered (see ifCastFromHand).
   const fromHandAnd = intervening && /^When ~ enters$/.test(intervening[1]!) ? /^you cast it from your hand and (.+)$/.exec(intervening[2]!) : null;
   if (fromHandAnd) intervening![3] = `if you cast it from your hand, ${intervening![3]}`;
-  const ifCond = putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // Momentum Rumbler: "Whenever ~ attacks, if it doesn't have first strike, ...", "... if it has first strike, ...": its
+  // keywords as it triggers and resolves (CR 603.4).
+  const kwIf = intervening && /^Whenever ~ /.test(intervening[1]!) ? /^it (has|doesn't have) (first strike|double strike|flying|trample|vigilance|deathtouch|lifelink|haste|reach|menace|defender)$/.exec(intervening[2]!) : null;
+  const kw = kwIf ? keywordOf(kwIf[2]!) : undefined;
+  const kwCond: StaticCondition | null = kwIf && kw ? { kind: "selfIs", filter: { kind: "object", ...(kwIf[1] === "has" ? { keywords: [kw] } : { notKeywords: [kw] }), text: `${kwIf[1] === "has" ? "with" : "without"} ${kwIf[2]}` } } : null;
+  const ifCond = kwCond ? kwCond : putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -2527,6 +2538,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
     return body ? { event: "selfCycled", body } : "fail";
   }
+  // "When you discard ~" (Titanbones, Towering Heart, Edgar's Awakening): the card's ability, wherever the discard put it
+  // (CR 701.9a; like cycling, CR 702.29c), its owner controlling it (CR 113.8).
+  const discarded = /^When you discard ~, (.+)$/.exec(line);
+  if (discarded) {
+    const body = parseBody(discarded[1]!, { selfCard: true });
+    return body ? { event: "selfDiscarded", body } : "fail";
+  }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   // "When you have 30 or more life, flip ~" (Rune-Tail), "When ~ has flying, flip it" (Student of Elements).
   // "When you control seven or more Thrulls, sacrifice ~" (Endrek Sahr).
@@ -2755,7 +2773,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Desmond Miles: "surveil X, where X is the amount of damage it dealt to that player": that much.
       if (event === "selfDealsCombatDamageToPlayer" && !/\bthat (?:much|many)\b/.test(text)) text = text.replace(/^([^X]*)\bX\b([^X]*), where X is the amount of damage (?:it|~) dealt to that player\.$/, "$1that many$2.");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const playerDealt = event === "youAreDealtDamage" || event === "youAreDealtCombatDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
+      const playerDealt = event === "youAreDealtDamage" || event === "youAreDealtCombatDamage" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented" || event === "chosenPlayerDealtDamage";
       // Sower of Discord: the trigger's player is the other chosen one (see effects/triggers.ts).
       if (event === "chosenPlayerDealtDamage") {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
@@ -2789,7 +2807,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line)) text = text.replace(/^((?:you may )?)return it to your hand\.$/, "$1return ~ to its owner's hand.");
       const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
       if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {
         const [tg, ...more] = body.targets;

@@ -514,6 +514,12 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
   const c = d.by?.chosen;
   if (c && !(ref && ref.object === c.id && (ref.zc === c.zc || (c.spell && ref.zc === c.zc + 1)))) return false;
   if (d.by?.other && isHolder) return false;
+  // Wall of Vapor: a creature the holder is blocking; Armored Transport: one blocking the holder.
+  if (d.by?.combatWithHolder) {
+    const o = ref ? s.objects[ref.object] : undefined;
+    const with_ = d.by.combatWithHolder === "blocked" ? h?.blocking : h?.blockedBy;
+    if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== ref!.zc || !with_?.includes(o.id)) return false;
+  }
   if (d.by?.filters && !d.by.filters.some((f) => (!f.spell || e.src.spell) && sourceMatches(s, bindChosen(f.spec, h?.chosen), e.src, d.you))) return false;
   const t = d.to;
   if (t) {

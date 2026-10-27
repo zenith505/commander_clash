@@ -21,7 +21,7 @@ function searchDest(text: string): SearchDest {
  * hand" (Cultivate), "then shuffle and put that card on top" (Vampiric Tutor).
  */
 export function parseSearch(s: string, count?: (text: string) => AmountExpr | null): Effect[] | null {
-  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|six|seven|eight|nine|ten|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
+  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|six|seven|eight|nine|ten|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then|exile) .+)$/i.exec(s);
   if (!m) return null;
   const upTo = !!m[1] || m[2] === "any number of";
   // "Up to X basic land cards" (New Frontiers): the X it was cast with. "X cards" (Insidious Dreams) too: as many as
@@ -90,6 +90,9 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
   const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : share ? { ...filter, text: `${filter.text} that share a land type` } : total ? { ...filter, text: `${filter.text} with total mana value ${total[1]} or less` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}), ...(total ? { totalMv: Number(total[1]) } : {}) };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
+  // Foresight, Manipulate Fate: "Search your library for three cards, exile them, then shuffle"; Selective Memory: "any
+  // number of nonland cards".
+  if (/^exile (?:them|it|that card), then shuffle$/i.test(rest) && !reveal) return [{ ...base, dest: { zone: "exile" }, away: true }];
   // "Put that card onto the battlefield attached to ~" (Light-Paws): an Aura, if it could enchant the source (rulings).
   if (filter?.subtypes?.length === 1 && filter.subtypes[0] === "Aura" && n === 1 && new RegExp(`^put ${SEARCH_PRONOUN} onto the battlefield attached to ~, then shuffle$`).test(rest)) return [{ ...base, dest: { zone: "battlefield", attachToSelf: true } }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the (?:other|rest) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)

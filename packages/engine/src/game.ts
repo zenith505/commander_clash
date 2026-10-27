@@ -2871,6 +2871,8 @@ function startNextTurn(s: GameState, skipping = false) {
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  // "Skips all combat phases of their next turn": this is that turn (CR 614.10).
+  for (const k of ap.skips ?? []) if (k.wholeTurn && k.turn === undefined) k.turn = s.turn;
   // The Second Doctor's bans: for this turn of theirs, those from before it over (Player.attackBansNextTurn).
   if (ap.attackBansNextTurn) {
     ap.attackBansNextTurn = ap.attackBansNextTurn.flatMap((b) => (b.turn === undefined ? [{ ...b, turn: s.turn }] : []));
@@ -3013,8 +3015,9 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
  */
 function takeSkip(s: GameState, pid: PlayerId, what: SkipWhat): boolean {
   const p = player(s, pid);
-  const i = p.skips?.findIndex((k) => k.what === what && (k.turn === undefined || k.turn === s.turn)) ?? -1;
+  const i = p.skips?.findIndex((k) => k.what === what && (k.turn === undefined ? !k.wholeTurn : k.turn === s.turn)) ?? -1;
   if (i < 0) return false;
+  if (p.skips![i]!.wholeTurn) return true; // every combat phase of that turn
   p.skips!.splice(i, 1);
   if (!p.skips!.length) p.skips = undefined;
   return true;
@@ -3045,6 +3048,15 @@ function beginStep(s: GameState, step: Step): void {
       }
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       dayNightUntapCheck(s); // CR 502.2
+      // "Lands you control don't untap during your next untap step": this is that step, for whatever they control now.
+      const noUntap = player(s, ap).noUntapNext;
+      if (noUntap) {
+        player(s, ap).noUntapNext = undefined;
+        for (const id of s.battlefield) {
+          const o = obj(s, id);
+          if (controllerOf(s, o) === ap && characteristics(s, o).types.some((t) => noUntap.includes(t))) o.skipNextUntap = true;
+        }
+      }
       // "You may choose not to untap ~": the active player decides which permanents will untap (CR 502.3).
       const may = s.battlefield.filter((id) => {
         const o = obj(s, id);
@@ -8076,14 +8088,20 @@ function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean,
   }
   // "Until your next turn, creatures can't attack you unless ..." (Summon: Yojimbo): the defender's own effects.
   for (const t of s.players[defender]?.attackTaxUntil ?? []) if (!planeswalker || t.planeswalkers) generic += t.n;
-  return { generic, mana };
+  return { generic: generic + ownAttackTax(s, attacker), mana };
+}
+
+/** Brainwash, Phyrexian Marauder: what attacking with this creature costs, whatever it attacks. */
+function ownAttackTax(s: GameState, attacker?: ObjectId): number {
+  const o = attacker !== undefined ? s.objects[attacker] : undefined;
+  return o?.zone === "battlefield" ? characteristics(s, o).ownAttackTax : 0;
 }
 
 /** What one attack costs: at a player, or at a planeswalker or battle (`planeswalker`, the permanent attacked). */
 export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: PlayerId; planeswalker?: ObjectId }): number {
   if (a.planeswalker === undefined) return attackTaxPer(s, a.defender, false, a.attacker);
   const pw = s.objects[a.planeswalker];
-  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : 0;
+  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : ownAttackTax(s, a.attacker);
 }
 
 /** What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d). */
@@ -8103,6 +8121,12 @@ export function attackCost(s: GameState, attacks: { attacker?: ObjectId; defende
   const mana: string[] = [];
   for (const a of attacks) {
     if (!attackTaxOf(s, a)) continue;
+    // Attacking a battle: only the attacker's own tax (attackTaxOf).
+    const pw = a.planeswalker !== undefined ? s.objects[a.planeswalker] : undefined;
+    if (pw && !(objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender)) {
+      generic += ownAttackTax(s, a.attacker);
+      continue;
+    }
     const parts = attackTaxParts(s, a.defender, a.planeswalker !== undefined, a.attacker);
     generic += parts.generic;
     mana.push(...parts.mana);

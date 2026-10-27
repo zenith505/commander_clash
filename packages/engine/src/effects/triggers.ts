@@ -1009,7 +1009,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       // Swarmborn Giant: "When you're dealt combat damage" (CR 510.2: all of it at once).
-      add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "youAreDealtCombatDamage" && you === ev.player && !!ev.combat) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "youAreDealtCombatDamage" && you === ev.player && !!ev.combat) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "opponentIsDealtNoncombatDamage" && you !== ev.player && !ev.combat) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
       // Sower of Discord: damage to one of the two chosen players; "that player" is the other one, who loses that much.
       const pair = o.chosen?.players;
       const other = pair?.length === 2 && pair.includes(ev.player) ? pair.find((p) => p !== ev.player) : undefined;
@@ -1732,6 +1732,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers, undefined, undefined, undefined, ev.x ?? 0);
+    // "When you discard ~": the same, for any discard (cycling is one, CR 702.29a).
+    if (card && card.zone !== "battlefield" && card.zone !== "hand") add(card, card.owner, (e) => e === "selfDiscarded", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "activated") {
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
     for (const id of s.battlefield) {

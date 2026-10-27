@@ -305,12 +305,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Rhystic Deluge: "Tap target creature unless its controller pays {1}", Excise: "Exile target attacking creature unless its
   // controller pays {X}", Plague Fiend: "destroy that creature unless its controller pays {2}" (the creature it dealt combat
   // damage to): that creature's controller decides as it resolves (CR 608.2d), as it last existed if it has left.
-  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile) (target (?:attacking )?creature|that creature) unless its controller (pays (?:\{[^}]+\})+)$/.exec(s))) {
+  // Crystal Shard: "Return target creature to its owner's hand unless its controller pays {1}".
+  if ((m = /^([Dd]estroy|[Tt]ap|[Ee]xile|[Rr]eturn) (target (?:attacking )?creature|that creature)( to its owner's hand)? unless its controller (pays (?:\{[^}]+\})+)$/.exec(s)) && !m[3] === !/^[Rr]eturn$/.test(m[1]!)) {
     const target = m[2] !== "that creature";
     if (!target && !ctx.subjectIt) return null;
     const before = ctx.targets.length;
-    const fx = parseSentence(`${capital(m[1]!)} ${m[2]}`, ctx);
-    const options = parsePunisherOptions(m[3]!, ctx);
+    const fx = parseSentence(`${capital(m[1]!)} ${m[2]}${m[3] ?? ""}`, ctx);
+    const options = parsePunisherOptions(m[4]!, ctx);
     if (!fx || fx.length !== 1 || !options || ctx.targets.length !== before + (target ? 1 : 0)) return null;
     const what = "what" in fx[0]! ? fx[0]!.what : undefined;
     if (!what || what.ref !== (target ? "target" : "subject")) return null;

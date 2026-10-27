@@ -641,6 +641,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(m[1]!);
     return filter?.kind === "spell" && filter.controller === "opponent" ? [{ type: "counterEach", filter: { ...filter, text: `each ${m[1]!}` } }] : null;
   }
+  // Reverse the Polarity: "Counter all other spells": every spell on the stack but this one, anyone's (CR 701.6a).
+  if (/^Counter all other spells$/.test(s) && ctx.spell) return [{ type: "counterEach", filter: { kind: "spell", types: [], notTypes: [], notColors: [], text: "all other spells" } }];
   // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".
   // Hydroelectric Specimen: "... target instant or sorcery spell with a single target to ~".
   if ((m = /^Change the target of target instant or sorcery spell with a single target to ~$/i.exec(s)))

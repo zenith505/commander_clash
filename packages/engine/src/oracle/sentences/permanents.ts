@@ -33,6 +33,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = each ? ({ ref: "created" } as ObjRef) : parseObject(fu[1]!, ctx);
     return what && (what.ref !== "target" || !what.n) && what.ref !== "each" ? [{ type: "attachEquipmentTo", what }] : null;
   }
+  // Energybending: "Lands you control gain all basic land types until end of turn": added to their other types, each with
+  // its mana ability (CR 305.6; rulings).
+  if ((fu = /^(.+?) gains? all basic land types until end of turn$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what && (what.ref === "each" || what.ref === "target") ? [{ type: "continuous", what, mods: [{ kind: "addTypes", types: [], subtypes: ["Plains", "Island", "Swamp", "Mountain", "Forest"] }], duration: "endOfTurn" }] : null;
+  }
   if (/^You have no maximum hand size until your next turn$/.test(s)) return [{ type: "noMaxHandSize", untilYourNextTurn: true }];
   // Illusion of Choice (CR 701.38): the votes of every vote this turn are this player's to make.
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
@@ -151,6 +157,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "~ becomes solved") return [{ type: "solve" }];
   if (s === "Harness ~") return [{ type: "harness" }];
   if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
+  // Wand of the Worldsoul: "The next spell you cast this turn has convoke" (CR 702.51), the same way.
+  if (s === "The next spell you cast this turn has convoke") return [{ type: "nextSpellImprovise", convoke: true }];
   // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
   if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you

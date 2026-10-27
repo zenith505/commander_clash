@@ -690,6 +690,8 @@ export interface Player {
   speed?: number;
   /** "The next spell you cast this turn has improvise" (Archway of Innovation): the turn it was made in, until a spell is cast. */
   nextSpellImprovise?: number;
+  /** "The next spell you cast this turn has convoke" (Wand of the Worldsoul): the same. */
+  nextSpellConvoke?: number;
   speedTurn?: number;
   /**
    * What this player gained until end of turn ("You gain shroud until end of turn", "you gain protection from the chosen
@@ -1350,6 +1352,8 @@ export interface GameEvent {
 export interface TurnLog {
   /** Cards each player cycled this turn (Valiant Rescuer's "for the first time each turn"). */
   cycled?: Record<number, number>;
+  /** Times each player investigated this turn (Erdwal Illuminator's "for the first time each turn"). */
+  investigated?: Record<number, number>;
   /**
    * The creatures that saddled each Mount this turn (CR 702.171c: tapped to pay its saddle cost), keyed by the Mount as
    * `id@zoneChanges`, each creature as `id@zoneChanges` (The Gitrog, Ravenous Ride: "a creature that saddled it this turn").
@@ -1417,6 +1421,8 @@ export interface TurnLog {
   artifactAbility?: Record<number, "mana" | "used">;
   /** Players who gained life (Needlebite Trap). */
   gainedLife?: PlayerId[];
+  /** Players who put a counter of any kind on a creature (Lasting Tarfire), as it entered too (CR 122.6). */
+  creatureCounterPutters?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */
   toGraveyard?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */

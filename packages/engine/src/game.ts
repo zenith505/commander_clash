@@ -4714,6 +4714,7 @@ export function lifeCostOffers(s: GameState, pid: PlayerId, id: ObjectId, x = 0)
 export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean {
   const d = defOf(s, o);
   if (compileCard(d).convoke) return true;
+  if (player(s, pid).nextSpellConvoke === s.turn) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     // "From exile": where it's cast from, the zone it's still in while it's paid for (CR 601.2a, 601.2g-h).
@@ -5339,6 +5340,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
   p.nextSpellImprovise = undefined; // it was the next spell cast (Archway of Innovation)
+  p.nextSpellConvoke = undefined; // and Wand of the Worldsoul's
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;

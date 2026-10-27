@@ -18292,6 +18292,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3d175a59-c1b4-43b8-8a1f-f7cbcefe130e",
+  "name": "Wand of the Worldsoul",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters tapped.\n{T}: Add {W}.\n{T}: The next spell you cast this turn has convoke.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "moc",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "05d24b0c-904a-46b6-b42a-96a4d91a0dd4",
   "name": "Wastes",
   "manaCost": "",

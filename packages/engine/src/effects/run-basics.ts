@@ -1,6 +1,6 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
-import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { addPhases, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -470,7 +470,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const k = milled.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).length;
       log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} from radiation${k ? `, ${k} of them nonland` : ""}.`);
       if (!k) return;
-      loseLife(s, p.id, k);
+      // Strong, the Brutish Thespian: they gain that much life instead (rulings).
+      const strong = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).radiationGains);
+      if (strong) {
+        gainLife(s, p.id, k);
+        log(s, `${p.name} gains ${k} life from radiation instead.`);
+      } else loseLife(s, p.id, k);
       p.rad = Math.max(0, (p.rad ?? 0) - k);
       log(s, `${p.name} removes ${k === 1 ? "a rad counter" : `${k} rad counters`}.`);
       return;
@@ -707,8 +712,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         for (const pid of players(s, e.who, ctx)) {
           const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
           if (n <= 0) continue;
+          // "Life lost this way" is what the life total actually lost: none if it can't change, twice under Bloodletter.
+          const before = player(s, pid).life;
           loseLife(s, pid, n);
-          total += n;
+          total += before - player(s, pid).life;
           log(s, `${player(s, pid).name} loses ${n} life.`);
         }
       });

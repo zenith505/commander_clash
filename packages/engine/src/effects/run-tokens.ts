@@ -372,6 +372,12 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Token doublers apply per player (CR 614.1a): "twice that many of those tokens". The tokens enter at the same time,
       // each player's too (CR 608.2f), so they see each other enter (CR 603.6a).
       enterTogether(s, () => createTokensFor(s, e, n, ctx, src, attackAt));
+      // Each investigation is one (CR 701.16a), however many Clues a doubler makes of it.
+      if (e.investigate) for (const pid of players(s, e.who, ctx)) for (let i = 0; i < n; i++) {
+        const done = ((s.turnLog ??= {}).investigated ??= {});
+        done[pid] = (done[pid] ?? 0) + 1;
+        fireEvent(s, { type: "investigated", player: pid, first: done[pid] === 1 });
+      }
       return;
     }
   }

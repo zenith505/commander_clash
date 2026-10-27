@@ -157,6 +157,8 @@ export type TriggerSourceEvent =
   | { type: "damagePreventedToPlayer"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
+  /** A player investigated (CR 701.16a), once for each time; `first`: their first time this turn. */
+  | { type: "investigated"; player: PlayerId; first: boolean }
   | { type: "foretold"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
   /** A player who wasn't the monarch became it (CR 725.3). */
@@ -971,6 +973,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFinalChapterResolves", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
+  } else if (ev.type === "investigated") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youInvestigate" && (!t.firstEachTurn || ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold" || ev.type === "becameMonarch") {
     const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : ev.type === "becameMonarch" ? "youBecomeMonarch" : "youCollectEvidence";
@@ -1907,6 +1914,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       batchWatch(w, controllerOf(s, w), abilitiesOf(s, w).triggers, false);
     }
+    // Duskmantle Guildmage: "Whenever a card is put into an opponent's graveyard from anywhere this turn" (CR 603.7b).
+    fromFloating((src, ctrl, triggers) => batchWatch(src, ctrl, triggers, false));
     // Infesting Radroach: a card's ability that works in its owner's graveyard, there after the event, even if it was
     // milled in the same event (rulings).
     fromGraveyards((o, owner) => batchWatch(o, owner, compileCard(defOf(s, o)).triggers, false));

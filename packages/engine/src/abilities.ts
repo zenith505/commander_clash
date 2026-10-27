@@ -1723,6 +1723,8 @@ export type StaticCondition =
   | { kind: "damagedByCreatures"; n: number }
   /** "If an opponent gained life this turn" (Needlebite Trap): whether or not they also lost life (rulings). */
   | { kind: "opponentGainedLife" }
+  /** "If you put a counter on a creature this turn" (Lasting Tarfire): of any kind, as it entered too (CR 122.6). */
+  | { kind: "youPutCounterOnCreature" }
   /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
   | { kind: "opponentCardsToGraveyard"; n: number }
   /**
@@ -2776,6 +2778,8 @@ export type Effect =
        * couldn't legally enchant that object (rulings on Roles).
        */
       attachTo?: ObjRef;
+      /** Investigate (CR 701.16a): a Clue token, made by investigating `n` times, each time an event (youInvestigate). */
+      investigate?: true;
     }
   /** Two kinds of tokens made by one instruction (Wurmcoil Engine): they enter at the same time (CR 608.2f). */
   | { type: "together"; effects: Effect[] }
@@ -3240,8 +3244,11 @@ export type Effect =
   | { type: "solve" }
   /** "Harness ~" (CR 701.64a): if it isn't harnessed, it becomes harnessed; its "∞ —" abilities then work (702.186b). */
   | { type: "harness" }
-  /** "The next spell you cast this turn has improvise" (Archway of Innovation, CR 702.126): used up by the next spell cast. */
-  | { type: "nextSpellImprovise" }
+  /**
+   * "The next spell you cast this turn has improvise" (Archway of Innovation, CR 702.126): used up by the next spell cast.
+   * `convoke`: "... has convoke" (Wand of the Worldsoul, CR 702.51) instead.
+   */
+  | { type: "nextSpellImprovise"; convoke?: true }
   /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
   /** `convert`: "convert ~" (CR 701.28a), which works just as transforming does. */
   | { type: "transform"; what: ObjRef; convert?: true }
@@ -3980,6 +3987,8 @@ export type TriggerEvent =
   | "youExpend"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
   | "youCollectEvidence"
+  /** "Whenever you investigate" (CR 701.16a), once for each time; `firstEachTurn`: only your first time each turn. */
+  | "youInvestigate"
   /** "Whenever you foretell a card" (Dream Devourer): exiling one from your hand with foretell, not casting it later (rulings, CR 702.143a). */
   | "youForetell"
   | "youFinalChapterResolves" // Narci, Fable Singer: the final chapter ability of a Saga you control finished resolving; the event's amount is the Saga's mana value
@@ -5422,6 +5431,13 @@ export interface CompiledCard {
   doubleLifeGainIf?: StaticCondition;
   /** "If an opponent would lose life during your turn, they lose twice that much life instead" (Bloodletter of Aclazotz). */
   opponentsLoseDouble?: true;
+  /**
+   * "You may look at an additional two cards each time you surveil" (Enhanced Surveillance, CR 701.25): that many more
+   * cards in each surveil of its controller's; they're part of what's surveilled (rulings), and each one adds its own.
+   */
+  surveilMore?: number;
+  /** "You gain life rather than lose life from radiation" (Strong, the Brutish Thespian; CR 728.1, 614.1a). */
+  radiationGains?: true;
   /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
   opponentsDrawOnce?: true;
   /** "Each player can't draw more than one card each turn" (Spirit of the Labyrinth). */

@@ -490,7 +490,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // about the source or about the object the trigger was about, with no targets of its own.
   // "At the beginning of the next end step, sacrifice it" (Apprentice Necromancer, Momo's Heist): the same instruction.
   if ((m = /^At the beginning of (the|your) next end step, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[2]!)) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} at the beginning of ${m[1]} next end step`, ctx);
-  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step|the beginning of (?:the|your) next end step)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
+  // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
+  // next upkeep (only instructions about you, below).
+  if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);
+  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step|the beginning of (?:the|your) next end step|the beginning of your next upkeep)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
     const before = ctx.targets.length;
     // "Sacrifice it", "its controller sacrifices it" (Celestial Sword): only a permanent its controller controls then
     // (CR 701.21a), or whoever controls it then. In an activated ability of a permanent that names nothing else before
@@ -524,14 +527,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
       if (y.type === "delayed") players = false;
     }
-    const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
+    const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : /upkeep/.test(m[2]!) ? "yourNextUpkeep" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
     // "Discard three cards at the beginning of the next end step" (Ideas Unbound), "create a 4/4 red Bird creature token
     // with flying at the beginning of the next end step" (Rukh Egg), "you lose the game" (Glorious End): about no object,
     // only its controller.
     // "Untap up to two lands" (Teferi, Hero of Dominaria): chosen then (rulings).
     if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame", "untapUpTo"].includes(y.type)))
       return [{ type: "delayed", when, effects: inner, text: m[1]! }];
-    if (!players || refs.size !== 1) return null;
+    if (!players || refs.size !== 1 || when === "yourNextUpkeep") return null;
     const [ref] = refs;
     // "Target creature you control gets +2/+2 until end of turn. Return it to its owner's hand at the beginning of the next
     // end step" (Dragon Mask), "Sacrifice those creatures ..." (Tears of Rage, Wake the Dead), "Exile that token ..."

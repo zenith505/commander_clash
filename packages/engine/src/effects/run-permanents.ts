@@ -26,6 +26,8 @@ import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../k
 export function transformPermanent(s: GameState, o: GameObject, byDayNight = false, convert = false): boolean {
   const d = s.cards[o.cardId];
   if (o.zone !== "battlefield" || o.faceDown || !d?.faces || d.faces.length !== 2 || (d.layout !== "transform" && d.layout !== "modal_dfc")) return false;
+  // "Can't transform" (Bound by Moonsilver): not by any effect, daybound and nightbound too, nor convert (CR 701.28f).
+  if (characteristics(s, o).cantTransform) return false;
   // A daybound or nightbound permanent transforms only as day and night say (CR 702.145b, e).
   if (!byDayNight && (objHasKeyword(s, o, "Daybound") || objHasKeyword(s, o, "Nightbound"))) return false;
   const to = o.face === 1 ? 0 : 1;
@@ -51,7 +53,7 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
  * (CR 701.27f).
  */
 function transformToken(s: GameState, me: GameObject): boolean {
-  if (me.zone !== "battlefield" || !me.isToken || me.copyOf || me.copyEffects?.length) return false;
+  if (me.zone !== "battlefield" || !me.isToken || me.copyOf || me.copyEffects?.length || characteristics(s, me).cantTransform) return false;
   const front = defOf(s, me);
   const back = front.tokenBack;
   if (!back) return false;

@@ -271,6 +271,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
   }
+  // Dramatic Accusation: "Shuffle enchanted creature into its owner's library": the permanent it's attached to.
+  if (/^[Ss]huffle enchanted creature into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "attached" } }];
   // "Shuffle any number of target cards from your graveyard into your library" (Perpetual Timepiece, Piper's Melody),
   // "... up to four target cards ..." (Cathartic Parting): those cards, then your library is shuffled even with no
   // target chosen (rulings on Perpetual Timepiece). Not when every target chosen has become illegal (CR 608.2b).

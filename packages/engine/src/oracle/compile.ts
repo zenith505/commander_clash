@@ -2578,6 +2578,20 @@ export function compile(d: CardDef): CompiledCard {
       out.mayNotUntap = true; // CR 502.3
       continue;
     }
+    // Ugin's Conjurant, Polukranos, Unchained: "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent
+    // that damage and remove that many +1/+1 counters from ~" (CR 615.5): see dealDamage.
+    if (/^If damage would be dealt to ~ while it has a \+1\/\+1 counter on it, prevent that damage and remove that many \+1\/\+1 counters from (?:~|it)\.$/.test(line)) {
+      out.counterShield = true;
+      continue;
+    }
+    // Polukranos, Unchained: "~ enters with six +1/+1 counters on it. It escapes with twelve +1/+1 counters on it
+    // instead." One replacement effect with two amounts (CR 614.1c, 702.138c).
+    const escInstead = new RegExp(`^~ enters with ${NUM} \\+1/\\+1 counters on it\\. It escapes with ${NUM} \\+1/\\+1 counters on it instead\\.$`).exec(line);
+    if (escInstead) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: num(escInstead[1]!), escaped: num(escInstead[2]!) };
+      continue;
+    }
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
     if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
       out.phantom = true;
@@ -3581,6 +3595,7 @@ export function compile(d: CardDef): CompiledCard {
   const kinds = (costs: AdditionalCost[] = []) => costs.map((c) => c.kind);
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
+  if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
   // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
   const overload = out.altCosts?.find((a) => a.kind === "overload");

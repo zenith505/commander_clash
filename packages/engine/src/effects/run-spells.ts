@@ -905,15 +905,28 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     if (s.resolving) s.resolving.unlessPaid = paid;
     if (paid) return;
   }
+  // Hinder: "put that card on your choice of the top or bottom of its owner's library": the countering spell's controller
+  // chooses as it resolves (rulings); a copy just ceases to exist (CR 707.10a).
+  let bottom = false;
+  if (instead === "libraryChoice") {
+    const o = item.objectId ? s.objects[item.objectId] : undefined;
+    const sc = (s.resolving!.scratch ??= {});
+    if (o && !o.spellCopy && !sc.topOrBottom) {
+      s.pending = { kind: "chooseOption", player: ctx.controller, source: by, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], about: o.id, prompt: `put ${defOf(s, o).name} on the top or bottom of ${player(s, o.owner).name}'s library?` };
+      return "paused";
+    }
+    bottom = sc.topOrBottom === "bottom";
+    sc.topOrBottom = undefined;
+  }
   s.stack.splice(i, 1);
   const spent = item.objectId ? s.objects[item.objectId]?.manaSpent : undefined;
-  if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead === "hand" ? "hand" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
+  if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead === "hand" ? "hand" : instead ? "library" : "graveyard", instead === "libraryTop" || (instead === "libraryChoice" && !bottom) ? { top: true } : {});
   // "Discover X, where X is that spell's mana value" (Hurl into History): with the X chosen for it (CR 202.3e, rulings).
   const gone = item.objectId && s.objects[item.objectId];
   // "The amount of mana spent to cast that spell" (Mana Sculpt): as it was on the stack.
   if (gone && (item.x || spent) && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x ?? 0, ...(spent ? { manaSpent: spent } : {}) };
   if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
-  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : instead ? " and puts it on top of its owner's library" : ""}.`);
+  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
   if (item.kind === "spell") fireEvent(s, { type: "spellCountered", by: ctx.controller });
 }

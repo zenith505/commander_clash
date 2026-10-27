@@ -497,9 +497,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const f = c.controlling;
         return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && objectMatches(s, f, s.objects[id]!, ctx.controller, false))).length;
       }
-      if (c.fewerCreaturesThanYou) {
+      if (c.fewerCreaturesThanYou || c.moreCreaturesThanYou) {
         const creatures = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && characteristics(s, s.objects[id]!).types.includes("Creature")).length;
-        return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && creatures(pid) < creatures(ctx.controller)).length;
+        return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && (c.moreCreaturesThanYou ? creatures(pid) > creatures(ctx.controller) : creatures(pid) < creatures(ctx.controller))).length;
       }
       if (c.moreLandsThanYou !== undefined) {
         const lands = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && characteristics(s, s.objects[id]!).types.includes("Land")).length;
@@ -878,7 +878,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":

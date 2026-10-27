@@ -318,6 +318,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Goad each creature that had a double strike counter put on it this way" (Spectacular Showdown).
   const hadPut = /^each creature that had an? (\+1\/\+1|double strike) counter put on it this way$/i.exec(x);
   if (hadPut) return { ref: "countersPutThisWay", kind: hadPut[1]!.toLowerCase() };
+  // Urge to Feed: "each permanent tapped this way" (the body's reading of "each of those Vampires" after tapping them).
+  if (ctx.tappedThisWay && /^each permanent tapped this way$/i.test(x)) return { ref: "tappedThisWay" };
   // Lost in the Maze: "Tap X target creatures. Put a stun counter on each of those creatures you don't control."
   if (/^each of those creatures you don't control$/i.test(x) && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, notYours: true };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;

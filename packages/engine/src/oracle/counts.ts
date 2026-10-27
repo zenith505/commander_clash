@@ -121,6 +121,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = m[1] === "X" ? { count: { kind: "x" } as Count } : parseCount(m[1]!, ctx);
     return round && c && !c.half && !c.negate ? { ...c, half: round } : null;
   }
+  // Skanos Dragonheart: "the greatest power among other Dragons you control and Dragon cards in your graveyard": the
+  // greater of the two (0 with neither).
+  if (!each && (m = /^the greatest power among ((?:other )?(?:creatures|[A-Z][a-z]+s) you control) and ((?:creature|[A-Z][a-z]+) cards) in your graveyard$/i.exec(p))) {
+    const a = parseCount(`the greatest power among ${m[1]}`, ctx);
+    const filter = parseSearchFilter(m[2]!.replace(/cards$/, "card"));
+    if (!a || a.times || a.plus || a.half || a.negate || filter?.kind !== "card") return null;
+    return { count: { kind: "greater", of: [a.count, { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...filter, text: m[2]!.replace(/cards$/, "card") }, greatestPower: true }] } };
+  }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
   // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.
@@ -255,6 +263,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Malignus: "the highest life total among your opponents" (those still in the game).
   if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
+  // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too).
+  if (/^the highest life total among players$/i.test(p)) return count({ kind: "life", who: { ref: "eachPlayer" }, highest: true });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
@@ -292,6 +302,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who has more cards in (?:their )?hand than you$/i.test(p)) return count({ kind: "players", opponents: true, handMoreThanYou: true });
   // Birth of the Imperium: "for each opponent who controls fewer creatures than you", counted as it resolves.
   if (each && /^opponent who controls fewer creatures than you$/i.test(p)) return count({ kind: "players", opponents: true, fewerCreaturesThanYou: true });
+  // Heidegger, Shinra Executive: "the number of opponents who control more creatures than you", counted as it resolves.
+  if (/^(?:the number of )?opponents? who controls? more creatures than you$/i.test(p)) return count({ kind: "players", opponents: true, moreCreaturesThanYou: true });
   // Surveyor's Scope: "the number of players who control at least two more lands than you", counted as it resolves.
   if (each && (m = /^players? who controls? at least (one|two|three) more lands? than you$/i.exec(p))) return count({ kind: "players", moreLandsThanYou: num(m[1]!) });
   // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.

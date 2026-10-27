@@ -896,7 +896,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       // Cat Collector: "for the first time during each of your turns".
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youGainLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)) && (!t.firstEachTurn || !!ev.first) && (!t.orLoseLife || s.activePlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
     // "Whenever you gain life this turn, ..." (Vizkopa Guildmage): a delayed trigger of its controller's (CR 603.7b, d).
@@ -1002,7 +1002,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }, undefined, undefined, undefined, undefined, undefined, undefined, { lifeBatch: ev.batch, lifeEach: { [ev.player]: ev.amount } });
       if (you !== ev.player)
         add(o, you, (e, t) => e === "opponentsLoseLife" && !s.triggerQueue.some((q) => q.sourceId === o.id && q.event?.lifeBatch !== undefined && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text), undefined, undefined, undefined, undefined, undefined, undefined, { ...(ev.batch !== undefined ? { lifeBatch: ev.batch } : {}) });
-      else add(o, you, (e, t) => e === "youLoseLife" && (!t.firstEachTurn || !!ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      else add(o, you, (e, t) => (e === "youLoseLife" && (!t.firstEachTurn || !!ev.first)) || (e === "youGainLife" && !!t.orLoseLife && s.activePlayer === you), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
   } else if (ev.type === "playerDealtDamage") {
@@ -1420,6 +1420,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
+      // Toxin Sliver: "Whenever a Sliver deals combat damage to a creature": anyone's, as it deals the damage.
+      if (ev.combat)
+        for (const id of s.battlefield) {
+          const w = obj(s, id);
+          const wc = controllerOf(s, w);
+          add(w, wc, (e, t) => e === "creatureDealsCombatDamageToCreature" && !!t.dealer && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, hit, undefined, undefined, undefined, info);
+        }
     }
   } else if (ev.type === "spellDealtDamage") {
     // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in

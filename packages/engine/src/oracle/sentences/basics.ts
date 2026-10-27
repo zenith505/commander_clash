@@ -186,7 +186,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Fertilid: "Target player searches their library for a basic land card, puts it onto the battlefield tapped, then
   // shuffles": that player searches, and must (CR 701.23).
-  if ((m = /^([Tt]arget player|[Tt]arget opponent) searches their library for (.+?), puts (it|that card) onto the battlefield( tapped)?, then shuffles$/.exec(s))) {
+  // Restorative Technique: "Target player gains 2 life, then searches ...": "That player searches ..." then.
+  if ((m = /^([Tt]arget player|[Tt]arget opponent|That player) searches their library for (.+?), puts (it|that card) onto the battlefield( tapped)?, then shuffles$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     const fx = who && parseSearch(`Search your library for ${m[2]!}, put ${m[3]} onto the battlefield${m[4] ?? ""}, then shuffle`);
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;

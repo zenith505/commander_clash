@@ -2035,6 +2035,8 @@ export interface Resolving {
   sacrificedThisWay?: LastKnown[];
   /** "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents a pick put counters on. */
   countersPutThisWay?: { id: ObjectId; zc: number; kind?: string }[];
+  /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
+  tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
   /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */

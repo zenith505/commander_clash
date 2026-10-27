@@ -159,6 +159,8 @@ export type TriggerSourceEvent =
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "foretold"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
+  /** A player who wasn't the monarch became it (CR 725.3). */
+  | { type: "becameMonarch"; player: PlayerId }
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
@@ -216,7 +218,7 @@ export type TriggerSourceEvent =
   /** With `planeswalker`, the damage was dealt to that planeswalker, and `player` controls it. */
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId; /** Dealt to a battle instead, `player` its protector. */ battle?: ObjectId }
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
-  | { type: "wasDealtDamage"; id: ObjectId; amount: number }
+  | { type: "wasDealtDamage"; id: ObjectId; amount: number; /** Combat damage (a batch is all combat damage or none, CR 510.2). */ combat?: true }
   /** The damage one source dealt a permanent in one event (Phyrexian Obliterator), and that source's controller. */
   | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId }
   /** A permanent dealt damage to a player, in combat or not. */
@@ -949,8 +951,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFinalChapterResolves", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
-  } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold") {
-    const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : "youCollectEvidence";
+  } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold" || ev.type === "becameMonarch") {
+    const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : ev.type === "becameMonarch" ? "youBecomeMonarch" : "youCollectEvidence";
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
@@ -1457,7 +1459,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage" || (e === "selfIsDealtNoncombatDamage" && !ev.combat), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
       // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
       for (const id of s.battlefield) {
@@ -1576,6 +1578,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;
         if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
+        if (t.cast.notFirst && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length < 2) return false;
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         // Alania: the first spell of one of these kinds its caster has cast this turn, this one (a copy wasn't cast).
         if (t.cast.firstOfKinds) {

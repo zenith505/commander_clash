@@ -334,6 +334,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.scratch?.punished ?? []).filter((p) => !s.players[p]!.lost).length;
     case "stateIf":
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
+    case "creaturesLeftThisTurn":
+      return s.turnLog?.creaturesLeft?.[ctx.controller] ?? 0;
     case "diedThisTurn":
       if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => d.all || d.subtypes.includes(c.subtype!)).length;
       return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
@@ -447,6 +449,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.drawing ? s.resolving.drawnBefore : s.resolving?.drawnThisWay)?.length ?? 0;
     case "asCast":
       return s.resolving?.item.asCast ?? evalCount(s, c.of, ctx);
+    case "discardedMatching":
+      return (s.resolving?.discardedAll ?? []).filter((id) => !!s.objects[id] && printedMatches(c.filter, defOf(s, s.objects[id]!))).length;
     case "discardedTypes":
       return new Set((s.resolving?.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size;
     case "snowSpent":
@@ -479,6 +483,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       if (c.lifeLessThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.life < (s.players[ctx.controller]?.life ?? 0)).length;
       if (c.handMoreThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length > (s.players[ctx.controller]?.hand.length ?? 0)).length;
+      if (c.handAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length >= c.handAtLeast!).length;
       if (c.handAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length <= c.handAtMost!).length;
       // Smuggler's Share: players still in the game, by what they did this turn.
       if (c.drewAtLeast !== undefined || c.landsEnteredAtLeast !== undefined)
@@ -835,7 +840,9 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+    case "creaturesLeftThisTurn":
+      return "#creatures that left the battlefield under your control this turn";
     case "diedThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}${c.subtype ?? "creature"}s that died this turn`;
     case "plusOnesPutThisTurn":
@@ -958,6 +965,8 @@ function describeCount(c: Count): string {
       return `${describeCount(c.of)} as cast`;
     case "discardedTypes":
       return "#card types discarded";
+    case "discardedMatching":
+      return `#${c.filter.text}s discarded`;
     case "flipsWon":
       return "flips won";
     case "mutations":

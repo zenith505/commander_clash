@@ -25,6 +25,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
+  // Mana Cannons: "where X is the number of colors that spell is", in a cast trigger: as Ramos's "that spell's colors".
+  if (/^the number of colors that spell is$/i.test(p) && ctx?.castSpell) return { count: { kind: "castSpellColors" } };
   // "The number of other Squirrels, Bats, Lizards, and Rats you control" (Valley Rotcaller): each that's any of them,
   // counted once, as "A or B" is.
   if ((m = /^(the number of (?:other )?)((?:[A-Z][a-z]+, )+)(?:and|or) ([A-Z][a-z]+)( you control)$/.exec(p))) {
@@ -38,7 +40,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // control named ~": the same count.
   if (each && (m = /^((?:other )?)creature you control named ~$/.exec(p))) return parseCount(`the number of ${m[1]}creatures you control named ~`, ctx);
   // Hare Apparent: "the number of other creatures you control named ~": with the source's name (CR 201.5), as it is now.
-  if ((m = /^(the number of (?:other )?creatures you control) named ~$/.exec(p))) {
+  if ((m = /^(the number of (?:other )?(?:creatures|permanents) you control) named ~$/.exec(p))) {
     const c = parseCount(m[1]!, ctx);
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
@@ -280,6 +282,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who has less life than you$/i.test(p)) return count({ kind: "players", opponents: true, lifeLessThanYou: true });
   // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.
   if (each && (m = /^opponent who has (one|two|three|zero|no) or fewer cards in hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtMost: m[1] === "no" ? 0 : num(m[1]!) });
+  // Wolfcaller's Howl: "the number of your opponents with four or more cards in hand", counted as it resolves.
+  if (each && (m = /^(?:your )?opponents? (?:with|who ha(?:s|ve)) (one|two|three|four|five|six|seven) or more cards in (?:their )?hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtLeast: num(m[1]!) });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
@@ -291,6 +295,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Seasoned Pyromancer: "for each nonland card discarded this way".
+  if (each && (m = /^(non[a-z]+|creature|land|artifact|instant|sorcery|enchantment) card discarded this way$/i.exec(p))) {
+    const filter = parseSearchFilter(`${m[1]!.toLowerCase()} card`);
+    return filter?.kind === "card" ? count({ kind: "discardedMatching", filter: { ...filter, text: `${m[1]!.toLowerCase()} card` } }) : null;
+  }
   // Dread Summons: "Each player mills X cards. For each creature card put into a graveyard this way, ...": the milled
   // cards that went there (one replaced to go elsewhere doesn't count, rulings).
   if (each && ctx?.afterAnyMill && (m = /^(.+? card) (?:put into a graveyard this way|milled this way)$/i.exec(p))) {
@@ -304,6 +313,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
+  if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
   if ((m = /^(nontoken )?creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[2] ? { yours: true as const } : {}), ...(m[1] ? { nontoken: true as const } : {}) });
   // The Zubera: "for each Zubera that died this turn", any player's.
   if ((m = /^([A-Z][a-z]+) that died this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "diedThisTurn", subtype: m[1]! });

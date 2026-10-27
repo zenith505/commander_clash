@@ -64,7 +64,7 @@ export const isGroup = (r: ObjRef) => r.ref === "allCreatures" || r.ref === "eac
 export const isSeveral = (r: ObjRef) => r.ref === "target" && (r.n ?? 1) > 1;
 
 /** "Each player discards their hand, then draws seven cards": one sentence, for the subject (see parseSpellsSentence). */
-export const WHEEL = /^(?:.+? )?discards? (?:all the cards in )?(?:your|their|his or her) hand, then draws? /i;
+export const WHEEL = /^(?:(?:.+? )?discards? (?:all the cards in )?(?:your|their|his or her) hand|Each player discards any number of cards), then (?:draws? |creates that many )/i;
 
 /**
  * What "... was spent to cast ~" asks of the mana spent (CR 601.2h): "{U}", "{U}{B}" (some of each), "at least three

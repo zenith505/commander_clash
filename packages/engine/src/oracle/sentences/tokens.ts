@@ -318,6 +318,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Proliferate X times$/.test(s) && (ctx.whereX || ctx.spell)) return [{ type: "proliferate", n: amt("X") }];
   // Populate (CR 701.36): copy a creature token you control, not targeted; with none, nothing happens.
   if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
+  // Full Flowering: "Populate X times": one populate after another, each able to copy a token an earlier one made.
+  if (/^Populate X times$/i.test(s) && ctx.spell) return [{ type: "repeat", n: X, effects: [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }] }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
   // Blink: "Exile target creature you control, then return it to the battlefield under its owner's control".
   // "Exile ~, then return it to the battlefield transformed under your control" (a Saga's last chapter): with its back
@@ -354,6 +356,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Explore (CR 701.44)
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];
+  // Jadelight Spelunker: "When ~ enters, it explores X times": X explores one after another (CR 701.44), X as it was cast.
+  if (/^(?:~|it) explores X times$/i.test(s) && (ctx.selfIt || /^~/.test(s)) && !ctx.spell) return [{ type: "repeat", n: X, effects: [{ type: "explore" }] }];
   // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you.
   if ((m = /^(target creature you control|it|that creature) explores$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

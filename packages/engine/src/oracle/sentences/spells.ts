@@ -169,6 +169,18 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const inner = parseSpellsSentence(`Discard your hand, then draw ${m[1]}`, ctx);
     return inner ? [{ type: "may", effects: inner, text: `discard your hand, then draw ${m[1]}` }] : null;
   }
+  // Flux: "Each player discards any number of cards, then draws that many cards": each chooses how many in APNAP order,
+  // they discard at the same time (CR 101.4), then each draws as many as they discarded.
+  if (/^Each player discards any number of cards, then draws that many cards$/.test(s))
+    return [{ type: "discard", who: { ref: "eachPlayer" }, n: 99, upTo: true }, { type: "draw", who: { ref: "eachPlayer" }, n: { count: { kind: "discardedThisWay", who: { ref: "eachOne" } } } }];
+  // Awaken the Erstwhile: "Each player discards all the cards in their hand, then creates that many 2/2 black Zombie
+  // creature tokens": each as many as they discarded themselves, all of them created at once after the discards.
+  if ((m = /^Each player discards all the cards in their hand, then creates that many (.+ tokens?)$/.exec(s))) {
+    const fx = parseSentence(`Create two ${m[1]}`, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    if (tok?.type !== "createToken" || tok.who.ref !== "you" || tok.n !== 2 || tok.tapped || tok.attacking || tok.counters || tok.attachTo) return null;
+    return [{ type: "discard", who: { ref: "eachPlayer" }, n: 0, hand: true }, { ...tok, who: { ref: "eachPlayer" }, n: { count: { kind: "discardedThisWay", who: { ref: "eachOne" } } } }];
+  }
   if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s)) && !/^Counter .+ unless /i.test(s)) {
     const who = /^Discard$/i.test(m[1]!) ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/ discards?$/i, ""), ctx);
     if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
@@ -340,6 +352,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (a?.ref !== "target" || a.n) return null;
     const to = parseDamageRecipient(m[2]!, ctx);
     return to?.ref === "anyTarget" ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, also: [{ ref: "target", index: a.index }], by: { target: a.index } }] : null;
+  }
+  // "Target creature you control deals damage equal to its power to target player" (Gravitic Punch): from that creature,
+  // its power as this resolves; none if either target is illegal (rulings).
+  if ((m = /^(Target creature you control) deals damage equal to its power to (target (?:player|opponent))$/.exec(s))) {
+    const a = parseObject(m[1]!.toLowerCase(), ctx);
+    if (a?.ref !== "target" || a.n) return null;
+    const to = parseDamageRecipient(m[2]!, ctx);
+    return to?.ref === "target" && !to.n ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
   }
   // "Target creature you control deals damage equal to twice its power to target creature you don't control" (Polliwallop).
   if ((m = /^(target creature you control) deals damage equal to twice its power to (target .+)$/i.exec(s))) {

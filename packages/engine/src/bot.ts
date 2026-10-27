@@ -1881,8 +1881,6 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   }
   // Doomsday exiles all but five cards of our library and graveyard: a combo piece bots have no plan for.
   if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "search" && e.exileRest)) return null;
-  // Morality Shift: our library goes to the graveyard, so only when the graveyard is the bigger pile.
-  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "exchangeGraveyardLibrary") && player(s, pid).graveyard.length <= player(s, pid).library.length) return null;
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   if (lifeSwapHurts(s, pid, compileCard(d).spell?.effects ?? [])) return null;

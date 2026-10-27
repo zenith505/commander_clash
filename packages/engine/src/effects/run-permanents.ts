@@ -240,22 +240,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Chosen as it resolves among the tapped ones (CR 608.2d), then untapped together.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      if (chooser === undefined || player(s, chooser).lost) return;
-      if (!sc.chosen?.[chooser]) {
+      const who = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (who === undefined) return;
+      if (!sc.chosen?.[who]) {
         const n = amountNow(s, e.n, ctx);
-        const options = s.battlefield.filter((id) => obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), chooser, false));
+        const options = s.battlefield.filter((id) => obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), who, false));
         if (n <= 0 || !options.length) return;
-        sc.queue = [chooser];
+        sc.queue = [who];
         sc.chosen = {};
-        s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "untap", what: `tapped ${e.filter.text}`, options, count: Math.min(n, options.length), min: 0 };
+        s.pending = { kind: "pickPermanents", player: who, source: src, action: "untap", what: `tapped ${e.filter.text}`, options, count: Math.min(n, options.length), min: 0 };
         return "paused";
       }
-      const ids = sc.chosen[chooser]!;
+      const ids = sc.chosen[who]!;
       sc.chosen = undefined;
       sc.queue = undefined;
       for (const id of ids) if (s.objects[id]?.zone === "battlefield") untapPermanent(s, obj(s, id));
-      if (ids.length) log(s, `${player(s, chooser).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      if (ids.length) log(s, `${player(s, who).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       return;
     }
     case "tapAnyNumber": {

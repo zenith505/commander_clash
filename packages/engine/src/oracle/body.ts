@@ -970,6 +970,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Lunar Force: "sacrifice ~ and counter that spell": two instructions; the spell is countered even if ~ is already gone
   // (rulings).
   text = text.replace(/^sacrifice ~ and counter that spell\.$/, "Sacrifice ~. Counter that spell.");
+  // The Thanos-Copter: "Vehicles you control become artifact creatures until end of turn": each one (CR 301.7b), the ones
+  // there as it resolves (CR 611.2c).
+  text = text.replace(/^Vehicles you control become artifact creatures until end of turn\.$/, "Each Vehicle you control becomes an artifact creature until end of turn.");
+  // Does Machines: "mill two cards, draw two cards, then discard two cards": one after another.
+  text = text.replace(/^([Mm]ill (?:a card|\w+ cards)), (draw (?:a card|\w+ cards), then discard (?:a card|\w+ cards))\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
+  // Spoils of Victory: "Search your library for a ... card and put that card onto the battlefield. Then shuffle." is the
+  // usual "..., put it onto the battlefield, then shuffle."
+  text = text.replace(/^(Search your library for an? [^.]+? card) and put that card onto the battlefield\. Then shuffle\.$/, "$1, put it onto the battlefield, then shuffle.");
   // Teyo, Lightshield Expert: "Put a +1/+1 counter on it if it's a creature. Put a loyalty counter on it if it's a
   // planeswalker.": each checked as it resolves (CR 608.2c); both if it's both (rulings).
   text = text.replace(/(^|\. )Put (an? [+\-/0-9a-z]+ counter) on it if it's an? (creature|planeswalker)(?=\.)/g, "$1If it's a $3, put $2 on it");
@@ -1477,6 +1485,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^([Pp]ut an? [^.]+? counter on ~) and add ((?:\{[WUBRGC]\})+)\.$/, "$1. Add $2.");
   // "That creature also gains trample until end of turn if you control a creature with power 4 or greater" (Temur Battle
   // Rage): checked as it resolves (CR 608.2c).
+  // Invincible Hymn: "Count the number of cards in your library. Your life total becomes that number.": counted as it
+  // resolves (CR 119.5).
+  text = text.replace(/^Count the number of cards in your library\. Your life total becomes that number\.$/, "Your life total becomes the number of cards in your library.");
+  // Grim Giganotosaurus: "destroy all artifacts and creatures other than ~": the same as "all other artifacts and creatures".
+  text = text.replace(/^([Dd]estroy) all ([a-z]+s(?: and [a-z]+s)?) other than ~\.$/, "$1 all other $2.");
+  // Patron of the Orochi: "Untap all Forests and all green creatures.": each of them (a green Forest creature once).
+  text = text.replace(/^Untap all ([A-Z][a-z]+s) and all (white|blue|black|red|green) creatures\.$/, "Untap all $1. Untap all $2 creatures.");
+  // See Beyond: "Draw two cards, then shuffle a card from your hand into your library.": two instructions, in order.
+  text = text.replace(/^Draw (\w+) cards, then shuffle (a|one|two) cards? from your hand into your library\.$/, (all, n, k) => `Draw ${n} cards. Shuffle ${k} card${k === "a" || k === "one" ? "" : "s"} from your hand into your library.`);
+  // Savage Punch: "Target creature you control fights target creature you don't control. The creature you control gets
+  // +2/+2 until end of turn before it fights if you control a creature with power 4 or greater.": the bonus first,
+  // checked as it resolves (CR 608.2c; rulings), then the fight.
+  text = text.replace(/^Target creature you control fights target creature you don't control\. The creature you control gets (\+\d+\/\+\d+) until end of turn before it fights if (you control a creature with power 4 or greater)\.$/, "If $2, target creature you control gets $1 until end of turn. It fights target creature you don't control.");
   // Marcus, Mutant Mayor: "draw a card if that creature has a +1/+1 counter on it. If it doesn't, put a +1/+1 counter
   // on it": one condition, checked as it resolves (CR 608.2c).
   text = text.replace(/^[Dd]raw a card if (that creature has an? [^.]+? counter on it)\. If it doesn't, ([^.]+)\.$/, "If $1, draw a card. Otherwise, $2.");
@@ -1539,8 +1560,6 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Patron of the Orochi: "Untap all Forests and all green creatures": each of them once, whichever group it's in (an
   // untapped permanent can't untap again), so one group after the other is the same.
   text = text.replace(/(^|\. )Untap all (Plains|Islands|Swamps|Mountains|Forests) and all ((?:white|blue|black|red|green) creatures)\./, "$1Untap all $2. Untap all $3.");
-  // Grim Giganotosaurus: "destroy all artifacts and creatures other than ~": every other one.
-  text = text.replace(/\ball artifacts and creatures other than ~/g, "all other artifacts and creatures");
   // Insurrection: "Untap all creatures and gain control of them until end of turn. They gain haste until end of turn.":
   // the same creatures throughout (rulings), those there as it resolves (CR 611.2c).
   text = text.replace(/^Untap all creatures and gain control of them until end of turn\. They gain haste until end of turn\.$/, "Untap all creatures. Gain control of all creatures until end of turn. All creatures gain haste until end of turn.");
@@ -2524,6 +2543,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const yard = parseCount("the number of cards in your graveyard", ctx);
       if (!exile || !inner || !yard || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount: yard, min: num(yardExile[1]!) }, effects: exile, otherwise: inner });
+      si++;
+      continue;
+    }
+    // Roots of Wisdom: "return a land card or Elf card from your graveyard to your hand. If you can't, draw a card.": you
+    // must return one if there's one (rulings), so the rest happens only with none there.
+    const yardReturn = /^[Rr]eturn an? [^.]+? card from your graveyard to your hand$/.test(s) ? /^If you can't, (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (yardReturn) {
+      const before = ctx.targets.length;
+      const ret = parseOne(capital(s), ctx);
+      const inner = parseOne(capital(yardReturn[1]!), ctx);
+      const pick = ret?.length === 1 && ret[0]!.type === "chooseFromGraveyard" ? ret[0] : undefined;
+      if (pick?.type !== "chooseFromGraveyard" || pick.n !== 1 || pick.upTo || pick.who || pick.dest || !pick.filter || Object.keys(pick).length !== 3 || !inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: pick.filter } }, min: 1 }, effects: [pick], otherwise: inner });
       si++;
       continue;
     }
@@ -4148,20 +4180,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    // Sifter Wurm: "scry 3, then reveal the top card of your library. You gain life equal to that card's mana value.";
-    // Interpret the Signs: "Draw cards equal to that card's mana value": the card revealed, counted as it's revealed
-    // (CR 701.20a, 608.2h), and drawn too if the draw takes it.
-    const revealMv = /^[Rr]eveal the top card of your library$/.test(s) ? /^(?:You gain life|Draw cards|~ deals damage) equal to that card's mana value(?: to that creature)?\.?$/.exec(sentences[si + 1] ?? "") : null;
-    if (revealMv && si + 2 === sentences.length) {
-      ctx.revealedTop = true;
-      const then = parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx);
-      ctx.revealedTop = false;
-      if (!then || then.length !== 1) return null;
-      effects.push({ type: "revealTop" }, ...then);
+    const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
+    // Interpret the Signs: "Reveal the top card of your library. Draw cards equal to that card's mana value."; Sifter Wurm:
+    // "You gain life equal to that card's mana value." The card stays on top.
+    const revealedMvThen = /^[Rr]eveal the top card of your library$/.test(s) ? /^(Draw cards|You gain life) equal to that card's mana value\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (revealedMvThen) {
+      const n = { count: { kind: "revealedManaValue" as const } };
+      effects.push({ type: "revealTop" }, revealedMvThen[1] === "Draw cards" ? { type: "draw", who: { ref: "you" }, n } : { type: "gainLife", who: { ref: "you" }, n });
       si++;
       continue;
     }
-    const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
     if (/^[Rr]eveal the top card of your library$/.test(s) || (atRandom && /^If that card has the chosen name, /.test(sentences[si + 1] ?? ""))) {
       const r = parseRevealedIf(sentences, si + 1, ctx);
       if (!r) return null;
@@ -5207,15 +5235,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
           }
           return all;
         });
-      if (!inner) return null;
-      // Bitter Chill: "If you do, scry 1, then draw a card": instructions that wait on a player go under an "if" after the
-      // payment, which keeps its place among them (a "may" would run them again from the start).
-      if (inner.length > 1 && inner.some((e) => pauses(e))) {
-        if (payFirst.payX) return null;
+      // Bitter Chill: "you may pay {1}. If you do, scry 1, then draw a card": instructions that stop for a choice run
+      // under an "if you do" of their own, which keeps its place while they wait.
+      if (inner && inner.length > 1 && inner.some((e) => pauses(e)) && !payFirst.payX) {
         effects.push({ type: "may", effects: [], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` }, { type: "if", cond: { kind: "youDid" }, effects: inner });
         payFirst = null;
         continue;
       }
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
       payFirst = null;
       continue;
@@ -6208,7 +6235,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (ifTypeDestroyed) {
       const prev = effects[effects.length - 1];
       const type = capital(ifTypeDestroyed[1]!);
-      if (prev?.type !== "destroy" || prev.what.ref !== "target" || !ctx.targets[prev.what.index]?.types?.includes(type) || /\b(?:its?|that)\b/.test(ifTypeDestroyed[2]!)) return null;
+      // Acolyte Hybrid: "If an artifact is destroyed this way, its controller draws a card": the destroyed target's
+      // controller as it last existed (CR 608.2h).
+      const itsController = /^its controller (?!.*\b(?:its?|that)\b)/.test(ifTypeDestroyed[2]!) && prev?.type === "destroy" && prev.what.ref === "target" && ctx.targets.length === prev.what.index + 1;
+      if (prev?.type !== "destroy" || prev.what.ref !== "target" || !ctx.targets[prev.what.index]?.types?.includes(type) || (!itsController && /\b(?:its?|that)\b/.test(ifTypeDestroyed[2]!))) return null;
       const inner = parseOne(capital(ifTypeDestroyed[2]!), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "destroyedThisWay", cardType: type }, effects: inner });
@@ -6217,6 +6247,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
     // Handling): checked against the card this resolution's discard put into the graveyard (CR 701.9a).
     // Vohar, Vodalian Desecrator: "Draw a card, then discard a card. If you discarded an instant or sorcery card this way, ...".
+    // Fanatic of the Harrowing: "Each player discards a card. If you discarded a card this way, draw a card.": you did (with
+    // an empty hand, you didn't, CR 701.9b).
+    const youDiscarded = /^If you discarded a card this way, (.+)$/.exec(s);
+    if (youDiscarded) {
+      const prev = effects[effects.length - 1];
+      const inner = parseOne(capital(youDiscarded[1]!), ctx);
+      if (prev?.type !== "discard" || prev.who.ref !== "eachPlayer" || prev.n !== 1 || prev.upTo || prev.filter || prev.hand || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay", who: { ref: "you" } } }, min: 1 }, effects: inner });
+      continue;
+    }
     // Lord Windgrace: "Discard a card, then draw a card. If a land card is discarded this way, draw an additional card":
     // the discard before the draw.
     const ifDiscarded = /^If (?:an? (.+? card) (?:was|is) discarded|you discarded an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
@@ -7189,16 +7229,6 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
-    // Corrupted Resolve: "Counter target spell if its controller is poisoned": one or more poison counters as it resolves
-    // (CR 122.1f, 608.2c).
-    const poisoned = /^(Counter target spell) if its controller is poisoned$/.exec(s);
-    if (poisoned && ctx.spell) {
-      const inner = parseOne(poisoned[1]!, ctx);
-      const c = inner?.length === 1 ? inner[0] : undefined;
-      if (c?.type !== "counterSpell") return null;
-      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "poison", who: { ref: "targetController", index: c.index } } }, min: 1 }, effects: inner! });
-      continue;
-    }
     // Unravel: "Counter target spell. If the amount of mana spent to cast that spell was less than its mana value, you draw a
     // card.": the countered spell as it last existed on the stack (CR 608.2h), X in its mana value (CR 202.3e).
     const spentLess = /^If the amount of mana spent to cast that spell was less than its mana value, (.+)$/.exec(s);
@@ -8081,11 +8111,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Soul Rend: "Destroy target creature if it's white. A creature destroyed this way can't be regenerated.": the
       // conditional destroy.
       const prev = effects[effects.length - 1];
+      // Kirtar's Wrath: "..., instead destroy all creatures, then create two 1/1 white Spirit creature tokens with flying.
+      // Creatures destroyed this way can't be regenerated.": the destroy done instead.
+      const insteadDestroy = /^Creatures destroyed this way/.test(s) && prev?.type === "if" && prev.otherwise && prev.effects[0]?.type === "destroy" && prev.effects.slice(1).every((e) => e.type !== "destroy") ? prev.effects[0] : undefined;
+      if (insteadDestroy?.type === "destroy") {
+        insteadDestroy.noRegen = true;
+        continue;
+      }
       const last = prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : prev;
       if (!last || last.type !== "destroy") return null;
       last.noRegen = true;
       // "Destroy target nonblack creature and target land. They can't be regenerated.": both.
       if (/^They\b/.test(s)) for (let i = effects.length - 2, e = effects[i]; e?.type === "destroy"; e = effects[--i]) e.noRegen = true;
+      // Part of the sentence before, for one after it ("If there are seven or more cards in your graveyard, instead ...",
+      // Kirtar's Wrath).
+      curStart = prevStart;
+      if (!thenParts.has(sentences[si]!)) curWhole = prevWhole;
       continue;
     }
     // Taigam, Master Opportunist: "copy it, then exile the spell you cast with four time counters on it. If it doesn't have

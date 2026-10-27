@@ -2450,13 +2450,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(["second", "third", "fourth", "fifth"].indexOf(position) + 1, lib.length - 1), 0, lib.shift()!);
           continue;
         }
-        // Unexpectedly Absent: under the top X cards; with X 0 on top, with fewer than X cards in that library on the bottom.
-        if (position === "beneathX") {
-          const depth = Math.max(0, ctx.x ?? 0);
-          log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their library beneath the top ${depth} card${depth === 1 ? "" : "s"}.`);
+        if (e.beneath !== undefined) {
+          // Unexpectedly Absent: under the top X cards; on the bottom with fewer; on top with X = 0 (rulings).
+          const n = Math.max(0, amountNow(s, e.beneath, ctx));
+          log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their library beneath the top ${n} cards.`);
           moveObject(s, o.id, "library", { top: true });
           const lib = player(s, o.owner).library;
-          if (o.zone === "library" && lib[0] === o.id && depth > 0) lib.splice(Math.min(depth, lib.length - 1), 0, lib.shift()!);
+          if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(n, lib.length - 1), 0, lib.shift()!);
           continue;
         }
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);

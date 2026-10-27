@@ -38,8 +38,6 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
-  // Morality Shift: "Exchange your graveyard and library."
-  if (/^Exchange your graveyard and library$/.test(s)) return [{ type: "exchangeGraveyardLibrary", who: { ref: "you" } }];
   // Nicol Bolas, the Arisen: "Exile all but the bottom card of target player's library": the top cards, as many as there
   // are less one.
   if ((m = /^Exile all but the bottom card of (target player|target opponent)'s library$/.exec(s))) {
@@ -351,7 +349,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
-  if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ on top of your library)$/.exec(s)))
+  if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ (?:from your graveyard )?on top of your library)$/.exec(s)))
     return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   // Gryff's Boon: "{3}{W}: Return ~ from your graveyard to the battlefield attached to target creature": the target, which
   // the ability targets (the Aura isn't cast, so it targets nothing itself, CR 303.4f); with that creature an illegal
@@ -620,6 +618,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // See Beyond: "Draw two cards, then shuffle a card from your hand into your library."
+  if ((m = new RegExp(`^Shuffle (a|${NUM}) cards? from your hand into your library$`, "i").exec(s))) return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), shuffle: true }];
   // Chimney Imp: "target opponent puts a card from their hand on top of their library"; Sadistic Augermage: "each player
   // puts ..."; Stunted Growth: "Target player chooses three cards from their hand and puts them on top of their library in
   // any order": each from their own hand, chosen as it resolves.
@@ -869,11 +869,6 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: second ? "ownersChoiceSecond" : "ownersChoice" }];
   }
-  // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that library."
-  if ((m = /^Put (target .+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
-    const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" && (what.n ?? 1) === 1 && ctx.targets[what.index]?.kind === "object" ? [{ type: "putInLibrary", what, position: "beneathX" }] : null;
-  }
   // Aetherspouts: "For each attacking creature, its owner puts it on their choice of the top or bottom of their library":
   // one at a time, each owner choosing for each of theirs (their order among them being the order they're put there).
   if (/^For each attacking creature, its owner puts it on their choice of the top or bottom of their library$/.test(s)) {
@@ -886,14 +881,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
-  // Mortuary: "Whenever a creature is put into your graveyard from the battlefield, put that card on top of your
-  // library": the card, if it's still in your graveyard (CR 400.7); yours, so its owner's library.
-  if (/^[Pp]ut that card on top of your library$/.test(s) && ctx.subjectLeft) {
-    const what = parseObject("that card", ctx);
-    return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
+  // Unexpectedly Absent: "Put target nonland permanent into its owner's library just beneath the top X cards of that
+  // library": the X it was cast with.
+  if ((m = /^Put (target [a-z ]+?) into its owner's library just beneath the top X cards of that library$/.exec(s)) && ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "putInLibrary", what, position: "top", beneath: amt("X") }] : null;
   }
-  // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
-  if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   // Elven Warhounds: "Whenever ~ becomes blocked by a creature, put that creature on top of its owner's library": the
   // trigger's subject.
@@ -1073,6 +1066,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // Intimidation Bolt: "~ deals 3 damage to target creature. Other creatures can't attack this turn.": every creature but
+  // that one, also ones that arrive later, and all of them if it left the battlefield (rulings).
+  if (/^Other creatures can't attack this turn$/.test(s) && ctx.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "other creatures" }, exceptTarget: ctx.lastObjectTarget }];
   // Venser, the Sojourner: "Creatures can't be blocked this turn": all creatures, also ones that arrive later (rulings).
   if (/^Creatures can't be blocked this turn$/.test(s)) return [{ type: "cantBeBlockedRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
   // "Until your next turn, those permanents can't attack or block and their activated abilities can't be activated" (Mythos

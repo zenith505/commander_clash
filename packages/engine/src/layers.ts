@@ -122,6 +122,8 @@ export interface Characteristics {
   /** "You may have ~ assign its combat damage as though it weren't blocked." */
   unblockedDamage: boolean;
   doesntUntap: boolean;
+  /** "Can't become untapped" (Frozen in Ice): not by any effect either (game.ts untapPermanent). */
+  cantBecomeUntapped?: true;
   cantBeSuspected: boolean;
   /** "Can block only creatures with flying" (CR 509.1b). */
   blocksOnlyFlyers: boolean;
@@ -801,7 +803,6 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "creatureDied":
       if (cond.notNamedSelf) return (s.diedNamesThisTurn ?? []).some((n) => !n || !sameName(n, defOf(s, src).name));
-      if (cond.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => (!cond.yours || d.controller === you) && (d.all || d.subtypes.includes(cond.subtype!))).length >= (cond.n ?? 1);
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
     case "meldPartner": {
       // "If you both own and control ~ and a creature named Bruna, the Fading Light" (CR 701.42): ~ as it is now.
@@ -1364,6 +1365,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "doesntUntap":
       c.doesntUntap = true;
+      return;
+    case "cantBecomeUntapped":
+      c.doesntUntap = true;
+      c.cantBecomeUntapped = true;
       return;
     case "cantBeSuspected":
       c.cantBeSuspected = true;

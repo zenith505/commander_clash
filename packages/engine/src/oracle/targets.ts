@@ -430,7 +430,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).
   // Silumgar, the Drifting Death: "creatures defending player controls get -1/-1 until end of turn" (CR 506.2).
   // Hurkyl's Recall: "all artifacts target player owns": the ones that player owns (CR 108.3).
-  const of = /^(.+?) (target player|target opponent|that player|defending player) (controls|owns)\b(.*)$/i.exec(x);
+  // Tectonic Instability: "Whenever a land enters, tap all lands its controller controls": the trigger's permanent's
+  // controller.
+  const of = /^(.+?) (target player|target opponent|that player|defending player|its controller) (controls|owns)\b(.*)$/i.exec(x);
   const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) && (of[3] === "controls" || (/^all /i.test(of[1]!) && !of[4])) ? parseGroup(`${of[1]}${of[4]}`, true) : null;
   if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller && !ofGroup.filter.owner) {
     const who = of[2]!.toLowerCase();
@@ -439,7 +441,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
       const index = addTarget(ctx, { kind: "player", opponent: who === "target opponent", text: who });
       ctx.lastPlayerTarget = index;
       whose = { ref: "target", index };
-    } else whose = parsePlayer(who === "defending player" ? who : "that player", ctx);
+    } else if (who === "its controller") whose = ctx.subject && !ctx.spell && ctx.lastObjectTarget === undefined && of[3] === "controls" ? { ref: "subjectController" } : null;
+    else whose = parsePlayer(who === "defending player" ? who : "that player", ctx);
     if (!whose || (whose.ref === "target" && whose.n)) return null;
     return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose, ...(of[3] === "owns" ? { ofOwner: true as const } : {}) };
   }
@@ -810,9 +813,10 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   if (twoHues) p = `${twoHues[1]} or ${twoHues[2]} creatures`;
   // "Non-Elf creatures get -2/-2 until end of turn" (Eyeblight Massacre): every creature that isn't an Elf.
   const nonType = /^non-([a-z]+) creatures$/i.exec(p);
-  // "Creature tokens get -2/-2 until end of turn" (Bloodline Culling): every creature token, whoever controls it.
-  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^(?:nonartifact creatures|creature tokens)$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
-  if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued) return null;
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
+  // Harvester of Misery: "other creatures get -2/-2 until end of turn": every creature but the source.
+  const othersAll = other && /^creatures$/i.test(p);
+  if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued && !othersAll) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
@@ -898,6 +902,14 @@ export function parseTargetPhrase(
     if (rest?.kind !== "object" || rest.anyOf) return null;
     const anyOf: TargetSpec[] = [{ kind: "object", status: "enchanted", text: "enchanted creature" }, { kind: "object", types: ["Enchantment"], text: "enchantment creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "enchanted creature or enchantment creature") };
+  }
+  // Sonar Strike: "target attacking, blocking, or tapped creature": one that's any of them (TargetSpec.anyOf).
+  const combatOrTapped = /^(target )?attacking, blocking, or tapped creature$/.exec(phrase.trim());
+  if (combatOrTapped) {
+    const rest = parseTargetPhrase(`${combatOrTapped[1] ?? ""}creature`, opts);
+    if (rest?.kind !== "object" || rest.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", combat: "attackingOrBlocking", text: "attacking or blocking creature" }, { kind: "object", tapped: true, text: "tapped creature" }];
+    return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "attacking, blocking, or tapped creature") };
   }
   // Silumgar Assassin: "target creature with power 3 or less an opponent controls": the same as "target creature an
   // opponent controls with power 3 or less".
@@ -1526,7 +1538,7 @@ export function parseTargetPhrase(
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
         // "Non-Lesson instant and sorcery card" (Iroh, Grand Lotus): a leading "non-" word is for every alternative, as
         // "nonartifact instant or sorcery" is.
-        else if ((alts.length === 1 || (alt === alts[0] && i === 0)) && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson", "Saga", "Bolas"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson"
+        else if ((alts.length === 1 || (alt === alts[0] && i === 0)) && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson", "Saga", "Bolas", "Spacecraft"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson", "non-Spacecraft"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       // "Nonlegendary attacking creature": attacking after a supertype.

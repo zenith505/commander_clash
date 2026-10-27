@@ -67,11 +67,14 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // one of them (rulings), as Kiora's "and/or" (oneOfEach).
       const anyOf: TargetSpec[] = CARD_TYPES_IN_DECKS.map((t) => ({ kind: "card", types: [t], text: `${t.toLowerCase()} card` }));
       Object.assign(dig, { count: anyOf.length, upTo: true, filter: { kind: "card", anyOf, text: "card of each card type" }, oneOfEach: anyOf, into: "hand" });
-    } else if ((m = new RegExp(`^Put any number of ([^,]+? cards) from among them into your hand and the rest ${REST}$`).exec(s))) {
+    } else if ((m = new RegExp(`^(?:Put|You may put) (any number of|up to two|up to three) ([^,]+? cards) from among them into your hand(?: and the rest(?: of the revealed cards)? ${REST})?$`).exec(s))) {
       // "Put any number of legendary cards from among them into your hand and the rest into your graveyard" (Dihada).
-      const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
-      if (!filter || / of the chosen /.test(m[1]!)) return null;
-      Object.assign(dig, { count: 99, upTo: true, filter, into: "hand" }, restOf(m[2]!));
+      // Kruphix's Insight: "Put up to three enchantment cards from among them into your hand and the rest of the revealed
+      // cards into your graveyard"; Glacial Revelation: "You may put any number of snow permanent cards from among them
+      // into your hand. Put the rest into your graveyard."
+      const filter = parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
+      if (!filter || / of the chosen /.test(m[2]!)) return null;
+      Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand" }, m[3] ? restOf(m[3]) : {});
     } else if (dig.reveal && (m = new RegExp(`^Put (an? .+? card) from among them into your hand(?: and the rest ${REST})?$`).exec(s))) {
       // "Reveal the top six cards ... Put an Assassin, Pirate, or Vehicle card from among them into your hand and the rest
       // on the bottom" (Adéwalé, Breaker of Chains): one that fits must be taken, if there's one (the cards are revealed).
@@ -433,6 +436,8 @@ export function parseChanges(text: string): Modification[] | null {
       if (!base) return null;
       out.push({ kind: "setPT", power: base[0], toughness: base[1] });
     }
+    // Turtle-Duck: "has base power 4" (layer 7b, CR 613.4b), its toughness left alone.
+    else if ((m = /^(?:has|have) base power (\d+)$/i.exec(p))) out.push({ kind: "setPower", power: Number(m[1]) });
     // Doran (CR 510.1a as modified) and defender (CR 702.3b), for a while.
     else if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/i.test(p)) out.push({ kind: "assignsToughness" });
     else if (/^can attack (?:this turn )?as though (?:it|they) didn't have defender$/i.test(p)) out.push({ kind: "attackDespiteDefender" });
@@ -501,7 +506,8 @@ export function parseBecomes(text: string): Modification[] | null {
     addColors = m[2] !== "types";
   }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
-  if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
+  // Kormus Bell: "1/1 black creatures that are still lands", one color too.
+  if ((m = /^(\d+\/\d+ (?:(?:white|blue|black|red|green) )?(?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
   // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): new card types replace the old ones (CR 205.1a),

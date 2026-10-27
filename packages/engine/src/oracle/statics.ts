@@ -919,9 +919,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (text === "a creature not named ~ died this turn") return { kind: "creatureDied", notNamedSelf: true };
-  // White Glove Gourmand: "if another Human died under your control this turn": "another" can only be another object (~ is
-  // still on the battlefield for this to matter), so any Human that died.
-  if ((m = /^(?:another|an?) ([A-Z][a-z]+) died( under your control)? this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "creatureDied", subtype: m[1]!, ...(m[2] ? { yours: true as const } : {}) };
+  // White Glove Gourmand: "if another Human died under your control this turn": of that type as it last existed. "Another"
+  // can't be the permanent with the ability, which hasn't died while it's on the battlefield.
+  if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
@@ -1479,8 +1479,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return grants && a && b ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...a, ...b] : null;
   }
   // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler), "... and can't attack you or
-  // planeswalkers you control" (the Vows).
-  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control|is goaded)$`).exec(rest))) {
+  // planeswalkers you control" (the Vows), "... and can't be blocked by more than one creature" (Rope).
+  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control|is goaded|can't be blocked by more than one creature)$`).exec(rest))) {
     // "... has deathtouch, and is goaded" (Ghoulish Impetus).
     const grants = parseGrants(m[3]!);
     const second = parseStaticMods(m[4]!);
@@ -1682,6 +1682,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^attacks or blocks each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }, { kind: "mustBlock" }];
   if (/^(?:doesn't untap during (?:its controller's|your) untap step|don't untap during their controllers' untap steps)$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
+  // Frozen in Ice, Blossombind: "can't become untapped": no effect or rule untaps it (see untapPermanent).
+  if (/^can't become untapped$/.test(rest)) return [{ kind: "cantBecomeUntapped" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Grounded: "Enchanted creature loses flying": in layer 6, by timestamp, so a later effect can give it back (CR 613.7).
   if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect)$/.exec(rest))) {
@@ -1887,6 +1889,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const rest = parseStaticLine(`Enchanted creature ${legendaryAura[1]} and ${legendaryAura[2]}.`);
     return rest && rest.affects.kind === "attached" && !rest.condition ? { ...rest, mods: [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Legendary"] }, ...rest.mods], text: line } : null;
   }
+  // In Bolas's Clutches: "Enchanted permanent is legendary"; Leyline of Singularity: "All nonland permanents are legendary"
+  // (layer 4, CR 205.4a, 613.1d), so the legend rule applies to them (CR 704.5j).
+  const legendary = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Legendary"] };
+  if (/^Enchanted (?:creature|permanent) is legendary$/.test(text)) return { affects: { kind: "attached" }, mods: [legendary], text: line };
+  if (text === "All nonland permanents are legendary") return { affects: { kind: "filter", types: [], spec: { kind: "object", notTypes: ["Land"], text: "nonland permanent" } }, mods: [legendary], text: line };
   // Unable to Scream: "As long as enchanted creature is face down, it can't be turned face up." Only a face-down
   // permanent can be turned face up (CR 702.37e, 701.40b), so it's the same as having it always.
   if (text === "As long as enchanted creature is face down, it can't be turned face up") return { affects: { kind: "attached" }, mods: [{ kind: "cantTurnFaceUp" }], text: line };
@@ -1986,6 +1993,15 @@ function parseStaticLine(line: string): StaticAbility | null {
     return mods ? { affects: { kind: "filter", types: ["Land"], ...(landsAre[2] ? { controller: "you" as const } : {}), ...(sub ? { spec: { kind: "object", types: ["Land"], subtypes: [sub], text: sub } } : {}) }, mods, text: line } : null;
   }
   if (/^All permanents are artifacts in addition to their other types$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }], text: line };
+  // Living Lands: "All Forests are 1/1 creatures that are still lands", Kormus Bell: "All Swamps are 1/1 black creatures
+  // that are still lands", Nature's Revolt: "All lands are 2/2 creatures that are still lands": creatures in addition to
+  // their types (layer 4, CR 205.1b), with that base power and toughness (7b) and that color instead of theirs (5, CR 105.3).
+  const allLands = /^All (lands|Plains|Islands|Swamps|Mountains|Forests) are (\d+\/\d+ (?:(?:white|blue|black|red|green) )?creatures that are still lands)$/.exec(text);
+  if (allLands) {
+    const affects = parseAffected(`All ${allLands[1]}`);
+    const mods = parseBecomes(allLands[2]!);
+    return affects?.kind === "filter" && mods ? { affects, mods, text: line } : null;
+  }
   // Darkest Hour: "All creatures are black": that color instead of their others, in layer 5 (CR 105.3, 613.1e).
   const allColor = /^All creatures are (white|blue|black|red|green)$/.exec(text);
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };

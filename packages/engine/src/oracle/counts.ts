@@ -111,11 +111,22 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
     return a && b && typeof a === "object" && typeof b === "object" && "count" in a && "count" in b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
   }
+  // Phthisis: "its power plus its toughness"; Predator's Rapport: "that creature's power plus its toughness": the one
+  // object's, added up.
+  if ((m = /^(its|~'s|that creature's) power plus its toughness$/i.exec(p))) {
+    const [a, b] = [parseCount(`${m[1]} power`, ctx), parseCount(`${m[1]} toughness`, ctx)];
+    return a && b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
+  }
   // Prophet of the Scarab: "the number of Zombies you control or the number of Zombie cards in your graveyard, whichever
   // is greater".
   if ((m = /^(the number of .+?) or (the number of .+), whichever is greater$/i.exec(p))) {
     const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
     return a && b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "greater", of: [a.count, b.count] } } : null;
+  }
+  // Triumphant Chomp: "2 or the greatest power among Dinosaurs you control, whichever is greater".
+  if ((m = new RegExp(`^${NUM} or (the greatest .+), whichever is greater$`, "i").exec(p))) {
+    const c = parseCount(m[2]!, ctx);
+    return c && !c.times && !c.plus && !c.half ? { count: { kind: "greater", of: [{ kind: "constant", n: num(m[1]!) }, c.count] } } : null;
   }
   if ((m = new RegExp(`^${NUM} minus (.+)$`, "i").exec(p))) {
     const c = parseCount(m[2]!, ctx);
@@ -461,8 +472,6 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
-  // Golden Ratio: "for each different power among creatures you control".
-  if (each && /^different power among creatures you control$/i.test(p)) return count({ kind: "powersAmongCreatures" });
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
@@ -593,6 +602,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = parseCount(`${m[1]} you control`, ctx);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, differentManaValues: true } } : null;
   }
+  // Golden Ratio: "for each different power among creatures you control": each power once, as the creatures have it.
+  if (each && (m = /^different power among (creatures) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other && !c.count.counter ? { count: { ...c.count, differentPowers: true } } : null;
+  }
   // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
   if ((m = /^differently named (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx, each);
@@ -627,9 +641,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
   // "attacking creature", "tapped creature": any controller. "Other attacking creatures" (Ghalta and Mavren): not the
   // object with the ability.
-  // Cybermat: "the number of attacking artifact creatures", any controller's.
-  if ((m = /^(other )?(attacking|blocking|tapped) ((?:artifact |enchantment )?creatures?)$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${m[2]} ${m[3]!.replace(/s$/, "")}`);
+  // Siani, Eye of the Storm: "the number of attacking creatures with flying". Sophina, Spearsage Deserter: "for each
+  // nontoken attacking creature".
+  if ((m = /^(other )?(nontoken )?(attacking|blocking|tapped) (creatures?)( with flying)?$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[2] ?? ""}${m[3]} creature${m[5] ?? ""}`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, ...(m[1] ? { other: true } : {}) }) : null;
   }
   // Shared Animosity: "it gets +1/+0 until end of turn for each other attacking creature that shares a creature type with

@@ -1585,6 +1585,38 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Mindshrieker (the milled card's mana value), Take Out the Trash ("if you do" after a conditional may), Zenith Flare
   (cards with cycling), Truce, Nova Flame, Mutiny, Credit Voucher, Crypsis, Mana Short, Spreading Plague, Nullmage and
   Spurnmage Advocate (not parsed yet).
+- Round B11 (ranks about 15,100 up to about 13,200, the easier templates, plus more played cards the same templates
+  cover: Crater Elemental, Island of Wak-Wak, Symmetry Sage, Pieces of the Puzzle, Customs Depot, Dromar, Living Plane,
+  the three Shadowhearts, Sparkshaper Visionary): "other creatures get -2/-2" (every creature but the source); "its
+  power plus its toughness"; "2 or the greatest power among Dinosaurs you control, whichever is greater"; "the number
+  of different powers among creatures you control"; "has base power 4" (layer 7b); "put any number of / up to three
+  ... cards from among them into your hand and the rest into your graveyard"; "Put ~ from your graveyard on top of your
+  library" as a cost; "If it's a Dragon, put two +1/+1 counters on it"; "Vehicles you control become artifact
+  creatures"; "mill X, draw Y, then discard Z"; "If you discarded a card this way" after each player discards; "reveal
+  the top card ... draw cards / gain life equal to that card's mana value"; Kirtar's Wrath's "instead" with "can't be
+  regenerated"; "Other creatures can't attack this turn" (a rule for the turn, later arrivals too, all but the target);
+  "just beneath the top X cards of that library"; "if that spell's controller has a poison counter"; "that player
+  untaps a land they control"; "Enchanted permanent is legendary", "All nonland permanents are legendary"; "can't
+  become untapped"; an Equipment's "can't be blocked by more than one creature"; Slivers with provoke; "attacking,
+  blocking, or tapped creature"; "tap all lands its controller controls"; Spacecraft; "attacking creatures with
+  flying" and "nontoken attacking creature" counts; "If an artifact is destroyed this way, its controller draws a
+  card"; Savage Punch's ferocious +2/+2 before the fight; "shuffle a card from your hand into your library" (the hand
+  picker with a Shuffle in button); "return a land card or Elf card from your graveyard to your hand. If you can't,
+  draw a card"; "Untap all Forests and all green creatures"; "Whenever you gain / lose life during your turn"; "if
+  another Human died under your control this turn"; "destroy all permanents at the beginning of the next end step";
+  "Exchange your graveyard and library"; "the highest life total among all players"; "destroy all artifacts and
+  creatures other than ~"; Invincible Hymn's life total from the library's size; "All Forests / Swamps / lands are N/N
+  (black) creatures that are still lands"; "you may pay {1}. If you do, scry 1, then draw a card" (choices after a
+  payment). +56 (26,154; the three Shadowhearts aren't Commander-legal).
+- Skipped there, with reasons: Leitmotif Composer (a named creature's "can't be blocked" should hold for later
+  arrivals too), Blossombind (counters can't be put on it, and wither rulings), Skyblade's Boon (an ability that works
+  from two zones), Cut Short (a planeswalker that activated an ability this turn), Cleansing Meditation (returning the
+  cards destroyed this way), Fall from Favor (the monarch condition), Pestilent Spirit (deathtouch on instants and
+  sorceries), Storyteller Pixie (Adventure spells), Wildgrowth Walker (explore triggers), Highcliff Felidar (the
+  greatest power per opponent), Long Feng (a creature or a land put into a graveyard), Kraken of the Straits (blockers'
+  power against a count), Uphill Battle ("played" creatures), End Hostilities (permanents attached to creatures),
+  Eiganjo Uprising ("X minus one" tokens), Consume Spirit ("Spend only black mana on X"), Energy Field, Ill-Gotten
+  Gains, Recall, Pyretic Rebirth, Viashino Heretic and Suffer the Past (not parsed yet).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1631,8 +1663,15 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Ice Floe, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Witch Hunt, Bridge from
   Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex, Martyr of Sands, Corpse Explosion,
-  Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange; then
-  on up from 15,000.
+  Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.
+  Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 470 are still unsupported there, its skips
+  included): Sandman's Quicksand (mayhem), Aeon Engine, Workshop Elders, Turtle Van, Haunting Imitation, The Fugitive
+  Doctor, Shifting Shadow, Abuelo's Awakening, Prince of Thralls, Eriette, Gastal Thrillroller, Manifold Insights, Take
+  Out the Trash, Glorfindel, Renegade Krasis, Discerning Taste, Fortune's Favor, Curse of Inertia, Trial of Agony,
+  Dreamshaper Shaman, Nefarious Lich, Cavernous Maw, Triarch Stalker, Fishing Pole, Chandra's Phoenix, Infernal
+  Vessel, Regna's Sanction, Nullstone Gargoyle, Faith's Shield, Kathril, Lochmere Serpent, Words of Wilding,
+  Grimdancer, Breath of the Sleepless, Jump Scare, Feral Encounter, Majestic Myriarch, Gimli, Break the Spell,
+  Midnight Arsonist; then on up from 13,200.
 
 ## Known gaps (from earlier rounds)
 

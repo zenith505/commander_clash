@@ -584,6 +584,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         // On the bottom the first pick goes lowest; on top it ends on top.
         for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
+        if (e.shuffle) {
+          shuffleLibrary(s, p);
+          log(s, `${p.name} shuffles ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand into their library.`);
+          done[pid] = true;
+          continue;
+        }
         log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
         done[pid] = true;
       }
@@ -738,24 +744,20 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
-    case "exchangeGraveyardLibrary": {
-      // Morality Shift: both at once; the owner orders the cards going to the graveyard (rulings), kept in library order
-      // here, and the graveyard's cards go into the library (which "then shuffle your library" shuffles).
-      for (const pid of players(s, e.who, ctx)) {
-        const p = player(s, pid);
-        const lib = [...p.library];
-        const yard = [...p.graveyard];
-        for (const id of yard) moveObject(s, id, "library");
-        for (const id of lib) moveObject(s, id, "graveyard");
-        log(s, `${p.name} exchanges their graveyard (${yard.length} cards) and library (${lib.length} cards).`);
-      }
-      return;
-    }
     case "shuffleZones": {
       const shuffled: [PlayerId, number][] = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        if (e.exchange) {
+          // Morality Shift: both at once (CR 701.12a); the library's cards go to the graveyard together, so their owner
+          // orders them when the order matters (CR 404.3, see graveyard.ts; rulings).
+          const lib = [...p.library];
+          for (const id of ids) moveObject(s, id, "library");
+          for (const id of lib) moveObject(s, id, "graveyard");
+          log(s, `${p.name} exchanges their graveyard (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
+          continue;
+        }
         if (e.bottom) {
           // Endurance: "puts all the cards from their graveyard on the bottom of their library in a random order".
           shuffle(s, ids);

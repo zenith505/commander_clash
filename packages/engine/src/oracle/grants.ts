@@ -172,7 +172,8 @@ export function parseGrants(text: string): Modification[] | null {
     // Exploit (CR 702.110a) is an enters trigger: "Other legendary creatures you control have exploit" (Colonel Autumn)
     // gives it to a creature as it enters, so it triggers (CR 603.6a, 603.10).
     // Evolve (CR 702.100d) and training (702.149b) too: "Creature tokens you control have evolve" (Propagator Drone).
-    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training)$/i.test(w)) {
+    // Provoke too (CR 702.39b): "All Sliver creatures have provoke" (Hunter Sliver).
+    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }

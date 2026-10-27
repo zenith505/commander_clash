@@ -1549,7 +1549,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   itself or the creature it enchants; "you may cast spells as though they had flash" while tapped; "Your opponents
   can't cast blue creature spells"; "When ~ is put into your graveyard from your library" (Narcomoeba, Creeping Chill,
   Gaea's Blessing); "Whenever this creature crews a Vehicle" (CR 702.122);
-  "deals damage to each creature blocking it" and "each creature blocking it gets -1/-1"; "Whenever a player discards
+  "Whenever a player discards
   one or more cards" (once per player); "tap ~ unless you sacrifice another creature"; "target player or
   planeswalker. That player or that planeswalker's controller discards"; "Then exile that player's graveyard"; "you
   and another target player each draw a card"; "destroy all Curses attached to you"; "If an artifact is destroyed this

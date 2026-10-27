@@ -879,3 +879,52 @@ describe("Keep-or-lose upkeeps, the trigger's player's lands, domain for a playe
     }
   });
 });
+
+const collapsingBorders = card("Collapsing Borders", "Enchantment", "{3}{R}", { cmc: 4, keywords: ["Domain"], oracleText: "Domain — At the beginning of each player's upkeep, that player gains 1 life for each basic land type among lands they control. Then this enchantment deals 3 damage to that player." });
+const hesitation = card("Hesitation", "Enchantment", "{1}{U}", { cmc: 2, oracleText: "When a player casts a spell, sacrifice this enchantment and counter that spell." });
+const gloriousEnforcer = card("Glorious Enforcer", "Creature — Angel", "{5}{W}{W}", { cmc: 7, power: "5", toughness: "5", keywords: ["Flying","Lifelink"], oracleText: "Flying, lifelink\nAt the beginning of each combat, if you have more life than an opponent, this creature gains double strike until end of turn." });
+const roostOfDrakes = card("Roost of Drakes", "Enchantment", "{U}", { cmc: 1, keywords: ["Kicker"], oracleText: "Kicker {2}{U} (You may pay an additional {2}{U} as you cast this spell.)\nWhen this enchantment enters, if it was kicked, create a 2/2 blue Drake creature token with flying.\nWhenever you cast a kicked spell, create a 2/2 blue Drake creature token with flying." });
+
+describe("Cards these templates also cover", () => {
+  it("are fully supported", () => supported(collapsingBorders, hesitation, gloriousEnforcer, roostOfDrakes));
+
+  it("Collapsing Borders: the upkeep's player gains 1 life per basic land type they have, then takes 3 damage", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, collapsingBorders);
+    for (const l of [forest, island]) putOnBattlefield(s, opp, l);
+    s = toUpkeep(s, opp);
+    expect(life(s, opp)).toBe(39);
+  });
+
+  it("Hesitation counters the next spell any player casts, yours too", () => {
+    let { s, ap, opp, ids } = setup([testShock()]);
+    const h = putOnBattlefield(s, ap, hesitation);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [player(opp)])));
+    expect(zone(s, h)).toBe("graveyard");
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+    expect(life(s, opp)).toBe(40);
+  });
+
+  it("Glorious Enforcer gains double strike at the beginning of combat only with more life than an opponent", () => {
+    for (const more of [true, false]) {
+      let { s, ap, opp } = setup([]);
+      const g = putOnBattlefield(s, ap, gloriousEnforcer);
+      // One opponent below you, or every opponent above you.
+      for (const p of s.turnOrder) if (p !== ap) s.players[p]!.life = more ? (p === opp ? 30 : 45) : 45;
+      s = settle(passUntil(s, "beginCombat", ap));
+      expect(has(s, g, "Double strike"), `more ${more}`).toBe(more);
+    }
+  });
+
+  it("Roost of Drakes makes a Drake if it was kicked, and one for each kicked spell you cast", () => {
+    const kicky = card("Test Kicker", "Sorcery", "{R}", { cmc: 1, oracleText: "Kicker {1}\nYou gain 1 life." });
+    let { s, ap, ids } = setup([roostOfDrakes, roostOfDrakes, kicky]);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [])));
+    expect(named(s, "Drake").length).toBe(0);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [], undefined, "auto", undefined, { kicks: [0] })));
+    // The second one's own "if it was kicked", and the first one's cast trigger.
+    expect(named(s, "Drake").length).toBe(2);
+    s = settle(run(s, planCast(s, ap, ids[2]!, [], undefined, "auto", undefined, { kicks: [0] })));
+    expect(named(s, "Drake").length).toBe(4);
+  });
+});

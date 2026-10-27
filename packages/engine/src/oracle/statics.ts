@@ -109,10 +109,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", mostCommonColor: false, text: "creature that doesn't share a color with the most common color" } } };
   }
   // "As long as equipped creature is a Human, it gets an additional +1/+1": a second bonus, only for a Human.
-  if ((m = /^As long as (enchanted|equipped) creature is an? ([A-Z][a-z]+), it (gets|has) (.+)$/.exec(text)) && CREATURE_TYPES.has(m[2]!)) {
-    const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);
+  // Bladed Bracers: "As long as equipped creature is a Human or an Angel, it has vigilance": either type.
+  if ((m = /^As long as (enchanted|equipped) creature is an? ([A-Z][a-z]+)(?: or an? ([A-Z][a-z]+))?, it (gets|has) (.+)$/.exec(text)) && CREATURE_TYPES.has(m[2]!) && (!m[3] || CREATURE_TYPES.has(m[3]))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[4]} ${m[5]!.replace(/^an additional /, "")}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
-    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [m[2]!], text: `${m[2]} creature` } } };
+    const kinds = [m[2]!, ...(m[3] ? [m[3]] : [])];
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], ...(kinds.length > 1 ? { anyOf: kinds.map((k): TargetSpec => ({ kind: "object", subtypes: [k], text: k })) } : { subtypes: kinds }), text: `${kinds.join(" or ")} creature` } } };
   }
   // Steel of the Godhead: "As long as enchanted creature is white, it gets +1/+1 and has lifelink": white among its colors
   // now (CR 105.2).
@@ -779,6 +781,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
+  if (/^you lost life last turn$/.test(text)) return { kind: "lostLifeLastTurn" };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
   // "If you didn't lose life this turn" (Luminarch Ascension), "if you lost life this turn".
@@ -859,6 +862,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // entered this turn" (Zurgo and Ojutai): about ~ itself.
   if (/^(?:~|it) attacked a battle this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackedBattleThisTurn" };
   if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
+  // Cactuar: "if ~ didn't enter the battlefield this turn".
+  if (/^~ didn't enter (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn", not: true };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
   // under your control this turn" (Mad Dog: neither happened), "unless it came under your control this turn" (Erg Raiders).
   if (/^~ didn't attack this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn", not: true };
@@ -882,7 +887,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent (?:has been|was) dealt damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
-  if (/^you've discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", yours: true };
+  // Mysterio's Mirage: "if you discarded a card this turn" is the same.
+  if (/^you(?:'ve)? discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", yours: true };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
@@ -947,8 +953,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return amount ? { kind: "amount", amount, ...(m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) }) } : null;
   }
   // Pestilence: "if no creatures are on the battlefield".
-  // Wirecat: "if an enchantment is on the battlefield": anyone's.
-  if ((m = /^an? (.+) is on the battlefield$/.exec(text))) {
+  // Wirecat: "if an enchantment is on the battlefield": anyone's. Knight of Malice: "as long as any player controls a white
+  // permanent": the same.
+  if ((m = /^an? (.+) is on the battlefield$/.exec(text.replace(/^any player controls (an? [a-z]+ permanent)$/, "$1 is on the battlefield")))) {
     const g = parseGroup(`all ${m[1]}s`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1 } : null;
   }
@@ -1000,6 +1007,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
   if ((m = /^(?:it|~) has an? (even|odd) number of counters on it$/.exec(text))) return { kind: "selfCounters", counter: "*", min: 0, parity: m[1] as "even" | "odd" };
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
+  // Shatterskull Charger: "if ~ doesn't have a +1/+1 counter on it": the same.
+  if ((m = new RegExp(`^~ doesn't have an? ${COUNTER} counter on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Jeweled Amulet: "Activate only if there are no charge counters on ~".
   if ((m = new RegExp(`^there are no ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Temple of Cyclical Time: "Activate only if it has no time counters on it": it is ~.
@@ -1045,6 +1054,20 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const filter = (name: string): TargetSpec => ({ kind: "object", types: type, notTypes: [], notColors: [], named: name, text: `${m![2]} named ${name}` });
     const conds: StaticCondition[] = [m[3]!, m[4]].filter((x): x is string => !!x).map((name) => ({ kind: "control", who: "you", filter: filter(name), ...(m![1] ? { max: 0 } : { min: 1 }) }));
     return conds.length === 1 ? conds[0]! : m[1] ? { kind: "allOf", conds } : { kind: "anyOf", conds };
+  }
+  // Narcolepsy: "if enchanted creature is untapped": the creature it's attached to, as it is now.
+  if ((m = /^enchanted creature is (tapped|untapped)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], tapped: m[1] === "tapped", text: `${m[1]} creature` } };
+  // Goblin Caves: "As long as enchanted land is a basic Mountain": the land it's attached to, as it is now (CR 205.4a).
+  if ((m = /^enchanted land is a basic (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], subtypes: [m[1]!], text: `basic ${m[1]}` } };
+  // Faerie Miscreant: "if you control another creature named ~": one other than it with its name (CR 201.2), as it is now.
+  if (/^you control another creature named ~$/.test(text)) {
+    const amount = parseCount("the number of other creatures you control named ~", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: 1 } : null;
+  }
+  // Lashwhip Predator: "if your opponents control three or more creatures": all of theirs together.
+  if ((m = new RegExp(`^your opponents control ${NUM} or more (creatures|artifacts|enchantments|lands)$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} your opponents control`, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // Kezzerdrix: "if your opponents control no creatures": none of them controls one, as "no opponent controls a creature".
   if ((m = /^your opponents control no ([a-z]+)s$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]}`, st);
@@ -1381,8 +1404,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // "Gets +2/+2 and can't block" (Childhood Horror), "gets +1/+1 and attacks each combat if able".
   // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual),
-  // "gets +1/+1 and doesn't untap during its controller's untap step" (Dance of the Dead).
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|loses all abilities|doesn't untap during its controller's untap step)$`).exec(rest))) {
+  // "gets +1/+1 and doesn't untap during its controller's untap step" (Dance of the Dead), "gets +3/+0 and can only attack
+  // alone" (Errantry).
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|loses all abilities|doesn't untap during its controller's untap step|can only attack alone)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
@@ -1418,6 +1442,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return more && !/ this turn$/.test(rest) ? [more] : null;
   }
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
+  // Bound by Moonsilver: "can't attack, block, or transform".
+  if (/^can't attack, block, or transform$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantTransform" }];
   // "Can't block and can't be blocked" (Changeling Outcast).
   if ((m = /^(can't [^,]+?) and (can't .+)$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);

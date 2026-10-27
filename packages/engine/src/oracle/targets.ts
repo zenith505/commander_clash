@@ -771,7 +771,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
   // Blaring Captain: "attacking Warriors get +1/+1 until end of turn": the same, of that creature type.
   const combatTyped = /^(?:[Aa]ttacking|[Bb]locking) ([A-Z][a-z]+)$/.exec(p);
-  const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p) || (!!combatTyped && /s$/.test(combatTyped[1]!) && CREATURE_TYPES.has(singular(combatTyped[1]!)));
+  // Agrus Kos: "attacking red creatures get +2/+0 until end of turn": of that color too.
+  const combat = /^(attacking|blocking|attacking or blocking) (?:(?:white|blue|black|red|green) )?creatures\b/i.test(p) || (!!combatTyped && /s$/.test(combatTyped[1]!) && CREATURE_TYPES.has(singular(combatTyped[1]!)));
   // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type; "creatures that aren't of
   // the chosen type get -3/-3" (Crippling Fear): every other creature.
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
@@ -1119,10 +1120,17 @@ export function parseTargetPhrase(
     p = p.slice(0, manaAb.index);
   }
   // Oblivion Stone: "each nonland permanent without a fate counter on it": any kind of counter.
-  const without = / without an? ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
+  // Coiling Stalker: "target creature you control that doesn't have a +1/+1 counter on it": the same.
+  const without = / (?:without|that doesn't have) an? ([+-]1\/[+-]1|[a-z]+) counters? on (?:it|them)/.exec(p);
   if (without) {
     extra.notCounter = counterKind(without[1]!);
     p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();
+  }
+  // Due Diligence: "target creature you control other than enchanted creature": not the one the source is attached to.
+  const notHost = / other than enchanted creature$/.exec(p);
+  if (notHost) {
+    extra.notSourceHost = true;
+    p = p.slice(0, notHost.index);
   }
   const none = / with no counters on (?:it|them)/.exec(p);
   if (none) {

@@ -385,6 +385,8 @@ export type Count =
   | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
   | { kind: "attackersThisTurn" }
+  /** "For each creature you attacked with this turn" (Search Party Captain): the creatures you declared as attackers this turn (PlayerState.attackedWith). */
+  | { kind: "youAttackedWithThisTurn" }
   /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
   | { kind: "commanderCasts"; /** "Each time they've cast a commander" (Commander's Insight): that player's instead. */ who?: PlayerRef }
   /** The mana value of the commander Effect "chooseOwnCommander" chose in this resolution (0 if none). */
@@ -1331,6 +1333,8 @@ export type Modification =
   | { kind: "cantBeSacrificed" }
   /** "It can't be turned face up" (Unable to Scream): not by its controller's special action (CR 116.2b, 702.37e). */
   | { kind: "cantTurnFaceUp" }
+  /** "Can't transform" (Bound by Moonsilver): nor convert (CR 701.28f), not even by day and night (run-permanents.ts transformPermanent). */
+  | { kind: "cantTransform" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this" }
   | { kind: "allMustBlock"; /** "All Walls able to block ~ do so" (Marble Priest): only blockers that fit this (CR 509.1c). */ by?: TargetSpec }
@@ -1585,6 +1589,8 @@ export type StaticCondition =
   | { kind: "opponentDealtDamage"; n: number; /** "If you were dealt 4 or more damage this turn" (Boarded Window): `you`. */ you?: true }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
   | { kind: "attackedWith"; n: number }
+  /** "If you lost life last turn" (First Response, Paladin of Atonement): during the turn before this one (GameState.lastTurn). */
+  | { kind: "lostLifeLastTurn" }
   /** "If you've drawn two or more cards this turn"; `opponent`: "if an opponent drew three or more cards this turn" (Runeflare Trap). */
   | { kind: "drawn"; n: number; opponent?: true }
   /** "If you descended this turn": a permanent card was put into your graveyard this turn (CR 700.11). */
@@ -2023,7 +2029,7 @@ export type Effect =
    * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
    * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
    */
-  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true }
+  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; until: "nextTurn" }
   /**
@@ -5180,6 +5186,8 @@ export interface CompiledCard {
   noCountersOn?: string[];
   /** Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." (counters.ts countersBanned). */
   opponentsCreaturesNoCounters?: CounterKind;
+  /** Tatterkite: "~ can't have counters put on it." (counters.ts countersBanned). */
+  selfNoCounters?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
   boastTwice?: true;
   /**

@@ -329,6 +329,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // The Zubera: "for each Zubera that died this turn", any player's.
   if ((m = /^([A-Z][a-z]+) that died this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "diedThisTurn", subtype: m[1]! });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
+  if (/^creatures? you attacked with this turn$/i.test(p)) return count({ kind: "youAttackedWithThisTurn" });
   // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
   if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
     return count({ kind: "enteredThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { types: [capital(m[1]!)] }) });
@@ -357,7 +358,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     ctx.lastPlayerTarget = i;
     return count({ kind: "playerDamageThisTurn", who: { ref: "target", index: i } });
   }
-  if (each ? /^1 life your opponents have lost this turn$/i.test(p) : /^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p)) return count({ kind: "opponentsLifeLost" });
+  // Cryptborn Horror: "where X is the total life lost by your opponents this turn", the same total.
+  if (each ? /^1 life your opponents have lost this turn$/i.test(p) : (/^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p) || /^the total life lost by your opponents this turn$/i.test(p))) return count({ kind: "opponentsLifeLost" });
   // Inquisition: "the number of white cards in their hand" (revealed just before).
   if ((m = /^((?:white|blue|black|red|green|creature|land|nonland|artifact|enchantment|instant|sorcery) cards?) in (your|that player's|target player's|their|target opponent's) hand$/i.exec(p))) {
     const who = whosePlayer(m[2]!, ctx);
@@ -420,6 +422,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Thunder Salvo: "the number of other spells you've cast this turn": not its own cast (rulings: resolved or not).
+  if (ctx?.spell && /^other spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", other: true });
   // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was
   // (rulings).
   if (/^spells? you've cast this turn from anywhere other than your hand$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });

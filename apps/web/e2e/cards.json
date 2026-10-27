@@ -5252,6 +5252,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8c91d50b-bf58-4d06-b3b7-4b6db867bfce",
+  "name": "Exile",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target nonwhite attacking creature. You gain life equal to its toughness.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "744b7e93-c893-4770-a3bb-6a45b7f8e4f7",
   "name": "Expel the Interlopers",
   "manaCost": "{3}{W}{W}",
@@ -12545,6 +12571,37 @@
   "set": "who",
   "releasedAt": "2023-10-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cc11efa2-27ca-4745-8178-31576539512a",
+  "name": "Priest of the Wakening Sun",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "At the beginning of your upkeep, you may reveal a Dinosaur card from your hand. If you do, you gain 2 life.\n{3}{W}{W}, Sacrifice this creature: Search your library for a Dinosaur card, reveal it, put it into your hand, then shuffle.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

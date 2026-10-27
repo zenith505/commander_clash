@@ -232,6 +232,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "discard", who, n: num(m[2]!), exile: true }] : null;
   }
+  // Ego Drain: "Exile a card from your hand": one of your choice, the same way.
+  if ((m = /^Exile (a|two|three) cards? from your hand$/.exec(s))) return [{ type: "discard", who: { ref: "you" }, n: num(m[1]!), exile: true }];
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
@@ -565,6 +567,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "counterSpell", index: a }, { type: "counterSpell", index: b }];
   }
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
+  // Unified Will: "Counter target spell if you control more creatures than that spell's controller": counted as it resolves
+  // (CR 608.2c); a spell of yours is never countered by it.
+  if (/^Counter target spell if you control more creatures than that spell's controller$/i.test(s)) {
+    const index = addTarget(ctx, { kind: "spell", text: "target spell" });
+    const creatures: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creatures" };
+    return [{ type: "if", cond: { kind: "amountsCompare", a: { count: { kind: "permanents", filter: creatures, whose: { ref: "you" } } }, atLeast: { count: { kind: "permanents", filter: creatures, whose: { ref: "targetController", index } }, plus: 1 } }, effects: [{ type: "counterSpell", index }] }];
+  }
   if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).

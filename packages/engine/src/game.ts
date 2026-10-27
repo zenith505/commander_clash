@@ -2797,7 +2797,7 @@ export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers
 function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
-  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length) };
+  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length), ...(s.lostLifeThisTurn?.length ? { lostLife: [...s.lostLifeThisTurn] } : {}) };
   // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
   // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
   const controlled = s.controlledTurn;

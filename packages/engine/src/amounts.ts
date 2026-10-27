@@ -365,6 +365,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
+    case "youAttackedWithThisTurn": {
+      const w = s.players[ctx.controller]?.attackedWith;
+      return w?.turn === s.turn ? w.keys.length : 0;
+    }
     case "toGraveyardThisTurn":
       return s.toGraveyardThisTurn ?? 0;
     case "sum":
@@ -880,6 +884,8 @@ function describeCount(c: Count): string {
       return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s you sacrificed this turn`;
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
+    case "youAttackedWithThisTurn":
+      return "#creatures you attacked with this turn";
     case "toGraveyardThisTurn":
       return "#permanents put into a graveyard this turn";
     case "sum":

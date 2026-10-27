@@ -2302,7 +2302,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // battlefield (CR 603.10a, 608.2h), as it triggers and resolves (CR 603.4).
   const diedType = intervening && /^Whenever (?:equipped|enchanted) creature dies$/.test(intervening[1]!) ? /^it was an? ([A-Z][a-z]+)$/.exec(intervening[2]!) : null;
   const diedTypeCond: StaticCondition | null = diedType && CREATURE_TYPES.has(diedType[1]!) ? { kind: "subjectType", subtype: diedType[1]! } : null;
-  const ifCond = diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // Sigil Captain: "Whenever a creature you control enters, if that creature is 1/1, ...": its power and toughness as
+  // it triggers and resolves (CR 603.4), as it last existed if it's gone.
+  const subjSize = intervening && /^Whenever (?:a|another) (?:nontoken )?creature (?:you control )?enters$/.test(intervening[1]!) ? /^that creature is (\d+)\/(\d+)$/.exec(intervening[2]!) : null;
+  const subjSizeCond: StaticCondition | null = subjSize ? { kind: "allOf", conds: [{ kind: "subjectPT", stat: "power", min: Number(subjSize[1]), max: Number(subjSize[1]) }, { kind: "subjectPT", stat: "toughness", min: Number(subjSize[2]), max: Number(subjSize[2]) }] } : null;
+  const ifCond = subjSizeCond ? subjSizeCond : diedTypeCond ? diedTypeCond : kickCond ? kickCond : dmgCond ? dmgCond : kwCond ? kwCond : putCond ? putCond : poisonedCond ? poisonedCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(fromHandAnd ? fromHandAnd[1]! : intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -2478,7 +2482,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // (rulings).
   // Ever-Watching Threshold: "Whenever an opponent attacks, if they attacked you and/or a planeswalker you control": the
   // same, the attack declared before it triggers (rulings: once for each such opponent).
-  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control|you), (.+)$/.exec(line.replace(/^Whenever an opponent attacks, if they attacked you and\/or a planeswalker you control, /, "Whenever an opponent attacks you and/or one or more planeswalkers you control, "));
+  // Orim's Prayer: "Whenever one or more creatures attack you" is the same as "Whenever a player attacks you with one or more
+  // creatures" (only an opponent can, CR 506.2).
+  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control|you), (.+)$/.exec(line.replace(/^Whenever an opponent attacks, if they attacked you and\/or a planeswalker you control, /, "Whenever an opponent attacks you and/or one or more planeswalkers you control, ").replace(/^Whenever one or more creatures attack you, (?!if )/, "Whenever a player attacks you with one or more creatures, "));
   if (attacked && (/^Whenever a player/.test(line) ? /^you with one or more creatures$/.test(attacked[1]!) : true)) {
     const thatMany = /\bthat many\b/.test(attacked[2]!);
     if (thatMany && (/\bX\b/.test(attacked[2]!) || !/^you with/.test(attacked[1]!))) return "fail";

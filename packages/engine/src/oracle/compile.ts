@@ -334,7 +334,10 @@ export function normalizeSelf(d: CardDef): string {
   t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   if (full) {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
-    t = t.replace(new RegExp(esc(full), "g"), "~");
+    // The card named Exile: "Exile target nonwhite attacking creature" is the keyword action, not the card (its name
+    // followed by "target" is never the card).
+    const verb = /^[A-Z][a-z]+$/.test(full) ? "(?! target\\b)" : "";
+    t = t.replace(new RegExp(esc(full) + verb, "g"), "~");
   }
   // Shortened names (CR 201.5c): "Gylwain" for "Gylwain, Casting Director", and for a legendary card with no comma,
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token
@@ -572,6 +575,16 @@ export function compile(d: CardDef): CompiledCard {
     // Adaptive Training Post: "Whenever you cast ..., if ~ has fewer than three charge counters on it, put a charge counter
     // on it": "it" is ~ both times, not the spell.
     line = line.replace(/^(Whenever you cast [^,]+, if ~ has [^,]+ counters on it, put an? [^ ,]+ counter on) it\.$/, "$1 ~.");
+    // Narcolepsy: "At the beginning of each upkeep, if enchanted creature is untapped, tap it": "it" is that creature.
+    line = line.replace(/^(At the beginning of [^,]+, if enchanted creature is (?:un)?tapped, (?:un)?tap) it\.$/, "$1 enchanted creature.");
+    // Stature, Size Shifter: "~ can't be blocked if ~'s power is 1 or less"; Illvoi Infiltrator: "... if you've cast two or
+    // more spells this turn": a static ability's condition, checked continuously, the same as "as long as".
+    line = line.replace(/^~ can't be blocked if (~'s power is \d+ or less|you've cast two or more spells this turn)\.$/, "~ can't be blocked as long as $1.");
+    // Whiplash, Vengeful Engineer: "Whenever ~ attacks, if he's equipped, ...": ~ itself.
+    line = line.replace(/^(Whenever ~ attacks, if) (?:he|she)'s equipped, /, "$1 it's equipped, ");
+    // Divine Sacrament: "Threshold — White creatures get an additional +1/+1 as long as there are seven or more cards in
+    // your graveyard": a second, conditional bonus on top of the first line's (CR 613.4c adds them both).
+    line = line.replace(/^((?:Threshold — )?(?:White|Blue|Black|Red|Green) creatures get) an additional (\+\d+\/\+\d+ as long as .+)$/, "$1 $2");
     // Poisonous N given to other creatures ("All Sliver creatures have poisonous 1", Virulent Sliver; "Enchanted creature
     // has poisonous 3"): "Whenever this creature deals combat damage to a player, that player gets N poison counters"
     // (CR 702.70a), one ability for each instance (702.70b).
@@ -2825,6 +2838,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCreaturesNoCounters = "+1/+1";
       continue;
     }
+    if (line === "~ can't have counters put on it.") {
+      out.selfNoCounters = true;
+      continue;
+    }
     if (line === "Counters can't be put on artifacts, creatures, enchantments, or lands.") {
       out.noCountersOn = ["Artifact", "Creature", "Enchantment", "Land"];
       continue;
@@ -3174,8 +3191,9 @@ export function compile(d: CardDef): CompiledCard {
     // is that, the other while it isn't, each checked continuously (CR 611.3a).
     // Relic Axe: "Equipped creature gets +1/+1. If it's a Warrior, it gets +2/+1 instead." is the same, for Equipment.
     const insteadIf = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+)\. If it's (an? [A-Z][a-z]+), it gets ([+-]\d+\/[+-]\d+) instead\.$/.exec(line);
+    // Bonds of Faith: "Enchanted creature gets +2/+2 as long as it's a Human. Otherwise, it can't attack or block."
     const boonLine = insteadIf ? `${insteadIf[1]} creature gets ${insteadIf[4]} as long as it's ${insteadIf[3]}. Otherwise, it gets ${insteadIf[2]}.` : line;
-    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it gets ([+-]\d+\/[+-]\d+)\.$/.exec(boonLine);
+    const boon = /^(Enchanted|Equipped) creature gets ([+-]\d+\/[+-]\d+) as long as it's (white|blue|black|red|green|an? [A-Z][a-z]+|an enchantment|an artifact)\. Otherwise, it (gets [+-]\d+\/[+-]\d+|can't attack or block)\.$/.exec(boonLine);
     if (boon) boon.splice(1, 1);
     if (boon) {
       const w = boon[2]!;
@@ -3186,7 +3204,7 @@ export function compile(d: CardDef): CompiledCard {
         : /^an (enchantment|artifact)$/.test(w) ? { kind: "object", types: ["Creature"], notTypes: [capital(w.slice(3))], text: `non${w.slice(3)} creature` }
         : { kind: "object", types: ["Creature"], notSubtypes: [w.replace(/^an? /, "")], text: `non-${w.replace(/^an? /, "")} creature` };
       const who = /^Equipped /.test(boonLine) ? "Equipped" : "Enchanted";
-      const [a, b] = [parseStatic(`${who} creature gets ${boon[1]}.`), parseStatic(`${who} creature gets ${boon[3]}.`)];
+      const [a, b] = [parseStatic(`${who} creature gets ${boon[1]}.`), parseStatic(`${who} creature ${boon[3]}.`)];
       if (yes && no && a?.affects.kind === "attached" && b?.affects.kind === "attached" && !a.condition && !b.condition) {
         out.statics.push({ ...a, condition: { kind: "attachedIs", filter: yes }, text: line }, { ...b, condition: { kind: "attachedIs", filter: no }, text: line });
         continue;
@@ -3336,6 +3354,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line) ??
       // Norin the Wary: "When a player casts a spell or a creature attacks, ...": a cast and an attack are never one event.
       /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line) ??
+      // Powerstone Minefield: "Whenever a creature attacks or blocks, ~ deals 2 damage to it.": each creature as it's
+      // declared as an attacker or as a blocker (CR 508.1, 509.1), never both at once.
+      /^Whenever a creature (attacks) or (blocks), (.+)$/.exec(line) ??
       // Lady Octopus: "Whenever you draw your first or second card each turn": each card is drawn one at a time (CR 121.2).
       /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line) ??
       // Astrologian's Planisphere: "Whenever you cast a noncreature spell and whenever you draw your third card each turn":
@@ -3343,7 +3364,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
-      const events = /^When you cast ~ and whenever/.test(line)
+      const events = /^Whenever a creature attacks or blocks, /.test(line)
+        ? [`Whenever a creature attacks, ${effect}`, `Whenever a creature blocks, ${effect}`]
+        : /^When you cast ~ and whenever/.test(line)
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
         : /^When you cast ~ and when ~ dies, /.test(line)
         ? [`When you cast ~, ${effect}`, `When ~ dies, ${effect}`]

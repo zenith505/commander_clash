@@ -247,7 +247,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
   // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.
-  const both = /^[Yy]ou and (target opponent|target player|that player|that opponent) each (draw|create|gain|lose|mill) (.+)$/.exec(s);
+  // Splinter, Aging Champion: "you and another target player": a player other than you, so an opponent (CR 102.3).
+  const both = /^[Yy]ou and (target opponent|target player|that player|that opponent|another target player) each (draw|create|gain|lose|mill) (.+)$/.exec(s);
+  if (both?.[1] === "another target player") both[1] = "target opponent";
   if (both) {
     const mine = parseSentence(`You ${both[2]} ${both[3]}`, ctx);
     const theirs = mine && parseSentence(`${both[1]!.replace(/^./, (c) => c.toUpperCase())} ${both[2]}s ${both[3]}`, ctx);

@@ -58,6 +58,19 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
   }
+  // Road Rage: "the number of Mounts and Vehicles you control": each permanent that's either, once.
+  if ((m = /^the number of ([A-Z][a-z]+s) and ([A-Z][a-z]+s) you control$/.exec(p))) {
+    const [a, b] = [parseCount(`the number of ${m[1]} you control`, ctx), parseCount(`the number of ${m[2]} you control`, ctx)];
+    const one = (c: ReturnType<typeof parseCount>) => (c && typeof c === "object" && c.count.kind === "permanents" && !c.plus && !c.times && c.count.filter.subtypes?.length === 1 && !c.count.filter.types?.length && c.count.filter.controller === "you" && Object.keys(c.count).length === 2 ? c.count.filter.subtypes[0]! : null);
+    const [sa, sb] = [one(a), one(b)];
+    return sa && sb && sa !== sb ? { count: { kind: "permanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [sa, sb], controller: "you", text: `${m[1]} and ${m[2]} you control` } } } : null;
+  }
+  // Walker of the Wastes: "for each land you control named Wastes": by that name (CR 201.2).
+  if (each && (m = /^(land|creature|artifact) you control named ([A-Z][A-Za-z',-]+(?: [A-Z][A-Za-z',-]+)*)$/.exec(p))) {
+    const c = parseCount(`the number of ${m[1]}s you control`, ctx);
+    if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
+    return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: m[2]!, text: `${c.count.filter.text} named ${m[2]}` } } };
+  }
   // "Each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way."
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
   if (ctx && ((each && /^creature sacrificed this way$/.test(p)) || /^the number of creatures sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
@@ -450,6 +463,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
+  // Earthen Ally: "for each color among Allies you control" (itself included).
+  if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
+    return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
   // Thunder Salvo: "the number of other spells you've cast this turn": not its own cast (rulings: resolved or not).
   if (ctx?.spell && /^other spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", other: true });
@@ -488,6 +504,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // Civic Saber: "Equipped creature gets +1/+0 for each of its colors" (a static ability: the permanent it applies to,
+  // colors as layer 5 left them, CR 613.4).
+  if (each && ctx === null && /^of its colors$/i.test(p)) return count({ kind: "affectedColors" });
   // Breathe Your Last: "Destroy target creature or planeswalker. You gain 1 life for each of its colors."
   if (/^of its colors$/i.test(p) && ctx?.lastObjectTarget !== undefined) {
     const of = whoseObject("its", ctx);

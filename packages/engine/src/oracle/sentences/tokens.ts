@@ -247,9 +247,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "delayed", when, each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
   }
   // "Incubate 2 five times" (The Argent Etchings): one incubate after another (CR 701.53a).
-  if ((m = /^Incubate (\d+) (twice|three times|four times|five times)$/.exec(s))) {
+  // Glistening Dawn: "Incubate X twice, where X is the number of lands you control": X each time.
+  if ((m = /^Incubate (\d+|X) (twice|three times|four times|five times)$/.exec(s))) {
     const times = { twice: 2, "three times": 3, "four times": 4, "five times": 5 }[m[2]!]!;
-    return Array.from({ length: times }, () => ({ type: "createToken" as const, who: { ref: "you" as const }, n: 1, token: INCUBATOR, counters: { counter: "+1/+1" as const, n: Number(m![1]) } }));
+    return Array.from({ length: times }, () => ({ type: "createToken" as const, who: { ref: "you" as const }, n: 1, token: INCUBATOR, counters: { counter: "+1/+1" as const, n: amt(m![1]!) } }));
   }
   // "Incubate 3 X times" (Progenitor Exarch): X incubates, one after another.
   if ((m = /^[Ii]ncubate (\d+) X times$/.exec(s))) return [{ type: "repeat", n: X, effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token: INCUBATOR, counters: { counter: "+1/+1", n: Number(m[1]) } }] }];

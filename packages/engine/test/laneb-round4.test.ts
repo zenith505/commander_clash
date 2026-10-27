@@ -220,7 +220,7 @@ describe("can't attack unless there are seven or more cards in your graveyard / 
     expect(potentialAttackers(s, ap).map((o) => o.id)).not.toContain(t);
     fillGraveyard(s, ap, 1);
     expect(potentialAttackers(s, ap).map((o) => o.id)).toContain(t);
-  });
+  }, 20_000); // about 4s alone, past the 5s default under a full run's load
 
   it("Mogg Conscripts and Silburlind Snapper attack only after you cast that kind of spell this turn", () => {
     let { s, ap, ids } = setup([greenBear(), card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." })]);

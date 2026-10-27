@@ -642,6 +642,9 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       // subject is the card where it went, and the trigger carries who controlled it.
       const lk = s.lastKnown?.[o.id];
       if (lk && lk.zc === ctx.subject!.zc) return [lk.controller];
+      // "When that creature dies this turn, its controller gets a poison counter" (Virulent Wound): a delayed trigger
+      // about the card in the graveyard, its controller as it last existed on the battlefield, one zone change earlier.
+      if (lk && o.zone !== "battlefield" && lk.zc === ctx.subject!.zc - 1 && !ctx.lki) return player(s, lk.controller).lost ? [] : [lk.controller];
       return ctx.lki?.controller !== undefined && !player(s, ctx.lki.controller).lost ? [ctx.lki.controller] : [];
     }
     case "subjectOwner": {

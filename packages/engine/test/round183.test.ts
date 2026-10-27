@@ -87,8 +87,17 @@ const longFengGrandSecretariat = card("Long Feng, Grand Secretariat", "Legendary
 const risonaAsariCommander = card("Risona, Asari Commander", "Legendary Creature — Human Samurai", "{1}{R}{W}", {cmc: 3,"power":"3","toughness":"3","keywords":["Haste"],"oracleText":"Haste\nWhenever Risona deals combat damage to a player, if it doesn't have an indestructible counter on it, put an indestructible counter on it.\nWhenever combat damage is dealt to you, remove an indestructible counter from Risona.","colors":["R","W"]});
 const structuralAssault = card("Structural Assault", "Sorcery", "{3}{R}{R}", {cmc: 5,"oracleText":"Destroy all artifacts, then Structural Assault deals damage to each creature equal to the number of artifacts that were put into graveyards from the battlefield this turn."});
 
+const thrillingDiscovery = card("Thrilling Discovery", "Sorcery", "{R}{W}", {cmc: 2,"oracleText":"You gain 2 life. Then you may discard two cards. If you do, draw three cards.","colors":["R","W"]});
+const lanternOfInsight = card("Lantern of Insight", "Artifact", "{1}", {cmc: 1,"oracleText":"Players play with the top card of their libraries revealed.\n{T}, Sacrifice this artifact: Target player shuffles."});
+const mathemagics = card("Mathemagics", "Sorcery", "{X}{X}{U}{U}", {cmc: 2,"oracleText":"Target player draws 2ˣ cards. (2⁰ = 1, 2¹ = 2, 2² = 4, 2³ = 8, 2⁴ = 16, 2⁵ = 32, and so on.)"});
+const spiritOfTheLabyrinth = card("Spirit of the Labyrinth", "Enchantment Creature — Spirit", "{1}{W}", {cmc: 2,"power":"3","toughness":"1","oracleText":"Each player can't draw more than one card each turn."});
+const dosanTheFallingLeaf = card("Dosan the Falling Leaf", "Legendary Creature — Human Monk", "{1}{G}{G}", {cmc: 3,"power":"2","toughness":"2","oracleText":"Players can cast spells only during their own turns."});
+const skyfisherSpider = card("Skyfisher Spider", "Creature — Spider", "{2}{B}{G}", {cmc: 4,"power":"3","toughness":"3","keywords":["Reach"],"oracleText":"Reach\nWhen this creature enters, you may sacrifice another creature. When you do, destroy target nonland permanent.\nWhen this creature dies, you may gain 1 life for each creature card in your graveyard. If you do, exile this card from your graveyard.","colors":["B","G"]});
+const sirensRuse = card("Siren's Ruse", "Instant", "{1}{U}", {cmc: 2,"oracleText":"Exile target creature you control, then return that card to the battlefield under its owner's control. If a Pirate was exiled this way, draw a card."});
+const getawayGlamer = card("Getaway Glamer", "Instant", "{W}", {cmc: 1,"keywords":["Spree"],"oracleText":"Spree (Choose one or more additional costs.)\n+ {1} — Exile target nontoken creature. Return it to the battlefield under its owner's control at the beginning of the next end step.\n+ {2} — Destroy target creature if no other creature has greater power."});
+
 describe("round 183", () => {
-  it("all compile", () => supported(rhinoBarrelingBrute, wildgrowthWalker, glacialDragonhunt, pyreticRebirth, guardianOfTazeem, kothTheGeomancer, duskmantleSeer, axgardArtisan, patronOfTheOrochi, ludevicNecroalchemist, unravel, virulentWound, ashlingTheExtinguisher, blotOut, predatoryImpetus, crackInTime, longFengGrandSecretariat, risonaAsariCommander, structuralAssault));
+  it("all compile", () => supported(rhinoBarrelingBrute, wildgrowthWalker, glacialDragonhunt, pyreticRebirth, guardianOfTazeem, kothTheGeomancer, duskmantleSeer, axgardArtisan, patronOfTheOrochi, ludevicNecroalchemist, unravel, virulentWound, ashlingTheExtinguisher, blotOut, predatoryImpetus, crackInTime, longFengGrandSecretariat, risonaAsariCommander, structuralAssault, thrillingDiscovery, lanternOfInsight, mathemagics, spiritOfTheLabyrinth, dosanTheFallingLeaf, skyfisherSpider, sirensRuse, getawayGlamer));
 
   it("Rhino, Barreling Brute: draws on attack only after a spell with mana value 4 or greater this turn", () => {
     for (const [spell, draws] of [[three, 0], [four, 1]] as const) {
@@ -349,5 +358,112 @@ describe("round 183", () => {
     expect(zone(s, w)).toBe("battlefield");
     expect(s.objects[w]!.damage).toBe(3);
     expect(s.objects[b]!.damage).toBe(3);
+  });
+
+  it("Thrilling Discovery: 2 life, then discarding two cards draws three; with fewer than two cards it can't be done", () => {
+    for (const cards of [2, 1]) {
+      const { s: s0, ap, ids } = setup([thrillingDiscovery]);
+      const p = s0.players[ap]!;
+      p.hand.filter((id) => id !== ids[0]).forEach((id) => {
+        p.hand.splice(p.hand.indexOf(id), 1);
+        s0.objects[id]!.zone = "graveyard";
+        p.graveyard.push(id);
+      });
+      const kept = Array.from({ length: cards }, () => into(s0, ap, bear(), "hand"));
+      const life = p.life;
+      let s = run(s0, planCast(s0, ap, ids[0]!));
+      s = resolveAll(s);
+      if (cards === 2) {
+        if (s.pending?.kind === "discard") s = resolveAll(act(s, { type: "discard", player: ap, objectIds: kept }));
+        expect(kept.map((id) => zone(s, id))).toEqual(["graveyard", "graveyard"]);
+        expect(s.players[ap]!.hand).toHaveLength(3);
+      } else {
+        expect(s.pending).toBeNull();
+        expect(s.players[ap]!.hand).toEqual(kept);
+      }
+      expect(s.players[ap]!.life).toBe(life + 2);
+    }
+  });
+
+  it("Lantern of Insight: target player shuffles", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const l = putOnBattlefield(s0, ap, lanternOfInsight);
+    const before = [...s0.players[opp]!.library];
+    const s = resolveAll(run(s0, planActivate(s0, ap, l, 0, [{ kind: "player", id: opp }])));
+    expect(zone(s, l)).toBe("graveyard");
+    expect([...s.players[opp]!.library].sort()).toEqual([...before].sort());
+    expect(s.players[opp]!.library).not.toEqual(before);
+  });
+
+  it("Mathemagics: draws two to the power of X cards", () => {
+    for (const [x, n] of [[0, 1], [2, 4], [3, 8]] as const) {
+      const { s: s0, ap, ids, opp } = setup([mathemagics]);
+      const hand = s0.players[opp]!.hand.length;
+      const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }], undefined, undefined, x)));
+      expect(s.players[opp]!.hand.length, String(x)).toBe(hand + n);
+    }
+  });
+
+  it("Spirit of the Labyrinth: no player draws more than one card each turn, its controller included", () => {
+    const { s: s0, ap, ids, opp } = setup([mathemagics, mathemagics]);
+    putOnBattlefield(s0, opp, spiritOfTheLabyrinth);
+    // The active player drew for the turn already.
+    const hand = s0.players[ap]!.hand.length;
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: ap }], undefined, undefined, 2)));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, islandCard);
+    const theirs = s.players[opp]!.hand.length;
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }], undefined, undefined, 2)));
+    expect(s.players[opp]!.hand.length).toBe(theirs + 1);
+  });
+
+  it("Dosan the Falling Leaf: spells only during their caster's own turn", () => {
+    const { s: s0, ap, ids, opp } = setup([shock]);
+    putOnBattlefield(s0, ap, dosanTheFallingLeaf);
+    expect(planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])).not.toBeNull();
+    const s = passUntil(s0, "upkeep", opp);
+    expect(waitingOn(s)).toBe(opp);
+    let t = s;
+    for (let i = 0; i < 8 && waitingOn(t) !== ap; i++) t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    expect(t.activePlayer).toBe(opp);
+    expect(waitingOn(t)).toBe(ap);
+    expect(planCast(t, ap, ids[0]!, [{ kind: "player", id: opp }])).toBeNull();
+  });
+
+  it("Skyfisher Spider: may gain life for each creature card in your graveyard, then it's exiled", () => {
+    for (const yes of [true, false]) {
+      const { s: s0, ap, ids } = setup([card("Test Bolt", "Instant", "{R}", { cmc: 1, oracleText: "This spell deals 3 damage to any target." })]);
+      const sp = putOnBattlefield(s0, ap, skyfisherSpider);
+      into(s0, ap, bear(), "graveyard");
+      const life = s0.players[ap]!.life;
+      const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(sp)])), yes);
+      expect(zone(s, sp)).toBe(yes ? "exile" : "graveyard");
+      expect(s.players[ap]!.life).toBe(life + (yes ? 2 : 0));
+    }
+  });
+
+  it("Siren's Ruse: a blink that draws only if a Pirate was exiled", () => {
+    for (const [def, draws] of [[bear(), 0], [card("Test Pirate", "Creature — Human Pirate", "{1}{U}", { cmc: 2, power: "2", toughness: "2" }), 1]] as const) {
+      const { s: s0, ap, ids } = setup([sirensRuse]);
+      const c = putOnBattlefield(s0, ap, def);
+      s0.objects[c]!.tapped = true;
+      const hand = s0.players[ap]!.hand.length;
+      const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(c)])));
+      const back = named(s, ap, def.name)[0]!;
+      expect(back).toBeDefined();
+      expect(s.objects[back]!.tapped).toBe(false);
+      expect(s.players[ap]!.hand.length, def.name).toBe(hand - 1 + draws);
+    }
+  });
+
+  it("Getaway Glamer: destroys the target only if no other creature has greater power", () => {
+    for (const [bigger, dies] of [[true, false], [false, true]] as const) {
+      const { s: s0, ap, ids, opp } = setup([getawayGlamer]);
+      const b = putOnBattlefield(s0, opp, bear());
+      if (bigger) putOnBattlefield(s0, ap, big);
+      else putOnBattlefield(s0, ap, bear());
+      const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [tgt(b)], [1])));
+      expect(zone(s, b), String(bigger)).toBe(dies ? "graveyard" : "battlefield");
+    }
   });
 });

@@ -100,6 +100,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     ctx.exchanged = true;
     return [{ type: "exchangeLife", a: { ref: "target", index: first }, b: { ref: "target", index: second } }];
   }
+  // Mathemagics: "Target player draws 2ˣ cards": two to the power of the X it was cast with.
+  if ((m = /^(.+?) draws? 2ˣ cards$/.exec(s))) {
+    const inner = parseSentence(`${m[1]} draws X cards`, ctx);
+    const d = inner?.length === 1 ? inner[0] : undefined;
+    return d?.type === "draw" && typeof d.n === "object" && d.n.count.kind === "x" && !d.n.times && !d.n.plus ? [{ ...d, n: { count: { kind: "x" }, pow2: true } }] : null;
+  }
   // Mister Negative: "If you lost life this way, draw that many cards" (none if you didn't).
   if (ctx.exchanged && /^If you lost life this way, draw that many cards$/.test(s)) return [{ type: "draw", who: { ref: "you" }, n: { count: { kind: "lifeLostThisWay" } } }];
   // Sandstone Oracle: "choose an opponent. If that player has more cards in hand than you, draw cards equal to the

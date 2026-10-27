@@ -90,6 +90,8 @@ export interface AmountExpr {
   signed?: true;
   /** "If X is 6 or more, ... twice X damage ... instead" (Shatterskull Smashing): twice as much when the X announced is this or more. */
   twiceIfX?: number;
+  /** "Draws 2ˣ cards" (Mathemagics): two to the power of the count, at most 1024 (more than all the cards in the game). */
+  pow2?: true;
 }
 
 /** What an amount counts. */
@@ -3590,6 +3592,8 @@ export type SpellCondition =
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "Destroy target creature if no other creature has greater power" (Getaway Glamer): that creature as it is now, still a legal target, against every other creature on the battlefield. */
+  | { kind: "targetGreatestPower"; index: number }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
   | { kind: "damagedThisWayIs"; filter: TargetSpec }
   /** "If a player is dealt damage this way, scry 1" (Play with Fire): damage this resolution dealt to a player. */
@@ -5222,6 +5226,8 @@ export interface CompiledCard {
    * permission to cast as though with flash (rulings), and not while something resolves (cascade).
    */
   opponentsSorceryTiming?: true;
+  /** "Players can cast spells only during their own turns" (Dosan the Falling Leaf). */
+  castOnlyOwnTurn?: true;
   /** "No more than one creature can attack each combat." / "... block ..." (Silent Arbiter; CR 508.1c, 509.1b): for everyone. */
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
   combatLimit?: { attack?: number; block?: number; attackYou?: number; /** "No more than one creature can attack ~ each combat" (The Eternal Wanderer). */ attackSelf?: number; /** "As long as ~ is tapped, no more than one creature can attack you each combat" (Mirri, Weatherlight Duelist). */ attackYouIfTapped?: number };
@@ -5324,6 +5330,8 @@ export interface CompiledCard {
   opponentsLoseDouble?: true;
   /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
   opponentsDrawOnce?: true;
+  /** "Each player can't draw more than one card each turn" (Spirit of the Labyrinth). */
+  playersDrawOnce?: true;
   /**
    * Notion Thief: "If an opponent would draw a card except the first one they draw in each of their draw steps, instead
    * that player skips that draw and you draw a card" (a replacement effect, CR 614.1a, 614.10).

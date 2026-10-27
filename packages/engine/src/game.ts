@@ -2077,9 +2077,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     return player(s, second).lost ? true : draw(s, second, 1, undefined, [], true);
   }
   while (n > 0 || made.length) {
-    // Narset, Parter of Veils: an opponent who has drawn a card this turn can't draw another; the draw doesn't happen, so
-    // nothing replaces it (rulings), and the rest of these don't either.
-    const narset = (player(s, pid).draws?.turn === s.turn ? player(s, pid).draws!.n : 0) >= 1 ? s.battlefield.find((id) => controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsDrawOnce) : undefined;
+    // Narset, Parter of Veils (Spirit of the Labyrinth: any player): an opponent who has drawn a card this turn can't
+    // draw another; the draw doesn't happen, so nothing replaces it (rulings), and the rest of these don't either.
+    const narset = (player(s, pid).draws?.turn === s.turn ? player(s, pid).draws!.n : 0) >= 1 ? s.battlefield.find((id) => (controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsDrawOnce) || abilitiesOf(s, obj(s, id)).playersDrawOnce) : undefined;
     if (narset) {
       log(s, `${player(s, pid).name} can't draw more than one card each turn (${nameOf(s, narset)}).`);
       break;
@@ -5386,6 +5386,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
     if (abilitiesOf(s, o).opponentsSorceryTiming && controllerOf(s, o) !== pid && (s.resolving || !canActAtSorcerySpeed(s, pid)))
       return `${characteristics(s, o).name}: opponents can cast spells only any time they could cast a sorcery`;
+    if (abilitiesOf(s, o).castOnlyOwnTurn && pid !== s.activePlayer) return `${characteristics(s, o).name}: players can cast spells only during their own turns`;
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     const cantCastIf = abilitiesOf(s, o).opponentsCantCastYourTurnIf;
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer && (!cantCastIf || (o.zone === "battlefield" && staticConditionNow(s, cantCastIf, o.id, controllerOf(s, o)))))

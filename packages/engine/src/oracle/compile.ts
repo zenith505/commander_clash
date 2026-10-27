@@ -1877,6 +1877,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsDrawOnce = true;
       continue;
     }
+    // Spirit of the Labyrinth: the same for every player, its controller too.
+    if (line === "Each player can't draw more than one card each turn.") {
+      out.playersDrawOnce = true;
+      continue;
+    }
     // Bloodletter of Aclazotz (CR 614.1a): life lost to damage too (CR 120.3a), and life paid (CR 119.4).
     if (line === "If an opponent would lose life during your turn, they lose twice that much life instead.") {
       out.opponentsLoseDouble = true;
@@ -2831,6 +2836,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {
       out.opponentsSorceryTiming = true;
+      continue;
+    }
+    // Dosan the Falling Leaf: no player can cast a spell during another player's turn, even while something resolves.
+    if (line === "Players can cast spells only during their own turns.") {
+      out.castOnlyOwnTurn = true;
       continue;
     }
     if (/^Compleated(?: \(|$)/.test(line) && d.types.includes("Planeswalker")) {

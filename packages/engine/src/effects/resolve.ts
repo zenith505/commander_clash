@@ -358,6 +358,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.moved) return o && o.zone === "graveyard" && ctx.sourceZc !== undefined && ((o.zoneChanges ?? 0) === ctx.sourceZc || (o.zoneChanges ?? 0) === ctx.sourceZc + 1) && (!ref.yours || o.owner === ctx.controller) ? [o] : [];
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
     // A merged permanent's other cards too, for an ability triggered by its leaving (CR 730.3c).
+    // "Exile ~ from your graveyard" (Skyfisher Spider): that card only, there.
+    if (ref.yours) return o && o.zone === "graveyard" && o.owner === ctx.controller && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : []), ...foundWith(s, ctx.lki, ctx.sourceId)];
   }
   if (ref.ref === "milled") return (s.resolving?.milled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));

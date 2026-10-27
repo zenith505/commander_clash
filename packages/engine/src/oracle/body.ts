@@ -283,6 +283,8 @@ const checkableMay = (e: Effect): boolean =>
   // exiling or discarding your hand, Herigast).
   (e.type === "exileFaceDown" && e.from === "hand") ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
+  // "You may discard two cards. If you do, draw three cards." (Thrilling Discovery): only with that many cards in hand.
+  (e.type === "discard" && e.who.ref === "you" && typeof e.n === "number" && e.n > 1 && !e.random && !e.filter && !e.upTo) ||
   // "You may discard your hand. If you do, draw three cards." (Phyrexian Dragon Engine): even an empty one (rulings on
   // Moonveil Regent).
   (e.type === "discard" && e.who.ref === "you" && e.hand && !e.filter) ||
@@ -296,6 +298,9 @@ const checkableMay = (e: Effect): boolean =>
   // "You may put a card from your hand on the bottom of your library. If you do, draw a card." (Volcanic Spite): only
   // with a card in hand.
   (e.type === "handToTop" && e.n === 1) ||
+  // "You may gain 1 life for each creature card in your graveyard. If you do, exile ~ from your graveyard." (Skyfisher
+  // Spider): only if life would be gained.
+  (e.type === "gainLife" && e.who.ref === "you") ||
   // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there.
   (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
   // "You may discard a card or sacrifice a land. If you do, ..." (Highway Robbery): one of them, only one that can be done.
@@ -5494,6 +5499,27 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner) return null;
       const filter: TargetSpec = wasSpell[2] ? { kind: "card", types: ["Planeswalker"], subtypes: [wasSpell[2]], text: `${wasSpell[2]} planeswalker card` } : { kind: "card", supertypes: ["Legendary"], text: "legendary card" };
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
+      continue;
+    }
+    // Getaway Glamer: "Destroy target creature if no other creature has greater power": checked as it resolves (rulings).
+    const greatest = /^(Destroy target creature) if no other creature has greater power$/.exec(s);
+    if (greatest) {
+      const i = ctx.targets.length;
+      const inner = parseOne(greatest[1]!, ctx);
+      if (!inner || ctx.targets.length !== i + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetGreatestPower", index: i }, effects: inner });
+      continue;
+    }
+    // Siren's Ruse: "Exile target creature you control, then return that card to the battlefield under its owner's control.
+    // If a Pirate was exiled this way, draw a card": the permanent as it last existed on the battlefield (CR 608.2h).
+    const typeExiled = /^If an? ([A-Z][a-z]+) was exiled this way, (.+)$/.exec(s);
+    if (typeExiled && CREATURE_TYPES.has(typeExiled[1]!)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "flicker" || prev.what.ref !== "target" || prev.at || prev.hold) return null;
+      const inner = parseOne(capital(typeExiled[2]!), ctx);
+      if (!inner) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [typeExiled[1]!], text: typeExiled[1]! };
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledThisWay", filter } }, min: 1 }, effects: inner });
       continue;
     }
     // Gideon's Defeat: "Exile target white creature that's attacking or blocking. If it was a Gideon planeswalker, you gain 5

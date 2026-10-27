@@ -47,6 +47,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // She-Hulk, Wallbreaker: "Whenever a Hero you control becomes blocked, put a +1/+1 counter on that Hero for each creature
   // blocking it": the trigger's attacker's blockers as it resolves, like rampage's (CR 702.23b).
   if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
+  // Guardian of the Gateless: "Whenever ~ blocks, it gets +1/+1 until end of turn for each creature it's blocking".
+  if (each && /^creature (?:it's|~ is) blocking$/.test(p) && (ctx?.selfIt || /~/.test(p))) return { count: { kind: "itBlocks" } };
   // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
   // battlefield named ~", any player's.
   if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);
@@ -330,6 +332,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^(?:your )?opponents? (?:with|who ha(?:s|ve)) (one|two|three|four|five|six|seven) or more cards in (?:their )?hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtLeast: num(m[1]!) });
   // Tymna the Weaver: "the number of opponents that were dealt combat damage this turn", those who've lost since too (rulings).
   if (each && /^opponents? (?:that|who) (?:were|was) dealt combat damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, combatDamaged: true });
+  if (each && /^opponents? (?:that|who) (?:were|was) dealt damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, damaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
   // Reaper's Scythe: "for each player who lost life this turn", you too.
@@ -621,8 +624,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
   // "attacking creature", "tapped creature": any controller. "Other attacking creatures" (Ghalta and Mavren): not the
   // object with the ability.
-  if ((m = /^(other )?(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${m[2]} creature`);
+  // Cybermat: "the number of attacking artifact creatures", any controller's.
+  if ((m = /^(other )?(attacking|blocking|tapped) ((?:artifact |enchantment )?creatures?)$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[2]} ${m[3]!.replace(/s$/, "")}`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, ...(m[1] ? { other: true } : {}) }) : null;
   }
   // Shared Animosity: "it gets +1/+0 until end of turn for each other attacking creature that shares a creature type with

@@ -231,8 +231,11 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Deals combat damage to a player or battle" (Beamtown Beatstick): "that player" isn't about a battle (CR 310).
     const orBattle = /^deals combat damage to a player or battle, /.test(m[3]!);
     if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";
-    // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
-    if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
+    // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm). Simian Sling:
+    // "Whenever ~ or equipped creature becomes blocked, it deals 1 damage to defending player": whichever became blocked
+    // (rulings), the subject either way.
+    const whichever = !!m[1] && event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text);
+    if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
       text = text.replace(/\bthe other creature\b/g, "that creature");
@@ -382,6 +385,13 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   // Visionary): "that player" is the opponent, "that many" the damage. Not from a graveyard (Asgardian Inspiration).
   // "Whenever a source you control deals 5 or more damage to a player" (Dragonborn Champion): one source at one time
   // (rulings), to any player, you included.
+  // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source, that player discards a card".
+  const single = /^Whenever an opponent is dealt (two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage by a single source, (.+)$/.exec(line);
+  if (single) {
+    if (/\b(it|its|that source|that much|that many)\b/.test(single[2]!)) return "fail";
+    const body = parseBody(single[2]!, { eventPlayer: true });
+    return body ? { event: "opponentDealtDamageBySource", body, minDamage: num(single[1]!) } : "fail";
+  }
   const m0 = /^Whenever a source you control deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage to a player, (.+)$/.exec(line);
   const m = m0 ? ([m0[0], undefined, m0[2]] as const) : /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
   if (!m) return null;
@@ -1062,13 +1072,23 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
  * the attacker; "defending player" is the player it's attacking (CR 508.5a).
  */
 function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // Stinkdrinker Bandit: "Whenever a Rogue you control attacks and isn't blocked, it gets +2/+1 until end of turn": once for
+  // each such creature no creature was declared to block (CR 509.1h, rulings), "it" being that creature.
+  const unblocked = /^Whenever (another|an?) ([A-Za-z ]+?) you control attacks and isn't blocked, (.+)$/.exec(line0);
+  if (unblocked) {
+    const filter = parseTargetPhrase(unblocked[2]!);
+    if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
+    const body = parseBody(unblocked[3]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlAttacksUnblocked", attacker: { filter: { ...filter, controller: "you", text: `${unblocked[2]} you control` }, ...(unblocked[1] === "another" ? { other: true } : {}) }, body };
+  }
   // "Whenever a creature you control that's enchanted or equipped attacks" (Reyav, Master Smith): one that's either as it
   // attacks.
   const line = line0.replace(/^Whenever a creature you control that's (enchanted or equipped|enchanted|equipped) attacks,/, (_, st: string) => `Whenever an ${st.replace(/ /g, "-")} creature you control attacks,`);
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   // "Whenever a creature you control with deathtouch attacks" (Hooded Blightfang), "Whenever a creature with flying
   // attacks" (Windreader Sphinx): one with it as it's declared.
-  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with a mana ability| with base power and toughness \d+\/\d+| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?) attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with a mana ability| with base power and toughness \d+\/\d+| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike|toxic))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature(?: with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
@@ -1354,6 +1374,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     toOpponent = m[2] === "an opponent";
     if (toOpponent) bodyText = otherOpponents(bodyText).replace(/\bthat opponent\b/g, "that player");
   } else return null;
+  // Angelic Guardian: "Whenever one or more creatures you control attack, they gain indestructible until end of turn":
+  // "they" are those attackers, as they were declared.
+  if (event === "creaturesYouControlAttack" && m[1] && !min && /^they (?:gain|get) [^.]+ until end of turn\.?$/.test(bodyText) && !/\b(?:they|them|their)\b/.test(bodyText.slice(5)))
+    bodyText = `those creatures ${bodyText.slice(5)}`;
   // The attackers as a group aren't modeled. Mishra's meld sentence's "them" is Mishra and the other creature it names.
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
@@ -1680,7 +1704,10 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
  * cycle or discard another card" (the same as "discard", rulings), "whenever a player cycles a card", "whenever you
  * discard a creature card". "One or more cards" (once per batch) isn't modeled.
  */
-function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
+function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // Valiant Rescuer: "Whenever you cycle another card for the first time each turn": the player's first cycle this turn.
+  const first = /^(Whenever you cycle (?:another|a) card) for the first time each turn, /.exec(line0);
+  const line = first ? `${first[1]}, ${line0.slice(first[0].length)}` : line0;
   // Anje Falkenrath: "Whenever you discard a card, if it has madness, ...": a card with madness, which it can't lose on
   // the way to exile or the graveyard, so the same as checking it again as the trigger resolves (CR 603.4).
   const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card(?: with madness)?), (.+)$/.exec(line.replace(/^(Whenever you discard a card), if it has madness, /, "$1 with madness, "));
@@ -1712,7 +1739,7 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
   const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true, ...(copyIt ? { subjectIt: true, subjectLeft: true } : {}) });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
-  return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };
+  return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}), ...(first ? { firstEachTurn: true as const } : {}) }, body };
 }
 
 /** "Whenever a creature you control exploits a nontoken creature" (CR 702.110b): the exploited creature is the subject. */

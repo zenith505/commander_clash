@@ -625,6 +625,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "handToTop", n: m[2] ? 1 : num(m[3]!), who }] : null;
   }
+  // See Beyond: "shuffle a card from your hand into your library".
+  if ((m = new RegExp(`^[Ss]huffle (a|${NUM}) cards? from your hand into your library$`).exec(s)))
+    return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), shuffle: true }];
   // "Draw three cards, then put a card from your hand on the bottom of your library": in any order (CR 401.4).
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on the bottom of your library( in any order)?$`, "i").exec(s)))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), bottom: true }];
@@ -847,19 +850,22 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Target creature's owner puts it on their choice of the top or bottom of their library", "The owner of target
   // nonland permanent puts it ...": one permanent, its owner choosing as it resolves.
-  if ((m = /^(?:(target .+?)'s owner|The owner of ((?:up to one (?:other )?)?target .+?)|Its owner) puts it on their choice of the top or bottom of their library$/i.exec(s))) {
+  if ((m = /^(?:(target .+?)'s owner|The owner of ((?:up to one (?:other )?)?target .+?)|Its owner) puts it (on their choice of the top or bottom of their library|into their library second from the top or on the bottom)$/i.exec(s))) {
     // Subtlety: "up to one target creature or planeswalker spell": one spell, or none (CR 115.6, 601.2c).
     const spellUpTo = m[2] && /^up to one target (.+ spell)$/.exec(m[2]);
     const spellSpec = spellUpTo ? parseTargetPhrase(spellUpTo[1]!) : undefined;
+    // Temporal Cleansing: "puts it into their library second from the top or on the bottom", a permanent only.
+    const second = /second from the top/.test(m[3]!);
+    if (second && (m[1] || spellUpTo)) return null;
     if (spellUpTo) return spellSpec?.kind === "spell" && !spellSpec.orPermanent && !spellSpec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, { ...spellSpec, optional: true, text: `up to one ${spellSpec.text}` }), bounce: true, libraryChoice: true }] : null;
     const what = parseObject(m[1] ?? m[2] ?? "it", ctx);
     if (what?.ref !== "target" || (what.n ?? 1) !== 1) return null;
     const spec = ctx.targets[what.index];
     // Subtlety: "Choose up to one target creature spell or planeswalker spell. Its owner puts it on their choice of the
     // top or bottom of their library." It leaves the stack without being countered (like Commit's, rulings).
-    if (spec?.kind === "spell" && !spec.orPermanent) return [{ type: "counterSpell", index: what.index, bounce: true, libraryChoice: true }];
+    if (spec?.kind === "spell" && !spec.orPermanent && !second) return [{ type: "counterSpell", index: what.index, bounce: true, libraryChoice: true }];
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
-    return [{ type: "putInLibrary", what, position: "ownersChoice" }];
+    return [{ type: "putInLibrary", what, position: second ? "ownersChoiceSecond" : "ownersChoice" }];
   }
   // Aetherspouts: "For each attacking creature, its owner puts it on their choice of the top or bottom of their library":
   // one at a time, each owner choosing for each of theirs (their order among them being the order they're put there).
@@ -873,6 +879,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
+  // Mortuary: "Whenever a creature is put into your graveyard from the battlefield, put that card on top of your
+  // library": the card, if it's still in your graveyard (CR 400.7); yours, so its owner's library.
+  if (/^[Pp]ut that card on top of your library$/.test(s) && ctx.subjectLeft) {
+    const what = parseObject("that card", ctx);
+    return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
+  }
+  // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
+  if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   // Elven Warhounds: "Whenever ~ becomes blocked by a creature, put that creature on top of its owner's library": the
   // trigger's subject.

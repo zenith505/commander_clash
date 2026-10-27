@@ -143,6 +143,15 @@ export function dealDamage(
     }
     return 0;
   }
+  // Phyrexian Hydra: all of it prevented, then a -1/-1 counter for each 1 damage prevented (CR 615.5). Other shields
+  // came first (dealDamageBatch), its controller's choice of order (rulings, CR 616.1).
+  if ("object" in to && abilitiesOf(s, to.object).preventToMinusCounters && canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
+    log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
+    const put = putCounters(s, to.object, "-1/-1", n);
+    invalidateCharacteristics(s);
+    if (put) log(s, `${put} -1/-1 counter${put === 1 ? " is" : "s are"} put on ${targetName}.`);
+    return 0;
+  }
   // Ugin's Conjurant: "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove
   // that many +1/+1 counters from ~" (CR 615.5): all of it prevented, as many counters as it has removed (rulings). Combat
   // damage is one event (CR 510.2), so every source's share is prevented once it applies. Damage that can't be prevented

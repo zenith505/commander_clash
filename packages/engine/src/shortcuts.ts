@@ -404,6 +404,8 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     lifeGained: Object.fromEntries(Object.entries(t.lifeGained ?? {}).map(([k, v]) => [k, Math.min(v, LIFE_CAP)])),
     // Counted with no cap (Neheb, the Eternal's mana), like the life totals themselves.
     lifeLost: t.lifeLost,
+    // Valiant Rescuer: only the first cycle each turn matters.
+    cycled: Object.fromEntries(Object.entries(t.cycled ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
   };
 }
 

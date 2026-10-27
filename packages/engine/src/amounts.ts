@@ -7,7 +7,7 @@
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
-import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue } from "./effects";
+import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import { STARTING_LIFE, type Chosen, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
@@ -577,7 +577,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // "That spell's mana value" in a cast trigger: as it was cast, X included (CR 202.3e), even if it has left the stack.
       if (c.of.ref === "castSpell") {
         const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
-        return item && c.kind === "manaValue" ? spellManaValue(s, item) : 0;
+        if (!item) return 0;
+        // "That spell's power" (Eshki, Temur's Roar): as it is on the stack, or as it last existed there (CR 608.2h).
+        return c.kind === "manaValue" ? spellManaValue(s, item) : (spellPT(s, item, c.kind) ?? 0);
       }
       // Not sacrificed for a cost: what the ability sacrificed as it resolved ("You may sacrifice another creature. If you do,
       // ... that creature's power", Disciple of Freyalise).
@@ -1048,7 +1050,7 @@ function describeCount(c: Count): string {
     case "discardedMatching":
       return `#${c.filter.text}s discarded`;
     case "flipsWon":
-      return "flips won";
+      return c.heads ? "coins that came up heads" : "flips won";
     case "mutations":
       return "times mutated";
     default:

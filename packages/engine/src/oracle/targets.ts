@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 export const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
@@ -29,6 +29,11 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   if (attacked && (attacked[1] === "that creature is" || attacked[1] === "it is")) return ctx.defending && (ctx.subject || ctx.subjectIt) ? { ref: "attackedBySelf", subject: true } : null;
   if (attacked) return !ctx.defending ? null : attacked[1] === "it's" && ctx.subjectIt ? { ref: "attackedBySelf", subject: true } : attacked[1] === "~'s" || !ctx.subject ? { ref: "attackedBySelf" } : null;
   if (/^that permanent or player$/i.test(p)) return ctx.eventRecipient ? { ref: "eventRecipient" } : null;
+  const orPw = /^(that player) or a planeswalker that player controls$/i.exec(p);
+  if (orPw) {
+    const who = parsePlayer(orPw[1]!, ctx);
+    return who && (who.ref === "chosenPlayer" || who.ref === "eventPlayer" || who.ref === "enchantedPlayer") ? { ref: "playerOrPlaneswalker", who } : null;
+  }
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // Needle Drop: "any target that was dealt damage this turn" (a player, creature, planeswalker or battle, CR 115.4).
   if (/^any target that was dealt damage this turn$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", dealtDamageThisTurn: true, text: p.toLowerCase() }) };
@@ -62,6 +67,9 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     const spec: TargetSpec = { kind: "any", text: "any other target", ...(before.length ? { distinctFrom: before } : { notSource: true }) };
     return { ref: "anyTarget", index: addTarget(ctx, spec) };
   }
+  // Lozhan, Dragons' Legacy: "any target that isn't a commander": any player, or a creature, planeswalker or battle that
+  // isn't a commander (rulings).
+  if (/^any target that isn't a commander$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", commander: false, text: p }) };
   // "Any target that isn't a Dragon" (Wrathful Red Dragon): a player, or a creature, planeswalker or battle without
   // that subtype (CR 115.4).
   const notType = /^any target that isn't an? ([A-Z][a-z]+)$/.exec(p);
@@ -541,7 +549,14 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "lifeGainedThisTurn":
     // The number a tapAnyNumber instruction tapped, fixed before its reflexive trigger's targets are chosen (settleDivided).
     case "tappedThisWay":
+    // Prismabasher: "the number of colors among permanents you control".
+    case "colorsAmongPermanents":
+    // Archipelagore: "the number of times ~ has mutated", fixed as the mutate trigger's targets are chosen.
+    case "mutations":
       return true;
+    // Rot Hulk: "the number of opponents you have".
+    case "players":
+      return Object.keys(c).every((k) => k === "kind" || k === "opponents");
     case "power":
     case "toughness":
     case "counters":
@@ -594,7 +609,10 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const manyMax = most > 6 ? most : undefined;
   const many = range === "any number of" || manyMax ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
   // A spell's X, or an activated ability's {X} (CR 107.3a, 602.2b), announced before targets are chosen.
-  if (count === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
+  // "Up to X target creatures ..., where X is ..." (Endurance Bobblehead): the amount, as the targets are chosen
+  // (TargetSpec.manyCount, set where "where X is" is read).
+  const whereMany = count === "X" && !!upTo && !!ctx.whereX;
+  if (count === "X" && !whereMany && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
   const [mine1, theirs] = thatPlayerControls(phrase!, ctx);
@@ -651,7 +669,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const first = ctx.targets.length;
   if (many) {
     if (single || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
+    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(manyMax ? { manyMax } : {}), ...(whereMany ? { manyWhere: true as const } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
@@ -1267,7 +1285,7 @@ export function parseTargetPhrase(
     extra.basePower = Number(m[1]);
     p = p.slice(0, m.index);
   }
-  if ((m = / (?:with toughness greater than its power|that each have toughness greater than their power)$/.exec(p))) {
+  if ((m = / (?:with toughness greater than (?:its|their) power|that each have toughness greater than their power)$/.exec(p))) {
     extra.toughnessAbovePower = true;
     p = p.slice(0, m.index);
   }

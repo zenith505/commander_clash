@@ -388,6 +388,14 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   }
   // "Spend this mana only to cast monocolored spells of that color" (Throne of Eldraine): of the color chosen for its source.
   if (sentence === "Spend this mana only to cast monocolored spells of that color.") return { text: sentence, spells: { kind: "spell", colorCount: "monocolored", chosen: "color", text: "monocolored spells of the chosen color" } };
+  // Troyan, Gutsy Explorer: "Spend this mana only to cast spells with mana value 5 or greater or spells with {X} in their
+  // mana costs" (Helga: "creature spells ..."). A spell with {X} qualifies whatever its mana value.
+  const mvOrX = /^Spend this mana only to cast (?:(creature) )?spells with mana value (\d+) or greater or (?:(creature) )?spells with \{X\} in their mana costs\.$/.exec(sentence);
+  if (mvOrX) {
+    if (mvOrX[1] !== mvOrX[3]) return null;
+    const what = mvOrX[1] ? "creature spells" : "spells";
+    return { text: sentence, spells: { kind: "spell", ...(mvOrX[1] ? { types: ["Creature"] } : {}), anyOf: [{ kind: "spell", manaValue: { min: Number(mvOrX[2]) }, text: `mana value ${mvOrX[2]} or greater` }, { kind: "spell", xInCost: true, text: "with {X} in its mana cost" }], text: `${what} with mana value ${mvOrX[2]} or greater or with {X} in their mana costs` } };
+  }
   // "Only to cast a Dragon spell or an Omen spell" (Maelstrom of the Spirit Dragon): a spell with either subtype (an Omen
   // half is "Sorcery — Omen", CR 205.3k).
   const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence.replace(/^Spend this mana only to cast an? (\w+) spell or an? (\w+) spell\.$/, "Spend this mana only to cast $1 or $2 spells."));

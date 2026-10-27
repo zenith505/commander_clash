@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -2182,7 +2182,8 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
 export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoice[]) {
   const def = restingDef(s.cards[t.sourceCardId]!);
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen, t.x ?? 0);
+  const body0 = withModes(triggerBody(s, t), t.modes);
+  const fit = fitMany(body0, chosen, manyX(s, body0.targets, t.controller, t.sourceId, t.x ?? 0));
   if (typeof fit === "string") throw new RulesError(fit);
   const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);

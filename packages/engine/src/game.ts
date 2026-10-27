@@ -771,6 +771,7 @@ export function moveObject(
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
+  o.attackedTurns = undefined;
   o.couldAttack = undefined;
   o.exertedTurn = undefined;
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
@@ -8222,6 +8223,18 @@ export function withoutCompany(s: GameState, id: ObjectId, attacks: { attacker: 
   return null;
 }
 
+/** A player's last turn: their latest one that has begun, or the one before it while it's theirs (the turn number it began). */
+export function lastTurnOf(s: GameState, pid: PlayerId): number | undefined {
+  const p = player(s, pid);
+  return s.activePlayer === pid ? p.lastTurnBegan : p.turnBegan;
+}
+
+/** "That attacked during its controller's last turn" (Giant Turtle, Halls of Mist): whoever controls it now (rulings). */
+export function attackedDuringLastTurn(s: GameState, o: GameObject, controller: PlayerId): boolean {
+  const last = lastTurnOf(s, controller);
+  return last !== undefined && !!o.attackedTurns?.includes(last);
+}
+
 /** Did `them` attack `you` during their last turn (their latest one that has begun, or the one before it while it's theirs)? */
 export function attackedYouLastTurn(s: GameState, them: PlayerId, you: PlayerId): boolean {
   const p = player(s, them);
@@ -8407,6 +8420,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
     const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
     o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
+    if (o.attackedTurns?.at(-1) !== s.turn) o.attackedTurns = [...(o.attackedTurns ?? []), s.turn].slice(-8);
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   // Attacking and "each time it has attacked this turn" (Moraug) change what the layers give it.

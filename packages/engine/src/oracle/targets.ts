@@ -1121,6 +1121,12 @@ export function parseTargetPhrase(
     extra.dealtDamageToYou = true;
     p = p.slice(0, dealtYouAny.index);
   }
+  // Halls of Mist: "Creatures that attacked during their controller's last turn", whoever controls each now.
+  const attackedLast = / that attacked during their controller's last turn$/.exec(p);
+  if (attackedLast) {
+    extra.combat = "attackedLastTurn";
+    p = p.slice(0, attackedLast.index);
+  }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);
   if (attacked) {

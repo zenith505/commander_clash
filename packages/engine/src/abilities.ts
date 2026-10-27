@@ -543,7 +543,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -994,6 +994,9 @@ export type ObjRef =
   | { ref: "tappedThisWay" };
 
 /** Which player(s) an effect touches. */
+/** What a player has the most of: life, cards in hand, or permanents they control that match `filter`. */
+export type MostStat = { what: "life" } | { what: "hand" } | { what: "control"; filter: TargetSpec };
+
 export type PlayerRef =
   | { ref: "you" }
   /** "Each player ~ attacked this turn" (Angel of Destiny): the players (not planeswalkers) the source attacked this turn, as this object. */
@@ -1074,6 +1077,8 @@ export type PlayerRef =
   | { ref: "opponentsControllingNo"; filter: TargetSpec }
   /** "Each player who controls the most creatures" (No Witnesses): every player tied for the most, counted as it resolves. */
   | { ref: "mostCreatures" }
+  /** "The player who controls the most Wizards" (Thoughtbound Primoc): the one player with the most, none if two or more tie (rulings on Sokenzan Renegade). */
+  | { ref: "uniqueMost"; stat: MostStat }
   /** "Each opponent who didn't discard a nonland card this way" (Kroxa): opponents none of whose cards discarded in this resolution match `filter` (printed characteristics), those who discarded nothing too. */
   | { ref: "opponentsNotDiscarded"; filter: TargetSpec }
   /** "Each player who controls an artifact or enchantment" (Fade from History): as this instruction is carried out. */
@@ -1696,6 +1701,13 @@ export type StaticCondition =
   | { kind: "handsEmpty" }
   /** "If you played a land this turn" (River of Tears): a land played, not one put onto the battlefield (CR 305.1). */
   | { kind: "playedLandThisTurn" }
+  /**
+   * "If a player controls more Wizards than each other player" (Thoughtbound Primoc), "has more life" (Ghazbán Ogre), "has
+   * more cards in hand" (Sokenzan Renegade): exactly one player in the game has the most, none tied with it.
+   */
+  | { kind: "uniqueMost"; stat: MostStat }
+  /** "As long as an opponent owns a card in exile" (Warden of the Beyond): any card, face down too, however many (rulings). */
+  | { kind: "opponentOwnsExiled" }
   /** "If a player has one or fewer cards in hand" (Temple of the Dead): some player in the game. */
   | { kind: "someHandAtMost"; n: number; /** "As long as an opponent has no cards in hand" (Guul Draz Specter). */ opponent?: true }
   /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */
@@ -3742,6 +3754,9 @@ export type TriggerEvent =
   | "selfCountersPut"
   /** "When ~ becomes monstrous" (CR 701.37b). */
   | "selfBecomesMonstrous"
+  /** "Whenever ~ phases in" (Warping Wurm), "Whenever ~ phases out" (Teferi's Imp, looking back in time, CR 603.10b): directly or indirectly (CR 702.26g). */
+  | "selfPhasesIn"
+  | "selfPhasesOut"
   /** "Whenever this Vehicle becomes crewed": whenever a crew ability of it resolves (CR 702.122e). */
   | "selfBecomesCrewed"
   /** "Whenever ~ crews a Vehicle" (CR 702.122d): it was tapped to pay a Vehicle's crew cost; the trigger's subject is that Vehicle. */
@@ -4139,6 +4154,11 @@ export interface TriggeredAbility {
   };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
+  /**
+   * "Whenever ~ blocks or becomes blocked by one or more black creatures" (Serra Inquisitors), "blocks one or more black
+   * creatures" (Rashka the Slayer): once per combat, if any creature it blocks or that blocks it matches (rulings).
+   */
+  blockFilter?: TargetSpec;
   /**
    * For "dealsDamageToYou": a source that's a permanent fitting `subjectFilter` (the subject, "it", "that creature"), or
    * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its

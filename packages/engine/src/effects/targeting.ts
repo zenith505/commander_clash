@@ -3,7 +3,7 @@ import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification,
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
-import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
+import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
@@ -116,6 +116,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
+  if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.dealtCombatDamageToYou && !s.turnLog?.combatDamagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;

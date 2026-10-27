@@ -6,7 +6,7 @@ import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase, PE
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
-import { parseAffected, parseExtraBlocks, parseIsA, parseStaticMods } from "../statics";
+import { parseAffected, parseExtraBlocks, parseIsA, parseMostStat, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
 import { parseGrants } from "../grants";
@@ -826,6 +826,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     const what = who && parseObject(m[2]!, ctx);
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
+  // Aisling Leprechaun: "Whenever ~ blocks or becomes blocked by a creature, that creature becomes green": its color for
+  // the rest of the game (layer 5, CR 105.3; "This effect lasts indefinitely").
+  if ((m = /^[Tt]hat creature becomes (white|blue|black|red|green)$/.exec(s))) {
+    const what = parseObject("that creature", ctx);
+    const mods = parseChanges(`becomes ${m[1]}`);
+    return what?.ref === "subject" && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // Thoughtbound Primoc: "the player who controls the most Wizards gains control of ~", Ghazbán Ogre: "the player with the
+  // most life", Sokenzan Renegade: "the player who has the most cards in hand": counted as it resolves, nobody if two or
+  // more are tied (rulings). For the rest of the game (layer 2).
+  if ((m = /^[Tt]he player (?:who controls the most ([A-Za-z]+)|with the most (life)|who has the most (cards in hand)) gains control of ~$/.exec(s))) {
+    const stat = parseMostStat(m[1] ?? m[2] ?? m[3]!);
+    return stat ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "uniqueMost", stat } }] : null;
   }
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
   // Jeweled Amulet: "Note the type of mana spent to pay this activation cost."

@@ -1,6 +1,6 @@
 # Roadmap
 
-26,277 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+26,319 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,934 of 4,988 (98%), top 10,000: 8,740 of
 9,979 (87%).
 
@@ -1648,17 +1648,38 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Skipped there, with reasons: Drake Familiar (returns any player's enchantment), Storm Elemental (a condition on the
   exiled card), Gift of Doom, Dralnu's Pet, Pollen Remedy, Chocobo Kick, Blood Tribute, Thought Lash and Phyrexian
   Devourer (their other lines aren't parsed yet).
+- Round B13 (harder skipped cards, least played first): state triggers (CR 603.8) are checked between the instructions
+  of a resolving spell or ability too ("even if only for a brief moment", rulings on Emperor Crocodile and Veiled
+  Crocodile), with an intervening if checked as they trigger (CR 603.4): "When an opponent has 10 or less life / you have
+  10 or less life / a player has no cards in hand / an opponent controls a creature with power 4 or greater, if ~ is an
+  enchantment, it becomes ..." (Lurking Jackals, Opal Avenger, Veiled Crocodile, Hidden Predators), Hidden Herd's "When
+  an opponent plays a nonbasic land", Opal Guardian's "~ becomes"; "When you control a creature with toughness 2 or less
+  / no other artifacts / no other creatures / a Dwarf, sacrifice ~"; "the player who controls the most Wizards / with
+  the most life / who has the most cards in hand gains control of ~", nobody on a tie (Thoughtbound Primoc, Wild
+  Mammoth, Ghazbán Ogre, Wild Dogs, Sokenzan Renegade); "~ phases out / ~ deals 8 damage to you / tap ~ unless you pay
+  ..." (Vaporous Djinn, Force of Nature, Minion of Tevesh Szat, Heavyweight Demolisher, Hasran Ogress); "Whenever ~
+  phases in / out" (Teferi's Imp, Shimmering Efreet; phasing out looks back in time, CR 603.10b); "blocks or becomes
+  blocked by one or more black creatures / Orcs", "blocks one or more black creatures", once per combat (Serra
+  Inquisitors, Amphibious Kavu, Dwarven Soldier, Rashka the Slayer); "that creature becomes green" (Aisling
+  Leprechaun); "if it attacked during your last turn" (Giant Turtle, Goblin Rock Sled, Tangle Kelp, Halls of Mist;
+  GameObject.attackedTurns); the Apocalypse Sanctuaries ("If you control a green permanent and a white permanent, ...
+  instead", one permanent of both colors counts, rulings); Keeper of Tresserhorn and Lim-Dûl's Paladin; Zealots en-Dal
+  ("all nonland permanents you control are white"), Warden of the Beyond ("an opponent owns a card in exile"), Walking
+  Dream, Lone Revenant. +42 (26,287 with round B12).
+- Skipped there, with reasons: Warping Wurm (its "phases in" counter and its upkeep "phases out unless you pay" go on the
+  stack together in the order its controller chooses, CR 603.3b; the engine has no such choice, and its order loses the
+  counter); Floral Spuzzem, Kukemssa Pirates, Goblin Vandal and Rysorian Badger ("If you do" after destroying, gaining
+  control of or exiling a target); Cosmic Horror ("if ~ is destroyed this way"); Electrozoa (energy at the first main
+  phase).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
-  supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
-  (creatures sharing a type), Heart Wolf (Dwarves, a delayed
-  leaves trigger), Endangered Armodon (state trigger), Exiled Doomsayer (morph cost tax), Treacherous Vampire and
-  Rotting Giant (sacrifice unless you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in
-  a graveyard dealing damage), Cut the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of
-  Blasting, Tribal Golem, Forethought Amulet; Unforge, Reign of Terror ("for each creature that died this way"),
-  Duskworker, Saprazzan Outrigger, Goblin Rock Sled, Vaporous
-  Djinn and Warping Wurm (phase out unless you pay), Zealots en-Dal, Synod Centurion, Steeling Stance (forecast),
-  Warden of the Beyond, Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Walking Dream, Burning Palm Efreet, Smoke Teller
+  supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Heart Wolf (Dwarves, a
+  delayed leaves trigger), Exiled Doomsayer (morph cost tax), Treacherous Vampire and Rotting Giant (sacrifice unless
+  you exile a card from your graveyard), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
+  the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Word of Blasting, Tribal Golem, Forethought
+  Amulet; Unforge, Reign of Terror ("for each creature that died this way"), Duskworker, Saprazzan Outrigger, Steeling
+  Stance (forecast), Fire and Brimstone, Exalted Dragon, Qal Sisma Behemoth, Cold Snap, Stabilizer, Burning Palm
+  Efreet, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a

@@ -610,6 +610,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!pay) return null;
     return [{ type: "may", effects: [], pay, otherwise: [{ type: "tap", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~ untapped` }];
   }
+  // Vaporous Djinn: "~ phases out unless you pay {U}{U}"; Force of Nature: "~ deals 8 damage to you unless you pay
+  // {G}{G}{G}{G}"; Heavyweight Demolisher: "tap ~ unless you pay {3}": chosen as it resolves (rulings on Hasran Ogress).
+  if ((m = /^(~ phases out|~ deals \w+ damage to you|[Tt]ap ~) unless you pay ((?:\{(?:\d+|[WUBRGC])\})+)$/.exec(s)) && (!/^~ deals/.test(m[1]!) || /^~ deals (?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) damage/.test(m[1]!))) {
+    const otherwise = parseSentence(m[1]!.replace(/^tap/, "Tap"), ctx);
+    const pay = parsePayCost(m[2]!);
+    if (!otherwise || otherwise.length !== 1 || !pay?.mana || !plainMana(pay.mana)) return null;
+    return [{ type: "may", effects: [], pay, otherwise, keep: true, text: `Pay ${m[2]}${/phases/.test(m[1]!) ? " to keep ~ phased in" : /^~ deals/.test(m[1]!) ? " to prevent ~'s damage" : " to keep ~ untapped"}` }];
+  }
   // Rush of Inspiration: "discard a card at random unless you pay {E}{E}": the choice is made on resolution, after the
   // draw before it; without the energy, the card is discarded.
   if ((m = /^(?:[Tt]hen )?[Dd]iscard a card( at random)? unless you pay ((?:\{E\})+)$/.exec(s))) {

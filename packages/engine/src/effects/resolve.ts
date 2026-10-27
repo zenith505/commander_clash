@@ -2,7 +2,7 @@ import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type E
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
-import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
@@ -27,7 +27,7 @@ import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { ringBearer } from "./run-ring";
-import { closeZoneBatch, fireEvent } from "./triggers";
+import { checkStateConditions, closeZoneBatch, fireEvent } from "./triggers";
 import { foundWith } from "../mutate";
 
 export interface ResolveCtx {
@@ -187,6 +187,8 @@ export function continueResolution(s: GameState): Resolution {
       // Auras coming back because the last instruction made an "until ~ leaves" source leave (CR 303.4f, 610.3).
       if (askAuraReturns(s) === "asked") return "paused";
       if (askGraveyardOrder(s)) return "paused";
+      // A state true only partway through the resolution still triggers (CR 603.8).
+      if (r.next > 0) checkStateConditions(s);
     }
     if (r.next >= r.body.effects.length) break;
     if (!r.scratch) s.leftTogether = undefined; // a new instruction, not one resuming after a choice
@@ -583,6 +585,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const n = (p: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === p && objIsType(s, obj(s, id), "Creature")).length;
       const most = Math.max(0, ...livingPlayers(s).map(n));
       return apnap(s, livingPlayers(s).filter((p) => n(p) === most));
+    }
+    case "uniqueMost": {
+      const p = uniqueMostPlayer(s, ref.stat, (who, f) => s.battlefield.filter((id) => { const o = obj(s, id); return controllerOf(s, o) === who && objectMatches(s, f, o, ctx.controller, false); }).length);
+      return p === undefined ? [] : [p];
     }
     case "opponentsControllingNo":
       return opponents(s, ctx.controller).filter((p) => !s.battlefield.some((id) => { const o = obj(s, id); return controllerOf(s, o) === p && objectMatches(s, ref.filter, o, ctx.controller, false); }));

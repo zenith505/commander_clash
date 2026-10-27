@@ -1,4 +1,4 @@
-import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
+import type { Amount, AmountExpr, Affects, Modification, MostStat, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
 import { ANY_COUNTER } from "../abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
@@ -78,7 +78,16 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseConditionalStatic(`As long as ~ has a ${ifCounter[1]} counter on it, it doesn't untap during your untap step.`);
     return st && { ...st, text: line };
   }
-  const ifControl = /^~ doesn't untap during your untap step if (you control an? [A-Z][a-z]+)\.$/.exec(line);
+  // Goblin Rock Sled: "~ doesn't untap during your untap step if it attacked during your last turn", Giant Turtle: "~
+  // can't attack if it attacked during your last turn", Tangle Kelp: "Enchanted creature doesn't untap during its
+  // controller's untap step if it attacked during its controller's last turn": "as long as" that's so.
+  const ifAttacked = /^(~ doesn't untap during your untap step|~ can't attack|Enchanted creature doesn't untap during its controller's untap step) if (it attacked during (?:your|its controller's) last turn)\.$/.exec(line);
+  if (ifAttacked) {
+    const st = parseConditionalStatic(`As long as ${ifAttacked[2]}, ${ifAttacked[1]!.replace(/^Enchanted/, "enchanted")}.`);
+    return st && { ...st, text: line };
+  }
+  // Walking Dream: "if an opponent controls two or more creatures".
+  const ifControl = /^~ doesn't untap during your untap step if (you control an? [A-Z][a-z]+|an opponent controls two or more creatures)\.$/.exec(line);
   if (ifControl) {
     const st = parseConditionalStatic(`As long as ${ifControl[1]}, ~ doesn't untap during your untap step.`);
     return st && { ...st, text: line };
@@ -614,8 +623,22 @@ export function parseUntargetable(t: string): Untargetable | null {
   return null;
 }
 
+/** What a player has the most of: "life", "cards in hand", or "Wizards" / "creatures" they control. */
+export function parseMostStat(what: string): MostStat | null {
+  if (what === "life") return { what: "life" };
+  if (what === "cards in hand") return { what: "hand" };
+  const filter = /^(?:[A-Z][a-z]+s|creatures|lands|artifacts|enchantments)$/.test(what) ? pickFilter(what) : null;
+  return filter ? { what: "control", filter } : null;
+}
+
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
+  // Thoughtbound Primoc: "if a player controls more Wizards than each other player", Ghazbán Ogre: "has more life",
+  // Sokenzan Renegade: "has more cards in hand": one player with the most, none tied (rulings).
+  if ((m = /^a player (?:controls more ([A-Za-z]+)|has more (life|cards in hand)) than each other player$/.exec(text))) {
+    const stat = parseMostStat(m[1] ?? m[2]!);
+    return stat ? { kind: "uniqueMost", stat } : null;
+  }
   // Blood Baron of Vizkopa: "as long as you have 30 or more life and an opponent has 10 or less life"; Sardian
   // Cliffstomper: "as long as it's your turn and you control four or more Mountains": both at once.
   if ((m = /^(it's your turn|you have \w+ or more life) and (.+)$/.exec(text))) {
@@ -891,6 +914,14 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you (?:control more (lands|creatures)|have more (life|cards in hand)) than each opponent$/.exec(text)))
     return { kind: "youMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
+  if (text === "an opponent owns a card in exile") return { kind: "opponentOwnsExiled" };
+  // Zealots en-Dal: "if all nonland permanents you control are white": none of them isn't (a colorless one isn't white).
+  if ((m = /^all nonland permanents you control are (white|blue|black|red|green)$/.exec(text)))
+    return { kind: "control", who: "you", filter: { kind: "object", types: [], notTypes: ["Land"], notColors: [COLOR_WORDS[m[1]!]!], text: `nonland non${m[1]} permanent` }, max: 0 };
+  // Giant Turtle: "if it attacked during your last turn" (its controller's, rulings); Tangle Kelp: "if it attacked during
+  // its controller's last turn", the enchanted creature.
+  if (/^it attacked during your last turn$/.test(text) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", combat: "attackedLastTurn", text: "that attacked during your last turn" } };
+  if (/^it attacked during its controller's last turn$/.test(text) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", combat: "attackedLastTurn", text: "that attacked during its controller's last turn" } };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
   if (/^it attacked this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackedThisTurn" };
@@ -1097,7 +1128,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Mercadian Atlas: "if you didn't play a land this turn".
   if (/^you didn't play a land this turn$/.test(text)) return { kind: "not", cond: { kind: "playedLandThisTurn" } };
   // Naomi, Pillar of Order; Kami of Terrible Secrets: "if you control an artifact and an enchantment": both.
-  if ((m = /^you control (an? [a-z]+) and (an? [a-z]+)$/.exec(text))) {
+  // Necra Sanctuary: "if you control a green permanent and a white permanent": one of each (a green and white one is both).
+  if ((m = /^you control (an? (?:(?:white|blue|black|red|green) permanent|[a-z]+)) and (an? (?:(?:white|blue|black|red|green) permanent|[a-z]+))$/.exec(text))) {
     const conds = [m[1]!, m[2]!].map((x) => parseStaticCondition(`you control ${x}`, st));
     return conds.every((c) => c?.kind === "control" && c.min === 1) ? { kind: "allOf", conds: conds as StaticCondition[] } : null;
   }
@@ -1138,6 +1170,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Thopter Assembly: "if you control no Thopters other than ~": the same as not controlling another Thopter.
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
+  // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
+  if ((m = /^you control no other (artifact|creature|land|enchantment)s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");

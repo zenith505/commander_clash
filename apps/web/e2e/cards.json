@@ -17624,6 +17624,38 @@
   "gameChanger": true
  },
  {
+  "oracleId": "66fc64db-7dc4-43fa-8087-281a72286c35",
+  "name": "Vaporous Djinn",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Creature — Djinn",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Djinn"
+  ],
+  "oracleText": "Flying\nAt the beginning of your upkeep, this creature phases out unless you pay {U}{U}. (While it's phased out, it's treated as though it doesn't exist. It phases in before you untap during your next untap step.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "09496421-74e4-466a-9546-56f2a0c8eef4",
   "name": "Vault of Whispers",
   "manaCost": "",

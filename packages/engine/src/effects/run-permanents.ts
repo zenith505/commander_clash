@@ -1375,10 +1375,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           return "paused";
         }
         const me = sc.attachWhich === "none" ? undefined : options.find((o) => o.id === sc.attachWhich);
-        if (me) {
-          attachTo(s, me, host);
-          log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
-        }
+        if (me) attachTo(s, me, host);
       }
       return;
     }

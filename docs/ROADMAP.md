@@ -1,7 +1,7 @@
 # Roadmap
 
-26,365 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,934 of 4,988 (98%), top 10,000: 8,740 of
+26,398 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,753 of
 9,979 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -401,6 +401,24 @@ line blocks.
    greatest power among creatures sacrificed this way), Old One Eye (a trigger from the graveyard), Phyrexian Soulgorger
    (cumulative upkeep that sacrifices creatures), Tangled Colony (damage dealt to it this turn), Erebos's Intervention
    (up to twice X targets), Judge Unworthy (scry, then reveal, then damage).
+   Round 184 went on from the top: pack tactics, the total power of the creatures attacked with as they were declared
+   (Battle Cry Goblin, Gnoll Hunter, Hobgoblin Captain, Intrepid Outlander, Minion of the Mighty, Targ Nar, Tiger-Tribe
+   Hunter), Troyan and Helga (mana for spells with mana value N or greater or with {X}), Elenda, Saint of Dusk, Eshki
+   ("that spell's power"), Lozhan ("any target that isn't a commander") and the Adventure spell triggers (Storyteller
+   Pixie, Chancellor of Tales, Gorion), Vial Smasher the Fierce and Curse of the Pierced Heart ("that player or a
+   planeswalker that player controls", a new prompt), "choose an opponent at random" (Raving Dead, Ruhan of the Fomori,
+   Truth or Consequences), Doran, Besieged by Time, Phial of Galadriel, Ral Zarek (coins no one calls), Robot
+   Domination, and "up to X targets, where X is ..." counted as the targets are chosen (Endurance Bobblehead,
+   Prismabasher, Mogis's Marauder, Archipelagore, Aether Burst, Recantation, Rumbling Crescendo, Serra's Liturgy, Vile
+   Requiem). Fixed: Blightwing Bandit exiled the top card of your own library, not that opponent's.
+   Out after round 184 (looked at, not done): Neverwinter Hydra (dice rolled as it enters), Blood Scrivener (a draw
+   replaced by two draws and a life loss), Knight Rampager (a target chosen at random), Rot Hulk (up to X cards returned
+   from a graveyard to the battlefield), Agility Bobblehead ("can't be blocked except by creatures with haste"),
+   Pili-Pala ({Q} in a mana ability), Trail of Mystery ("whenever a permanent you control is turned face up"), Sarkhan
+   the Masterless (each Dragon deals damage to the attacker), Ephara, God of the Polis (another creature entered under
+   your control last turn), Mindblade Render (combat damage dealt by a Warrior), Killing Wave (each creature's controller
+   pays life or sacrifices it), Dreadhound (a creature card put into a graveyard from a library), Indoraptor (bloodthirst
+   X), Werewolf Pack Leader ("isn't a Human").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1690,7 +1708,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ..., and gains" (Defiling Tears), "an additional +2/+2" (Strength of Night); Burning Palm Efreet, Thoughtcutter
   Agent, Rookie Mistake, Stinging Vitriol, Ral's Staticaster, Saprazzan Outrigger, Duskworker, Sawtooth Thresher, Mist
   Dragon, Psychic Allergy, Paragon of the Amesha, Dragonsoul Knight, Jump Scare, Wings of Velis Vel, Sash and
-  Waistcoat. +46 (26,365 with round 183).
+  Waistcoat. +46 (26,398 with round 184).
 - Skipped there, with reasons: Icy Prison ("unless any player pays {3}": the bots would pay to keep an opponent's
   creature exiled); Hail Storm (its damage to attackers and to you and your creatures is one event, not two); Urborg
   Stalker (a "nonblack, nonland permanent" in an intervening if); Fyndhorn Druid ("if it was blocked this turn" needs

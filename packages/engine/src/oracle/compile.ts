@@ -1901,6 +1901,21 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsLoseDouble = true;
       continue;
     }
+    // Phial of Galadriel: "If you would draw a card while you have no cards in hand, draw two cards instead." The two draws
+    // it makes aren't replaced by it again (CR 614.5).
+    if (line === "If you would draw a card while you have no cards in hand, draw two cards instead." && !out.drawTwoInstead) {
+      out.drawTwoInstead = "always";
+      out.drawTwoIf = { kind: "handAtLeast", n: 0, exactly: true };
+      continue;
+    }
+    // "If you would gain life while you have 5 or less life, you gain twice that much life instead." (Phial of Galadriel):
+    // the life total before the gain.
+    const lowGain = /^If you would gain life while you have (\d+) or less life, you gain twice that much life instead\.$/.exec(line);
+    if (lowGain && !out.doubleLifeGain) {
+      out.doubleLifeGain = true;
+      out.doubleLifeGainIf = { kind: "life", max: Number(lowGain[1]) };
+      continue;
+    }
     if (line === "If you would gain life, you gain twice that much life instead.") {
       out.doubleLifeGain = true;
       continue;
@@ -3378,6 +3393,14 @@ export function compile(d: CardDef): CompiledCard {
       for (const p of attachedStatics) out.statics.push({ ...p!, text: line });
       continue;
     }
+    // Elenda, Saint of Dusk: "As long as <condition>, ~ gets +1/+1 and has menace. ~ gets an additional +5/+5 as long as
+    // <condition>.": two static abilities of ~, each with its own condition; the second bonus adds to the first.
+    const selfParts = /^As long as [^,.]+, ~ [^.]+\. ~ gets an additional [^.]+ as long as [^.]+\.$/.test(line) ? line.split(/(?<=\.) /) : null;
+    const selfStatics = selfParts?.map((p) => { const q = p.replace(/^~ gets an additional /, "~ gets "); return parseConditionalStatic(q) ?? parseStatic(q); });
+    if (selfStatics?.every((p) => p?.affects.kind === "self" && p.condition)) {
+      for (const p of selfStatics) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // "Lieutenant — As long as you control your commander, ~ gets +2/+2 and creatures you control have vigilance"
     // (Angelic Field Marshal), "... and other creatures you control get +2/+2 and have trample" (Thunderfoot Baloth):
     // two effects of one static ability with one condition, each read as its own (CR 604.2, 611.3).
@@ -3480,7 +3503,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When (a player casts a spell) or (a creature attacks), (.+)$/.exec(line) ??
       // Powerstone Minefield: "Whenever a creature attacks or blocks, ~ deals 2 damage to it.": each creature as it's
       // declared as an attacker or as a blocker (CR 508.1, 509.1), never both at once.
-      /^Whenever a creature (attacks) or (blocks), (.+)$/.exec(line) ??
+      // Doran, Besieged by Time: "Whenever a creature you control attacks or blocks": yours only.
+      /^Whenever a creature (?:you control )?(attacks) or (blocks), (.+)$/.exec(line) ??
       // Lady Octopus: "Whenever you draw your first or second card each turn": each card is drawn one at a time (CR 121.2).
       /^Whenever you draw your (first) or (second) card each turn, (.+)$/.exec(line) ??
       // Astrologian's Planisphere: "Whenever you cast a noncreature spell and whenever you draw your third card each turn":
@@ -3488,8 +3512,8 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (you cast an? [^,]+? spell) and whenever (you draw your (?:first|second|third) card each turn), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
-      const events = /^Whenever a creature attacks or blocks, /.test(line)
-        ? [`Whenever a creature attacks, ${effect}`, `Whenever a creature blocks, ${effect}`]
+      const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
+        ? ((who) => [`Whenever ${who} attacks, ${effect}`, `Whenever ${who} blocks, ${effect}`])(/ you control /.test(line) ? "a creature you control" : "a creature")
         : /^When you cast ~ and whenever/.test(line)
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
         : /^When you cast ~ and when ~ dies, /.test(line)

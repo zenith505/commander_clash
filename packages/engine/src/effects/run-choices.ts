@@ -20,6 +20,7 @@ import { voteWins } from "./run-votes";
 import { defMv } from "../faces";
 import { putCounters } from "../counters";
 import { CREATURE_TYPES } from "../keywords";
+import { nextRandom } from "../rng";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -460,6 +461,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
         const most = Math.max(...living.map((x) => player(s, x).life));
         const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : opponents(s, ctx.controller);
+        // "At random": no one chooses (CR 608.2d doesn't apply).
+        if (e.random && opps.length > 1) {
+          const pick = opps[Math.floor(nextRandom(s) * opps.length)]!;
+          r.chosen = { ...r.chosen, player: pick };
+          log(s, `${player(s, pick).name} is chosen at random for ${src}.`);
+          return;
+        }
         if (opps.length === 1) {
           r.chosen = { ...r.chosen, player: opps[0]! };
           log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);

@@ -951,6 +951,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const w = s.players[you]?.attackedWith;
       return w?.turn === s.turn && w.keys.length >= cond.n;
     }
+    case "attackPower": {
+      const w = s.players[you]?.attackPower;
+      return w?.turn === s.turn && w.n >= cond.n;
+    }
     case "handAtLeast": {
       const n = s.players[you]?.hand.length ?? 0;
       return cond.exactly ? n === cond.n : cond.fewer ? n < cond.n : n >= cond.n;
@@ -1427,6 +1431,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.attacksIfAble = true;
       return;
     case "mustAttackPlayer":
+      if (m.player === "chosen" || (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0))) return;
       if (!c.mustAttack.includes(m.player)) c.mustAttack.push(m.player);
       return;
     case "cantBeBlockedBy":

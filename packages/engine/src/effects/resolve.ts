@@ -809,6 +809,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
+      : // "~ attacks that player this combat if able" (Raving Dead): the player chosen as it resolved, in the combat going on.
+        m.kind === "mustAttackPlayer"
+        ? { ...m, ...(m.player === "chosen" && s.resolving?.chosen?.player !== undefined ? { player: s.resolving.chosen.player } : {}), ...(m.combat === "this" ? { combat: s.combatsThisTurn ?? 0 } : {}) }
       : m.kind === "mustBeBlocked" && m.combat === "this"
       ? { kind: "mustBeBlocked", combat: s.combatsThisTurn ?? 0 }
       : // "Those players" (Chaos Dragon): the opponents with the highest result of the roll just made, ties included.
@@ -1276,6 +1279,14 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     return { objs: [], pids: at?.attacking !== undefined && !s.players[at.attacking]?.lost ? [at.attacking] : [] };
   }
   // "That permanent or player" (Ghyrson Starn): the permanent dealt damage, while it's still that permanent, else the player.
+  // The player or planeswalker chosen as it resolved (see runBasicsEffect "damage"), while it's still that permanent.
+  if (to.ref === "playerOrPlaneswalker") {
+    const whom = s.resolving?.scratch?.damageWhom;
+    if (whom === undefined) return { objs: [], pids: [] };
+    if (whom.startsWith("p")) return { objs: [], pids: [Number(whom.slice(1)) as PlayerId] };
+    const o = s.objects[whom];
+    return { objs: o?.zone === "battlefield" ? [o] : [], pids: [] };
+  }
   if (to.ref === "eventRecipient") return ctx.subject ? { objs: objects(s, { ref: "subject" }, ctx), pids: [] } : { objs: [], pids: players(s, { ref: "eventPlayer" }, ctx) };
   if (to.ref === "anyTarget") {
     const out: { objs: GameObject[]; pids: PlayerId[] } = { objs: [], pids: [] };

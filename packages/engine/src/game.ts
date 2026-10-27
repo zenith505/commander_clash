@@ -12,7 +12,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
@@ -1740,7 +1740,11 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
     log(s, `${player(s, pid).name} gains ${plus} more life.`);
   }
   // "If you would gain life, you gain twice that much life instead" (CR 614.1a): each one doubles it again (rulings).
-  const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).doubleLifeGain).length;
+  // Phial of Galadriel: only while its controller has 5 or less life, before the gain.
+  const doublers = s.battlefield.filter((id) => {
+    const ab = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    return !!ab?.doubleLifeGain && (!ab.doubleLifeGainIf || staticConditionNow(s, ab.doubleLifeGainIf, id, pid));
+  }).length;
   if (doublers) {
     n *= 2 ** doublers;
     log(s, `${player(s, pid).name} gains twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
@@ -4339,7 +4343,7 @@ export function castProblem(
   let specs = settleDivided(s, { targets: spellTargetSpecs(d, modes, castHow(choices)), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
-    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, x);
+    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, manyX(s, specs, pid, id, x));
     if (typeof fit === "string") return fit;
     [specs, targets] = [fit.body.targets, fit.targets];
   }
@@ -4638,8 +4642,14 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       // Semblance Anvil: a card type (CR 205.2a) the spell shares with a card exiled with it (CR 607.2a).
       if (m.sharesTypeWithLinked && !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t)))) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
-      const { manaValue: range, power: pw, ...rest } = bindChosen(m.filter, src.chosen);
+      const { manaValue: range, power: pw, toughnessAbovePower: tough, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
+      // "With toughness greater than their power" (Doran, Besieged by Time): the spell's own, a "*" by its
+      // characteristic-defining ability (CR 604.3), as for power below.
+      if (tough) {
+        const [p, t] = (["power", "toughness"] as const).map((k) => (/^\d+$/.test(d[k] ?? "") ? Number(d[k]) : characteristics(s, o)[k]));
+        if (!(t! > p!)) continue;
+      }
       if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
       // "With power 4 or greater" (Goreclaw): the spell's own power, a "*" by its characteristic-defining ability (CR
       // 604.3); not counters or effects it would have on the battlefield (rulings).
@@ -5078,7 +5088,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
-    const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   // Spliced cards' text, after the spell's own (CR 702.47c); the cards stay in your hand, revealed.
@@ -6439,7 +6449,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
-    const fit = fitMany(body, targets, x);
+    const fit = fitMany(body, targets, manyX(s, body.targets, pid, id, x));
     if (typeof fit === "string") return fit;
     [body, targets] = [fit.body, fit.targets];
   }
@@ -6726,7 +6736,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   if (manySlot(body.targets) >= 0) {
-    const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
+    const fit = fitMany(body, targets ?? [], manyX(s, body.targets, p.id, id, x)) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
@@ -7009,7 +7019,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, t.x ?? 0);
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, manyX(s, pend.specs, p.id, t.sourceId, t.x ?? 0));
   if (typeof fit === "string") throw new RulesError(fit);
   const problem = targetProblem(s, fit.body.targets, fit.targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
@@ -7596,6 +7606,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "rollResult") {
     // "Roll two d8 and choose one result": which die is "that result" (see runDiceEffect).
     (r.scratch ??= {}).rollChoice = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "damageWhom") {
+    // "That player or a planeswalker that player controls": the one the damage is dealt to (see Effect "damage").
+    if (!pend.options.includes(choice)) throw new RulesError("choose the player or one of their planeswalkers");
+    (r.scratch ??= {}).damageWhom = choice;
+    log(s, `${p.name} chooses ${pend.labels?.[pend.options.indexOf(choice)] ?? choice} for ${pend.source}.`);
     continueResolution(s);
     return;
   }
@@ -8431,6 +8449,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
   if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
+  // Pack tactics: their power as they attack, statics for attacking creatures counted; a power below 0 adds nothing.
+  p.attackPower = { turn: s.turn, n: attacks.reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0) };
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
   if (p.attackedPlayers.players.length) p.attackedInTurn = { turn: s.turn, players: [...new Set([...(p.attackedInTurn?.turn === s.turn ? p.attackedInTurn.players : []), ...p.attackedPlayers.players])] };

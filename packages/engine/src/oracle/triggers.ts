@@ -592,8 +592,13 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     if (kind?.kind !== "spell") return "fail";
     if ((nth[5] === "during their turn" && nth[1] === "you") || (nth[5] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
     const spellX = !!nth[4] && /\bX\b/.test(nth[6]!) && !/\bwhere X is\b/.test(nth[6]!);
-    const body0 = parseBody(nth[6]!, { castSpell: true, eventPlayer: true, ...(spellX ? { ownX: true } : {}) });
-    const body = body0 && spellX ? { ...replaceX(body0, { count: { kind: "castSpellX" } }), text: body0.text } : body0;
+    // "That player" is the one who cast it, except when that's you: then it's the opponent whose turn it is (Blightwing
+    // Bandit: "during each opponent's turn, look at the top card of that player's library"), or a player the text chose
+    // (Vial Smasher the Fierce: "choose an opponent at random. ... that player").
+    const youOpp = nth[1] === "you" && nth[5] === "during each opponent's turn";
+    const body0 = parseBody(nth[6]!, { castSpell: true, ...(nth[1] !== "you" || youOpp ? { eventPlayer: true } : {}), ...(spellX ? { ownX: true } : {}) });
+    const body1 = body0 && youOpp ? { ...(JSON.parse(JSON.stringify(body0).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body0), text: body0.text } : body0;
+    const body = body1 && spellX ? { ...replaceX(body1, { count: { kind: "castSpellX" } }), text: body1.text } : body1;
     const nth4 = nth[5];
     return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }

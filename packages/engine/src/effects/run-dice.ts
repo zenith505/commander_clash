@@ -106,6 +106,15 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
       return "paused";
     }
   }
+  // Ral Zarek: flips no one calls, only heads or tails (CR 705.2): no "won" or "lost" events (rulings). With Krark's Thumb
+  // each is two coins and one is ignored: the heads one is kept.
+  if (e.uncalled) {
+    let heads = 0;
+    for (let i = 0; i < (e.n ?? 1); i++) if (flip().some((h) => h)) heads++;
+    s.resolving!.flipped = { won: heads > 0, wins: heads };
+    log(s, `${player(s, who).name} flips ${e.n ?? 1} coins for ${src}: ${heads} came up heads.`);
+    return;
+  }
   let wins = 0;
   let won = false;
   // Even "until you lose a flip" ends some time; a long run of wins is cut short where paper Magic would be (CR 732).

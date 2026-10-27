@@ -289,6 +289,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Put a +1/+1 counter on ~ for each flip you won" (Crazed Firecat).
   // "For each flip you win, create ..." (Goblin Traprunner, after "flip three coins") too.
   if (each && /^flip you w(?:on|in)$/i.test(p)) return count({ kind: "flipsWon" });
+  // Ral Zarek: "for each coin that comes up heads", after uncalled flips (see body.ts).
+  if (each && /^coin that comes up heads$/i.test(p) && ctx?.uncalledFlips) return count({ kind: "flipsWon", heads: true });
   // Life and hands.
   if ((m = /^(your|their|that player's|target player's|target opponent's|enchanted player's) life total$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
@@ -384,6 +386,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
   // Caller of the Claw: "for each nontoken creature put into your graveyard from the battlefield this turn".
+  if (/^artifacts that were put into graveyards from the battlefield this turn$/i.test(p)) return count({ kind: "artifactsToGraveyardThisTurn" });
   if ((m = /^(nontoken )?creatures? put into your graveyard from the battlefield this turn$/i.exec(p))) return count({ kind: "creaturesToYourGraveyard", ...(m[1] ? { nontoken: true as const } : {}) });
   if ((m = /^(nontoken )?creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[2] ? { yours: true as const } : {}), ...(m[1] ? { nontoken: true as const } : {}) });
   // The Zubera: "for each Zubera that died this turn", any player's.
@@ -540,12 +543,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
-    if (of?.ref === "castSpell" && kind !== "manaValue") return null;
+    if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
     return of && count({ kind, of });
   }
   // "The difference between that creature's power and its toughness" (Jaws of Defeat): the larger less the smaller
   // (rulings).
-  if ((m = /^the difference between (~'s|its|that creature's) power and its toughness$/i.exec(p))) {
+  // Doran, Besieged by Time: "the difference between its power and toughness".
+  if ((m = /^the difference between (~'s|its|that creature's) power and (?:its )?toughness$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     return of && count({ kind: "absDifference", of: [{ kind: "power", of }, { kind: "toughness", of }] });
   }
@@ -743,7 +747,11 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
   if (x === "that card's" && ctx.revealedTop) return { ref: "revealed" };
   if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
-  if (x === "that card's") return ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" ? { ref: "target", index: 0 } : null;
+  // Pyretic Rebirth: "... ~ deals damage equal to that card's mana value to up to one target creature": the one card targeted.
+  if (x === "that card's") {
+    const cards = ctx.targets.flatMap((t, i) => (t.kind === "card" ? [i] : []));
+    return cards.length === 1 && ctx.targets.every((t) => t.kind === "card" || t.kind === "object" || t.kind === "any") ? { ref: "target", index: cards[0]! } : null;
+  }
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
   if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;
   // "The creature's power" after "that creature's controller" (Boros Fury-Shield): the creature targeted.

@@ -17927,6 +17927,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1b355139-4891-436c-9079-0ce17ecc2d65",
+  "name": "Vial Smasher the Fierce",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Goblin Berserker",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Berserker"
+  ],
+  "oracleText": "Whenever you cast your first spell each turn, choose an opponent at random. Vial Smasher deals damage equal to that spell's mana value to that player or a planeswalker that player controls.\nPartner (You can have two commanders if both have partner.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "c16",
+  "releasedAt": "2016-11-11",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c6adfaa7-d9cf-4501-8e7d-e035369390d2",
   "name": "Vicious Offering",
   "manaCost": "{1}{B}",

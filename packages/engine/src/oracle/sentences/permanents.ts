@@ -295,6 +295,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const inner = parseSentence(capital(m[2]!), ctx);
     return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[2]!, thisTurn: true, ...(m[1] ? { underYourControl: true as const } : {}) }] : null;
   }
+  // Virulent Wound: "When that creature dies this turn, its controller gets a poison counter": the player who controlled
+  // it as it last existed on the battlefield (CR 603.10a, 608.2h).
+  if (/^When that creature dies this turn, its controller gets a poison counter$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "poison", who: { ref: "subjectController" }, n: 1 }], text: "its controller gets a poison counter", thisTurn: true }];
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
   // doesn't return (rulings).
@@ -979,6 +983,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // control this combat." Ties count: an opponent with the same result as yours had the highest result (rulings).
   if (/^If one or more opponents had the highest result, ~ can't attack those players or planeswalkers they control this combat$/.test(s))
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantAttackPlayers", players: "highestRoll", combat: "this" }], duration: "endOfTurn" }];
+  // Raving Dead: "Choose an opponent at random. ~ attacks that player this combat if able": a requirement to attack that
+  // player (CR 508.1d), as encore's; one that can't attack them needn't attack at all.
+  if (/^~ attacks that player this combat if able$/.test(s) && ctx.chosenOpponent) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "mustAttackPlayer", player: "chosen", combat: "this" }], duration: "endOfTurn" }];
   // "That token attacks this combat if able" (Howlsquad Heavy): the same requirement, nothing else gained.
   if ((m = /^(That token|That creature|It) attacks this (turn|combat) if able$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);

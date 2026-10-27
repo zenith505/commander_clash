@@ -195,6 +195,21 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "revealTopToHand": {
+      // Duskmantle Seer: the players in APNAP order (CR 101.4), each their own card; one with an empty library reveals
+      // nothing and loses no life.
+      if (e.each) {
+        for (const pid of apnap(s, s.turnOrder.filter((q) => !player(s, q).lost))) {
+          const q = player(s, pid);
+          const top = q.library[0];
+          if (!top) continue;
+          const d = defOf(s, obj(s, top));
+          const n = defMv(d);
+          log(s, `${q.name} reveals ${d.name}${n > 0 ? `, loses ${n} life,` : ""} and puts it into their hand.`);
+          if (n > 0) loseLife(s, pid, n);
+          moveObject(s, top, "hand");
+        }
+        return;
+      }
       const p = player(s, ctx.controller);
       const id = p.library[0];
       // An empty library: nothing is revealed, and the life is 0.

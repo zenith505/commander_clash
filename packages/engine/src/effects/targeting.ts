@@ -378,6 +378,25 @@ export function spellManaValue(s: GameState, item: StackItem): number {
 }
 
 /**
+ * A creature spell's power or toughness on the stack: its printed one, or from its characteristic-defining ability, which
+ * works on the stack too (CR 604.3); nothing else changes a spell's power. Undefined for a noncreature spell (CR 208.3). A
+ * face-down spell is a 2/2 creature (CR 708.2a).
+ */
+export function spellPT(s: GameState, item: StackItem, key: "power" | "toughness"): number | undefined {
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  if (!o) return undefined;
+  if (o.faceDown) return 2;
+  const d = defOf(s, o);
+  if (!d.types.includes("Creature")) return undefined;
+  const printed = d[key] ?? "0";
+  if (/^\d+$/.test(printed)) return Number.parseInt(printed, 10);
+  const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
+  const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
+  const amount = def?.[key];
+  return amount === undefined ? undefined : evalAmount(s, amount, { controller: item.controller, sourceId: o.id });
+}
+
+/**
  * Does a spell on the stack match `spec` (cast triggers: "a creature spell with power 5 or greater", "a spell with mana
  * value 4 or greater")? Its mana value counts the X chosen for it (CR 202.3e). A power or toughness of "*" comes from
  * its characteristic-defining ability, which works on the stack too (CR 604.3); nothing else changes a spell's power.
@@ -395,16 +414,7 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   if (notCastFromHand && o.castFrom === "hand" && !o.spellCopy) return false;
   if (castFromGraveyard && (o.castFrom !== "graveyard" || o.spellCopy)) return false;
   if (mv && !inRange(spellManaValue(s, item), mv)) return false;
-  // Only creature spells have power and toughness (CR 208.3).
-  const pt = (key: "power" | "toughness"): number | undefined => {
-    if (!d.types.includes("Creature")) return undefined;
-    const printed = d[key] ?? "0";
-    if (/^\d+$/.test(printed)) return Number.parseInt(printed, 10);
-    const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
-    const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
-    const amount = def?.[key];
-    return amount === undefined ? undefined : evalAmount(s, amount, { controller: item.controller, sourceId: o.id });
-  };
+  const pt = (key: "power" | "toughness") => spellPT(s, item, key);
   for (const [key, range] of [["power", pw], ["toughness", tg]] as const) {
     if (!range) continue;
     const n = pt(key);
@@ -630,7 +640,17 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
   const most = spec.manyMax !== undefined ? Math.min(most0, spec.manyMax) : most0;
   // "X target creatures": exactly X, each one required (as many as there are, if fewer: it can't be cast so).
   if (spec.many === "exactX") return expandMany(body, Math.min(x, most));
-  return expandMany(body, spec.many === "x" ? Math.min(x, most) : most, true);
+  return expandMany(body, spec.many === "x" ? Math.min(manyX(s, body.targets, controller, sourceId, x), most) : most, true);
+}
+
+/**
+ * The most targets "up to X target ..." can have: the X announced, or with "where X is ..." (TargetSpec.manyCount) that
+ * number as the targets are chosen (CR 601.2c), before any cost is paid (601.2h): Recantation's verse counters are
+ * counted while it's still on the battlefield.
+ */
+export function manyX(s: GameState, targets: TargetSpec[], controller: PlayerId, sourceId: ObjectId | undefined, x = 0): number {
+  const spec = targets[manySlot(targets)];
+  return spec?.manyCount ? Math.max(0, evalAmount(s, spec.manyCount, targetingCtx(s, controller, sourceId))) : x;
 }
 
 /**

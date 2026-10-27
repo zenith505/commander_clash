@@ -323,6 +323,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // any of those subtypes, read like "Demon, Horror, and Nightmare spells you cast cost {1} less to cast".
   if ((m = /^Each spell you cast that's an? ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+) costs (\{\d+\} less to cast)$/.exec(text)))
     text = `${m[1]!.replace(/,? or /, m[1]!.includes(",") ? ", and " : " and ")} spells you cast cost ${m[2]}`;
+  // Doran, Besieged by Time: "Each creature spell you cast with toughness greater than its power costs {1} less to cast".
+  if ((m = /^Each creature spell you cast with toughness greater than its power costs (\{\d+\} less to cast)$/.exec(text))) text = `Creature spells you cast with toughness greater than their power cost ${m[1]}`;
   // Eminence: "As long as ~ is in the command zone or on the battlefield, other Dragon spells you cast cost {1} less to
   // cast" (The Ur-Dragon): it works from the command zone too (CR 113.6); not the card itself.
   if ((m = /^(?:Eminence — )?As long as ~ is in the command zone or on the battlefield, other ((?:[A-Z][a-z]+ )+spells you cast cost \{\d+\} less to cast)$/.exec(text))) {
@@ -489,16 +491,18 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // Fortune Teller's Talent: "Spells you cast from anywhere other than your hand cost {2} less to cast."
   const notHand = !zones ? / from anywhere other than your hand(?= costs? \{)/.exec(text) : null;
   if (notHand) text = text.slice(0, notHand.index) + text.slice(notHand.index + notHand[0].length);
-  m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
+  m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less)| with toughness greater than their power)?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
   // "Spells you cast", "Instant and sorcery spells", "Noncreature spells", "Dragon spells", "Blue spells"
   // "Creature spells you cast with power 4 or greater" (Goreclaw): the spell's power as it's cast (see costModsFor).
   const pw = / with power (\d+) or (greater|less)$/.exec(m[4] ?? "");
+  // Doran, Besieged by Time: "with toughness greater than their power", the spell's own (see costModsFor).
+  const tough = m[4] === " with toughness greater than their power";
   // "Spells you cast with mana value 5 or greater" (Thryx): the mana value bound with no other words.
-  const parsed = words || (m[4] && !pw) ? parseTargetPhrase(`${words ? `${words} ` : ""}spell${pw ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
-  if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
-  const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
+  const parsed = words || (m[4] && !pw && !tough) ? parseTargetPhrase(`${words ? `${words} ` : ""}spell${pw || tough ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
+  if (!parsed || parsed.kind !== "spell" || ((pw || tough) && !parsed.types?.includes("Creature"))) return "fail";
+  const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : tough ? { ...parsed, toughnessAbovePower: true } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
   if ((m[5] && who !== "you") || (zones && (m[5] || !m[3])) || (notHand && (m[5] || who !== "you"))) return "fail";
   const n = Number(/\d+/.exec(m[6]!)![0]) * (m[7] === "less" ? -1 : 1);
@@ -801,6 +805,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
   // "As long as you've cast a spell this turn" (Fortune Teller's Talent): any spell.
   if (/^you've cast a spell this turn$/.test(text)) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" } };
+  // Rhino, Barreling Brute: "if you've cast a spell with mana value 4 or greater this turn": its mana value on the stack,
+  // X included (CR 202.3e).
+  if ((m = /^you've cast a spell with mana value (\d+) or greater this turn$/.exec(text))) return { kind: "castCount", n: 1, filter: { kind: "card", text: "spell" }, mvAtLeast: Number(m[1]) };
   // Nightpack Ambusher: "if you didn't cast a spell this turn".
   // Stoic Sphinx: "~ has hexproof as long as you haven't cast a spell this turn" likewise, in a static ability (an
   // effect's "If you haven't cast a spell this turn, you may cast that card" is Conduit of Worlds' own instruction).
@@ -998,6 +1005,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you were dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!), you: true };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
+  if ((m = new RegExp(`^you attacked with creatures with total power ${NUM} or greater this combat$`).exec(text))) return { kind: "attackPower", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
   // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.
   if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
@@ -1018,7 +1026,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Anya, Merciless Angel: "an opponent's life total is less than half their starting life total" (CR 903.7).
   if (/^an opponent's life total is less than half their starting life total$/.test(text)) return { kind: "life", max: Math.ceil(STARTING_LIFE / 2) - 1, opponent: true };
   if ((m = /^each player has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), everyone: true };
-  if ((m = /^you have at least (\d+) life more than your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1]) };
+  // Elenda, Saint of Dusk: "your life total is at least 10 greater than your starting life total".
+  if ((m = /^(?:you have at least (\d+) life more than|your life total is at least (\d+) greater than) your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1] ?? m[2]) };
   if ((m = /^your life total is (greater than or equal to|greater than|less than or equal to|less than) (half )?your starting life total$/.exec(text))) {
     const base = m[2] ? Math.floor(STARTING_LIFE / 2) : STARTING_LIFE;
     return { kind: "life", ...{ "greater than or equal to": { min: base }, "greater than": { min: base + 1 }, "less than or equal to": { max: base }, "less than": { max: base - 1 } }[m[1]!] };
@@ -1532,6 +1541,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
+  }
+  // Predatory Impetus: "gets +3/+3, must be blocked if able, and is goaded": all three.
+  const RIDER = "can't [^,]+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|doesn't untap during its controller's untap step";
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), (${RIDER}),? and (${RIDER})$`).exec(rest))) {
+    const parts = [m[1]!, m[4]!, m[5]!].map((x) => parseStaticMods(x));
+    return parts.every((x) => x) ? parts.flatMap((x) => x!) : null;
   }
   // "Equipped creature gets +3/+0 and loses flying" (Colossus Hammer): abilities lost in layer 6.
   if ((m = new RegExp(`^gets? ${PT}/${PT} and loses (.+)$`).exec(rest))) {

@@ -596,8 +596,13 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     if (kind?.kind !== "spell") return "fail";
     if ((nth[5] === "during their turn" && nth[1] === "you") || (nth[5] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
     const spellX = !!nth[4] && /\bX\b/.test(nth[6]!) && !/\bwhere X is\b/.test(nth[6]!);
-    const body0 = parseBody(nth[6]!, { castSpell: true, eventPlayer: true, ...(spellX ? { ownX: true } : {}) });
-    const body = body0 && spellX ? { ...replaceX(body0, { count: { kind: "castSpellX" } }), text: body0.text } : body0;
+    // "That player" is the one who cast it, except when that's you: then it's the opponent whose turn it is (Blightwing
+    // Bandit: "during each opponent's turn, look at the top card of that player's library"), or a player the text chose
+    // (Vial Smasher the Fierce: "choose an opponent at random. ... that player").
+    const youOpp = nth[1] === "you" && nth[5] === "during each opponent's turn";
+    const body0 = parseBody(nth[6]!, { castSpell: true, ...(nth[1] !== "you" || youOpp ? { eventPlayer: true } : {}), ...(spellX ? { ownX: true } : {}) });
+    const body1 = body0 && youOpp ? { ...(JSON.parse(JSON.stringify(body0).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body0), text: body0.text } : body0;
+    const body = body1 && spellX ? { ...replaceX(body1, { count: { kind: "castSpellX" } }), text: body1.text } : body1;
     const nth4 = nth[5];
     return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
@@ -1892,6 +1897,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // combat damage to is the one it attacks (CR 506.2, 510.1), and a blocking one deals it to no player.
     .replace(/^Whenever ~ deals combat damage to defending player, /, "Whenever ~ deals combat damage to a player, ")
     .replace(/^(Whenever ~ deals (?:combat )?damage to an opponent), that opponent /, "$1, that player ")
+    // Risona, Asari Commander: "Whenever combat damage is dealt to you": only creatures deal combat damage (CR 510.1), once
+    // for each combat damage step; "if it doesn't have an indestructible counter on it" after "Whenever ~ deals ...": ~.
+    .replace(/^Whenever combat damage is dealt to you, /, "Whenever one or more creatures deal combat damage to you, ")
+    .replace(/^(Whenever ~ deals combat damage to a player), if it doesn't have an? ([a-z]+) counter on it, /, "$1, if ~ doesn't have an $2 counter on it, ")
+    // Long Feng, Grand Secretariat: "Whenever another creature you control or a land you control is put into a graveyard
+    // from the battlefield": one event for each permanent that's either (a land creature triggers it once).
+    .replace(/^Whenever another creature you control or a land you control is put into a graveyard from the battlefield, /, "Whenever another creature or land you control is put into a graveyard from the battlefield, ")
     // Resolute Archangel: "if your life total is less than your starting life total, it becomes equal to ...": "it" is
     // your life total.
     .replace(/(, if your life total is less than your starting life total), it becomes equal to your starting life total\.$/, "$1, your life total becomes your starting life total.");
@@ -2576,7 +2588,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // once for each permanent they're put on at the same time (rulings on Hapatra).
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
-  const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
+  // Axgard Artisan: "Whenever one or more +1/+1 counters are put on ~ for the first time each turn": that kind.
+  const firstTime = !youPut && /^Whenever one or more (?:\+1\/\+1 )?counters are put on ~ for the first time each turn, /.test(line);
   const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|a permanent you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
@@ -2612,6 +2625,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const filter = parseTargetPhrase(mutates[1]!);
     const body = filter && filter.kind === "object" && parseBody(mutates[2]!, { subjectIt: true });
     return filter && body ? { event: "permanentMutates", tappedFilter: filter, body } : "fail";
+  }
+  // Wildgrowth Walker: "Whenever a creature you control explores, ..." (CR 701.44b), that creature the subject.
+  const explores = /^Whenever a creature you control explores, (.+)$/.exec(line);
+  if (explores) {
+    const body = parseBody(explores[1]!, { subjectIt: true });
+    return body ? { event: "creatureYouControlExplores", body } : "fail";
   }
   const block = parseBlockTrigger(line);
   if (block) return block;

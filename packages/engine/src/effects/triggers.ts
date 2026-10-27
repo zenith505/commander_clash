@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -190,6 +190,8 @@ export type TriggerSourceEvent =
   /** A crew ability of this Vehicle resolved (CR 702.122e). */
   | { type: "crewed"; id: ObjectId }
   | { type: "crews"; id: ObjectId; vehicle: ObjectId }
+  /** A permanent explored (CR 701.44b), `controller` controlling it then or as it last existed (701.44c). */
+  | { type: "explored"; id: ObjectId; controller: PlayerId }
   /** A mutating spell merged with this permanent (CR 702.140d). */
   | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
@@ -1094,9 +1096,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const reached = (t: TriggeredAbility) => t.countersReach === undefined || (after - ev.amount < t.countersReach && after >= t.countersReach);
     // "For the first time each turn": counters put on this object earlier this turn count, whatever had the ability then.
     const zc = o.zoneChanges ?? 0;
-    const first = !(o.countersPutAt && o.countersPutAt.turn === s.turn && o.countersPutAt.zc === zc);
-    o.countersPutAt = { turn: s.turn, zc };
-    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !t.countersEach && kindOk(t, controllerOf(s, o)) && reached(t) && (!t.countersFirstTime || first), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    const earlier = o.countersPutAt && o.countersPutAt.turn === s.turn && o.countersPutAt.zc === zc ? o.countersPutAt : undefined;
+    const first = !earlier;
+    // Axgard Artisan: "+1/+1 counters ... for the first time each turn": the first time that kind is put on it this turn.
+    const firstOfKind = !earlier?.kinds?.includes(ev.counter);
+    o.countersPutAt = { turn: s.turn, zc, kinds: [...(earlier?.kinds ?? []).filter((k) => k !== ev.counter), ev.counter] };
+    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !t.countersEach && kindOk(t, controllerOf(s, o)) && reached(t) && (!t.countersFirstTime || (t.countersKind === undefined ? first : firstOfKind)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter (rulings).
     for (let i = 0; i < ev.amount; i++) add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !!t.countersEach && kindOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, { amount: 1 });
     // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).
@@ -1174,6 +1179,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
+  } else if (ev.type === "explored") {
+    // "Whenever a creature you control explores" (Wildgrowth Walker): even one that has left the battlefield (rulings),
+    // a creature as it last existed there (CR 701.44c).
+    const o = s.objects[ev.id];
+    const creature = o && (o.zone === "battlefield" ? objIsType(s, o, "Creature") : defOf(s, o).types.includes("Creature"));
+    if (o && creature)
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) === ev.controller) add(w, ev.controller, (e) => e === "creatureYouControlExplores", undefined, undefined, o);
+      }
   } else if (ev.type === "mutates") {
     // "Whenever this creature mutates" (CR 702.140d): an ability of the merged permanent, from any of its components.
     const o = obj(s, ev.id);
@@ -2175,7 +2190,8 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
 export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoice[]) {
   const def = restingDef(s.cards[t.sourceCardId]!);
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen, t.x ?? 0);
+  const body0 = withModes(triggerBody(s, t), t.modes);
+  const fit = fitMany(body0, chosen, manyX(s, body0.targets, t.controller, t.sourceId, t.x ?? 0));
   if (typeof fit === "string") throw new RulesError(fit);
   const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);

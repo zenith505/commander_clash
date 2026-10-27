@@ -1096,7 +1096,9 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
+  p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1173,6 +1175,11 @@ export function parseTargetPhrase(
   // "Creature you control with base power or toughness 1" (Sword of the Squeak).
   if ((m = / with base power or toughness (\d+)$/.exec(p))) {
     extra.basePtEither = Number(m[1]);
+    p = p.slice(0, m.index);
+  }
+  // "Other creatures you control with base power and toughness 1/1" (Bess, Soul Nourisher).
+  if ((m = / with base power and toughness (\d+)\/(\d+)$/.exec(p))) {
+    extra.basePT = [Number(m[1]), Number(m[2])];
     p = p.slice(0, m.index);
   }
   // "Another creature you control with base power 1" (Rapid Augmenter).
@@ -1523,7 +1530,9 @@ export function parseTargetPhrase(
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  // "Creature spell with power or toughness 2 or less" (Stern Scolding): as it is on the stack (see spellMatches).
+  const spellPt = (extra.power || extra.toughness || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf.every((a) => a.power || a.toughness))) && types.length === 1 && types[0] === "Creature";
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC && !spellPt) || ((extra.power || extra.toughness) && !spellPt) || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

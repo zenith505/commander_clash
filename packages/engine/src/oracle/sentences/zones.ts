@@ -1218,6 +1218,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!);
     return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: 1, action: "bounce" }] : null;
   }
+  // Mana Breach: "that player returns a land they control to its owner's hand": theirs, chosen as it resolves, not targeted.
+  if ((m = /^(.+?) returns (?:a|an) (.+?) they control to its owner's hand$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[2]!);
+    return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: 1, action: "bounce" }] : null;
+  }
   // "Defending player exiles two permanents they control" (Bane of Bala Ged): their own, chosen as it resolves, not
   // targeted; with no more than that many, all of them (rulings).
   if ((m = new RegExp(`^(.+?) exiles ${NUMX} (.+?) they control$`).exec(s))) {

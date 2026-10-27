@@ -2,6 +2,7 @@ import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilit
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { CREATURE_TYPES } from "../keywords";
+import { STARTING_LIFE } from "../types";
 import { Ctx, addTarget } from "./body";
 import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 import { parseSearchFilter } from "./search";
@@ -286,6 +287,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Surveyor's Scope: "the number of players who control at least two more lands than you", counted as it resolves.
   if (each && (m = /^players? who controls? at least (one|two|three) more lands? than you$/i.exec(p))) return count({ kind: "players", moreLandsThanYou: num(m[1]!) });
   // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.
+  // Anya, Merciless Angel: "for each opponent whose life total is less than half their starting life total" (CR 903.7:
+  // 40 in Commander).
+  if (each && /^opponent whose life total is less than half their starting life total$/i.test(p)) return count({ kind: "players", opponents: true, lifeAtMost: Math.ceil(STARTING_LIFE / 2) - 1 });
   if (each && /^opponent who has less life than you$/i.test(p)) return count({ kind: "players", opponents: true, lifeLessThanYou: true });
   // Bandit's Talent: "for each opponent who has one or fewer cards in hand", counted as it resolves.
   if (each && (m = /^opponent who has (one|two|three|zero|no) or fewer cards in hand$/i.exec(p))) return count({ kind: "players", opponents: true, handAtMost: m[1] === "no" ? 0 : num(m[1]!) });
@@ -325,6 +329,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
   // Gadrak, the Crown-Scourge: "for each nontoken creature that died this turn".
   if (/^creatures? that left the battlefield under your control this turn$/i.test(p)) return count({ kind: "creaturesLeftThisTurn" });
+  // Caller of the Claw: "for each nontoken creature put into your graveyard from the battlefield this turn".
+  if ((m = /^(nontoken )?creatures? put into your graveyard from the battlefield this turn$/i.exec(p))) return count({ kind: "creaturesToYourGraveyard", ...(m[1] ? { nontoken: true as const } : {}) });
   if ((m = /^(nontoken )?creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[2] ? { yours: true as const } : {}), ...(m[1] ? { nontoken: true as const } : {}) });
   // The Zubera: "for each Zubera that died this turn", any player's.
   if ((m = /^([A-Z][a-z]+) that died this turn$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) return count({ kind: "diedThisTurn", subtype: m[1]! });

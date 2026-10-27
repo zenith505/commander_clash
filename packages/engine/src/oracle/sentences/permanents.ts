@@ -25,6 +25,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = parseTargetPhrase(fu[1]!);
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: fu[1]! }, n: 1, action: "choose" }, { type: "turnFaceUp", what: { ref: "created" } }] : null;
   }
+  // Nahiri, Heir of the Ancients: "You may attach an Equipment you control to it", the token just created; Goldwardens'
+  // Gambit: "For each of those tokens, you may attach an Equipment you control to it".
+  if ((fu = /^(?:For each of those tokens, y|Y)ou may attach an Equipment you control to (it|that creature)$/.exec(s))) {
+    const each = /^For each /.test(s);
+    if (each && !ctx.lastCreatedAny) return null;
+    const what = each ? ({ ref: "created" } as ObjRef) : parseObject(fu[1]!, ctx);
+    return what && (what.ref !== "target" || !what.n) && what.ref !== "each" ? [{ type: "attachEquipmentTo", what }] : null;
+  }
   if (/^You have no maximum hand size until your next turn$/.test(s)) return [{ type: "noMaxHandSize", untilYourNextTurn: true }];
   // Illusion of Choice (CR 701.38): the votes of every vote this turn are this player's to make.
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
@@ -264,9 +272,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
   // Kelsien, the Plague: "When that creature dies this turn, you get an experience counter": a delayed trigger about the
   // creature it targeted (CR 603.7), for the rest of this turn, with an effect that doesn't refer to that creature.
-  if ((m = /^When that creature dies this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && !ctx.spell && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[1]!)) {
+  // A spell's too (Scarblade's Malice: "When that creature dies this turn, create a 2/2 black and green Elf creature
+  // token"), when the instruction isn't about the spell.
+  if ((m = /^When that creature dies this turn, (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && !(ctx.spell && /~/.test(m[1]!)) && !/\b(?:it|its|that creature|that card|target|this way)\b/i.test(m[1]!)) {
+    // Not one that targets (Fatal Fissure's earthbend): that target would be chosen as the trigger is put on the stack.
+    const of = ctx.lastObjectTarget;
+    const before = ctx.targets.length;
     const inner = parseSentence(capital(m[1]!), ctx);
-    return inner ? [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: inner, text: m[1]!, thisTurn: true }] : null;
+    return inner && ctx.targets.length === before ? [{ type: "delayed", when: "dies", of: { ref: "target", index: of }, effects: inner, text: m[1]!, thisTurn: true }] : null;
   }
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token

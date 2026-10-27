@@ -722,9 +722,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
     // Gilgamesh: which of the Equipment to attach: the one with the greatest mana value.
     if (pend.kind === "chooseOption" && pend.what === "attachWhich") {
-      const ids = pend.options.filter((o) => o !== "none" && s.objects[o]);
+      // Goldwardens' Gambit: not one already moved onto an earlier token this way.
+      const sc = s.resolving?.scratch;
+      const earlier = sc?.attachEqAt !== undefined ? (sc.attachEach ?? []).slice(0, sc.attachEqAt) : [];
+      const ids = pend.options.filter((o) => o !== "none" && s.objects[o] && !earlier.includes(s.objects[o]!.attachedTo ?? ""));
       const best = ids.sort((a, b) => defOf(s, s.objects[b]!).cmc - defOf(s, s.objects[a]!).cmc)[0];
-      return [{ type: "chooseOption", player: pid, choice: best ?? pend.options[0]! }];
+      return [{ type: "chooseOption", player: pid, choice: best ?? (pend.options.includes("none") ? "none" : pend.options[0]!) }];
     }
     // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.
     if (pend.kind === "chooseOption" && pend.what === "enchant") {

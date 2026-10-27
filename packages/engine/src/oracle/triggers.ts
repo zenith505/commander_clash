@@ -1018,7 +1018,7 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   // "Whenever a creature you control with deathtouch attacks" (Hooded Blightfang), "Whenever a creature with flying
   // attacks" (Windreader Sphinx): one with it as it's declared.
-  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with a mana ability| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?) attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less)| with an? \+1\/\+1 counter on it| with a mana ability| with base power and toughness \d+\/\d+| with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature(?: with (?:flying|deathtouch|lifelink|trample|menace|vigilance|haste|reach|first strike|double strike))?|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
@@ -1065,13 +1065,13 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
   // "A creature you control with a +1/+1 counter on it" (Byrke, Long Ear of the Law): one with it as it's declared.
   // "A creature you control with a mana ability" (Raggadragga).
-  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with a mana ability$| with [a-z ]+$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
-  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with a mana ability$| with [a-z ]+$|$)/, "");
+  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with a mana ability$| with base power and toughness \d+\/\d+$| with [a-z ]+$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
+  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$| with power \d+ or (?:greater|less)$| with an? \+1\/\+1 counter on it$| with a mana ability$| with base power and toughness \d+\/\d+$| with [a-z ]+$|$)/, "");
   if (!filter || filter.kind !== "object" || filter.controller || (filter.chosen && filter.chosen !== "type") || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   const body = parseBody(w[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
   if (!body) return "fail";
   if (any) return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: w[2]! }, anyone: true, ...(w[1] === "another" ? { other: true } : {}) }, body };
-  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: filter.chosen ? `${w[2]!.replace(/ of the chosen type$/, "")} you control of the chosen type` : / with [a-z ]+$/.test(w[2]!) && (!/ with an? /.test(w[2]!) || / with a mana ability$/.test(w[2]!)) ? w[2]!.replace(/ with /, " you control with ") : `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
+  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: filter.chosen ? `${w[2]!.replace(/ of the chosen type$/, "")} you control of the chosen type` : / with (?:[a-z ]+|base power and toughness \d+\/\d+)$/.test(w[2]!) && (!/ with an? /.test(w[2]!) || / with a mana ability$/.test(w[2]!)) ? w[2]!.replace(/ with /, " you control with ") : `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
 }
 
 /**
@@ -2767,6 +2767,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifNotToken = true;
         body0 = notToken[1]!;
       }
+      // Guildsworn Prowler: "When ~ dies, if it wasn't blocking, ...": an intervening if (CR 603.4) on the creature as it last
+      // existed (CR 603.10a).
+      let ifNotBlocking = false;
+      const notBlocking = /^if it wasn't blocking, (.+)$/i.exec(body0);
+      if (notBlocking) {
+        if (event !== "selfDies") return "fail" as const;
+        ifNotBlocking = true;
+        body0 = notBlocking[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -2865,7 +2874,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

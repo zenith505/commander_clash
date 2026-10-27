@@ -280,6 +280,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   const list = parseTargetList(s, ctx);
   if (list !== undefined) return list;
+  // "When that creature dies this turn, you draw a card" (A Good Day to Die): a delayed trigger (sentences/permanents.ts),
+  // not a draw with a long subject.
+  if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;

@@ -679,6 +679,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   if (searchInstead) return parseBody(`Search your library for ${searchInstead[1]}, put that card into your hand, then shuffle. If ~ was cast from a graveyard, instead search your library for ${searchInstead[2]}, put those cards into your hand, then shuffle.`, opts);
   // Increasing Confusion: "Target player mills X cards. If ~ was cast from a graveyard, that player mills twice that many
   // cards instead": twice X.
+  // Obzedat, Ghost Council: "You may exile ~. If you do, return it to the battlefield under its owner's control at the
+  // beginning of your next upkeep. It gains haste.": one delayed trigger (CR 603.7), the card it became coming back with
+  // haste for as long as it remains on the battlefield (rulings).
+  if (!opts.spell && !opts.selfCard && /^[Yy]ou may exile ~\. If you do, return it to the battlefield under its owner's control at the beginning of your next upkeep\. It gains haste\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "may", effects: [{ type: "flicker", what: { ref: "self" }, under: "owner", at: "yourNextUpkeep", haste: true }], text: "exile ~" }], text };
   const millTwice = /^(Target player mills X cards\. If ~ was cast from a graveyard, that player mills) twice that many cards instead\.$/.exec(text.trim());
   if (millTwice) return parseBody(`${millTwice[1]} twice X cards instead.`, opts);
   const instead = /^(Counter target spell unless its controller pays \{\d+\})\. If (you control [^,.]+), counter that spell unless its controller pays (\{\d+\}) instead\.$/.exec(text.trim());
@@ -1213,7 +1218,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
   // (Ajani Steadfast), "put a +1/+1 counter on each creature you control and a loyalty counter on each planeswalker you
   // control" (Brokers Ascendancy, in a trigger): two kinds of counters on two groups, one after the other.
-  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
+  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
   // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
@@ -1623,6 +1628,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // creature.
     if (/^(?:[Tt]hen )?[Ii]t explores again\.?$/.test(s)) {
       if (last?.type !== "explore") return null;
+      effects.push({ ...last });
+      continue;
+    }
+    // Foul-Tongue Shriek: "Target opponent loses 1 life for each attacking creature you control. You gain that much life.":
+    // the life lost this way (as extort's, CR 702.101a).
+    if (/^You gain that much life$/.test(s.replace(/\.$/, "")) && last?.type === "loseLife" && !last.drain && effects.length - 1 === effects.indexOf(last) && si > 0 && /\bloses? \d+ life\b/.test(sentences[si - 1]!)) {
+      last.drain = true;
+      continue;
+    }
+    // Roalesk, Apex Hybrid: "proliferate, then proliferate again": two proliferate actions, one after the other (CR 701.34).
+    if (/^(?:[Tt]hen )?[Pp]roliferate again\.?$/.test(s)) {
+      if (last?.type !== "proliferate" || last.n || last.twice || last.thenPhaseOut) return null;
       effects.push({ ...last });
       continue;
     }
@@ -3103,7 +3120,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may play lands and cast spells from among cards exiled this way without paying their mana costs" (Gix): lands
     // too, played as this resolves.
     const lands = castAmongHead && /^You may play lands and cast spells from among (?:them|cards exiled this way) without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
-    const castAmong = castAmongHead && /^You may (?:play lands and )?cast (?:(any number of|up to two|an?) )?(?:(instant or sorcery|instant and sorcery|sorcery|instant) )?spells?(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying (?:their mana costs|its mana cost)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const castAmong = castAmongHead && /^You may (?:play lands and )?cast (?:(any number of|up to two|an?) )?(?:(instant or sorcery|instant and sorcery|sorcery|instant|Aura) )?spells?(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying (?:their mana costs|its mana cost)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     // Improvisation Capstone: "Exile cards from the top of your library until you exile cards with total mana value 4 or
     // greater."
     const untilMv = /^Exile cards from the top of your library until you exile cards with total mana value (\d+) or greater$/.exec(s);
@@ -3381,8 +3398,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "An instant or sorcery spell ... its mana cost", "spells ... their mana costs": the words agree.
       if (one !== /its mana cost$/.test(sentences[si + 1]!.replace(/\.$/, "")) || (one && total)) return null;
       const limit = mv ? amt(mv) : undefined;
-      const types = kinds ? (kinds === "sorcery" ? ["Sorcery"] : kinds === "instant" ? ["Instant"] : ["Instant", "Sorcery"]) : undefined;
-      const filter: TargetSpec | undefined = types ? { kind: "card", types: types as TargetSpec["types"] & string[], notTypes: [], notColors: [], text: `${kinds} card` } : undefined;
+      const types = kinds && kinds !== "Aura" ? (kinds === "sorcery" ? ["Sorcery"] : kinds === "instant" ? ["Instant"] : ["Instant", "Sorcery"]) : undefined;
+      // "You may cast an Aura spell from among them" (Herald of Amity).
+      const filter: TargetSpec | undefined = kinds === "Aura" ? parseSearchFilter("Aura card") ?? undefined : types ? { kind: "card", types: types as TargetSpec["types"] & string[], notTypes: [], notColors: [], text: `${kinds} card` } : undefined;
+      if (kinds === "Aura" && !filter) return null;
       // What happens to the exiled cards not cast: "Then put the exiled instant and sorcery cards that weren't cast this
       // way into your hand and the rest on the bottom of your library in a random order" (Muse Vortex), "Then put all
       // cards exiled this way that weren't cast into your graveyard" (Epic Experiment), "Put the exiled cards not cast
@@ -3393,7 +3412,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
           ? { dest: "bottomRandom", toHand: true }
           : /^Put all cards exiled this way that weren't cast into your graveyard$/.test(restText)
             ? { dest: "graveyard" }
-            : /^Put the exiled cards not cast this way on the bottom of your library in a random order$/.test(restText)
+            : /^Put the exiled cards not cast this way on the bottom of your library in a random order$/.test(restText) || (one && /^Put the rest on the bottom of your library in a random order$/.test(restText))
               ? { dest: "bottomRandom" }
               : undefined;
       if (rest?.dest === "bottomRandom" && who.ref !== "you") return null;
@@ -6814,6 +6833,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [hostType[2]!], text: hostType[2]! } } }, effects: inner, otherwise: previous });
       continue;
     }
+    // Expel from Orazca: "Return target nonland permanent to its owner's hand. If you have the city's blessing, you may put
+    // that permanent on top of its owner's library instead." With the blessing as it resolves (CR 702.131c), its
+    // controller chooses where it goes.
+    if (/^If you have the city's blessing, you may put that permanent on top of its owner's library instead$/.test(s) && effects.length - prevWhole === 1 && last?.type === "bounce" && last.what.ref === "target" && !last.what.n) {
+      const back = effects.pop()!;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "citysBlessing" } }, effects: [{ type: "may", effects: [{ type: "putInLibrary", what: last.what, position: "top" }], otherwise: [back], text: "put that permanent on top of its owner's library instead" }], otherwise: [back] });
+      continue;
+    }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
@@ -6928,7 +6955,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Knollspine Dragon: "you may discard your hand and draw cards equal to ...": the same as ", then draw", in that order
     // (CR 608.2c), one choice for both (Clive, Ifrit's Dominant).
     if (/^[Yy]ou may discard your hand and draw cards equal to /.test(s)) s = s.replace(" and draw ", ", then draw ");
-    const may = /^[Yy]ou may (?!play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!attach an Equipment you control to (?:it|that creature)$|play the exiled card |play one of the cards exiled with ~ without paying its mana cost$|cast a copy of the exiled card |play (?:an|up to \w+|X) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast (?:(?:sorcery|creature|artifact|enchantment) )?spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw |reveal cards from the top of your library until you reveal [^.]+$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

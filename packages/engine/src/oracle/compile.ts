@@ -2871,7 +2871,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "~ enters with a number of +1/+1 counters on it equal to ..." is "with X ... counters on it, where X is ...".
-    const aNumber = new RegExp(`^(?:Undergrowth — )?~ enters(?: the battlefield)? with a number of ${COUNTER} counters on (?:it|him|her) equal to (.+)\\.$`).exec(line);
+    const aNumber = new RegExp(`^(?:Undergrowth — )?~ enters(?: the battlefield)? with a number of ${COUNTER} counters on (?:it|him|her|~) equal to (.+)\\.$`).exec(line);
     // "The amount of mana spent to cast it" (Marath): the spell it was, only as it enters from the stack.
     if (aNumber && /^the amount of mana spent to cast (?:it|~)$/.test(aNumber[2]!)) {
       if (out.entersWithCounters) out.unsupported.push(raw);

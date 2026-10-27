@@ -12967,6 +12967,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "67a1529f-aa37-4df8-97e3-5b1d8c03a76f",
+  "name": "Raven Guild Initiate",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "Morph—Return a Bird you control to its owner's hand. (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Morph"
+  ],
+  "commanderLegal": "legal",
+  "set": "scg",
+  "releasedAt": "2003-05-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1818324c-2738-42e2-a78b-63abf325d8e9",
   "name": "Razorgrass Screen",
   "manaCost": "{1}",
@@ -17751,6 +17784,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c6adfaa7-d9cf-4501-8e7d-e035369390d2",
+  "name": "Vicious Offering",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Kicker—Sacrifice a creature. (You may sacrifice a creature in addition to any other costs as you cast this spell.)\nTarget creature gets -2/-2 until end of turn. If this spell was kicked, that creature gets -5/-5 until end of turn instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Kicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "be8b36ce-52c1-4ca0-9141-4c9a80dca3ea",
   "name": "Victory Chimes",
   "manaCost": "{3}",
@@ -18018,6 +18079,40 @@
   "set": "ogw",
   "releasedAt": "2016-01-22",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "92cf18ab-dd7b-4bc8-8b85-a81b8cb5192c",
+  "name": "Watcher of the Roost",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Bird Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Soldier"
+  ],
+  "oracleText": "Flying\nMorph—Reveal a white card in your hand. (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nWhen this creature is turned face up, you gain 2 life.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Morph"
+  ],
+  "commanderLegal": "legal",
+  "set": "ktk",
+  "releasedAt": "2014-09-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

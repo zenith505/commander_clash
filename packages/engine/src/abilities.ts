@@ -5832,6 +5832,13 @@ export interface CompiledCard {
      */
     waterbend?: number;
     required?: true;
+    /**
+     * "Kicker—Sacrifice two lands.", "Kicker—{2}{R}, Sacrifice a land." (CR 702.33a, 118.8): the kicker cost's parts that
+     * aren't mana (its one cost's mana, if any, is `costs[0]`), paid with the spell's other costs when it's kicked;
+     * `text` says the whole cost.
+     */
+    extraCosts?: AdditionalCost[];
+    text?: string;
   };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
@@ -5937,7 +5944,8 @@ export interface CompiledCard {
   /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */
   assist?: true;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */
-  faceDownCast?: { kind: FaceDownKind; cost: string };
+  /** `costs`: "Morph—Pay 5 life." (CR 702.37a, 118.8), a morph cost that isn't mana (`cost` is "" then); `text` says it. */
+  faceDownCast?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string };
   /** Hooded Hydra: "As ~ is turned face up, put five +1/+1 counters on it" (a replacement, CR 614.1e), however it's turned face up (rulings). */
   faceUpCounters?: { counter: string; n: number };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */

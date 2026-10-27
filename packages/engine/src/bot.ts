@@ -899,7 +899,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A manifested card with morph has two ways (CR 701.40c): the cheaper first.
       const ways = faceUpWays(s, o).map((w, i) => ({ i, v: manaValue(parseManaCost(w.cost)) })).sort((a, b) => a.v - b.v);
       for (const w of ways) {
-        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i));
+        const extra = faceUpWays(s, o)[w.i]!.costs;
+        const costs = extra ? faceUpCosts(s, pid, o, extra) : undefined;
+        if (costs === null) continue;
+        const plan = planTurnFaceUp(s, pid, id, w.i, faceUpX(s, pid, o, w.i), costs);
         if (plan) return plan;
       }
     }
@@ -1112,6 +1115,37 @@ function chooseEndTurnEscape(s: GameState, pid: PlayerId): Action[] | null {
  * Exert (CR 701.43d): for what it triggers (its own "when you do", or "whenever you exert a creature"), while there's
  * life to spare for it not untapping to block.
  */
+/**
+ * What we'd pay a morph cost that isn't mana with ("Morph—Discard a card", CR 702.37e), or null if we'd rather leave it
+ * face down: life with plenty to spare; the cards in hand we'd discard first, keeping one; any card to reveal (it stays
+ * in hand); tokens and cheap permanents to sacrifice or return, lands only once we have plenty. Never our commander.
+ */
+function faceUpCosts(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[]): CostChoices | null {
+  const out: CostChoices = {};
+  const hand = player(s, pid).hand;
+  for (const c of costs) {
+    if (c.kind === "payLife") {
+      if (player(s, pid).life < c.n + 15) return null;
+    } else if (c.kind === "reveal" && !c.orControl) {
+      const fits = hand.filter((x) => printedMatches(c.filter, defOf(s, obj(s, x))));
+      if (fits.length < c.n) return null;
+      out.reveal = fits.slice(0, c.n);
+    } else if (c.kind === "discard" && !c.random) {
+      const fits = chooseDiscards(s, pid, hand.length).filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
+      if (fits.length < c.n || hand.length < c.n + 1) return null;
+      out.discard = fits.slice(0, c.n);
+    } else if (c.kind === "sacrifice" || c.kind === "returnToHand") {
+      const pool = (c.kind === "sacrifice" ? s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objectMatches(s, c.filter, obj(s, x), pid, false) && canBeSacrificed(s, obj(s, x))) : returnCandidates(s, pid, c))
+        .map((x) => obj(s, x))
+        .filter((x) => x.id !== o.id && !x.isCommander && (objIsType(s, x, "Land") ? lands(s, pid) >= 6 + c.n : x.isToken || worth(s, pid, x) <= 3))
+        .sort((a, b) => Number(b.tapped) - Number(a.tapped) || worth(s, pid, a) - worth(s, pid, b));
+      if (pool.length < c.n) return null;
+      out[c.kind] = pool.slice(0, c.n).map((x) => x.id);
+    } else return null;
+  }
+  return out;
+}
+
 /**
  * The X to turn a face-down permanent face up with, for an {X} in its morph or disguise cost (CR 107.3d): as much as we
  * can pay, except that "up to X targets" (Aurelia's Vindicator) takes only as many as we'd choose, and "all creatures
@@ -2519,6 +2553,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const bb = compileCard(defOf(s, obj(s, id)));
   const bbCosts = bb.buybackCosts && !via && !extra.sacrifice && !extra.discard ? chooseExtraCosts(s, pid, id, targets ?? [], via, alt, extra.costOr, x ?? 0, modes, true) : undefined;
   const buybacks = bb.buyback !== undefined && !via && (!bb.buybackCosts || bbCosts) ? [true, false] : [false];
+  // "Kicker—Sacrifice two lands" (CR 702.33a): kicked only when we'd pay its costs as we would our other ones.
+  const kickCosts = bb.kicker?.extraCosts && !extra.sacrifice && !extra.discard && !extra.returnToHand && !extra.tap ? chooseExtraCosts(s, pid, id, targets ?? [], via, alt, extra.costOr, x ?? 0, modes, false, [0]) : undefined;
   // Splice (CR 702.47a): the cards in hand worth adding, with their own targets after the spell's; then without.
   const spliced = chooseSplices(s, pid, id, x ?? 0);
   // Offering (CR 702.48a): only when it can't be cast otherwise (not now, or not with our mana), for the cheapest
@@ -2532,9 +2568,9 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   for (const offer of offering ? [undefined, offering.id] : [undefined])
     for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
       for (const buyback of buybacks)
-        for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
+        for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length) && !(k.length && bb.kicker?.extraCosts && (!kickCosts || buyback)))) {
           const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
-          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
+          const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length && kickCosts ? kickCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}), ...(offer ? { offering: offer } : {}) });
           // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
           if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
           if (plan) return plan;
@@ -2599,11 +2635,11 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?:
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[], buyback?: boolean): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[], buyback?: boolean, kicks?: number[]): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}) }, x, s, pid)) {
+  for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}), ...(kicks ? { kicks } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, obj(s, id), [...targeted].map(String));

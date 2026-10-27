@@ -2429,14 +2429,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const moved: Record<number, { id: ObjectId; zc: number }[]> = {};
       for (const o of todo) {
         let position = e.position;
-        if (position === "ownersChoice") {
+        if (position === "ownersChoice" || position === "ownersChoiceSecond") {
           // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7).
           const sc = (s.resolving!.scratch ??= {});
           if (!sc.topOrBottom) {
-            s.pending = { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], prompt: `put ${defOf(s, o).name} on the top or bottom of your library?` };
+            s.pending = position === "ownersChoice"
+              ? { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], prompt: `put ${defOf(s, o).name} on the top or bottom of your library?` }
+              : { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["second", "bottom"], labels: ["Second from the top", "Bottom"], about: o.id, prompt: `put ${defOf(s, o).name} into your library second from the top or on the bottom?` };
             return "paused";
           }
-          position = sc.topOrBottom as "top" | "bottom";
+          position = sc.topOrBottom as "top" | "bottom" | "second";
           sc.topOrBottom = undefined;
         }
         if (position === "second" || position === "third" || position === "fourth" || position === "fifth") {

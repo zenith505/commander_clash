@@ -1446,6 +1446,11 @@ export function compile(d: CardDef): CompiledCard {
       out.entersTappedUnless = { kind: "control", who: "you", types: ["Land"], other: true, max: num(ifOthers[1]!) - 1 };
       continue;
     }
+    // Eddymurk Crab: "~ enters tapped if it's not your turn": untapped exactly during your turn (CR 614.1d).
+    if (line === "~ enters tapped if it's not your turn.") {
+      out.entersTappedUnless = { kind: "yourTurn" };
+      continue;
+    }
     const unless = /^~ enters tapped unless (.+)\.$/.exec(line);
     if (unless) {
       const cond = parseEntersCondition(unless[1]!);
@@ -2607,6 +2612,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: "+1/+1", n: num(escInstead[1]!), escaped: num(escInstead[2]!) };
       continue;
     }
+    // Phyrexian Hydra: "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage
+    // prevented this way." (CR 615): see dealDamage.
+    if (line === "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage prevented this way.") {
+      out.preventToMinusCounters = true;
+      continue;
+    }
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
     if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
       out.phantom = true;
@@ -2830,6 +2841,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastDuringCombat = true;
       continue;
     }
+    // Basandra, Battle Seraph: every player, its controller too.
+    if (line === "Players can't cast spells during combat.") {
+      out.opponentsCantCastDuringCombat = "all";
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;
@@ -2954,6 +2970,17 @@ export function compile(d: CardDef): CompiledCard {
     if (slung) {
       if (out.entersWithCounters) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(slung[1]!), n: { count: { kind: "webSlungMv" } }, ifWebSlung: true };
+      continue;
+    }
+    // Ulasht, the Hate Seed: "~ enters with a +1/+1 counter on it for each other red creature you control and a +1/+1
+    // counter on it for each other green creature you control": both counts, a creature of both colors counted twice.
+    const ewcTwo = new RegExp(`^~ enters with an? ${COUNTER} counter on it for each (.+?) and an? ${COUNTER} counter on it for each (.+?)\\.$`).exec(line);
+    if (ewcTwo && ewcTwo[1] === ewcTwo[3]) {
+      const a = parseCount(ewcTwo[2]!, null, true);
+      const b = parseCount(ewcTwo[4]!, null, true);
+      const plain = (x: typeof a) => !!x && typeof x === "object" && !x.times && !x.plus && !x.half && !x.negate;
+      if (!a || !b || !plain(a) || !plain(b) || out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(ewcTwo[1]!), n: { count: { kind: "sum", of: [a.count, b.count] } } };
       continue;
     }
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.

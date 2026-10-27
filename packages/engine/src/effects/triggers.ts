@@ -861,12 +861,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Senu: "When a legendary creature you control attacks and isn't blocked, if this card is exiled": only a card
         // already in exile as blockers are declared (rulings), once for each such creature.
         fromExiled((w, owner) => owner === you && add(w, owner, (e, t) => e === "creatureYouControlAttacksUnblocked" && !!t.attacker && objectMatches(s, t.attacker.filter, o, owner, false), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking }));
+        // "Whenever a Rogue you control attacks and isn't blocked" (Stinkdrinker Bandit): each permanent of the attacker's
+        // controller, once for each such creature, "it" being that creature.
+        for (const w of watchers)
+          if (controllerOf(s, w) === you) add(w, you, (e, t) => e === "creatureYouControlAttacksUnblocked" && !t.zone && !!t.attacker && !(t.attacker.other && w.id === o.id) && objectMatches(s, t.attacker.filter, o, you, false), undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
         add(o, you, (e, t) => e === "selfAttacksUnblocked" && (!t.attacksPlayer || !o.attackingPermanent), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
       }
       if (o.attacking !== undefined && o.blockedBy?.length) {
         // "Defending player" (afflict) is the player it's attacking.
-        add(o, you, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        // "Whenever ~ or equipped creature becomes blocked" (Simian Sling): about ~ itself here, the subject.
+        add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
         const bearer = isRingBearer(s, o);
         for (const b of o.blockedBy) {
@@ -1382,6 +1388,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const w = obj(s, id);
         if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
+    // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
+    // controller that player is an opponent of, once for each source (rulings).
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const you = controllerOf(s, w);
+      if (opponents(s, you).includes(ev.player)) add(w, you, (e, t) => e === "opponentDealtDamageBySource" && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    }
     // "Whenever a creature deals damage to you", "Whenever a source an opponent controls deals damage to you": the damaged
     // player's permanents, once for each source. A permanent source is the subject; whose source it is, the event player.
     const fromPermanent = o?.zone === "battlefield" ? o : undefined;
@@ -1746,6 +1759,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "playerDiscards" || !d) return false;
         if ((d.by === "you" && ev.player !== you) || (d.by === "opponent" && ev.player === you)) return false;
         if ((d.cycled && !ev.cycled) || (d.other && ev.id === o.id)) return false;
+        if (d.firstEachTurn && (s.turnLog?.cycled?.[ev.player] ?? 0) !== 1) return false;
         return !d.filter || printedMatches(d.filter, ev.card);
         // The card as it is now, where it went ("exile that card from your graveyard").
       }, undefined, undefined, card, undefined, undefined, undefined, { player: ev.player });

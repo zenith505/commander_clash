@@ -382,6 +382,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const amount = parseCount(`the number of ${m[1]} that player controls`, { ...ctx, eachOne: true });
     return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, amount }] : null;
   }
+  // Invincible Hymn: "Your life total becomes the number of cards in your library" (CR 119.5).
+  if (/^Your life total becomes the number of cards in your library$/.test(s)) {
+    const amount = parseCount("the number of cards in your library", ctx);
+    return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "you" }, n: 0, amount }] : null;
+  }
   // Repay in Kind: "Each player's life total becomes the lowest life total among all players."
   if (/^Each player's life total becomes the lowest life total among all players$/.test(s)) return [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, lowest: true }];
   // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
@@ -864,6 +869,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
   // Screaming Nemesis: each player the damage just before was dealt to (CR 119.7), for good.
   if (/^If a player is dealt damage this way, they can't gain life for the rest of the game$/.test(s)) return [{ type: "noLifeGainForGame", who: { ref: "damagedThisWay" } }];
+  // Stigma Lasher: "Whenever ~ deals damage to a player, that player can't gain life for the rest of the game" (CR 119.7).
+  if ((m = /^([Tt]hat player|[Tt]arget player|[Tt]arget opponent) can't gain life for the rest of the game$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "noLifeGainForGame", who }] : null;
+  }
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller

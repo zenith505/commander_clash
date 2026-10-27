@@ -130,6 +130,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   const poisoned = new RegExp(`^each opponent (?:with|who has) ${NUM} or more poison counters$`).exec(x);
   if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
+  if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
   // Bonder's Ornament: "Each player who controls a permanent named ~".
@@ -800,7 +801,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   if (twoHues) p = `${twoHues[1]} or ${twoHues[2]} creatures`;
   // "Non-Elf creatures get -2/-2 until end of turn" (Eyeblight Massacre): every creature that isn't an Elf.
   const nonType = /^non-([a-z]+) creatures$/i.exec(p);
-  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^nonartifact creatures$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
+  // "Creature tokens get -2/-2 until end of turn" (Bloodline Culling): every creature token, whoever controls it.
+  const hued = /^(?:non-?)?(?:white|blue|black|red|green)(?: or (?:white|blue|black|red|green))? creatures$/i.test(p) || /^(?:nonartifact creatures|creature tokens)$/i.test(p) || /^creatures with no counters on them$/i.test(p) || (!!nonType && CREATURE_TYPES.has(capital(nonType[1]!)));
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed && !hued) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that saddled (?:it|~) this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);

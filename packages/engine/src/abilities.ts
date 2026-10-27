@@ -149,6 +149,8 @@ export type Count =
   | { kind: "putThisWay" }
   /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
   | { kind: "blockingIt"; subject?: true }
+  /** "For each creature it's blocking" (Guardian of the Gateless): the creatures the source is blocking as this resolves. */
+  | { kind: "itBlocks" }
   /** "For each card returned to your hand this way" (Paradoxical Outcome): the cards it returned that you own, still in your hand (a token isn't a card; another player's goes to their hand). */
   | { kind: "returnedToYourHand" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
@@ -407,7 +409,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; /** "Opponents that were dealt combat damage this turn" (Tymna the Weaver), also those who have lost since (rulings). */ combatDamaged?: true; /** "For each opponent who was dealt damage this turn" (Gnoll War Band): by any source, those still in the game (rulings). */ damaged?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec; /** "Who has one or fewer cards in hand" (Bandit's Talent), counted now. */ handAtMost?: number; /** "With four or more cards in hand" (Wolfcaller's Howl), counted now. */ handAtLeast?: number; /** "Who has more cards in their hand than you" (Consuming Tide), counted now. */ handMoreThanYou?: true; /** "For each opponent who has less life than you" (Great Unclean One), counted now. */ lifeLessThanYou?: true; /** "For each opponent whose life total is less than half their starting life total" (Anya, Merciless Angel): with at most this much life, counted now. */ lifeAtMost?: number; /** "For each opponent who controls fewer creatures than you" (Birth of the Imperium), counted now. */ fewerCreaturesThanYou?: true; /** "The number of opponents who control more creatures than you" (Heidegger, Shinra Executive), counted now. */ moreCreaturesThanYou?: true; /** "Players who control at least two more lands than you" (Surveyor's Scope), counted now. */ moreLandsThanYou?: number; /** "For each opponent you attacked" (Rose, Cutthroat Raider): players you attacked this turn, still in the game. */ attacked?: true; /** "For each player who has lost the game" (Rampant Frogantua): those no longer in it (CR 104.3, 800.4a). */ lostGame?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1056,6 +1058,8 @@ export type PlayerRef =
   | { ref: "subjectControllerOpponents" }
   /** "Each opponent who doesn't control a legendary creature or planeswalker" (Nicol Bolas, Dragon-God): those controlling no permanent that matches `filter` as it resolves. */
   | { ref: "opponentsControllingNo"; filter: TargetSpec }
+  /** "Each player who controls the most creatures" (No Witnesses): every player tied for the most, counted as it resolves. */
+  | { ref: "mostCreatures" }
   /** "Each opponent who didn't discard a nonland card this way" (Kroxa): opponents none of whose cards discarded in this resolution match `filter` (printed characteristics), those who discarded nothing too. */
   | { ref: "opponentsNotDiscarded"; filter: TargetSpec }
   /** "Each player who controls an artifact or enchantment" (Fade from History): as this instruction is carried out. */
@@ -2179,7 +2183,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" | "fourth" | "fifth" }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth" }
   | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** "Exile all cards from all hands and graveyards" (Worldfire): the hand too, then the graveyard. */ hand?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "All cards with flashback" (Tombfire): cards that have it there, their own or given by an effect (CR 702.34a). */ withFlashback?: true; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
@@ -2839,7 +2843,7 @@ export type Effect =
   | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
-  | { type: "handToTop"; n: Amount; bottom?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
+  | { type: "handToTop"; n: Amount; bottom?: true; /** See Beyond: "shuffle a card from your hand into your library". */ shuffle?: true; /** "Target opponent puts a card from their hand on top of their library" (Chimney Imp), "each player ..." (Sadistic Augermage): each of them, from their own hand, in turn order (default: you). */ who?: PlayerRef }
   /** Scroll Rack: any number of cards from the hand exiled face down, that many from the top of the library put into the hand (not drawn), then the exiled cards on top in any order. */
   | { type: "scrollRack" }
   /**
@@ -3854,6 +3858,8 @@ export type TriggerEvent =
   /** "Whenever damage that would be dealt to you is prevented" (Selfless Squire): "that many" is the damage prevented. */
   | "youDamagePrevented"
   | "opponentIsDealtDamage"
+  /** "Whenever an opponent is dealt 3 or more damage by a single source" (Pain Magnification): once for each source and opponent, `minDamage` at once (rulings). */
+  | "opponentDealtDamageBySource"
   /** "Whenever an opponent is dealt noncombat damage" (Chandra's Spitfire). */
   | "opponentIsDealtNoncombatDamage"
   | "enchantedPlayerDealtDamage"
@@ -4090,7 +4096,7 @@ export interface TriggeredAbility {
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
    * (rulings: cycling a card triggers it once).
    */
-  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
+  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec; /** "For the first time each turn" (Valiant Rescuer): the player's first cycle this turn. */ firstEachTurn?: true };
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix): this permanent too, whatever the filter says. */ orSelf?: true; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
@@ -4121,7 +4127,7 @@ export interface TriggeredAbility {
   damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
-  /** For "sourceYouControlDamagesOpponent": "deals 5 or more damage" at once (Dragonborn Champion). */
+  /** For "sourceYouControlDamagesOpponent" and "opponentDealtDamageBySource": "deals 5 or more damage" at once (Dragonborn Champion). */
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;
@@ -5143,6 +5149,11 @@ export interface CompiledCard {
    */
   counterShield?: true;
   /**
+   * Phyrexian Hydra: "If damage would be dealt to ~, prevent that damage. Put a -1/-1 counter on ~ for each 1 damage
+   * prevented this way." Damage that can't be prevented is dealt as usual, with no counters (rulings).
+   */
+  preventToMinusCounters?: true;
+  /**
    * Khârn the Betrayer: "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control
    * of it" (CR 615.5): the control change happens right away, also when the damage can't be prevented (615.12).
    */
@@ -5177,7 +5188,7 @@ export interface CompiledCard {
   compleated?: true;
   opponentsCantCastYourTurn?: true;
   /** "Your opponents can't cast spells during combat" (Marisi, Breaker of the Coil): during any combat phase, whoever's turn (CR 506.1), even a spell an effect lets or tells them cast (rulings). */
-  opponentsCantCastDuringCombat?: true;
+  opponentsCantCastDuringCombat?: true | /** "Players can't cast spells during combat" (Basandra, Battle Seraph): its controller too. */ "all";
   /** "Each opponent who cast a spell this turn can't attack with creatures" (Angelic Arbiter): checked as attackers are declared, counting spells cast before it was there (rulings). */
   opponentsWhoCastCantAttack?: true;
   /** "Each opponent who attacked with a creature this turn can't cast spells" (Angelic Arbiter): one who declared an attacker this turn (rulings). */

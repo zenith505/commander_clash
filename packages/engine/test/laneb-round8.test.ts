@@ -928,3 +928,48 @@ describe("Cards these templates also cover", () => {
     expect(named(s, "Drake").length).toBe(4);
   });
 });
+
+const winterthornBlessing = card("Winterthorn Blessing", "Sorcery", "{G}{U}", { cmc: 2, keywords: ["Flashback"], oracleText: "Put a +1/+1 counter on up to one target creature you control. Tap up to one target creature you don't control, and that creature doesn't untap during its controller's next untap step.\nFlashback {1}{G}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)" });
+const seersVision = card("Seer's Vision", "Enchantment", "{2}{U}{B}", { cmc: 4, colors: ["B","U"], oracleText: "Your opponents play with their hands revealed.\nSacrifice this enchantment: Look at target player's hand and choose a card from it. That player discards that card. Activate only as a sorcery." });
+const magetaTheLion = card("Mageta the Lion", "Legendary Creature — Human Spellshaper", "{3}{W}{W}", { cmc: 5, power: "3", toughness: "3", oracleText: "{2}{W}{W}, {T}, Discard two cards: Destroy all creatures except for Mageta. Those creatures can't be regenerated." });
+
+describe("Up to one of each, a look at a hand, all creatures but one", () => {
+  it("are fully supported", () => supported(winterthornBlessing, seersVision, magetaTheLion));
+
+  it("Winterthorn Blessing: a +1/+1 counter on yours, and theirs tapped and kept tapped through its next untap step", () => {
+    let { s, ap, opp, ids } = setup([winterthornBlessing]);
+    const mine = putOnBattlefield(s, ap, greenBear());
+    const theirs = putOnBattlefield(s, opp, redOgre());
+    s = settle(run(s, planCast(s, ap, ids[0]!, [tgt(mine), tgt(theirs)])));
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[theirs]!.tapped).toBe(true);
+    s = passUntil(s, "upkeep", opp);
+    expect(s.objects[theirs]!.tapped).toBe(true);
+  });
+
+  it("Seer's Vision: sacrifice it to look at a player's hand and make them discard the card you choose", () => {
+    let { s, ap, opp } = setup([]);
+    const sv = putOnBattlefield(s, ap, seersVision);
+    const card1 = into(s, opp, redOgre());
+    s = run(s, planActivate(s, ap, sv, 0, [player(opp)]));
+    for (let i = 0; i < 10 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const pend = s.pending;
+    expect(pend).toMatchObject({ kind: "searchLibrary", player: ap, hand: opp });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [card1] }));
+    expect(zone(s, sv)).toBe("graveyard");
+    expect(zone(s, card1)).toBe("graveyard");
+  });
+
+  it("Mageta the Lion destroys every other creature, and they can't be regenerated", () => {
+    let { s, ap, opp } = setup([testShock(), testShock()]);
+    const m = putOnBattlefield(s, ap, magetaTheLion);
+    const bear = putOnBattlefield(s, opp, greenBear());
+    s.objects[bear]!.regenShields = 1;
+    const mine = putOnBattlefield(s, ap, redOgre());
+    s = run(s, planActivate(s, ap, m, 0, undefined, undefined, undefined, undefined, { discard: s.players[ap]!.hand.slice(0, 2) }));
+    s = settle(s);
+    expect(zone(s, m)).toBe("battlefield");
+    expect(zone(s, bear)).toBe("graveyard");
+    expect(zone(s, mine)).toBe("graveyard");
+  });
+});

@@ -924,6 +924,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // HYDRA Troopers: "create a tapped 2/1 ... token with menace if there are two or more creature cards in your graveyard.
   // Otherwise, mill two cards.": checked as it resolves (CR 608.2c), not an intervening "if".
   text = text.replace(/^create ([^.]+?) if (there are [a-z]+ or more [a-z]+ cards in your graveyard)\. Otherwise,/, "If $2, create $1. Otherwise,");
+  // Seer's Vision: "Look at target player's hand and choose a card from it. That player discards that card.": as "reveals
+  // their hand. You choose ...", the hand seen only by you.
+  text = text.replace(/(^|\. )(Look at target (?:player|opponent)'s hand) and choose (an? [a-z ]*?card) from it\. That player discards that card\./, "$1$2. You choose $3 from it. That player discards that card.");
+  // Winterthorn Blessing: "Tap up to one target creature you don't control, and that creature doesn't untap during its
+  // controller's next untap step": two instructions about the same creature.
+  text = text.replace(/(^|\. )(Tap up to one target creature you don't control), and that creature (doesn't untap during its controller's next untap step)\./, "$1$2. It $3.");
+  // Mageta the Lion: "Destroy all creatures except for ~. Those creatures can't be regenerated.": every other creature.
+  text = text.replace(/(^|\. )Destroy all creatures except for ~\. Those creatures can't be regenerated\./, "$1Destroy all other creatures. They can't be regenerated.");
   // Ultimate Nullification: "Exile all creatures and graveyards": the creatures, then the graveyards they didn't go to.
   text = text.replace(/^Exile all creatures and graveyards\./, "Exile all creatures. Exile all graveyards.");
   // Sphinx Sovereign: "you gain 3 life if ~ is untapped. Otherwise, each opponent loses 3 life.": checked as it resolves
@@ -4437,7 +4445,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const choose = /^You choose an? (.+?) from it( with mana value \d+ or (?:less|greater))?( and exile that card)?$/.exec(s);
     if (choose) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      // Seer's Vision: "Look at target player's hand. You choose a card from it": seen only by you.
+      if (prev?.type !== "lookAtHand" || (!prev.reveal && sentences[si - 1] !== "Look at target player's hand")) return null;
       // Lost Hours: "That player puts that card into their library third from the top."
       const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?|That player puts that card into their library third from the top|That player shuffles that card into their library)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!then) return null;

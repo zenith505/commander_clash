@@ -301,7 +301,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
   // "Target creature gets +3/+0 until end of turn. When it dies this turn, manifest dread." (Turn Inside Out): "it" is
   // that target creature.
-  if (/^When it dies this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)
+  if (/^When it dies (?:under your control )?this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)
     return parsePermanentsSentence(s.replace(/^When it dies/, "When that creature dies"), ctx) ?? null;
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);

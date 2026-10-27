@@ -236,6 +236,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
+    // Vicious Battlerager: "Whenever ~ becomes blocked by a creature, that creature's controller loses 5 life": the
+    // blocker's, as it last existed (CR 608.2h).
+    if (i === undefined && ctx.subject && x === "that creature's controller") return { ref: "subjectController" };
     return i !== undefined ? { ref: "targetController", index: i } : null;
   }
   // The Lord of Pain: "another target player", not the one the trigger is about (bound in triggerBody).

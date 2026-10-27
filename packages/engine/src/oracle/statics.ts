@@ -237,6 +237,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
   else if ((m = /^(~ .+?) if (you've committed a crime this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  // Fugitive Droid: "~ can't be blocked if an artifact entered the battlefield under your control this turn": the same.
+  else if ((m = /^(~ can't be blocked) if (an? [a-z]+ entered the battlefield under your control this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   if (!statement || !cond) return null;
   // Theros gods: "As long as your devotion to black is less than five, ~ isn't a creature": it loses the card type
   // creature and its creature types (layer 4, CR 205.3d; rulings). It works even if the God lost all abilities, as layer 4
@@ -1571,7 +1573,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Grounded: "Enchanted creature loses flying": in layer 6, by timestamp, so a later effect can give it back (CR 613.7).
-  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch)$/.exec(rest))) {
+  if ((m = /^loses? (flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect)$/.exec(rest))) {
     const k = parseKeywordList(m[1]!);
     return k ? [{ kind: "removeKeywords", keywords: k }] : null;
   }
@@ -2004,7 +2006,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch))$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can only attack alone|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+|loses? (?:flying|first strike|trample|haste|vigilance|reach|defender|lifelink|deathtouch|infect))$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

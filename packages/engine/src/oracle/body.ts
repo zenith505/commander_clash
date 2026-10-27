@@ -867,6 +867,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Aria of Flame: "put a verse counter on ~, then it deals damage equal to the number of verse counters on it to ...":
   // "it" is ~.
   text = text.replace(/\b(put an? [a-z]+ counter on ~, then) it deals damage equal to the number of ([a-z]+) counters on it to\b/gi, "$1 ~ deals damage equal to the number of $2 counters on ~ to");
+  // Herald of Ilharg: "~ deals damage equal to the number of counters on it to each opponent": "it" is ~.
+  text = text.replace(/(^|\. |, )~ deals damage equal to the number of ((?:[+-]?[a-z0-9/+-]+ )?)counters on it to\b/g, "$1~ deals damage equal to the number of $2counters on ~ to");
   // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
   // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
@@ -1228,8 +1230,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
   // (Ajani Steadfast), "put a +1/+1 counter on each creature you control and a loyalty counter on each planeswalker you
   // control" (Brokers Ascendancy, in a trigger): two kinds of counters on two groups, one after the other. Ich-Tekik,
-  // Salvage Splicer: "put a +1/+1 counter on ~ and a +1/+1 counter on each Golem you control", the same.
-  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three|five) ([^.]*?counters?) on (~|each [^.]+?) and (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
+  // Salvage Splicer: "put a +1/+1 counter on ~ and a +1/+1 counter on each Golem you control", Captain America, Team
+  // Leader: "Put a +1/+1 counter on that Hero and a +1/+1 counter on ~", the same.
+  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three|five) ([^.]*?counters?) on (~|each [^.]+?|that [A-Z][a-z]+) and (an?|one|two|three|five) ([^.]*?counters?) on (each [^.]+?|~)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
   // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
@@ -7756,7 +7759,8 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   // 608.2h), a changeling's all of them.
   // "If that spell's mana value is 5 or greater, create three of those tokens instead" (Prismari Pianist), in a cast
   // trigger: the spell's mana value as the ability resolves, or as it last existed on the stack (CR 608.2h).
-  const spellMv = ctx.castSpell ? /^If that spell's mana value is (\d+) or greater, (.+)$/.exec(s) : null;
+  // Herald of Ilharg: "If that spell has mana value 5 or greater, ...": the same.
+  const spellMv = ctx.castSpell ? /^If that spell's mana value is (\d+) or greater, (.+)$/.exec(s) ?? /^If that spell has mana value (\d+) or greater, (.+)$/.exec(s) : null;
   if (spellMv) {
     const amount = parseCount("that spell's mana value", ctx);
     return amount ? { cond: { kind: "amountNow", amount, min: Number(spellMv[1]) }, not: false, text: spellMv[2]!, noTargets: true } : null;

@@ -465,6 +465,9 @@ export function compile(d: CardDef): CompiledCard {
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
       // the choice, then the counters, two abilities in one paragraph.
       .replace(/^(As ~ enters, choose a creature type\.) (~ enters with .+)$/m, "$1\n$2")
+      // Draconic Destiny: "Enchanted creature gets +1/+1 and has ... "{1}: ~ gets +1/+0 until end of turn." It's a Dragon in
+      // addition to its other types.": two static abilities of the Aura, the type not part of the quoted one (rulings).
+      .replace(/^((?:Enchanted|Equipped) creature [^\n]+") It's (an? [A-Z][a-z]+ in addition to its other types\.)$/m, (_, a: string, b: string) => `${a}\n${a.startsWith("Enchanted") ? "Enchanted" : "Equipped"} creature is ${b}`)
       // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
       // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
       .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
@@ -2829,6 +2832,14 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCreaturesNoCounters = "+1/+1";
       continue;
     }
+    if (line === "Creatures you control can't have -1/-1 counters put on them.") {
+      out.yourCreaturesNoCounters = "-1/-1";
+      continue;
+    }
+    if (line === "You can't get poison counters.") {
+      out.noPoisonForYou = true;
+      continue;
+    }
     if (line === "Counters can't be put on artifacts, creatures, enchantments, or lands.") {
       out.noCountersOn = ["Artifact", "Creature", "Enchantment", "Land"];
       continue;
@@ -3330,6 +3341,8 @@ export function compile(d: CardDef): CompiledCard {
       // "Whenever ~ or another nontoken Spirit you control dies or deals combat damage to a player, ..." (Millicent,
       // Restless Revenant): a death and combat damage are never one event.
       /^Whenever (~ or another [^,]+? you control) dies or deals combat damage to a player, (.+)$/.exec(line) ??
+      // Park Heights Maverick: "Whenever ~ deals combat damage to a player or dies, proliferate": the same.
+      /^Whenever ~ deals combat damage to a player or dies, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
@@ -3381,6 +3394,8 @@ export function compile(d: CardDef): CompiledCard {
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
+            : /^Whenever ~ deals combat damage to a player or dies, /.test(line)
+              ? [`Whenever ~ deals combat damage to a player, ${effect}`, `When ~ dies, ${effect}`]
             : /^Whenever ~ or another [^,]+? you control dies or deals combat damage to a player, /.test(line)
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)

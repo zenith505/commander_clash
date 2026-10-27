@@ -707,6 +707,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "When that creature dies this turn": only this turn, and only if it dies (CR 700.4).
       if (d.thisTurn !== undefined && d.thisTurn !== s.turn) continue;
       if (d.dies && !ev.wasCreature) continue;
+      if (d.underControl && ev.controller !== d.controller) continue;
       if (d.to?.includes(ev.to))
         s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }

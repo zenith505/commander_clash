@@ -2324,7 +2324,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -5203,6 +5203,10 @@ export interface CompiledCard {
   noCountersOn?: string[];
   /** Blightbeetle: "Creatures your opponents control can't have +1/+1 counters put on them." (counters.ts countersBanned). */
   opponentsCreaturesNoCounters?: CounterKind;
+  /** Melira, Sylvok Outcast: "Creatures you control can't have -1/-1 counters put on them." (counters.ts countersBanned). */
+  yourCreaturesNoCounters?: CounterKind;
+  /** Melira, Sylvok Outcast: "You can't get poison counters." (counters.ts playerCountersToPut). */
+  noPoisonForYou?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
   boastTwice?: true;
   /**

@@ -324,11 +324,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Persistent Marshstalker: "return ~ from your graveyard to the battlefield tapped and attacking" (attacking what its
   // controller chooses, CR 508.4).
   // Phoenix Chick: "... tapped and attacking with a +1/+1 counter on it" (it enters with it, CR 614.1c).
-  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with a \+1\/\+1 counter on it)?$/.exec(s))) {
+  // Retrofitted Transmogrant: "{3}{B}: Return ~ from your graveyard to the battlefield tapped with two +1/+1 counters on it".
+  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) \+1\/\+1 counters? on it)?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
     const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
-    if ((m[3] || m[4]) && (m[1] === "your hand" || !m[2] || !m[3] || ctx.auraCard)) return null;
-    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { "+1/+1": 1 } } : {}) }];
+    if ((m[3] || m[4]) && (m[1] === "your hand" || ctx.auraCard)) return null;
+    if (m[3] && !m[2]) return null;
+    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { "+1/+1": num(m[5]!) } } : {}) }];
   }
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."

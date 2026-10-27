@@ -941,6 +941,8 @@ export interface DelayedTrigger {
   thisTurn?: number;
   /** `leaves`: only when it dies, a creature put into a graveyard from the battlefield (CR 700.4). */
   dies?: true;
+  /** With `dies`: "When it dies under your control this turn" (Desperate Measures): only while `controller` controlled it as it died. */
+  underControl?: true;
   /**
    * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
    * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7). Also an Aura's

@@ -974,6 +974,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || (x.kind === "addAbility" && what.ref === "created"))) return [{ type: "continuous", what, mods, duration: "game" }];
   }
+  // Riding the Dilu Horse: "Target creature gets +2/+2 and gains horsemanship.": no duration, so for as long as it stays
+  // on the battlefield (CR 611.2a, rulings).
+  if ((m = /^([Tt]arget creature) (gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)?)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
+    if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || x.kind === "modifyPT")) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
   // Chance for Glory: "Creatures you control gain indestructible": the creatures there as it resolves (CR 611.2c), for as
   // long as each stays on the battlefield (CR 611.2a).
   if ((m = /^(Creatures you control) (gain [a-z ,]+)$/.exec(s)) && ctx.spell) {

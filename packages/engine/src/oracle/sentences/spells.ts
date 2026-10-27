@@ -486,7 +486,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Avoid Fate: "Counter target instant or Aura spell that targets a permanent you control": a spell of those kinds.
   if ((m = /^Counter target (spell|spell or ability|instant or Aura spell) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
     const what = m[3] === "you" ? "you" : parseTargetPhrase(m[3]!.replace(/^an? /, ""));
-    if (what !== "you" && what?.kind !== "object") return null;
+    // Outwit: "Counter target spell that targets a player": any player (targetsMatch).
+    if (what !== "you" && what?.kind !== "object" && !(what?.kind === "player" && m[3] === "a player" && !what.opponent)) return null;
     const kinds = /^instant or Aura spell$/.test(m[1]!) ? parseTargetPhrase(m[1]!) : null;
     if (/^instant or Aura spell$/.test(m[1]!) && kinds?.kind !== "spell") return null;
     const base = kinds ? { ...kinds } : m[1]!.toLowerCase() === "spell" ? { kind: "spell" as const } : stackSpec("spell or ability");

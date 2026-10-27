@@ -838,6 +838,12 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * "Return target creature and all Auras attached to it" (Hubris): also each permanent matching `filter` attached to
+       * the target as this resolves (none if the target is illegal, CR 608.2b). `only`: "Destroy all Equipment attached to
+       * that creature" (Turn to Slag): just those.
+       */
+      attachedToo?: { filter: TargetSpec; only?: true };
       /** "~ and that creature each get +2/+0" (Gogo, Mysterious Mime): the source too, while it's still that permanent. */
       andSelf?: true;
       /** "Each of those creatures you don't control" (Lost in the Maze): only the targets another player controls as it resolves. */

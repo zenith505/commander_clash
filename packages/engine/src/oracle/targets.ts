@@ -371,6 +371,23 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (ctl) ctx.controllerNamed = t.index;
     return { ...t, sameName: { filter: g.filter, ...(ctl ? { of: true as const } : {}) } };
   }
+  // Hubris: "target creature and all Auras attached to it"; Silence the Believers: "any number of target creatures and all
+  // Auras attached to them"; Turn to Slag: "all Equipment attached to that creature" (the target before).
+  const andAttached = /^(.*target creatures?) and all (Auras|Equipment) attached to (?:it|them)$/i.exec(x);
+  const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
+  if ((andAttached || attachedThat) && !cards) {
+    const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
+    const filter: TargetSpec = kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" };
+    if (attachedThat) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (t?.kind !== "object" || t.many || t.optional || !t.types?.includes("Creature")) return null;
+      return { ref: "target", index: i, attachedToo: { filter, only: true } };
+    }
+    const t = parseObjectNow(andAttached![1]!, ctx, cards);
+    if (t?.ref !== "target" || t.sameName) return null;
+    return { ...t, attachedToo: { filter } };
+  }
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).
   // Silumgar, the Drifting Death: "creatures defending player controls get -1/-1 until end of turn" (CR 506.2).
@@ -1291,6 +1308,15 @@ export function parseTargetPhrase(
   if (p === "creature or vehicle") {
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
+  }
+  // Ray of Ruin: "creature, Vehicle, or nonbasic land": any one of the three (TargetSpec.anyOf).
+  if (p === "creature, vehicle, or nonbasic land" && !extra.anyOf) {
+    extra.anyOf = [
+      { kind: "object", types: ["Creature"], text: "creature" },
+      { kind: "object", subtypes: ["Vehicle"], text: "Vehicle" },
+      { kind: "object", types: ["Land"], notSupertypes: ["Basic"], text: "nonbasic land" },
+    ];
+    p = "permanent";
   }
   // Seedship Broodtender: "creature or Spacecraft card"; Avoid Fate: "instant or Aura spell": either one (CR 205.3).
   const orSub = /^(creature|instant) or (spacecraft|aura)$/.exec(p);

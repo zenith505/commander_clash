@@ -848,7 +848,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
     // "Protection from spells and from permanents that were cast this turn" (Emrakul, the World Anew): the same, two.
-    const kwLine = line.replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
+    // "Protection from blue, from black, and from red" (Oversoul of Dusk): three.
+    const kwLine = line.replace(/(protection) from (\w+), from (\w+),? and from (\w+)/gi, "$1 from $2, $1 from $3, $1 from $4").replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;

@@ -30,6 +30,9 @@ export interface DamageSource {
   /** Card types and subtypes, for protection from artifacts, creatures, Goblins (CR 702.16a). */
   types: readonly string[];
   subtypes: readonly string[];
+  /** For protection from legendary creatures and from non-Spirit creatures. */
+  supertypes?: readonly string[];
+  allCreatureTypes?: boolean;
   keywords: string[];
   /** A commander dealing combat damage counts toward commander damage (CR 903.10a). */
   commanderId?: ObjectId;
@@ -55,7 +58,7 @@ export interface DamageSource {
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, supertypes: c.supertypes, allCreatureTypes: c.allCreatureTypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
@@ -65,7 +68,7 @@ function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; ba
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
-export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource["ref"]): DamageSource => ({ name: d.name, controller, colors: d.colors, types: d.types, subtypes: d.subtypes, keywords: d.keywords, manaValue: defMv(d), ...(ref ? { ref } : {}) });
+export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource["ref"]): DamageSource => ({ name: d.name, controller, colors: d.colors, types: d.types, subtypes: d.subtypes, supertypes: d.supertypes, keywords: d.keywords, manaValue: defMv(d), ...(ref ? { ref } : {}) });
 
 /** Can't this source's damage be prevented (CR 615.12)? */
 export const unpreventable = (src: DamageSource, combat: boolean) => src.unpreventable === "all" || (src.unpreventable === "combat" && combat);

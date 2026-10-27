@@ -29,6 +29,8 @@ export const SUPPORTED_KEYWORDS = [
   "Snow landwalk",
   "Legendary landwalk",
   "Nonbasic landwalk",
+  // A card type (CR 702.14a: "artifact landwalk", Vectis Gloves): a land that's also an artifact.
+  "Artifact landwalk",
   // A supertype and a land type (CR 702.14c: "snow swampwalk", a snow Swamp), and Desertwalk (Desert Nomads).
   "Snow plainswalk",
   "Snow islandwalk",
@@ -95,6 +97,10 @@ export interface SourceQuality {
   controller?: number;
   types?: readonly string[];
   subtypes?: readonly string[];
+  /** Its supertypes, for protection from legendary creatures (Tsabo Tavoc). */
+  supertypes?: readonly string[];
+  /** It has every creature type (changeling, CR 702.73a), for protection from non-Spirit creatures. */
+  allCreatureTypes?: boolean;
   /** It's a spell (not an ability of the source), for "can't be the target of spells". */
   spell?: true;
   /** Its name, for protection from a card name (Runed Halo, CR 702.16a). */
@@ -147,6 +153,10 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
   if (/^mana value \d+ or (?:less|greater)$/.test(q)) return `Protection from ${q}`;
+  // Tsabo Tavoc: "protection from legendary creatures"; Harbinger of Spring: "protection from non-Spirit creatures".
+  if (q === "legendary creatures") return `Protection from ${q}`;
+  const nonType = /^non-([a-z]+) creatures$/.exec(q);
+  if (nonType && CREATURE_TYPES.has(nonType[1]!.charAt(0).toUpperCase() + nonType[1]!.slice(1))) return `Protection from non-${nonType[1]!.charAt(0).toUpperCase() + nonType[1]!.slice(1)} creatures`;
   const st = creatureTypeOfPlural(q);
   return st ? `Protection from ${text.trim().slice(-q.length).replace(/^./, (c) => c.toUpperCase())}` : undefined;
 }
@@ -246,6 +256,12 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (mv && (mv[2] === "less" ? (src.manaValue ?? 0) <= Number(mv[1]) : (src.manaValue ?? 0) >= Number(mv[1]))) return true;
     const st = creatureTypeOfPlural(q);
     if (st && src.subtypes?.includes(st)) return true;
+    // "Protection from legendary creatures", "... non-Spirit creatures": a creature source that's legendary, or that isn't
+    // a Spirit (a changeling is every creature type, CR 702.73a).
+    const isCreature = !!src.types?.includes("Creature");
+    if (q === "legendary creatures" && isCreature && src.supertypes?.includes("Legendary")) return true;
+    const nonType = /^non-([a-z]+) creatures$/.exec(q);
+    if (nonType && isCreature && !src.allCreatureTypes && !src.subtypes?.some((t) => t.toLowerCase() === nonType[1])) return true;
   }
   return false;
 }
@@ -366,6 +382,7 @@ const WALK_SUPERTYPES: Record<string, { supertype: string; non?: true }> = { sno
  * supertype ("snow landwalk", "nonbasic landwalk"), or with both ("snow swampwalk"). Null if it isn't landwalk.
  */
 export function landwalkLand(keyword: string): ((land: { types: string[]; subtypes: string[]; supertypes: string[] }) => boolean) | null {
+  if (/^artifact landwalk$/i.test(keyword)) return (l) => l.types.includes("Land") && l.types.includes("Artifact");
   const m = /^(?:(snow|legendary|nonbasic) )?(plains|island|swamp|mountain|forest|desert|land)walk$/i.exec(keyword);
   if (!m || (!m[1] && m[2]!.toLowerCase() === "land")) return null;
   const sup = m[1] ? WALK_SUPERTYPES[m[1].toLowerCase()]! : undefined;

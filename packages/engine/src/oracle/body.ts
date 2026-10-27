@@ -879,6 +879,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // them chosen as it resolves (rulings), the same one for both.
   text = text.replace(/(^|\. )You draw X cards and you lose X life, where X is the mana value of a commander you own on the battlefield or in the command zone\./, "$1Choose a commander you own on the battlefield or in the command zone. You draw X cards, where X is the chosen commander's mana value. You lose X life, where X is the chosen commander's mana value.");
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
+  // In Oketra's Name: "Zombies you control get +2/+1 until end of turn. Other creatures you control get +1/+1 until end of
+  // turn.": the other ones are those that aren't Zombies.
+  text = text.replace(/^([A-Z][a-z]+)s you control (get [+-]\d+\/[+-]\d+ until end of turn\.) Other creatures you control (get [+-]\d+\/[+-]\d+ until end of turn\.)$/, (all, kind: string, a: string, b: string) => (CREATURE_TYPES.has(kind) ? `${kind}s you control ${a} Non-${kind} creatures you control ${b}` : all));
+  // Join Forces: "Untap up to two target creatures. They each get +2/+2 until end of turn.": each of them, as "they get".
+  text = text.replace(/((?:^|\. )(?:Untap|Tap) (?:up to )?(?:two|three) target creatures\.) They each get /, "$1 They get ");
+  // Suffocating Blast: "Counter target spell and ~ deals 3 damage to target creature.": two instructions, in order.
+  text = text.replace(/^Counter target spell and (~ deals \d+ damage to target creature\.)$/, "Counter target spell. $1");
+  // Sigil Blessing: "Until end of turn, target creature you control gets +3/+3 and other creatures you control get +1/+1."
+  text = text.replace(/^Until end of turn, (target creature you control) (gets [+-]\d+\/[+-]\d+) and (other creatures you control) (get [+-]\d+\/[+-]\d+)\.$/, "Target creature you control $2 until end of turn. Other creatures you control $4 until end of turn.");
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.
@@ -4062,26 +4071,41 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Burn the Impure: "If that creature has infect, ~ deals 3 damage to that creature's controller." Lightning Dart: "~ deals
     // 1 damage to target creature. If that creature is white or blue, ~ deals 4 damage to it instead.": which one, by the
     // creature as this resolves.
-    const dmgIs = /^~ deals \d+ damage to target creature$/.test(s)
-      ? /^If that creature (is an? (enchantment|artifact)|is (white|blue|black|red|green)(?: or (white|blue|black|red|green))?|has ([a-z]+)), (~ deals \d+ damage to that creature's controller|~ deals (\d+) damage to (?:it|that creature) instead)\.?$/.exec(sentences[si + 1] ?? "")
+    // Electrostatic Bolt: "If it's an artifact creature, ~ deals 4 damage to it instead"; Purifying Dragon: "it deals 1
+    // damage to target creature defending player controls. If that creature is a Zombie, ~ deals 2 damage to it instead";
+    // Rending Flame: "~ deals 5 damage to target creature or planeswalker. If that permanent is a Spirit, ~ also deals 2
+    // damage to that permanent's controller." All as it is when this resolves (CR 608.2c).
+    const dmgIs = /^(?:~|it) deals \d+ damage to target (?:creature|creature or planeswalker)(?: defending player controls| an opponent controls)?$/.test(s)
+      ? /^If (?:that creature|that permanent|it's) (is an? (enchantment|artifact)|an? (artifact) creature|is (white|blue|black|red|green)(?: or (white|blue|black|red|green))?|has ([a-z]+)|(?:is )?an? ([A-Z][a-z]+)), (~ (?:also )?deals \d+ damage to (?:that creature's|that permanent's|its) controller|~ deals (\d+) damage to (?:it|that creature) instead)\.?$/.exec(sentences[si + 1] ?? "")
       : null;
-    const dmgKeyword = dmgIs?.[5] ? capital(dmgIs[5]) : undefined;
+    const dmgKeyword = dmgIs?.[6] ? capital(dmgIs[6]) : undefined;
+    const dmgSubject = !dmgIs ? undefined : /^If that permanent /.test(sentences[si + 1]!) ? "permanent" : /^If that creature /.test(sentences[si + 1]!) ? "creature" : "it";
+    const dmgTargetsPw = / creature or planeswalker\b/.test(s);
     // Hexgold Slash: "If that creature has toxic, ...": any toxic ability (CR 702.164).
-    if (dmgIs && (!dmgKeyword || dmgKeyword === "Toxic" || (SUPPORTED_KEYWORDS as readonly string[]).includes(dmgKeyword))) {
+    if (
+      dmgIs &&
+      (!dmgKeyword || dmgKeyword === "Toxic" || (SUPPORTED_KEYWORDS as readonly string[]).includes(dmgKeyword)) &&
+      (!dmgIs[7] || CREATURE_TYPES.has(dmgIs[7])) &&
+      (dmgSubject === "permanent") === dmgTargetsPw &&
+      (dmgSubject !== "it" || !!dmgIs[3] || !!dmgIs[7]) &&
+      !(/'s controller$/.test(dmgIs[8]!) && !dmgIs[8]!.includes(dmgSubject === "permanent" ? "that permanent's" : "that creature's") && !dmgIs[8]!.includes("its controller"))
+    ) {
       const before = ctx.targets.length;
-      const fx = parseOne(s, ctx);
+      const fx = parseOne(s.replace(/^it deals /, "~ deals "), ctx);
       if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "damage") return null;
-      const filter: TargetSpec = dmgIs[2]
-        ? { kind: "object", types: [capital(dmgIs[2])], notTypes: [], notColors: [], text: dmgIs[2] }
-        : dmgIs[3]
-          ? { kind: "object", types: [], notTypes: [], notColors: [], colors: [dmgIs[3], dmgIs[4]].filter(Boolean).map((c) => COLOR_WORDS[c!]!), text: dmgIs[1]!.replace(/^is /, "") }
+      const filter: TargetSpec = dmgIs[2] || dmgIs[3]
+        ? { kind: "object", types: [capital(dmgIs[2] ?? dmgIs[3]!)], notTypes: [], notColors: [], text: dmgIs[2] ?? dmgIs[3]! }
+        : dmgIs[7]
+          ? { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [dmgIs[7]], text: dmgIs[7] }
+          : dmgIs[4]
+          ? { kind: "object", types: [], notTypes: [], notColors: [], colors: [dmgIs[4], dmgIs[5]].filter(Boolean).map((c) => COLOR_WORDS[c!]!), text: dmgIs[1]!.replace(/^is /, "") }
           : dmgKeyword === "Toxic"
             ? { kind: "object", types: [], notTypes: [], notColors: [], toxic: true, text: "with toxic" }
-            : { kind: "object", types: [], notTypes: [], notColors: [], keywords: [dmgKeyword!], text: `with ${dmgIs[5]}` };
-      if (dmgIs[7]) {
-        effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [{ ...fx[0]!, amount: num(dmgIs[7]) } as Effect], otherwise: fx });
+            : { kind: "object", types: [], notTypes: [], notColors: [], keywords: [dmgKeyword!], text: `with ${dmgIs[6]}` };
+      if (dmgIs[9]) {
+        effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [{ ...fx[0]!, amount: num(dmgIs[9]) } as Effect], otherwise: fx });
       } else {
-        const then = parseOne(dmgIs[6]!, ctx);
+        const then = parseOne(dmgIs[8]!.replace(" also ", " ").replace(/\b(?:that permanent's|its) controller$/, "that creature's controller"), ctx);
         if (!then || !then.length || ctx.targets.length !== before + 1) return null;
         effects.push(...fx, { type: "if", cond: { kind: "targetIs", index: before, filter }, effects: then });
       }
@@ -4133,12 +4157,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Karametra's Blessing: "If it's an enchanted creature or enchantment creature, ..." (TargetSpec.anyOf).
     // Elder Cathar: "put a +1/+1 counter on target creature you control. If that creature is a Human, put two +1/+1
     // counters on it instead.": which one, by the creature as this resolves (CR 608.2c).
-    const moreCounters = /^If that creature is an? ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on it instead$/.exec(s);
+    // Ray of Enfeeblement: "Target creature gets -4/-1 until end of turn. If that creature is white, it gets -4/-4 until
+    // end of turn instead.": one or the other, by the creature's color as this resolves (CR 608.2c).
+    const ptInstead = /^If that creature is (white|blue|black|red|green|an? [A-Z][a-z]+), it gets ([+-]\d+)\/([+-]\d+) until end of turn instead$/.exec(s);
+    if (ptInstead) {
+      const last = effects[effects.length - 1];
+      const mod = last?.type === "continuous" ? last.mods[0] : undefined;
+      const kind = ptInstead[1]!.replace(/^an? /, "");
+      if (last?.type !== "continuous" || last.what.ref !== "target" || last.duration !== "endOfTurn" || last.mods.length !== 1 || mod?.kind !== "modifyPT" || (!COLOR_WORDS[kind] && !CREATURE_TYPES.has(kind))) return null;
+      const filter: TargetSpec = COLOR_WORDS[kind]
+        ? { kind: "object", types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[kind]!], text: kind }
+        : { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [kind], text: kind };
+      const other: Effect = { ...last, mods: [{ kind: "modifyPT", power: Number(ptInstead[2]), toughness: Number(ptInstead[3]) }] };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [other], otherwise: [last] };
+      continue;
+    }
+    // Wakandan Royal Guard: "If that creature is another Hero, ...": a Hero other than ~ (TargetSpec.notSource).
+    const moreCounters = /^If that creature is (an?|another) ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on it instead$/.exec(s);
     if (moreCounters) {
       const last = effects[effects.length - 1];
-      if (last?.type !== "counters" || last.what.ref !== "target" || last.what.n || last.counter !== "+1/+1" || last.n !== 1 || !CREATURE_TYPES.has(moreCounters[1]!)) return null;
-      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [moreCounters[1]!], text: `a ${moreCounters[1]}` };
-      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(moreCounters[2]!) }], otherwise: [last] };
+      if (last?.type !== "counters" || last.what.ref !== "target" || last.what.n || last.counter !== "+1/+1" || last.n !== 1 || !CREATURE_TYPES.has(moreCounters[2]!)) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [moreCounters[2]!], ...(moreCounters[1] === "another" ? { notSource: true } : {}), text: `${moreCounters[1]} ${moreCounters[2]}` };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(moreCounters[3]!) }], otherwise: [last] };
       continue;
     }
     // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.

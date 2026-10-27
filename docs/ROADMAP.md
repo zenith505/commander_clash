@@ -1,6 +1,6 @@
 # Roadmap
 
-25,787 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+25,870 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,932 of 4,988 (98%), top 10,000: 8,724 of
 9,979 (87%).
 
@@ -1444,6 +1444,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (block costs on one creature: only global ones are modeled); Weight of Spires, Skull Raid, Gremlin Infestation
   (each a template not parsed yet); Wall of Shadows ("can't be the target of spells that can target only Walls");
   Chained Throatseeker ("can't attack unless defending player is poisoned").
+- Round B8 (ranks about 21,900 up to about 19,500, template clusters, plus more played cards the same templates cover:
+  Cruel Reality, Wasitora, Vicious Battlerager, Nessian Boar, Glorious Enforcer and others): mass pumps split by
+  controller ("creatures you control get +1/+1 and creatures your opponents control get -1/-1", Skulduggery's two
+  targets); "if you have less life / control fewer creatures than an opponent" and "more life than an opponent";
+  "an opponent has no cards in hand"; "a Lesson card in your graveyard"; "cards with cycling in your graveyard"; "in
+  its controller's graveyard" for an Aura; "as long as you haven't cast a spell this turn"; "During your turn, you
+  and ~ have hexproof"; intervening "if ~ was dealt damage this turn" and "if ~ wasn't kicked"; "Whenever you cast a
+  kicked spell" and "if that spell was kicked"; cast triggers for "an instant, sorcery, or Wizard spell" and "a white
+  or blue instant or sorcery spell"; "Then if it wasn't kicked"; "If the player can't, ..." after a sacrifice;
+  "that creature's controller" for the creature blocking or blocked; "put that creature on top of its owner's
+  library"; "Destroy all Plains"; "and all Equipment attached to that creature"; "Counter up to two target spells";
+  "Regenerate it" after a target; "Exile it (sacrifice ~) unless you sacrifice ...", "return ~ to its owner's hand
+  unless you remove two oil counters"; "unless they control two or more basic lands" (the trigger's player); "attach
+  all Equipment on the battlefield to it"; domain for a target player and "Each player creates ... for each untapped
+  Forest they control"; "Sacrifice any number of lands, then add that much {C}"; "if ~ is untapped. Otherwise, ..."
+  (as it last existed, the rulings: tapped is now kept in last-known information); "Put a +1/+1 counter on it if it's
+  a creature. Put a loyalty counter on it if it's a planeswalker"; "Whenever equipped creature dies, if it was a
+  Human"; "create ... if there are two or more creature cards in your graveyard. Otherwise, ..."; "Look at target
+  player's hand and choose a card from it. That player discards that card"; "Destroy all creatures except for ~".
+  +86, three of them also done by round 179: +83 (25,870 with round 179).
+- Skipped there, with reasons: Devour Flesh and Doomgape (the sacrificed creature's toughness, as an effect's
+  sacrifice); Laquatus's Creativity ("that many" counted after the draw); Voidpouncer (two kinds of counters);
+  Ravaging Riftwurm (more time counters as it's kicked); Loyal Sentry and Abu Ja'far (destroying the creatures in a
+  block); Orcish Spy (looking at the top cards without reordering); Gandalf, Wandering Wizard ("~'s owner ... and
+  draws"); Parasitic Implant ("enchanted creature's controller sacrifices it"); Jaded Response ("shares a color with a
+  creature you control"); Cruel Calculations (cards put into a graveyard from a library this turn); Chainflail
+  Centipede ("~ or equipped creature attacks, it ..."); Spike Cannibal (moving every +1/+1 counter); Driftgloom Coyote
+  ("if that creature had power 2 or less" after an exile until).
 - Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
   name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Lurking Jackals (a state trigger on an enchantment), Graxiplon
@@ -1462,10 +1490,17 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   up", now close), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
   ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Surge of Zeal ("shares a
   color with it"), Sabotage Strategist, Lavabrink Venturer (odd or even).
-  Then up from about 21,900 (not looked at closely yet): Septic Rats, Eaten by Spiders, Burning Hands ("deals 6 damage
-  instead" without "to it"), Laquatus's Creativity, Animate Wall, Volition Reins, Hold for Questioning, Dinrova Horror,
-  Glistening Deluge, Woebringer Demon, Skizzik, Wall of Resistance, Mana Seism, Waiting in the Weeds, Allied
-  Strategies, Dralnu's Crusade, Lord of Tresserhorn, Jaded Response, Ultimate Nullification.
+  Then up from about 21,900 (round B8 took the easier ones; these are left): Wall of Shadows, Festering Newt,
+  Flameskull, Defiant Greatmaw, Aegis Sculptor, Fickle Efreet, Burn Away ("when that creature dies this turn"), Bill
+  Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame
+  Discharge (modified creatures as you cast it), Rayami, Touch of Moonglove, Library of Lat-Nam, Carrion Rats,
+  Shifting Loyalties, Madcap Experiment, Wall of Resurgence, Silhana Wayfinder, Resolute Strike, Forgestoker Dragon,
+  Aven Shrine, Piercing Rays (forecast), Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
+  Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Martyr of Frost, Haunted Plate
+  Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Porphyry Nodes, Gnarlbark Elm, Time to Feed,
+  Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,
+  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dense Foliage, Dralnu's Crusade, then on up from 21,300
+  (`LO=19500 HI=21300` in a band listing).
 
 ## Known gaps (from earlier rounds)
 

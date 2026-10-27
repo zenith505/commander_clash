@@ -860,9 +860,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" | "fourth" }] : null;
   }
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
-  if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
+  // Elven Warhounds: "Whenever ~ becomes blocked by a creature, put that creature on top of its owner's library": the
+  // trigger's subject.
+  if ((m = /^Put (target .+?|~|that creature) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && (m[1] !== "that creature" || (ctx.subject && ctx.lastObjectTarget === undefined))) {
     const what = parseObject(m[1]!, ctx);
-    return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
+    return what && (what.ref === "target" || what.ref === "self" || (what.ref === "subject" && m[1] === "that creature")) ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
   // "Put two target lands on top of their owners' libraries" (Plow Under), "Put all enchantments on top of their owners'
   // libraries" (Harmonic Convergence): each owner arranges their own cards there (CR 401.4, rulings).
@@ -967,6 +969,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "attachToChosen", source: { ref: "each", filter: { kind: "object", subtypes: ["Aura", "Equipment"], controller: "you", text: "Aura or Equipment you control" } }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true }];
   // Balan, Wandering Knight: "Attach all Equipment you control to ~": each that could be attached to it (CR 701.3a-b).
   if (/^Attach all Equipment you control to ~$/.test(s) && !ctx.spell) return [{ type: "attachAll", filter: { kind: "object", subtypes: ["Equipment"], controller: "you", text: "Equipment you control" } }];
+  // Vulshok Battlemaster: "attach all Equipment on the battlefield to it": every player's, still under its controller's
+  // control (rulings).
+  if ((m = /^[Aa]ttach all Equipment on the battlefield to (~|it)$/.exec(s)) && !ctx.spell && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) return [{ type: "attachAll", filter: { kind: "object", subtypes: ["Equipment"], text: "Equipment" } }];
   // Ardenn: "attach any number of Auras and Equipment you control to target permanent or player": chosen as it resolves
   // (rulings), each that could be attached to it (CR 701.3a-b).
   if ((m = /^(?:you may )?attach any number of Auras and Equipment you control to (target permanent or player)$/i.exec(s)) && !ctx.spell) {

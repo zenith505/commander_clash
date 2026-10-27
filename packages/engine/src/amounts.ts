@@ -330,8 +330,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const own = () => (src?.zone === "battlefield" ? characteristics(s, src).name : (ctx.sourceName ?? (src ? defOf(s, src).name : "")));
       const filter = c.filter && (c.filter.named === "~" ? { ...c.filter, named: own() } : bindChosen(c.filter, ctx.chosen));
-      if (c.greatestPower) return Math.max(0, ...refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
+      const affected = c.affectedController && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      const whose = c.affectedController ? (affected ? [view(affected)?.controller ?? controllerOf(s, affected)] : []) : refPlayers(s, c.who, ctx);
+      if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
+      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
     }
     case "life":
       if (c.highest) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.life));
@@ -708,9 +710,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "basicLandTypes": {
       const types = new Set<string>();
+      const whose = c.whose ? refPlayers(s, c.whose, ctx) : [ctx.controller];
       for (const id of s.battlefield) {
         const ch = view(s.objects[id]!);
-        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Land")) continue;
+        if (!ch || !whose.includes(ch.controller) || !ch.types.includes("Land")) continue;
         for (const st of ch.subtypes) if (["Plains", "Island", "Swamp", "Mountain", "Forest"].includes(st)) types.add(st);
       }
       return types.size;

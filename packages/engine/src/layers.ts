@@ -756,7 +756,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       if (cond.eventPlayer) return eventPlayer !== undefined && eventPlayer !== you && !s.players[eventPlayer]!.lost && measure(eventPlayer) > mine;
       if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
-      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) >= mine + (cond.atLeast ?? 1));
+      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (cond.fewer ? measure(p) < mine : measure(p) >= mine + (cond.atLeast ?? 1)));
     }
     case "youMostLife":
       return !s.players[you]!.lost && s.turnOrder.every((p) => s.players[p]!.lost || s.players[p]!.life <= s.players[you]!.life);
@@ -863,6 +863,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
       return !!lk && lk.zc === subjectZc && (lk.counters?.[cond.counter] ?? 0) > 0;
     }
+    case "subjectType": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc) {
+        const c = chars.get(sub.id);
+        return !!c && (c.subtypes.includes(cond.subtype) || (!!c.allCreatureTypes && c.types.includes("Creature")));
+      }
+      // Gone: as it last existed on the battlefield, whether the trigger names it there or in the zone it went to.
+      const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      const same = !!lk && (lk.zc === subjectZc || (lk.zc + 1 === subjectZc && sub?.zoneChanges === subjectZc));
+      return same && (lk!.creatureTypes === "all" || !!lk!.creatureTypes?.includes(cond.subtype));
+    }
     case "subjectDealtExcess":
       return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
     case "opponentsDealtExcess":
@@ -935,7 +946,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "playedLandThisTurn":
       return (s.players[you]?.landsPlayedThisTurn ?? 0) > 0;
     case "someHandAtMost":
-      return s.players.some((p) => !p.lost && p.hand.length <= cond.n);
+      return s.players.some((p) => !p.lost && (!cond.opponent || p.id !== you) && p.hand.length <= cond.n);
     case "totalPower": {
       let n = 0;
       for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) n += cond.toughness ? c.toughness : c.power;
@@ -1030,7 +1041,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // CR 506.5: "attacking alone" means it's attacking and no other creature is.
       if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
-      if (cond.is === "tapped" || cond.is === "untapped") return src.tapped === (cond.is === "tapped");
+      // Sphinx Sovereign gone before its ability resolves: tapped or untapped as it last existed (rulings, CR 608.2h).
+      if (cond.is === "tapped" || cond.is === "untapped") {
+        const lk = sourceZc !== undefined && (src.zoneChanges ?? 0) !== sourceZc ? s.lastKnown?.[sourceId] : undefined;
+        return (lk && lk.zc === sourceZc ? !!lk.tapped : src.tapped) === (cond.is === "tapped");
+      }
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
@@ -1045,6 +1060,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
       if (cond.is === "token") return !!src.isToken; // Aeve, Progenitor Ooze
+      if (cond.is === "dealtDamageThisTurn") return src.zone === "battlefield" && !!src.wasDealtDamage;
+      if (cond.is === "kicked") return !!src.kicked?.length;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
@@ -1058,7 +1075,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "control": {
       // "Defending player" is the player the source is attacking (CR 506.2); it has none otherwise.
       // "An opponent controls seven or more lands": any one opponent.
-      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
+      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.

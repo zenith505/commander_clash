@@ -573,7 +573,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: m && host && size(defOf(s, obj(s, m.id))) < size(defOf(s, host)) ? "bottom" : "top" }];
     }
     if (pend.kind === "chooseOption" && pend.what === "anchor") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
-    if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
+    // Its owner keeps it on top (Subtlety); Hinder's controller sends another player's card to the bottom.
+    if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: pend.about && s.objects[pend.about] && s.objects[pend.about]!.owner !== pid ? "bottom" : "top" }];
     // A creature put onto the battlefield attacking: the player the source attacks, offered first.
     // "Search your library and/or graveyard": both, for the most to choose from.
     if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];

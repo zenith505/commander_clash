@@ -1227,6 +1227,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // A battle enters with its printed defense in defense counters (CR 310.4b), its copiable values' if it's a copy (rulings).
   const defense = isType(defOf(s, o), "Battle") ? Number.parseInt(defOf(s, o).defense ?? "", 10) : NaN;
   if (defense > 0) add("defense", defense);
+  // Polukranos, Unchained: "It escapes with twelve +1/+1 counters on it instead" (CR 702.138c).
+  if (withCounters && opts.escaped && printed.entersWithCounters?.escaped !== undefined) withCounters = { ...withCounters, n: printed.entersWithCounters.escaped };
   if (withCounters) add(withCounters.counter, withCounters.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);

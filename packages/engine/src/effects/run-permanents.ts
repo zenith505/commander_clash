@@ -278,6 +278,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       sc.queue = undefined;
       for (const id of ids) tapPermanent(s, obj(s, id));
       r.tappedThisWay = ids.length;
+      r.tappedIds = ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 }));
       log(s, ids.length ? `${player(s, ctx.controller).name} taps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.` : `${player(s, ctx.controller).name} taps nothing.`);
       return;
     }

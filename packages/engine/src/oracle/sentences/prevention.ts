@@ -29,6 +29,8 @@ function sourceQuality(q: string): TargetSpec | null {
  */
 function sourceGroup(p: string): TargetSpec | null {
   const t = p.trim();
+  // Prismatic Strands: "sources of the chosen color", the color chosen as it resolves (bound then, CR 608.2d).
+  if (/^sources of the chosen color$/i.test(t)) return { kind: "object", chosen: "color", text: "sources of the chosen color" };
   const colors = /^((?:white|blue|black|red|green) sources(?:,? (?:and|or) (?:white|blue|black|red|green) sources)*)$/i.exec(t);
   if (colors) return { kind: "object", colors: t.toLowerCase().split(/ sources(?:,? (?:and|or) )?/).filter(Boolean).map((w) => COLOR_WORDS[w]!), text: t.toLowerCase() };
   // "Black and/or red sources" (Surge of Salvation): a source that's either color, or both.

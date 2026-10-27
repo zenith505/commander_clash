@@ -39,7 +39,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // ~": face-up ones only (rulings), either kind counted once.
   if (!each && (m = /^the total number of cards you own in exile and in your graveyard that are ([A-Z][a-z]+)s or are named ~$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) {
     const card = { kind: "card" as const, types: [], notTypes: [], notColors: [] };
-    return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { ...card, anyOf: [{ ...card, subtypes: [m[1]!] }, { ...card, named: "~" }], text: `${m[1]} card or card named ~` }, graveyardToo: true } };
+    return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { ...card, anyOf: [{ ...card, subtypes: [m[1]!], text: `${m[1]} card` }, { ...card, named: "~", text: "card named ~" }], text: `${m[1]} card or card named ~` }, graveyardToo: true } };
   }
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).

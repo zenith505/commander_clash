@@ -226,7 +226,7 @@ export function dealDamage(
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
     o.wasDealtDamage = true;
     // Aegar: what dealt damage to it this turn, as the source was then.
-    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}) });
+    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}), amount: n });
     // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything), once the
     // excess damage dealt at the same time is known (see dealPlanned).
     if (src.id && c.types.includes("Creature")) {

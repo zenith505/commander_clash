@@ -551,7 +551,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
+  combat?: /** "Blocked creature" (Warpath): an attacking creature blocked this combat, even with its blockers gone (CR 509.1h); "unblocked": attacking and not blocked (509.1h). */ "blocked" | "unblocked" | /** "Nonattacking, nonblocking creature" (Unlikely Alliance). */ "notInCombat" | /** "Nonattacking creature" (Alarum): not an attacking creature now. */ "notAttacking" | "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | /** "Creature that blocked this turn" (Sizzling Barrage): declared as a blocker this turn (CR 509.1), even if it's no longer blocking (rulings). */ "blockedThisTurn" | /** "That attacked during their controller's last turn" (Halls of Mist): its controller now. */ "attackedLastTurn" | /** "That didn't attack this turn" (Kratos, God of War): not declared as an attacker this turn (CR 508.1a). */ "didntAttackThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking you or a planeswalker you control" (Soul Snare). */ "attackingYouOrYourPlaneswalker" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent" | /** "Attacking alone" (Security Bypass): the only attacking creature (CR 506.5). */ "attackingAlone";
   /**
    * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
    * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
@@ -608,6 +608,13 @@ export interface TargetSpec {
   combatDamagedBySource?: true;
   /** For players: "target player who attacked this turn" (Fire and Brimstone): who declared attackers this turn (a fact that can't change by the time it resolves). */
   attackedThisTurn?: true;
+  /**
+   * For players: "target opponent who has more life than you do as you activate this ability", "who controls more
+   * creatures", "who has at least two more cards in hand", "who has at least two fewer creature cards in their graveyard"
+   * (the Keepers): `stat` theirs minus yours is at least `by` (with `fewer`, yours minus theirs), checked only as it's chosen
+   * (rulings: it resolves even if that's no longer true).
+   */
+  comparedToYou?: { stat: "life" | "creatures" | "hand" | "creatureCardsInGraveyard"; by: number; fewer?: true };
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   notPlayer?: PlayerId;
@@ -666,6 +673,8 @@ export interface TargetSpec {
   inGraveyardOfControllerOf?: number[];
   /** "Target player shuffles up to three target cards from their graveyard" (Memory's Journey): owned by this player target. */
   inGraveyardOfTarget?: number;
+  /** "Choose target opponent ... Destroy target nonblack creature that player controls" (Keeper of the Dead): controlled by this player target. */
+  controlledByTarget?: number;
   /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
   differentControllerFrom?: number[];
   /**
@@ -690,6 +699,8 @@ export interface TargetSpec {
    */
   differentManaValues?: true;
   differentManaValueFrom?: number[];
+  /** "X target cards from a single graveyard" (Rats' Feast): on the `many` entry until it's made into its targets, which then get `sameGraveyardAs`. */
+  singleGraveyard?: true;
   /**
    * "Any number of target artifacts with total mana value 6 or less", "up to two target creature cards with total power
    * 10 or less": with the other targets that have it, the targets chosen add up to no more than `max` (CR 601.2c), or
@@ -792,6 +803,12 @@ export interface TargetSpec {
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */
   targetsWhat?: TargetSpec | "you";
+  /** "Counter target spell that targets ~" (Mistfolk): this ability's source, made into `targetsWhat` (as `objectId`) as targets are chosen and as it resolves (bindBound). */
+  targetsSource?: true;
+  /** For "any" targets: "target creature token, player, or planeswalker" (Coalborn Entity): a creature only if it's a token. */
+  creatureTokens?: true;
+  /** That very object (see `targetsSource`). */
+  objectId?: string;
   /** "That targets you or a creature you control" (Siren Stormtamer): with `targetsWhat`, a spell that targets you counts too. */
   targetsYouToo?: true;
   /**
@@ -904,6 +921,12 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * Radiance: "target creature and each other creature that shares a color with it" (Wojek Siren): also every other
+       * permanent matching `filter` that has at least one of the target's colors as this resolves; a colorless target
+       * shares a color with nothing, and none are affected if the target is illegal (rulings, CR 608.2b).
+       */
+      sharesColor?: { filter: TargetSpec };
       /**
        * "Return target creature and all Auras attached to it" (Hubris): also each permanent matching `filter` attached to
        * the target as this resolves (none if the target is illegal, CR 608.2b). `only`: "Destroy all Equipment attached to
@@ -1408,6 +1431,10 @@ export type Modification =
   | { kind: "cantTurnFaceUp" }
   /** "Can't transform" (Bound by Moonsilver): nor convert (CR 701.28f), not even by day and night (run-permanents.ts transformPermanent). */
   | { kind: "cantTransform" }
+  /** "Can't crew Vehicles" (Revoke Privileges): it can't be tapped to pay a crew cost (CR 702.122a). */
+  | { kind: "cantCrew" }
+  /** "~ can't be equipped" (Goblin Brawler): Equipment can't become attached to it (CR 701.3b) and becomes unattached (704.5n). */
+  | { kind: "cantBeEquipped" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked"; /** "Must be blocked this combat if able" (Neyith of the Dire Hunt): in that combat only, as for attacksIfAble. */ combat?: number | "this" }
   | { kind: "allMustBlock"; /** "All Walls able to block ~ do so" (Marble Priest): only blockers that fit this (CR 509.1c). */ by?: TargetSpec }
@@ -1513,6 +1540,8 @@ export type StaticCondition =
   | { kind: "subjectNameUnique" }
   /** "If it was a Human" (Slayer's Plate): the trigger's subject's creature types, or as it last existed (CR 608.2h). */
   | { kind: "subjectType"; subtype: string }
+  /** "If it's a creature" (Trail of Mystery): the trigger's subject has this card type, or had it as it last existed (CR 608.2h). */
+  | { kind: "subjectCardType"; type: string }
   /** "If it wasn't put onto the battlefield with this ability" (Kodama of the East Tree): the entering permanent (GameObject.putBy). */
   | { kind: "subjectPutBySelf"; not?: true }
   /** Chainer: "if you didn't cast it from your hand", about the entering permanent (GameObject.castFromHand). */
@@ -1582,7 +1611,7 @@ export type StaticCondition =
   /** "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's event player. */
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
   /** "As long as you have more cards in hand than each opponent" (Okina Nightwatch): strictly more than each opponent still in the game. */
-  | { kind: "youMost"; what: "lands" | "creatures" | "life" | "hand" }
+  | { kind: "youMost"; what: "lands" | "creatures" | "life" | "hand"; /** "You control fewer creatures than each opponent" (Even the Odds): strictly fewer than each opponent in the game. */ fewer?: true }
   /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */
   | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
   /** "If one or more players being attacked are poisoned" (Norn's Decree): attacked themselves, not their planeswalkers or battles (CR 508.3b), with a poison counter. */
@@ -1648,7 +1677,9 @@ export type StaticCondition =
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
   /** "If a player discarded a card this turn" (The Raven Man): any player, any discard this turn. */
   | { kind: "discardedThisTurn"; /** "If an opponent discarded a card this turn" (Tinybones, Trinket Thief): an opponent of `you`. */ opponent?: true; /** "If you've discarded a card this turn" (Recalibrate): `you`. */ yours?: true }
-  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true }
+  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true; /** "An opponent has been dealt damage this turn" (Bloodcrazed Goblin): damage, not life loss (infect's too, CR 120.3). */ damaged?: true; /** "Noncombat damage" (Grim Repriser): with `damaged`, only damage that wasn't combat damage (CR 120.2b). */ noncombat?: true }
+  /** "If you've scried or surveilled this turn" (Proctor of Potential): `you` scried or surveilled at least once this turn (CR 701.22, 701.25). */
+  | { kind: "scriedThisTurn" }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
@@ -1885,6 +1916,8 @@ export type Effect =
       by?: "subject" | "attached" | "castSpell" | "created" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
+      /** "And an additional 1 damage to each green creature" (Kaervek's Hex): a recipient in both `to` and `also` is dealt the two amounts added up, as one. */
+      merge?: true;
     }
   /**
    * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
@@ -2181,7 +2214,7 @@ export type Effect =
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
    */
-  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" }
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand. */ n?: number; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
@@ -2858,7 +2891,10 @@ export type Effect =
       type: "takeFromHand";
       who: PlayerRef;
       filter?: TargetSpec;
-      action: "discard" | "exile" | /** Lost Hours */ "libraryThird" | /** Perish the Thought: "That player shuffles that card into their library." */ "shuffleIn";
+      action: "discard" | "exile" | /** Lost Hours */ "libraryThird" | /** Perish the Thought: "That player shuffles that card into their library." */ "shuffleIn" | /** Painful Memories: "Put that card on top of that player's library." */ "libraryTop";
+      /** "Choose two cards from it", "X cards" (Mind Warp): that many, or every card there is if fewer (CR 609.3); `upTo`: "up to two", none to that many. */
+      n?: Amount;
+      upTo?: true;
       until?: "sourceLeaves";
       linked?: boolean;
       /** "You may exile a nonland card from it" (Elite Spellbinder): or none. */
@@ -3796,6 +3832,7 @@ export type TriggerEvent =
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
   | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter
+  | "permanentTurnedFaceUp" // "Whenever a permanent is turned face up" (Aven Farseer): see TriggeredAbility.tappedFilter
   /**
    * "Whenever you tap ~ for mana", "whenever a player taps a land for mana" (CR 106.12: activating a mana ability with {T}
    * in its cost), with a body that adds no mana, so it isn't a mana ability and uses the stack (CR 605.1b). See manaTap.
@@ -4131,14 +4168,14 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
    */
   manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
   /**
-   * For "permanentBecomesTapped" and "permanentBecomesUntapped": which permanent ("a Dwarf you control"); it's the subject
+   * For "permanentBecomesTapped", "permanentBecomesUntapped" and "permanentTurnedFaceUp": which permanent ("a Dwarf you control"); it's the subject
    * ("put a wind counter on it").
    */
   tappedFilter?: TargetSpec;
@@ -4206,7 +4243,9 @@ export interface TriggeredAbility {
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
    * (rulings: cycling a card triggers it once).
    */
-  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec; /** "For the first time each turn" (Valiant Rescuer): the player's first cycle this turn. */ firstEachTurn?: true };
+  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec; /** "For the first time each turn" (Valiant Rescuer): the player's first cycle this turn. */ firstEachTurn?: true; /** "Whenever a spell or ability an opponent controls causes you to discard a card" (Spiritual Focus). */ byOpponent?: true };
+  /** "When a spell or ability an opponent controls causes you to discard ~" (Sand Golem): a "selfDiscarded" trigger only for such a discard; the event player is that opponent. */
+  discardedByOpponent?: true;
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix): this permanent too, whatever the filter says. */ orSelf?: true; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
   /** For "yourCreatureDealsDamage": the creature (`dealer` its filter, or `self` this one), what it's dealt to, and whether the subject is what was dealt damage ("destroy that planeswalker") rather than the creature. */
@@ -4311,6 +4350,8 @@ export interface TriggeredAbility {
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
   ifHadCounter?: string;
+  /** "When ~ dies, if 4 or more damage was dealt to it this turn" (the Zuberas): from all sources (rulings), as it last existed (CR 603.10a). */
+  ifDamagedThisTurn?: number;
   /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
   ifNotToken?: true;
   /** "When ~ dies, if it wasn't blocking" (Guildsworn Prowler): as it last existed (CR 603.4, 603.10a). */
@@ -5793,6 +5834,8 @@ export interface CompiledCard {
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).
    */
   discardedToBattlefield?: boolean;
+  /** Dodecapod: "with two +1/+1 counters on it", as it enters that way. */
+  discardedToBattlefieldCounters?: number;
   /**
    * "If an opponent would mill one or more cards, they mill that many cards plus four instead" (The Water Crystal),
    * "... twice that many cards instead" (Bruvac): replacement effects on its controller's opponents' mills (CR 614.1a).

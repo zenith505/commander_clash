@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
+import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -39,6 +39,16 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
     .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
+/** Radiance: the other permanents matching `group.filter` that share at least one color with `t` now (CR 105.2). */
+export function sharingAColor(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sharesColor"]>, controller: PlayerId): GameObject[] {
+  if (t.zone !== "battlefield") return [];
+  const colors = characteristics(s, t).colors;
+  if (!colors.length) return [];
+  return s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => o.id !== t.id && characteristics(s, o).colors.some((c) => colors.includes(c)) && objectMatches(s, group.filter, o, controller, false));
+}
+
 /** Is `o` attacking `pid` or a planeswalker `pid` controls now (CR 506.3)? Not a battle. */
 function attacksYouOrYourPlaneswalker(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.attacking === undefined) return false;
@@ -51,7 +61,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (o.zone !== "battlefield") return false;
   // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it. Nor "that saddled it" without
   // the source (see pickOptions, isLegalTarget).
-  if (spec.bound || spec.saddledSource || spec.drafted) return false;
+  if (spec.bound || spec.saddledSource || spec.drafted || spec.targetsSource) return false;
+  if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
@@ -117,6 +128,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "notAttacking" && o.attacking !== undefined) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
+  if (spec.combat === "blockedThisTurn" && o.blockedTurn !== s.turn) return false;
   if (spec.combat === "didntAttackThisTurn" && o.attacked?.turn === s.turn) return false;
   if (spec.combat === "attackedLastTurn" && !attackedDuringLastTurn(s, o, c.controller)) return false;
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
@@ -491,7 +503,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     return !spec.opponent || t.id !== controller;
   }
   if (t.kind === "stack") {
-    if (spec.kind !== "spell") return false;
+    // "That targets ~" not bound to its source yet (bindBound): nothing is known to fit it.
+    if (spec.kind !== "spell" || spec.targetsSource) return false;
     // A resolving spell is still on the stack until it finishes (CR 608.2n): "change the target" can pick it.
     const item = s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined);
     if (!item) return false;
@@ -535,6 +548,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   if (spec.kind === "any") {
     // Any target is a creature, planeswalker, battle or player (CR 115.4); "player or planeswalker" narrows the objects.
     const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker", "Battle"];
+    // Coalborn Entity: a creature only if it's a token (TargetSpec.creatureTokens).
+    if (spec.creatureTokens && !o.isToken && !objIsType(s, o, "Planeswalker")) return false;
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
   // "Target spell or nonland permanent": a permanent fits the permanent half.
@@ -578,7 +593,9 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
  * The filter with its amount bound (TargetSpec.bound) worked out now, as a range of its key; without one, as is. A negative
  * amount counts as 0 (CR 107.1b).
  */
-export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): TargetSpec {
+export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): TargetSpec {
+  // Mistfolk: "target spell that targets ~": the source, as it is now (TargetSpec.targetsSource).
+  const spec: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.
@@ -736,9 +753,22 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (spec.notSource && t.kind === "object" && t.id === sourceId && !(spec.notSourceUnlessCreature && s.objects[t.id] && objIsType(s, s.objects[t.id]!, "Creature"))) return false;
   if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.attackedThisTurn && (t.kind !== "player" || s.players[t.id]?.attackedTurn !== s.turn)) return false;
+  if (spec.comparedToYou && (t.kind !== "player" || !comparedToYouOk(s, spec.comparedToYou, t.id, controller))) return false;
   if (spec.notSourceHost && t.kind === "object" && sourceId && t.id === s.objects[sourceId]?.attachedTo) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;
   return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t) && totalOk(s, specs, chosen, i, t);
+}
+
+/** "Target opponent who has more life than you do as you activate this ability" (TargetSpec.comparedToYou), as it's chosen. */
+function comparedToYouOk(s: GameState, c: NonNullable<TargetSpec["comparedToYou"]>, them: PlayerId, you: PlayerId): boolean {
+  const stat = (pid: PlayerId) => {
+    const p = s.players[pid]!;
+    if (c.stat === "life") return p.life;
+    if (c.stat === "hand") return p.hand.length;
+    if (c.stat === "creatureCardsInGraveyard") return p.graveyard.filter((id) => isType(defOf(s, obj(s, id)), "Creature")).length;
+    return s.battlefield.filter((id) => objIsType(s, obj(s, id), "Creature") && controllerOf(s, obj(s, id)) === pid).length;
+  };
+  return c.fewer ? stat(you) - stat(them) >= c.by : stat(them) - stat(you) >= c.by;
 }
 
 /** The mana value or power a "with total ..." target adds (TargetSpec.total): of the card or permanent as it is now. */
@@ -794,7 +824,7 @@ export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets:
     const c = next[i];
     if (i === j || !c || c.kind === "none") return true;
     if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
-    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith].some((g) => g?.includes(j));
+    const related = [x.sameGraveyardAs, x.inGraveyardOfControllerOf, x.inGraveyardOfTarget === undefined ? undefined : [x.inGraveyardOfTarget], x.controlledByTarget === undefined ? undefined : [x.controlledByTarget], x.differentControllerFrom, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith].some((g) => g?.includes(j));
     return !related || relatedOk(s, x, next, c);
   });
 }
@@ -808,6 +838,8 @@ export function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[]
   if (others(spec.inGraveyardOfControllerOf).some((x) => x.zone !== "battlefield" || controllerOf(s, x) !== o.owner)) return false;
   const ofPlayer = spec.inGraveyardOfTarget === undefined ? undefined : chosen[spec.inGraveyardOfTarget];
   if (ofPlayer?.kind === "player" && ofPlayer.id !== o.owner) return false;
+  const byPlayer = spec.controlledByTarget === undefined ? undefined : chosen[spec.controlledByTarget];
+  if (byPlayer?.kind === "player" && (o.zone !== "battlefield" || controllerOf(s, o) !== byPlayer.id)) return false;
   // Another target's controller: on the battlefield its controller now, otherwise as it last existed there (rulings on
   // Run Away Together).
   const ctl = (x: GameObject) => (x.zone === "battlefield" ? controllerOf(s, x) : (s.lastKnown?.[x.id]?.controller ?? x.owner));

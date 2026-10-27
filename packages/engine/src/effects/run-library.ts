@@ -344,13 +344,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (!sc.found) {
-        const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // "With mana value X or less" (Venarian Glimmer): the X it was cast with (CR 107.3a).
+        const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
-        if (!cards.length) return;
+        // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
+        const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
+        if (!cards.length || n <= 0) return;
         const kind = e.filter?.text ?? "card";
-        const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : "to exile";
-        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional ? 0 : 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
+        const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : "to exile";
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
@@ -365,7 +369,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           moveObject(s, id, "library");
         }
         if (ids.length) shuffleLibrary(s, p);
-      } else if (e.action === "libraryThird")
+      } else if (e.action === "libraryTop")
+        for (const id of ids) {
+          log(s, `${player(s, ctx.controller).name} puts a card from ${p.name}'s hand on top of their library.`);
+          moveObject(s, id, "library", { top: true });
+        }
+      else if (e.action === "libraryThird")
         for (const id of ids) {
           log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their library third from the top.`);
           moveObject(s, id, "library", { top: true });
@@ -453,7 +462,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).
         if (!cards.length) {
-          if (n > 0) fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
+          if (n > 0) {
+            noteScried(s, p.id);
+            fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
+          }
           return;
         }
         s.pending = { kind: "arrangeTop", player: p.id, how: e.type, cards, source: src };
@@ -470,6 +482,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
+      noteScried(s, p.id);
       fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size });
       return;
     }
@@ -1407,7 +1420,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
     // Obstinate Baloth: its owner picks this replacement over madness or a graveyard one (CR 616.1, rulings).
     if (c.discardedToBattlefield && cause !== undefined && cause !== pid) {
       log(s, `${defOf(s, o).name} is put onto the battlefield instead.`);
-      moveObject(s, id, "battlefield", { controller: pid });
+      moveObject(s, id, "battlefield", { controller: pid, ...(c.discardedToBattlefieldCounters ? { counters: { "+1/+1": c.discardedToBattlefieldCounters } } : {}) });
       continue;
     }
     const madness = c.madness;
@@ -1434,7 +1447,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   if (cycled) ((s.turnLog ??= {}).cycled ??= {})[pid] = (s.turnLog.cycled?.[pid] ?? 0) + ids.length;
-  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}) }));
+  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}), ...(cause !== undefined ? { cause } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }
 
@@ -1591,4 +1604,12 @@ function sacrificedKin(s: GameState, ctx: ResolveCtx, f: TargetSpec): TargetSpec
   const lk = ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1);
   const kin = !lk ? [] : lk.allCreatureTypes ? [...CREATURE_TYPES] : (lk.subtypes ?? []).filter((t) => CREATURE_TYPES.has(t));
   return { ...rest, subtypes: kin.length ? kin : ["(none)"] };
+}
+
+/** Who scried or surveilled this turn (TurnLog.scried), for "if you've scried or surveilled this turn". */
+function noteScried(s: GameState, player: PlayerId) {
+  const log = (s.turnLog ??= {});
+  if ((log.scried ??= []).includes(player)) return;
+  log.scried.push(player);
+  invalidateCharacteristics(s); // "As long as you've scried or surveilled this turn" (Surveillance Phantasm)
 }

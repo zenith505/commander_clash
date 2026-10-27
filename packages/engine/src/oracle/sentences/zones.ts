@@ -274,6 +274,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what: { ref: "self" } }, { type: "shuffleIntoLibrary", what }] : null;
   }
+  // Coastal Wizard: "Return ~ and another target creature to their owners' hands": the same way, ~ staying if the target
+  // is illegal and the ability doesn't resolve (CR 608.2b). Wizard Mentor: "Return ~ and target creature you control to
+  // their owner's hand" (it can target itself, rulings: it's returned once).
+  if ((m = /^Return ~ and ((?:another )?target [^,]+?) to their (?:owners' hands|owner's hand)$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "bounce", what: { ref: "self" } }, { type: "bounce", what }] : null;
+  }
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
   // Seasons Past: "Put ~ on the bottom of its owner's library", likewise the resolving spell itself (CR 608.2n).
@@ -411,6 +418,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "randomFromGraveyard", dest: "hand", ...(filter ? { filter } : {}) }];
   }
+  // Make a Wish: "Return two cards at random from your graveyard to your hand".
+  if ((m = /^[Rr]eturn (two|three) cards at random from your graveyard to your hand$/.exec(s))) return [{ type: "randomFromGraveyard", dest: "hand", n: num(m[1]!) }];
   // Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield": a creature card, so a
   // permanent card (CR 110.4b).
   if ((m = /^[Rr]eturn an? (.+? creature card) at random from your graveyard to the battlefield$/.exec(s))) {

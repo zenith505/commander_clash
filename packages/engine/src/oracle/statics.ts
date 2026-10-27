@@ -932,6 +932,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Okina Nightwatch: "you have more cards in hand than each opponent", strictly more than each opponent in the game.
   if ((m = /^you (?:control more (lands|creatures)|have more (life|cards in hand)) than each opponent$/.exec(text)))
     return { kind: "youMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  // Even the Odds: "you control fewer creatures than each opponent".
+  if ((m = /^you (?:control fewer (lands|creatures)|have (less life|fewer cards in hand)) than each opponent$/.exec(text)))
+    return { kind: "youMost", what: (m[1] ?? (m[2] === "less life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand", fewer: true };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (text === "an opponent owns a card in exile") return { kind: "opponentOwnsExiled" };
   // Zealots en-Dal: "if all nonland permanents you control are white": none of them isn't (a colorless one isn't white).
@@ -978,6 +981,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   // Bloodcrazed Goblin: "unless an opponent has been dealt damage this turn" (bloodthirst's condition, CR 702.54a).
   if (/^an opponent (?:has been|was) dealt damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true };
+  // Grim Repriser: "if an opponent has been dealt noncombat damage this turn", whenever it was dealt (rulings).
+  if (/^an opponent (?:has been|was) dealt noncombat damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true, noncombat: true };
+  // Proctor of Potential: "if you've scried or surveilled this turn" (a scry of 0 is no scry, CR 701.22b, 701.25c).
+  if (text === "you've scried or surveilled this turn") return { kind: "scriedThisTurn" };
   if (/^a player discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn" };
   if (/^an opponent discarded a card this turn$/.test(text)) return { kind: "discardedThisTurn", opponent: true };
   // Mysterio's Mirage: "if you discarded a card this turn" is the same.
@@ -1595,6 +1602,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
   // Bound by Moonsilver: "can't attack, block, or transform".
   if (/^can't attack, block, or transform$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantTransform" }];
+  // Revoke Privileges: "can't attack, block, or crew Vehicles".
+  if (/^can't attack, block, or crew Vehicles$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantCrew" }];
   // "Can't block and can't be blocked" (Changeling Outcast).
   if ((m = /^(can't [^,]+?) and (can't .+)$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);
@@ -1683,6 +1692,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
   }
   if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
+  // Goblin Brawler: "can't be equipped": no Equipment can become attached to it, and one that is becomes unattached (CR
+  // 301.5c, 701.3b, 704.5n; rulings).
+  if (/^can't be equipped$/.test(rest)) return [{ kind: "cantBeEquipped" }];
   if (/^can't be turned face up$/.test(rest)) return [{ kind: "cantTurnFaceUp" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
   if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {

@@ -2153,7 +2153,8 @@ const convokers = (s: GameState) => s.battlefield.map((id) => s.objects[id]!).fi
 function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
   if (pick.kind === "teamwork") return convokers(s).filter((o) => !pick.convoke?.includes(o.id));
   if (pick.kind === "harmonize") return convokers(s);
-  return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId));
+  // Not one that "can't crew Vehicles" (Revoke Privileges); saddling isn't crewing.
+  return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId) && !(pick.kind === "crew" && !pick.saddle && characteristics(s, o).cantCrew));
 }
 
 /** The bar shown while announcing X. */

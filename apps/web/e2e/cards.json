@@ -5423,6 +5423,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8841fdb9-0565-4ef5-814c-293c14242741",
+  "name": "Extortion",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at target player's hand and choose up to two cards from it. That player discards those cards.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e597d8a1-3bbc-4001-b642-f4421447970f",
   "name": "Extract from Darkness",
   "manaCost": "{3}{U}{B}",
@@ -5448,6 +5474,32 @@
   "commanderLegal": "legal",
   "set": "cns",
   "releasedAt": "2014-06-06",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0fef3f4f-18b6-452c-a634-c870709abcf5",
+  "name": "Eye Spy",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top card of target player's library. You may put that card into their graveyard.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -8802,6 +8854,37 @@
   ]
  },
  {
+  "oracleId": "62d1300f-2b76-42b9-8e6c-f920712cd547",
+  "name": "Keeper of the Light",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{W}, {T}: Choose target opponent who has more life than you do as you activate this ability. You gain 3 life.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "exo",
+  "releasedAt": "1998-06-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
   "name": "Khorvath Brightflame",
   "manaCost": "{5}{R}",
@@ -11939,6 +12022,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "27a3faa1-4f1a-4581-9e19-9265faa9c10b",
+  "name": "Painful Memories",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at target opponent's hand and choose a card from it. Put that card on top of that player's library.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mir",
+  "releasedAt": "1996-10-08",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d819d35-5cd3-48f1-a77a-b7c3ff82c62e",
   "name": "Palace Siege",
   "manaCost": "{3}{B}{B}",
@@ -13420,6 +13529,36 @@
   "commanderLegal": "legal",
   "set": "khm",
   "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "60b2f991-47ef-4da3-ba61-0692695ea098",
+  "name": "Revoke Privileges",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature can't attack, block, or crew Vehicles.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

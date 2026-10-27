@@ -506,7 +506,7 @@ export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: nu
   const counts = (c: GameObject) => crewPower(s, c, saddle);
   // What tapping a creature costs us: its power, unless it couldn't attack this turn anyway.
   const lost = (c: GameObject) => (isSummoningSick(s, c) ? 0 : Math.max(0, power(s, c)));
-  const pool = crewCandidates(s, pid, vehicleId)
+  const pool = crewCandidates(s, pid, vehicleId, !saddle)
     .filter((c) => counts(c) > 0)
     .sort((a, b) => lost(a) - lost(b) || counts(b) - counts(a));
   // Either the cheapest single creature that's enough, or the cheapest ones added up.

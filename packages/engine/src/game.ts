@@ -771,6 +771,7 @@ export function moveObject(
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
+  o.blockedTurn = undefined;
   o.attackedTurns = undefined;
   o.couldAttack = undefined;
   o.exertedTurn = undefined;
@@ -4963,6 +4964,7 @@ function tapCreaturesProblem(s: GameState, pid: PlayerId, ids: ObjectId[], what:
     const c = s.objects[id];
     if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !objIsType(s, c, "Creature")) return `only creatures you control can ${what}`;
     if (c.tapped) return `${nameOf(s, id)} is already tapped`;
+    if (what === "crew" && characteristics(s, c).cantCrew) return `${nameOf(s, id)} can't crew Vehicles`;
   }
   return null;
 }
@@ -6421,7 +6423,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (ab.station) {
     // Station (CR 702.184a): tap another untapped creature you control, whatever its power.
     if (tapCreatures === undefined) {
-      if (!crewCandidates(s, pid, o.id).length) return "no other untapped creature to tap for station";
+      if (!crewCandidates(s, pid, o.id, false).length) return "no other untapped creature to tap for station";
     } else {
       if (tapCreatures.length !== 1) return "station taps exactly one other creature";
       if (tapCreatures[0] === o.id) return "the creature tapped for station must be another one";
@@ -6688,9 +6690,12 @@ function activationTax(s: GameState, o: GameObject, pid: PlayerId): number {
   return n;
 }
 
-/** Creatures that could crew this Vehicle: other untapped creatures you control (CR 702.122a). */
-export function crewCandidates(s: GameState, pid: PlayerId, vehicleId: ObjectId): GameObject[] {
-  return creaturesOf(s, pid).filter((c) => c.id !== vehicleId && !c.tapped);
+/**
+ * Creatures that could crew this Vehicle: other untapped creatures you control (CR 702.122a), not one that "can't crew
+ * Vehicles" (Revoke Privileges). `crewing` false: for saddle or station, which aren't crewing.
+ */
+export function crewCandidates(s: GameState, pid: PlayerId, vehicleId: ObjectId, crewing = true): GameObject[] {
+  return creaturesOf(s, pid).filter((c) => c.id !== vehicleId && !c.tapped && !(crewing && characteristics(s, c).cantCrew));
 }
 
 /**
@@ -6710,7 +6715,7 @@ export function crewPower(s: GameState, c: GameObject, saddle = false): number {
 function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[], saddle = false): string | null {
   const what = saddle ? "saddle" : "crew";
   if (chosen === undefined) {
-    const total = crewCandidates(s, pid, vehicle.id).reduce((x, c) => x + crewPower(s, c, saddle), 0);
+    const total = crewCandidates(s, pid, vehicle.id, !saddle).reduce((x, c) => x + crewPower(s, c, saddle), 0);
     return total >= n ? null : `not enough untapped creatures to ${what} ${n}`;
   }
   if (chosen.includes(vehicle.id)) return saddle ? "a Mount can't saddle itself" : "a Vehicle can't crew itself";
@@ -8684,6 +8689,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     const at = obj(s, b.attacker);
     (bl.blocking ??= []).push(at.id);
     (at.blockedBy ??= []).push(bl.id);
+    bl.blockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
   if (p.id !== chooser.id && !blocks.length) log(s, `${chooser.name} chose no blocks for ${p.name}.`);
@@ -9311,9 +9317,9 @@ function attachmentSBAs(s: GameState): boolean {
     } else if (c.subtypes.includes("Equipment") && o.attachedTo) {
       // Unattached from anything but a creature, and when it becomes a creature itself (CR 301.5c, 704.5n, 704.5p).
       // Also when the creature has protection from the Equipment's color (CR 702.16d).
-      // And from one an "~ can be attached only to" no longer allows (O-Naginata rulings).
+      // And from one an "~ can be attached only to" no longer allows (O-Naginata rulings), or one that "can't be equipped".
       const only = abilitiesOf(s, o).attachOnly;
-      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host)) || (only && !objectMatches(s, only, host, controllerOf(s, o), false))) {
+      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || characteristics(s, host).cantBeEquipped || protectedFrom(characteristics(s, host).keywords, withCastThisTurn(s, o, c), protectionHolder(s, host)) || (only && !objectMatches(s, only, host, controllerOf(s, o), false))) {
         if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
         o.attachedTo = undefined;
         invalidateCharacteristics(s);

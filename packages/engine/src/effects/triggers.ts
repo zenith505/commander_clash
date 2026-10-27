@@ -259,7 +259,7 @@ export type TriggerSourceEvent =
   /** A player searched their own library (CR 701.23). */
   | { type: "searchedLibrary"; player: PlayerId }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
-  | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number }
+  | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number; /** The controller of the spell or ability whose effect made them discard, if one did (not a cost). */ cause?: PlayerId }
   /** A card (or token) was put into a graveyard, from any zone. */
   | { type: "toGraveyard"; id: ObjectId; from?: ZoneName }
   /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
@@ -728,7 +728,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       o,
       ev.controller,
       (e, t) =>
-        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
+        (((e === "selfDies" && ev.wasCreature) || (e === "selfToGraveyard" && (!t.ownGraveyard || ev.controller === o.owner))) && ev.to === "graveyard" && !(t.ifNotToken && o.isToken) && !(t.ifNotBlocking && !!ev.snapshot?.blocking) && !(t.ifHadCounter && !((ev.counters[t.ifHadCounter] ?? 0) > 0)) && !(t.ifDamagedThisTurn !== undefined && (s.turnLog?.damageDealtTo?.[`${ev.id}@${was}`] ?? []).reduce((n, d) => n + (d.amount ?? 0), 0) < t.ifDamagedThisTurn) && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
         e === "selfLeaves" ||
         e === "selfLostControl",
@@ -1215,6 +1215,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     // An X in its morph or disguise cost is the X its own abilities use (CR 702.37f, 702.168e).
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp", undefined, undefined, undefined, undefined, ev.x);
+    // "Whenever a permanent (you control) is turned face up": the permanent is the subject.
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };
@@ -1750,6 +1756,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!w) return true;
         if (w.spell && item!.kind !== "spell") return false;
         if (w.spellTypes && !(item!.objectId && s.objects[item!.objectId] && w.spellTypes.some((t) => objIsType(s, s.objects[item!.objectId!]!, t)))) return false;
+        if (w.spellSubtypes && !(item!.kind === "spell" && item!.objectId && s.objects[item!.objectId] && w.spellSubtypes.some((t) => characteristics(s, s.objects[item!.objectId!]!).subtypes.includes(t)))) return false;
         const mine = (p: PlayerId) => (w.by === "you" ? p === watcher : w.by === "opponent" ? p !== watcher : true);
         if (!mine(by)) return false;
         return !w.first || !before.some(mine);
@@ -1760,7 +1767,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const noWard = exposed(s, o) || !!characteristics(s, o).wardLost;
       const ward = (tr: TriggeredAbility) => tr.body.effects.some((x) => x.type === "counterUnlessPays" && x.ward);
       add(o, you, (e, tr) => ((e === "becomesTargetOfOpponent" && you !== by) || (e === "selfBecomesTarget" && fits(tr, you))) && !(noWard && ward(tr)), undefined, ev.stackId, undefined, undefined, undefined, undefined, that);
-      addHosted(o, (e) => e === "selfBecomesTarget", ev.stackId);
+      // Spectral Prison: "When enchanted creature becomes the target of a spell" (TriggeredAbility.targeted).
+      addHosted(o, (e, tr) => e === "selfBecomesTarget" && fits(tr, you), ev.stackId);
       for (const id of s.battlefield) {
         const w = obj(s, id);
         const wc = controllerOf(s, w);
@@ -1821,6 +1829,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "playerDiscards" || !d) return false;
         if ((d.by === "you" && ev.player !== you) || (d.by === "opponent" && ev.player === you)) return false;
         if ((d.cycled && !ev.cycled) || (d.other && ev.id === o.id)) return false;
+        // Spiritual Focus: only a discard an opponent's spell or ability caused (not a cost).
+        if (d.byOpponent && (ev.cause === undefined || ev.cause === ev.player)) return false;
         if (d.firstEachTurn && (s.turnLog?.cycled?.[ev.player] ?? 0) !== 1) return false;
         return !d.filter || printedMatches(d.filter, ev.card);
         // The card as it is now, where it went ("exile that card from your graveyard").
@@ -1829,7 +1839,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers, undefined, undefined, undefined, ev.x ?? 0);
     // "When you discard ~": the same, for any discard (cycling is one, CR 702.29a).
-    if (card && card.zone !== "battlefield" && card.zone !== "hand") add(card, card.owner, (e) => e === "selfDiscarded", compileCard(defOf(s, card)).triggers);
+    // "When a spell or ability an opponent controls causes you to discard ~" (Sand Golem): only then; "that player" is
+    // that opponent.
+    const byOpp = ev.cause !== undefined && ev.cause !== card?.owner;
+    if (card && card.zone !== "battlefield" && card.zone !== "hand")
+      add(card, card.owner, (e, t) => e === "selfDiscarded" && (!t.discardedByOpponent || byOpp), compileCard(defOf(s, card)).triggers, undefined, undefined, undefined, undefined, undefined, byOpp ? { player: ev.cause! } : undefined);
   } else if (ev.type === "activated") {
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
     for (const id of s.battlefield) {

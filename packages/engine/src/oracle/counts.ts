@@ -453,6 +453,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^cards? in (?:your opponents'|all opponents') hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachOpponent" } });
   // Realm Seekers: "the total number of cards in all players' hands", every player's added up.
   if (/^cards? in all players' hands$/i.test(p)) return count({ kind: "cardsInHand", who: { ref: "eachPlayer" } });
+  // Flunk: "the number of cards in that creature's controller's hand": the targeted creature's controller as this resolves.
+  if (/^cards? in that creature's controller's hand$/i.test(p) && ctx) {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    return t?.kind === "object" && !t.many && t.types?.includes("Creature") ? count({ kind: "cardsInHand", who: { ref: "targetController", index: i } }) : null;
+  }
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });
@@ -747,6 +753,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // "The exiled creature's mana value" after an "Exile a creature you control" cost (Food Chain); compile() checks it has one.
   if (x === "the exiled creature's") return ctx ? { ref: "sacrificed", exiledCost: true } : null;
   // "The revealed card's power" after a "reveal a colorless creature card from your hand" cost (Titan's Presence).
+  // "Target opponent reveals a card at random from their hand. Target creature gets -X/-X until end of turn, where X is
+  // the revealed card's mana value" (Planeswalker's Scorn): that card.
+  if (x === "the revealed card's" && ctx?.revealedTop) return { ref: "revealed" };
   if (x === "the revealed card's") return ctx ? { ref: "sacrificed", revealedCost: true } : null;
   // A reflexive trigger after "you may sacrifice another creature": that creature, as it last existed (CR 608.2h).
   if (x === "that creature's" && ctx?.sacrificedIt) return { ref: "sacrificed" };

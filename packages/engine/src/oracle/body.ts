@@ -937,6 +937,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
   // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
+  // Ana Battlemage: "tap target untapped creature and that creature deals damage equal to its power to its controller":
+  // two instructions about the target, in order.
+  text = text.replace(/^([Tt]ap target untapped creature) and (that creature deals damage equal to its power to its controller)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
   // Wartime Protestors: "put a +1/+1 counter on that creature and it gains haste until end of turn": two instructions about
   // the same creature.
   // Sinkhole Surveyor: "you lose 1 life and ~ endures 1" (CR 701.63a), one after the other.
@@ -1845,7 +1848,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Put a +1/+1 counter on ~ and it can't be blocked this turn" (Sahagin): two instructions, both about ~.
     .flatMap((x) => {
       // Not under a leading condition ("If you do, put ... and it gains menace"): the condition is for both.
-      const m = /^If /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
+      // Nor under a leading "Unless you sacrifice an Island, ..." (Elder Spawn): both are what happens without it.
+      const m = /^(?:If|[Uu]nless) /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
     })
     // Legion Leadership: "Until end of turn, double target creature's power and it gains first strike": two instructions.
@@ -5972,6 +5976,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(capital(playerDealt[1]!), ctx);
       if (!fx || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "playerDamagedThisWay" }, effects: fx });
+      continue;
+    }
+    // Mishra's War Machine, Minion of Leshrac: "If ~ deals damage to you this way, tap it": only if the damage wasn't all
+    // prevented (rulings), after "~ deals 3 damage to you unless you discard a card".
+    const unlessDmg = effects[effects.length - 1];
+    if (/^If (?:it|~) deals damage to you this way, tap (?:it|~)$/.test(s) && unlessDmg?.type === "may" && unlessDmg.otherwise?.length === 1 && unlessDmg.otherwise[0]!.type === "damage") {
+      effects.push({ type: "if", cond: { kind: "playerDamagedThisWay" }, effects: [{ type: "tap", what: { ref: "self" } }] });
       continue;
     }
     const dealtIs = /^If an? ([A-Z][a-z]+|creature) is dealt damage this way, (.+)$/.exec(s);

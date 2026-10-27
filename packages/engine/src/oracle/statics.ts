@@ -182,6 +182,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[2]!);
     return mods ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } } : null;
   }
+  // Essence Leak: "As long as enchanted permanent is red or green, it has "At the beginning of your upkeep, sacrifice ~
+  // unless you pay its mana cost."": while it's either color (CR 105.2); it does nothing to another permanent (rulings).
+  if ((m = /^As long as enchanted permanent is (white|blue|black|red|green) or (white|blue|black|red|green), it (has ".+")$/.exec(text))) {
+    const mods = parseStaticMods(m[3]!);
+    return mods?.length && mods.every((x) => x.kind === "addAbility") ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], colors: [COLOR_WORDS[m[1]!]!, COLOR_WORDS[m[2]!]!], text: `${m[1]} or ${m[2]} permanent` } } } : null;
+  }
   // The Kaldheim Runes: "As long as enchanted permanent is an Equipment, it has "Equipped creature has flying."" (Rune of
   // Flight): while it's an Equipment, it has that static ability, which then applies to the creature it's attached to.
   if ((m = /^As long as enchanted permanent is an Equipment, it (has ".+")$/.exec(text))) {
@@ -1463,6 +1469,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Aettir and Priwen: "has base power and toughness X/X, where X is your life total": the same, layer 7b (the "where X
   // is" is read with the rest of the line).
   if (/^(?:has|have) base power and toughness X\/X$/.test(rest)) return [{ kind: "setPT", power: { count: { kind: "x" } }, toughness: { count: { kind: "x" } } }];
+  // Withercrown: "has base power 0 and has "..."": layer 7b (CR 613.4b), its toughness left alone, and the ability (layer 6).
+  if ((m = /^(?:has|have) base power (\d+)(?: and ((?:has|have) .+))?$/.exec(rest))) {
+    const more = m[2] ? parseStaticMods(m[2]) : [];
+    return more ? [{ kind: "setPower", power: Number(m[1]) }, ...more] : null;
+  }
   // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
   if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];
   // Opalescence: "is a creature in addition to its other types and has base power and base toughness each equal to its
@@ -1495,6 +1506,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = m[4] ? parseStaticMods(m[4]) : [];
     return more && [{ kind: "addTypes", types: ["Creature"], subtypes: m[3] ? [m[3]] : [] }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more];
   }
+  // Flaring Flame-Kin: "gets +2/+2, has trample, and has "..."": the same as "gets +2/+2 and has trample and "..."".
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), (?:has|have) ([a-z ]+), and (?:has|have) (".+")$`).exec(rest))) return parseStaticMods(`${m[1]} and has ${m[4]} and ${m[5]}`);
   // The Possessed creatures: "gets +1/+1, is black, and has "..."": its color is black instead (layer 5, CR 105.3, 613.1e).
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), is (white|blue|black|red|green),? and ((?:has|have) .+)$`).exec(rest))) {
     const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(m[5]!)];
@@ -1528,6 +1541,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = /^(.+?),? and all creatures able to block it do so$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);
     return first && [...first, { kind: "allMustBlock" }];
+  }
+  // Serra Bestiary: "can't attack or block, and its activated abilities with {T} in their costs can't be activated" (mana
+  // abilities with {T} too, rulings).
+  if ((m = /^(.+?),? and (?:its|their) activated abilities with \{T\} in their costs can't be activated$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    return first && [...first, { kind: "cantActivate", tapCost: true }];
   }
   // Arrest: "can't attack or block, and its activated abilities can't be activated" (mana abilities too, CR 605.1a).
   if ((m = /^(.+?),? and its activated abilities can't be activated( unless they're mana abilities)?$/.exec(rest))) {
@@ -1661,6 +1680,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Spitfire Handler: an attacker's power compared with its own as blockers are declared (CR 509.1b).
   if (/^can't block creatures with power greater than ~'s power$/.test(rest)) return [{ kind: "cantBlockGreaterPower" }];
+  // Ironclaw Curse: "can't block creatures with power equal to or greater than the enchanted creature's toughness", both as
+  // blockers are declared (CR 509.1b).
+  if (/^can't block creatures with power equal to or greater than the enchanted creature's toughness$/.test(rest)) return [{ kind: "cantBlockPowerAtLeastToughness" }];
   // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
   if ((m = /^can't block ([A-Z][a-z]+)$/.exec(rest))) {
     const one = singular(m[1]!);

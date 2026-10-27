@@ -65,7 +65,7 @@ describe("echo and cumulative upkeep", () => {
     expect(isFullySupported(card("Or Test", "Enchantment", "{G}", { oracleText: "Cumulative upkeep {G} or {W}" }))).toBe(true);
     expect(isFullySupported(card("Or Life Test", "Enchantment", "{G}", { oracleText: "Cumulative upkeep—Pay 1 life or sacrifice a creature." }))).toBe(false);
     expect(isFullySupported(card("Discard Echo", "Creature — Ape", "{G}", { power: "1", toughness: "1", oracleText: "Echo—Discard a card." }))).toBe(true); // since Lane B round B12
-    expect(isFullySupported(card("Graveyard Echo", "Creature — Ape", "{G}", { power: "1", toughness: "1", oracleText: "Echo—Exile a card from your graveyard." }))).toBe(false);
+    expect(isFullySupported(card("Graveyard Echo", "Creature — Ape", "{G}", { power: "1", toughness: "1", oracleText: "Echo—Exile a card from your graveyard." }))).toBe(true); // since Lane B round B18
   });
 
   it("echo: pay at your next upkeep or sacrifice it; only the first upkeep after it came under your control", () => {

@@ -59,7 +59,7 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       continue;
     }
     if (m.kind === "cantActivate") {
-      parts.push(`can't have ${plural ? "their" : "its"} activated abilities activated`);
+      parts.push(`can't have ${plural ? "their" : "its"} activated abilities${m.tapCost ? " with {T} in their costs" : ""} activated`);
       continue;
     }
     if (m.kind === "doesntUntap") {

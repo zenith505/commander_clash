@@ -248,8 +248,10 @@ describe('"you may pay ... If you do"', () => {
   it("compiles, and keeps a whole \"If you do\" sentence together", () => {
     supported(brassMan, poet, ivory);
     expect(compileCard(brassMan).triggers[0]!.body.effects[0]).toMatchObject({ type: "may", pay: { mana: "{1}" } });
-    // Choosing a color "then" returning creatures both depend on paying; we don't read that yet.
-    expect(isFullySupported(dromar)).toBe(false);
+    // Choosing a color "then" returning creatures both depend on paying: an "if you do" after the payment (lane B
+    // round 11 plays it through).
+    expect(isFullySupported(dromar)).toBe(true);
+    expect(compileCard(dromar).triggers[0]!.body.effects.map((e) => e.type)).toEqual(["may", "if"]);
   });
 
   it("Ivory Cup: paid from untapped lands, or declined", () => {

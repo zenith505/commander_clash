@@ -536,6 +536,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Its controller's next untap step skips it, then it untaps as usual (CR 502.3).
       for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
       return;
+    case "noUntapNext":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        p.noUntapNext = [...new Set([...(p.noUntapNext ?? []), ...e.types])];
+        log(s, `${e.types.map((t) => `${t.toLowerCase()}s`).join(" and ")} ${p.name} controls won't untap during their next untap step.`.replace(/^./, (c) => c.toUpperCase()));
+      }
+      return;
     case "noMaxHandSize":
       // "For as long as you control ~": nothing if you no longer do (CR 611.2b; rulings on The Great Synthesis).
       if (e.whileControlled) {

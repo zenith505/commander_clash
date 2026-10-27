@@ -486,6 +486,11 @@ export function compile(d: CardDef): CompiledCard {
       // Questing Druid: "Whenever you cast a spell that's white, blue, black, or red": a spell that's any of those colors,
       // as "a white, blue, black, or red spell" says (CR 105.2).
       .replace(/^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )*(?:white|blue|black|red|green),? or (?:white|blue|black|red|green)), /m, "Whenever you cast a $1 spell, ")
+      // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
+      .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
+      // The Genjus: "Enchant Forest" ... "Enchanted Forest becomes ...": the land it's attached to, which is a Forest while
+      // it's legally attached (CR 303.4d); "enchanted land" says the same.
+      .replace(/\b([Ee])nchanted (Forest|Island|Swamp|Mountain|Plains)(?= becomes | is put into a graveyard| is an? )/g, (x, e: string, t: string, _i, text: string) => (new RegExp(`^Enchant ${t}$`, "m").test(text) ? `${e}nchanted land` : x))
       .split("\n")
       .map((l) => {
         const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());

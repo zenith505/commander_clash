@@ -213,8 +213,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" && !what.of ? [{ type: "destroy", what: { ...what, of: { ref: "combatDamagedBySelf" } } }] : null;
   }
-  // "Destroy target nonblack creature and target land" (Plague Spores): two targets, each destroyed.
-  if ((m = /^(Destroy|Exile) (target [^,]+?) and (target .+)$/i.exec(s)) && !/ and target /.test(m[3]!)) {
+  // "Destroy target nonblack creature and target land" (Plague Spores): two targets, each destroyed. Relic Crush: "...
+  // and up to one other target artifact or enchantment", a different one, maybe none (CR 115.3).
+  if ((m = /^(Destroy|Exile) (target [^,]+?) and ((?:up to one other )?target .+)$/i.exec(s)) && !/ and target /.test(m[3]!)) {
     const a = parseObject(m[2]!, ctx);
     const b = a && parseObject(m[3]!, ctx);
     const type = m[1]!.toLowerCase() as "destroy" | "exile";
@@ -367,6 +368,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^(.+?) assigns no combat damage this (turn|combat)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "noCombatDamage", what, ...(m[2] === "combat" ? { combat: true as const } : {}) }] : null;
+  }
+  // Bontu's Last Reckoning: "Lands you control don't untap during your next untap step"; Mana Vapors: "Lands target player
+  // controls don't untap during their next untap step"; Exhaustion: "Creatures and lands target opponent controls ...":
+  // whatever of those that player controls when that step comes, also ones they got since (Mana Vapors rulings).
+  if ((m = /^(Lands|Creatures and lands) (you control|target player controls|target opponent controls) don't untap during (your|their) next untap step$/.exec(s)) && (m[2] === "you control") === (m[3] === "your")) {
+    const who = m[2] === "you control" ? { ref: "you" as const } : parsePlayer(m[2]!.replace(/ controls$/, ""), ctx);
+    return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : ["Creature", "Land"] }] : null;
   }
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {

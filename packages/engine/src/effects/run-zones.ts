@@ -2305,7 +2305,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // All at once (CR 608.2c), whatever they are.
         // Garna: only those put there this turn (GameObject.toGraveyardTurn).
         const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn)));
-        if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${player(s, ctx.controller).name}'s hand.`);
+        if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${e.who.ref === "you" ? `${player(s, ctx.controller).name}'s hand` : "their owners' hands"}.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;
       }

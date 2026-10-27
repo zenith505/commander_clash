@@ -141,6 +141,8 @@ export interface Characteristics {
   attackTaxCountersPlaneswalkers: number;
   /** Generic mana per creature blocking, whoever controls it (Archangel of Tithes, CR 509.1d). */
   blockTax: number;
+  /** Generic mana to attack with this creature, whoever it attacks (Brainwash, Phyrexian Marauder). */
+  ownAttackTax: number;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -287,6 +289,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackTaxCounters: 0,
     attackTaxCountersPlaneswalkers: 0,
     blockTax: 0,
+    ownAttackTax: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -819,7 +822,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return fits(s.players[you]?.life ?? 0);
     }
     case "discardedThisTurn":
-      return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you));
+      return (s.turnLog?.discards ?? []).some((d) => d.cards.length > 0 && (!cond.opponent || d.player !== you) && (!cond.yours || d.player === you));
     case "opponentLostLife":
       if (cond.damaged) return (s.damagedThisTurn ?? []).some((p) => p !== you);
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
@@ -911,7 +914,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return !(s.players[you]?.hand ?? []).some((id) => printedMatches(cond.filter, defOf(s, s.objects[id]!)));
     case "opponentDealtDamage":
       // Also an opponent who has left the game since (Spinerock Knoll rulings).
-      return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => Number(p) !== you && n >= cond.n);
+      return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => (cond.you ? Number(p) === you : Number(p) !== you) && n >= cond.n);
     case "attackedWith": {
       const w = s.players[you]?.attackedWith;
       return w?.turn === s.turn && w.keys.length >= cond.n;
@@ -1341,6 +1344,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "blockTax":
       c.blockTax += m.n;
       return;
+    case "ownAttackTax":
+      // Phyrexian Marauder: {1} for each +1/+1 counter on it now (its counters invalidate the characteristics).
+      c.ownAttackTax += m.perPlusOne ? m.n * Math.max(0, s.objects[id]?.counters["+1/+1"] ?? 0) : m.n;
+      return;
     case "attackTax": {
       if (m.perCounter) {
         c.attackTaxCounters++;
@@ -1495,6 +1502,15 @@ function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock:
 // applies to (Bothersome Quasit), whatever the order the two came in.
 const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "loseCreatureTypes", "setColors", "addColors", "loseAllAbilities", "goad"]);
 
+/**
+ * An "as long as it has defender" condition (Manor Gargoyle, Solid Footing) is about keywords, so it depends on effects
+ * that give or take them away (CR 613.8a). Only these are checked, which keeps layer 6 quick.
+ */
+function readsKeywords(e: Inst): boolean {
+  const c = e.condition;
+  return (c?.kind === "selfIs" || c?.kind === "attachedIs") && !!c.filter.keywords?.length;
+}
+
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";
   return `${controllerOfInst(e, chars)}|${appliesTo(s, e, chars).join(",")}`;
@@ -1507,7 +1523,7 @@ function signature(s: GameState, e: Inst, chars: CharMap): string {
  */
 function dependsOn(s: GameState, a: Inst, b: Inst, layer: Layer, chars: CharMap): boolean {
   if (a.locked || a.fixed) return false;
-  if (!modsIn(b, layer).some((m) => CAN_CREATE_DEPENDENCY.has(m.kind))) return false;
+  if (!modsIn(b, layer).some((m) => CAN_CREATE_DEPENDENCY.has(m.kind) || ((m.kind === "addKeywords" || m.kind === "removeKeywords") && readsKeywords(a)))) return false;
   if (!b.locked && !exists(s, b, chars)) return false;
   const trial: CharMap = new Map(chars);
   for (const id of appliesTo(s, b, chars)) trial.set(id, copyChars(chars.get(id)!));

@@ -68,6 +68,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^The player whose turn it is may end the turn$/.test(s)) return [{ type: "eachMay", who: { ref: "activePlayer" }, effects: [{ type: "endTurn" }], text: "end the turn" }];
   // Soothsaying: "Shuffle your library."
   if (/^Shuffle your library$/.test(s)) return [{ type: "shuffle", who: { ref: "you" } }];
+  // Boggart Forager, Soldier of Fortune: "Target player shuffles their library."
+  if (/^Target player shuffles their library$/.test(s)) {
+    const who = parsePlayer("target player", ctx);
+    return who ? [{ type: "shuffle", who }] : null;
+  }
   // Controlling another player (CR 723): "You control target player during that player's next turn" (Mindslaver),
   // "you gain control of target opponent during that player's next turn" (Emrakul), "... during their next turn".
   if ((m = /^You (?:gain control of|control) (target player|target opponent) during (?:that player's|their) next turn$/i.exec(s))) {
@@ -84,6 +89,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const skip = skips[m[4]!.toLowerCase()]!;
     if (!who || (m[3] && skip !== "turn") || (m[5] && skip !== "combat")) return null;
     return [{ type: "skip", who, skip, n: m[3] === "two" ? 2 : m[3] === "three" ? 3 : 1, ...(m[5] ? { thisTurn: true as const } : {}) }];
+  }
+  // False Peace, Empty City Ruse: "Target player skips all combat phases of their next turn" (CR 614.10).
+  if ((m = /^(Target player|Target opponent) skips all combat phases of their next turn$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "skip", who, skip: "combat", n: 1, wholeTurn: true }] : null;
   }
   if ((m = /^(.+?) (loses?|wins?) the game$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

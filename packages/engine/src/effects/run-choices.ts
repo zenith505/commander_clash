@@ -4,7 +4,7 @@ import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
-import { controllerOf, staticConditionNow } from "../layers";
+import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
@@ -630,6 +630,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetSharesName"
+            ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
+              ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
+            : e.cond.kind === "targetsSameColors"
+            ? targetsSameColors(s, ctx, e.cond.index, e.cond.n)
             : e.cond.kind === "targetGreatestPower"
             ? ((o) => !!o && o.zone === "battlefield" && objIsType(s, o, "Creature") && !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && power(s, obj(s, id)) > power(s, o)))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "flickeredIs"
@@ -723,6 +728,22 @@ function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetS
   if (o?.zone === "battlefield") return objectMatches(s, filter, o, ctx.controller, false);
   const card = s.objects[t.id];
   return !!card && card.zone === "graveyard" && (t.zc === undefined || (card.zoneChanges ?? 0) === t.zc) && printedMatches(filter, defOf(s, card));
+}
+
+/** Dead Ringers (SpellCondition "targetsSameColors"): each target's colors now, or as it last existed on the battlefield. */
+function targetsSameColors(s: GameState, ctx: ResolveCtx, index: number, n: number): boolean {
+  const sets: string[] = [];
+  for (let i = index; i < index + n; i++) {
+    const t = ctx.targets[i];
+    if (t?.kind !== "object") return false;
+    const o = s.objects[t.id];
+    const here = o?.zone === "battlefield" && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc);
+    const lk = s.lastKnown?.[t.id];
+    const colors = here ? characteristics(s, o).colors : lk && (t.zc === undefined || lk.zc === t.zc) ? lk.source?.colors : undefined;
+    if (!colors) return false;
+    sets.push([...colors].sort().join(""));
+  }
+  return sets.every((x) => x === sets[0]);
 }
 
 /** "If it was a creature card" (SpellCondition "targetCardWas"): the target card, wherever it went, by its printed characteristics. */

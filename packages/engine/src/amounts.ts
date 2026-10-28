@@ -585,6 +585,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
       return same ? (o.devoured ?? 0) : 0;
     }
+    case "lifePaidAsEntered": {
+      // "The life paid as it entered" (Minion of the Wastes): the source as that permanent, also after it left (CR 608.2h).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o) return 0;
+      const zc = o.zoneChanges ?? 0;
+      const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
+      return same ? (o.lifePaidAsEntered ?? 0) : 0;
+    }
     case "mutations": {
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!o) return 0;
@@ -1105,6 +1113,8 @@ export function substituteX(a: Amount, x: AmountExpr): Amount {
   if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
+  // "Half X damage, rounded up, ..., where X is the number of Mountains you control" (Eternal Flame): half the definition.
+  if (a.half) return t === 1 && !a.plus && !a.negate && !x.half && !x.third && !x.per && !x.negate ? { ...x, half: a.half } : a;
   if (t === 1 && !a.plus) return { ...x, ...(a.negate !== x.negate ? { negate: true } : { negate: undefined }) };
   return { count: x.count, times: t * (x.times ?? 1), plus: t * (x.plus ?? 0) + (a.plus ?? 0), ...(a.negate ? { negate: true } : {}) };
 }

@@ -506,6 +506,8 @@ export interface GameObject {
   enteredFromExile?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** A resolving spell's "return ~ to its owner's hand" (Cerebral Eruption): it goes there as it finishes resolving. */
+  toHandOnResolve?: true;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
   discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
@@ -590,6 +592,8 @@ export interface GameObject {
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
+  /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife): how much was paid, for "the life paid as it entered". */
+  lifePaidAsEntered?: number;
   /**
    * Cast bestowed (CR 702.103b): as a spell and as the permanent it becomes, it's an Aura with enchant creature, not a
    * creature (see defOf). It stops being bestowed when it becomes unattached or resolves with an illegal target (702.103e-f).
@@ -1108,6 +1112,8 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
+  /** The permanent that gets the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully, CR 602.2b). */
+  counterOn?: ObjectId[];
   /** Waterbend as an additional cost to cast it (CR 701.67a): untapped artifacts and creatures you control, each paying {1}. */
   waterbend?: ObjectId[];
   /** Cards in hand revealed for "reveal a Pirate card from your hand". */

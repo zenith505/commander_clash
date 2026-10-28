@@ -746,6 +746,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what?.ref === "each" ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : 1 }] : null;
   }
+  // Descendant of Masumaro: "then remove a +1/+1 counter from ~ for each card in target opponent's hand": as many as there
+  // are (all of them if fewer, rulings), counted as it resolves.
+  if ((m = new RegExp(`^(?:Then )?[Rr]emove an? ${COUNTER} counter from ~ for each (.+)$`).exec(s))) {
+    const n = parseCount(m[2]!, ctx, true);
+    return n ? [{ type: "removeCounters", what: { ref: "self" }, counter: counterKind(m[1]!), n }] : null;
+  }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;

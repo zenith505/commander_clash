@@ -297,6 +297,31 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "discard" || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "target", index: before }, options, effects: [{ ...fx[0]!, who: { ref: "punished" } }] }];
   }
+  // Skullscorch: "Target player discards two cards at random unless that player has ~ deal 4 damage to them"; Flay: "Then
+  // that player discards another card at random unless they pay {1}": that player decides as it resolves (CR 608.2d,
+  // rulings on Flay), the damage dealt by the spell.
+  if ((m = new RegExp(`^(?:[Tt]hen )?(Target player|Target opponent|[Tt]hat player) discards (${NUM} cards?|another card) at random unless (?:that player|they) (has ~ deal \\d+ damage to them|pays? (?:\\{[^}]+\\})+)$`).exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`${capital(m[1]!)} discards ${m[2]!.replace(/^another\b/, "a")} at random`, ctx);
+    const options = parsePunisherOptions(m[4]!, ctx);
+    const target = !/^[Tt]hat/.test(m[1]!);
+    if (fx?.length !== 1 || fx[0]!.type !== "discard" || !options || ctx.targets.length !== before + (target ? 1 : 0)) return null;
+    const who = target ? ({ ref: "target", index: before } as const) : fx[0]!.who;
+    return [{ type: "punisher", who, options, effects: [{ ...fx[0]!, who: { ref: "punished" } }] }];
+  }
+  // Eternal Flame: "~ deals X damage to target opponent or planeswalker and half X damage, rounded up, to you" (its "where
+  // X is" read by the body): the same X, halved and rounded up for you (CR 107.1a).
+  if ((m = /^(~ deals X damage to target (?:opponent|player) or planeswalker) and half X damage, rounded up, to you$/.exec(s))) {
+    const fx = parseSentence(m[1]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "damage") return null;
+    return [...fx, { type: "damage", amount: { count: { kind: "x" }, half: "up" }, to: { ref: "you" } }];
+  }
+  // Soul Charmer: "you gain 2 life unless that creature's controller pays {2}" (the creature it dealt combat damage to).
+  if ((m = /^[Yy]ou gain (\d+) life unless that creature's controller (pays (?:\{[^}]+\})+)$/.exec(s)) && ctx.subjectIt) {
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (!options) return null;
+    return [{ type: "punisher", who: { ref: "subjectController" }, options, effects: [{ type: "gainLife", who: { ref: "you" }, n: Number(m[1]) }], thenText: `you gain ${m[1]} life` }];
+  }
   // Vectis Dominator: "Tap target creature unless its controller pays 2 life": that player decides as it resolves.
   if ((m = /^(Tap target creature) unless its controller (pays \d+ life)$/.exec(s))) {
     const before = ctx.targets.length;
@@ -328,6 +353,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[2]!, ctx);
     if (!fx || !options || ctx.targets.length !== before) return null;
     return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: fx, mode: "ifNone", thenText: m[1]!.replace(/^They\b/, "they").replace(/^That creature\b/, "that creature") }];
+  }
+  // Nakaya Shade: "~ gets +1/+1 until end of turn unless any player pays {2}" (each player gets the option as it
+  // resolves, rulings); Barbarian Bully: "~ gets +2/+2 until end of turn unless a player has ~ deal 4 damage to them":
+  // each player in turn order, the caster too, the pump only if no one does (CR 101.4).
+  if ((m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn) unless (?:any|a) player (pays (?:\{[^}]+\})+|has ~ deal \d+ damage to them)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(m[1]!, ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (!fx || !options || ctx.targets.length !== before) return null;
+    return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: fx, mode: "ifNone", thenText: m[1]! }];
   }
   // Waterbending Lesson: "Then discard a card unless you waterbend {2}." You choose as it resolves whether to pay {2},
   // tapping artifacts and creatures you control for its generic mana (CR 701.67a, rulings), or to discard.

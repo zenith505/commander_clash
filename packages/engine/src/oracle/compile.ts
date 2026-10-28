@@ -351,8 +351,10 @@ export function normalizeSelf(d: CardDef): string {
     // followed by "target" is never the card).
     const verb = /^[A-Z][a-z]+$/.test(full) ? "(?! target\\b)" : "";
     // Aurochs: "for each other attacking Aurochs" is the creature type that is also its name (CR 205.3m), not the card.
+    // Assembly-Worker: "Target Assembly-Worker creature" is the type too (rulings: any creature of that type).
     const typed = CREATURE_TYPES.has(full) ? "(?<!attacking )" : "";
-    t = t.replace(new RegExp(typed + esc(full) + verb, "g"), "~");
+    const typedAfter = CREATURE_TYPES.has(full) ? "(?! creatures?\\b)" : "";
+    t = t.replace(new RegExp(typed + esc(full) + verb + typedAfter, "g"), "~");
   }
   // Shortened names (CR 201.5c): "Gylwain" for "Gylwain, Casting Director", and for a legendary card with no comma,
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token

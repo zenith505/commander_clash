@@ -6253,6 +6253,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "42b01697-8663-4b53-86d5-699063bd0778",
+  "name": "Flowstone Sculpture",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "{2}, Discard a card: Put a +1/+1 counter on this creature or this creature gains flying, first strike, or trample. (This effect lasts indefinitely.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7dde4eb6-e9d7-4259-abc2-3af738e0f00f",
   "name": "Foil",
   "manaCost": "{2}{U}{U}",
@@ -19359,6 +19386,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "000e5d65-96c3-498b-bd01-72b1a1991850",
+  "name": "Walking Sponge",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Sponge",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sponge"
+  ],
+  "oracleText": "{T}: Target creature loses your choice of flying, first strike, or trample until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3d175a59-c1b4-43b8-8a1f-f7cbcefe130e",
   "name": "Wand of the Worldsoul",
   "manaCost": "{2}{W}",
@@ -19384,6 +19441,37 @@
   "set": "moc",
   "releasedAt": "2023-04-21",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ee2c8714-6e85-4eb5-9bd6-057b6abfb136",
+  "name": "Warlord's Elite",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "As an additional cost to cast this spell, tap two untapped artifacts, creatures, and/or lands you control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

@@ -71,6 +71,11 @@ const mountVelusManticore = () => card("Mount Velus Manticore", "Enchantment Cre
 const flowstoneSculpture = () => card("Flowstone Sculpture", "Artifact Creature — Shapeshifter", "{6}", { cmc: 6, colors: [], power: "4", toughness: "4", oracleText: "{2}, Discard a card: Put a +1/+1 counter on this creature or this creature gains flying, first strike, or trample. (This effect lasts indefinitely.)" });
 const gremlinMine = () => card("Gremlin Mine", "Artifact", "{1}", { cmc: 1, colors: [], oracleText: "{1}, {T}, Sacrifice this artifact: It deals 4 damage to target artifact creature.\n{1}, {T}, Sacrifice this artifact: Remove up to four charge counters from target noncreature artifact." });
 const fearOfExposure = () => card("Fear of Exposure", "Enchantment Creature — Nightmare", "{2}{G}", { cmc: 3, colors: ["G"], power: "5", toughness: "4", keywords: ["Trample"], oracleText: "As an additional cost to cast this spell, tap two untapped creatures and/or lands you control.\nTrample" });
+const weiAssassins = () => card("Wei Assassins", "Creature — Human Soldier Assassin", "{3}{B}{B}", { cmc: 5, colors: ["B"], power: "3", toughness: "2", oracleText: "When this creature enters, target opponent chooses a creature they control. Destroy that creature." });
+const mabel = () => card("Mabel, Bitter Recluse", "Legendary Creature — Mouse Warlock", "{B}", { cmc: 1, colors: ["B"], power: "1", toughness: "1", keywords: ["Deathtouch"], oracleText: "Deathtouch\nWhen Mabel enters, remove up to three counters from another target creature or planeswalker." });
+const walkingSponge = () => card("Walking Sponge", "Creature — Sponge", "{1}{U}", { cmc: 2, colors: ["U"], power: "1", toughness: "1", oracleText: "{T}: Target creature loses your choice of flying, first strike, or trample until end of turn." });
+const hailStorm = () => card("Hail Storm", "Instant", "{1}{G}{G}", { cmc: 3, colors: ["G"], oracleText: "Hail Storm deals 2 damage to each attacking creature and 1 damage to you and each creature you control." });
+const assemblyWorker = () => card("Assembly-Worker", "Artifact Creature — Assembly-Worker", "{3}", { cmc: 3, colors: [], power: "2", toughness: "2", oracleText: "{T}: Target Assembly-Worker creature gets +1/+1 until end of turn." });
 const guardianOfTheGreatDoor = () => card("Guardian of the Great Door", "Creature — Angel", "{W}{W}", { cmc: 2, colors: ["W"], power: "4", toughness: "4", keywords: ["Flying"], oracleText: "As an additional cost to cast this spell, tap four untapped artifacts, creatures, and/or lands you control.\nFlying" });
 
 const creature = (name: string, typeLine: string, manaCost: string, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, manaCost, { power: String(p), toughness: String(t), ...extra });
@@ -89,6 +94,7 @@ describe("Lane B round 33", () => {
   it("compiles every card fully", () => {
     supported(stormElemental(), soundTheCall(), deathpactAngel(), rekindlingPhoenix(), foodFight(), elkinBottle(), desperateResearch(), pompousGadabout());
     supported(deepwoodElder(), warlordsElite(), mountVelusManticore(), flowstoneSculpture(), gremlinMine(), fearOfExposure(), guardianOfTheGreatDoor());
+    supported(weiAssassins(), mabel(), walkingSponge(), hailStorm(), assemblyWorker());
   });
 });
 
@@ -328,6 +334,87 @@ describe("Elkin Bottle and Pompous Gadabout", () => {
     const s = attackWith(s0, [gad], opp);
     expect(() => blockWith(s, [[hidden, gad]])).toThrow();
     expect(blockWith(s, [[named, gad]]).objects[gad]!.blockedBy).toContain(named);
+  });
+});
+
+describe("More from the bottom", () => {
+  it("Wei Assassins: the targeted opponent chooses one of their creatures, and it's destroyed", () => {
+    const { s: s0, ap, ids, opp } = setup([weiAssassins()]);
+    const big = putOnBattlefield(s0, opp, creature("Big Bear", "Creature — Bear", "{4}{G}", 5, 5, { cmc: 5, colors: ["G"] }));
+    const small = putOnBattlefield(s0, opp, greenBear());
+    let s = castNow(s0, ap, ids[0]!);
+    s = settle(s, (x) => !!x.pending && x.pending.kind !== "pickPermanents");
+    if (s.pending?.kind === "chooseTargets") s = settle(act(s, { type: "chooseTargets", player: ap, targets: [ply(opp)] }), at("pickPermanents", opp));
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: opp, action: "choose" });
+    s = settle(act(s, { type: "pickPermanents", player: opp, ids: [small] }));
+    expect([zone(s, small), zone(s, big)]).toEqual(["graveyard", "battlefield"]);
+  });
+
+  it("Mabel, Bitter Recluse: removes up to three counters of any kinds from another creature", () => {
+    const { s: s0, ap, ids, opp } = setup([mabel()]);
+    const bear = putOnBattlefield(s0, opp, greenBear());
+    s0.objects[bear]!.counters = { "+1/+1": 3, shield: 1 };
+    invalidateCharacteristics(s0);
+    let s = castNow(s0, ap, ids[0]!);
+    s = settle(s, (x) => x.pending?.kind === "chooseTargets" || at("chooseOption", ap)(x));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    // Not Mabel herself: another target.
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [tgt(ids[0]!)] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [tgt(bear)] }), at("chooseOption", ap));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "removeCounter" });
+    s = choose(s, "shield");
+    s = choose(s, "+1/+1");
+    s = settle(choose(s, "+1/+1"));
+    expect([s.objects[bear]!.counters["+1/+1"], s.objects[bear]!.counters.shield ?? 0]).toEqual([1, 0]);
+    expect(pt(s, bear)).toBe("3/3");
+  });
+
+  it("Walking Sponge: the target loses the one keyword chosen, until end of turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const sponge = putOnBattlefield(s0, ap, walkingSponge());
+    const bird = putOnBattlefield(s0, opp, creature("Trampling Bird", "Creature — Bird", "{3}{G}", 3, 3, { cmc: 4, colors: ["G"], keywords: ["Flying", "Trample"], oracleText: "Flying, trample" }));
+    let s = settle(run(s0, planActivate(s0, ap, sponge, 0, [tgt(bird)])), at("chooseOption", ap));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "keyword", options: ["Flying", "First strike", "Trample"] });
+    s = settle(choose(s, "Flying"));
+    expect([kws(s, bird, "Flying"), kws(s, bird, "Trample")]).toEqual([false, true]);
+    s = passUntil(s, "main1", nextPlayer(s, ap));
+    expect(kws(s, bird, "Flying")).toBe(true);
+  });
+
+  it("Hail Storm: 2 to each attacker, 1 to you and each of your creatures, all at once", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const attacker = putOnBattlefield(s0, ap, creature("Big Bear", "Creature — Bear", "{4}{G}", 5, 5, { cmc: 5, colors: ["G"] }));
+    const home = putOnBattlefield(s0, ap, greenBear());
+    const theirs = putOnBattlefield(s0, opp, greenBear());
+    const storm = toZone(s0, opp, hailStorm(), "hand");
+    for (let i = 0; i < 3; i++) putOnBattlefield(s0, opp, card("Forest", "Basic Land — Forest"));
+    let s = attackWith(s0, [attacker], opp);
+    const before = [life(s, ap), life(s, opp)];
+    s = act(s, { type: "passPriority", player: ap });
+    s = settle(run(s, planCast(s, opp, storm, [], undefined, "auto")));
+    // The attacking Bear is the active player's: 2 only. The defending player's creatures and life take 1 each.
+    expect(s.objects[attacker]!.damage).toBe(2);
+    expect([s.objects[home]!.damage, zone(s, theirs)]).toEqual([0, "battlefield"]);
+    expect(s.objects[theirs]!.damage).toBe(1);
+    expect([life(s, ap), life(s, opp)]).toEqual([before[0], before[1]! - 1]);
+  });
+
+  it("Hail Storm: an attacking creature of the caster's is dealt 3 as one", () => {
+    const { s: s0, ap, ids } = setup([hailStorm()]);
+    const attacker = putOnBattlefield(s0, ap, creature("Big Bear", "Creature — Bear", "{4}{G}", 5, 5, { cmc: 5, colors: ["G"] }));
+    let s = attackWith(s0, [attacker], nextPlayer(s0, ap));
+    s = settle(castNow(s, ap, ids[0]!));
+    expect(s.objects[attacker]!.damage).toBe(3);
+  });
+
+  it("Assembly-Worker: targets any Assembly-Worker creature, not only ones named Assembly-Worker", () => {
+    const { s: s0, ap } = setup([]);
+    const worker = putOnBattlefield(s0, ap, assemblyWorker());
+    const other = putOnBattlefield(s0, ap, creature("Mishra's Worker", "Artifact Creature — Assembly-Worker", "{4}", 2, 2, { cmc: 4, colors: [] }));
+    const bear = putOnBattlefield(s0, ap, greenBear());
+    expect(planActivate(s0, ap, worker, 0, [tgt(bear)])).toBeNull();
+    const s = settle(run(s0, planActivate(s0, ap, worker, 0, [tgt(other)])));
+    expect(pt(s, other)).toBe("3/3");
   });
 });
 

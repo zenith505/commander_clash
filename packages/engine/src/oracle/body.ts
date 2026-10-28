@@ -5807,6 +5807,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ ...a, also: [b.to], ...(additional[3] !== additional[1] ? { alsoAmount: b.amount } : {}), merge: true });
       continue;
     }
+    // Hail Storm: "~ deals 2 damage to each attacking creature and 1 damage to you and each creature you control": all
+    // dealt at once, an attacking creature you control dealt the two amounts added up.
+    const twoAmounts = /^~ deals (\d+) damage to (each [^,]+?) and (\d+) damage to ((?:you and )?each [^,]+)$/.exec(s);
+    if (twoAmounts && !parseOne(s, ctx)) {
+      const first = parseOne(`~ deals ${twoAmounts[1]} damage to ${twoAmounts[2]}`, ctx);
+      const second = parseOne(`~ deals ${twoAmounts[3]} damage to ${twoAmounts[4]}`, ctx);
+      const [a, b] = [first?.[0], second?.[0]];
+      if (first?.length !== 1 || second?.length !== 1 || a?.type !== "damage" || b?.type !== "damage" || a.also || a.to.ref !== "each" || b.alsoAmount || b.merge) return null;
+      effects.push({ ...a, also: [b.to, ...(b.also ?? [])], alsoAmount: b.amount, merge: true });
+      continue;
+    }
     // Discordant Dirge: "where X is the number of verse counters on ~": counted as it resolves (CR 107.3c, 608.2h).
     const chooseN = /^You choose (up to )?(two|three|X) cards from it(?:, where X is (.+))?$/.exec(s);
     if (chooseN) {
@@ -9265,7 +9276,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Gains protection from colorless or from the color of your choice" (Giver of Runes): one of six, chosen as it resolves.
     // "Gains protection from artifacts or from the color of your choice" (Apostle's Blessing) likewise.
     s = s.replace(/ (gains?) protection from (colorless|artifacts) or from the color of your choice\b/, " $1 your choice of protection from $2, protection from white, protection from blue, protection from black, protection from red, or protection from green");
-    const choiceOf = / (gains?|gain) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?)(?= until end of turn\b| and |$)/.exec(s);
+    const choiceOf = / (gains?|gain|loses?) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?)(?= until end of turn\b| and |$)/.exec(s);
     if (choiceOf) {
       const options = choiceOf[2]!.split(/,? or |, /).map((w) => keywordOf(w));
       // One such choice per ability: it's kept for the rest of the resolution.

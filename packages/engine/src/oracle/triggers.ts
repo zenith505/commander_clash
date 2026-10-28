@@ -1110,6 +1110,9 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature you control with a +1/+1 counter on it deals combat damage to a player" (Bred for the Hunt): the
   // counter is on it as it deals the damage.
   line = line.replace(/^Whenever (an?|another) (\w+) you control (with an? [^ ]+ counter on it) deals combat damage /, "Whenever $1 $2 $3 you control deals combat damage ");
+  // Subira, Tulzidi Caravanner: "whenever a creature you control with power 2 or less deals combat damage to a player":
+  // its power right after the damage is dealt (rulings), as the trigger event happens.
+  line = line.replace(/^Whenever (an?|another) creature you control (with (?:power|toughness) \d+ or (?:less|greater)) deals combat damage /, "Whenever $1 creature $2 you control deals combat damage ");
   // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);

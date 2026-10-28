@@ -437,10 +437,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
   }
   // "The first creature spell you cast each turn costs {2} less to cast", "The second spell you cast each turn ...".
-  if ((m = /^The (first|second) (.*?)spell you cast each turn costs \{(\d+)\} less to cast$/.exec(text))) {
+  // Momo, Friendly Flier: "The first non-Lemur creature spell with flying you cast during each of your turns costs {1}
+  // less to cast": the spell's own flying (as Warden of Evos Isle's), only during your turn; one that matches but has
+  // no generic mana to reduce still uses it up (rulings).
+  if ((m = /^The (first|second) (.*?)spell( with (?:flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace))? you cast (each turn|during each of your turns) costs \{(\d+)\} less to cast$/.exec(text))) {
     const filter = m[2] ? parseTargetPhrase(`${m[2]}spell`) : { kind: "spell" as const, text: "spell" };
     if (!filter || filter.kind !== "spell") return "fail";
-    return { costMod: { who: "you", filter: { ...filter, text: `${m[2]}spells` }, n: -Number(m[3]), nth: m[1] === "first" ? 1 : 2, text: line } };
+    const kw = m[3] ? { keywords: [capital(m[3].slice(6))] } : {};
+    return { costMod: { who: "you", filter: { ...filter, ...kw, text: `${m[2]}spells${m[3] ?? ""}` }, n: -Number(m[5]), nth: m[1] === "first" ? 1 : 2, ...(m[4] === "each turn" ? {} : { turn: "yours" as const }), text: line } };
   }
   // Warden of Evos Isle: "Creature spells with flying you cast cost {1} less to cast": the spell's own printed flying, not
   // flying it would get on the battlefield (rulings).
@@ -980,6 +984,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
   // Karakyk Guardian: "~ has hexproof as long as it hasn't dealt damage yet": since it became this object (CR 400.7).
   if (/^(?:~|it) hasn't dealt damage yet$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "hasDealtDamage", not: true };
+  // The Tarrasque: "~ has haste and ward {10} as long as it was cast": it entered as a spell, cast from any zone (rulings).
+  // Only for a static ability's own effect: "When ~ enters, if it was cast" is the trigger's `ifCast`.
+  if (/^(?:~|it) was cast$/.test(text) && st.mods.length && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "cast" };
   // Cactuar: "if ~ didn't enter the battlefield this turn".
   if (/^~ didn't enter (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn", not: true };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
@@ -1150,8 +1157,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
   const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
-  if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
-    return { kind: "selfCounter", counter: counterKind(m[1]!) };
+  // Gatewatch Beacon: "if ~ has loyalty counters on it": one or more.
+  if ((m = new RegExp(`^(?:~|it) has (?:an? ${COUNTER} counter|${COUNTER} counters) on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
+    return { kind: "selfCounter", counter: counterKind((m[1] ?? m[2])!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
   if ((m = /^(?:it|~) has an? (even|odd) number of counters on it$/.exec(text))) return { kind: "selfCounters", counter: "*", min: 0, parity: m[1] as "even" | "odd" };
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
@@ -1226,6 +1234,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Kezzerdrix: "if your opponents control no creatures": none of them controls one, as "no opponent controls a creature".
   if ((m = /^your opponents control no ([a-z]+)s$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]}`, st);
+  // Chevill, Bane of Monsters: "if your opponents control no permanents with bounty counters on them": any bounty counter,
+  // whoever put it there (rulings).
+  if ((m = /^your opponents control no ([a-z]+)s with ([a-z]+) counters on them$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]} with a ${m[2]} counter on it`, st);
   // Homicidal Seclusion, Demonic Rising: "as long as you control exactly one creature".
   if ((m = /^you control exactly one ([a-z]+)$/.exec(text))) {
     const c = parseStaticCondition(`you control a ${m[1]}`, st);
@@ -1478,7 +1489,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   };
   // Raised by Giants: "have base power and toughness 10/10 and are Giants in addition to their other types" (layers 4
   // and 7b, CR 613.1d, 613.4b).
-  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)(?: and (?:is an? ([A-Z][a-z]+)|are ([A-Z][a-z]+)) in addition to (?:its|their) other types)?$/.exec(rest))) {
+  // Graaz, Unstoppable Juggernaut: "... and are Juggernauts in addition to their other creature types".
+  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)(?: and (?:is an? ([A-Z][a-z]+)|are ([A-Z][a-z]+)) in addition to (?:its|their) other (?:creature )?types)?$/.exec(rest))) {
     const t = m[3] ?? (m[4] && singular(m[4]));
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
@@ -2396,7 +2408,14 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (p === null || t === null) return null;
     mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
-  if (where) {
+  // Elturel Survivors: "where X is the number of lands defending player controls": the player ~ is attacking (or whose
+  // planeswalker or battle it attacks, CR 506.2), as it is now; none while it isn't attacking.
+  const defending = where && affects.kind === "self" ? /^the number of (.+) defending player controls$/.exec(where[2]!) : null;
+  if (defending) {
+    const c = parseCount(`the number of ${defending[1]} on the battlefield`, null);
+    if (!c || typeof c !== "object" || !("count" in c) || c.count.kind !== "permanents" || c.count.whose || Object.keys(c).length !== 1) return null;
+    mods = replaceX(mods, { count: { ...c.count, whose: { ref: "selfDefending" } } });
+  } else if (where) {
     const def = counts(parseCount(where[2]!, null), where[2]!);
     if (!def) return null;
     mods = replaceX(mods, def);

@@ -848,7 +848,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ownTrigger = item?.kind === "ability" && item.sourceId === sourceId && src.zone === "battlefield" && !!src.wasCast && src.enteredTurn === s.turn;
       // Hotheaded Giant: a permanent spell enters without a resolving item; it counts itself only if it was cast (rulings).
       const entering = !!cond.entering && !!src.wasCast && mine.some((c) => c.card === defOf(s, src).oracleId);
-      const itself = entering || (!!item && item.controller === you && (ownSpell || ownTrigger) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
+      // Sage of the Skies: "When you cast this spell, if you've cast another spell this turn": the spell on the stack, cast
+      // (not a copy), has counted itself, as it triggers and as the trigger resolves.
+      const castOnStack = src.zone === "stack" && s.stack.some((x) => x.kind === "spell" && !x.copy && x.objectId === sourceId && x.controller === you);
+      const itself = entering || ((castOnStack || (!!item && item.controller === you && (ownSpell || ownTrigger))) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
       return mine.length - (itself ? 1 : 0) > 0;
     }
     case "creatureDied":
@@ -1154,6 +1157,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Whirling Dervish: "if ~ dealt damage to an opponent this turn": this object (CR 400.7), to any opponent (CR 102.3).
       if (cond.is === "dealtDamageToOpponentThisTurn") return src.zone === "battlefield" && Object.entries(s.turnLog?.damagedBy ?? {}).some(([pid, by]) => Number(pid) !== you && by.includes(`${src.id}@${src.zoneChanges ?? 0}`));
       if (cond.is === "kicked") return !!src.kicked?.length;
+      if (cond.is === "cast") return src.zone === "battlefield" && !!src.wasCast;
       if (cond.is === "countersPutThisTurn") return src.countersPutAt?.turn === s.turn && src.countersPutAt.zc === (src.zoneChanges ?? 0);
       if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));

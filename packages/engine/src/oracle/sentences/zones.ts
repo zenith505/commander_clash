@@ -17,6 +17,8 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
   if (s === "Put all creatures on the bottom of their owners' libraries") return [{ type: "putAllOnBottom", filter: { kind: "object", types: ["Creature"], text: "creature" } }];
   // Living Death: each part for all players at once (rulings, Effect livingDeath).
   if (s === "Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath" }];
+  // Scrap Mastery: the same with artifacts (rulings: only the cards exiled by the first part come back).
+  if (s === "Each player exiles all artifact cards from their graveyard, then sacrifices all artifacts they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath", cardType: "Artifact" }];
   if (ctx.spell) return undefined;
   // Memory Jar: each player's hand, face down, then everyone draws seven (CR 608.2c); at the next end step, everyone
   // discards their hand and gets back the cards they exiled (only the same objects, CR 400.7).
@@ -615,6 +617,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || spec.chosen !== "type") return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1]} card of the chosen type` }, ...(m[2] === "your hand" ? { toHand: true as const } : {}) }];
   }
+  // Creeping Renaissance: "Choose a permanent type. Return all cards of the chosen type from your graveyard to your hand."
+  if (/^[Rr]eturn all cards of the chosen type from your graveyard to your hand$/.test(s)) return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", chosen: "type", text: "card of the chosen type" }, toHand: true }];
   // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
   const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
   if (yours) {
@@ -813,7 +817,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
   }
-  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
     const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
@@ -976,6 +980,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject("that card", ctx);
     return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
   }
+  // The Cauldron of Eternity: "Whenever a creature you control dies, put it on the bottom of its owner's library": the card,
+  // if it's still in the graveyard (CR 400.7).
+  if ((m = /^[Pp]ut (it|that card) on (top|the bottom) of its owner's library$/.exec(s)) && ctx.subjectLeft) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: m[2] === "top" ? "top" : "bottom" }] : null;
+  }
   // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
   if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
@@ -1075,13 +1085,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source }] : null;
   }
   // "Attach target Aura you control to target creature" (Aura Finesse), "target Aura or Equipment you control" (Codsworth).
-  if ((m = /^Attach ((?:up to one )?target (?:Equipment|Aura|Aura or Equipment)\b(?:(?! to )(?! attached to ).)*(?: attached to an? creature(?: you control)?)?) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
+  // Armory Automaton: "attach any number of target Equipment to it", all of them to the source (rulings).
+  if ((m = /^Attach ((?:up to one |any number of )?target (?:Equipment|Aura|Aura or Equipment)\b(?:(?! to )(?! attached to ).)*(?: attached to an? creature(?: you control)?)?) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
     const pronoun = !/\btarget\b/i.test(m[2]!);
     if (pronoun && ctx.spell) return null;
     const hostFirst = pronoun ? parseObject(m[2]!, ctx) : null;
     const source = parseObject(m[1]!, ctx);
     const what = hostFirst ?? (pronoun ? null : parseObject(m[2]!, ctx));
-    if (source?.ref !== "target" || source.n || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref)) return null;
+    const many = /^any number of /i.test(m[1]!);
+    if (source?.ref !== "target" || (source.n && !many) || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref) || (many && what.ref !== "self")) return null;
     return [{ type: "attach", what, source }];
   }
   // Inventory Management: "For each Aura and Equipment you control, you may attach it to a creature you control": each in
@@ -1360,6 +1372,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const half = roundOf(m[3], ctx);
     if (among?.ref !== "target" || !filter || filter.kind !== "object" || !half) return null;
     return [{ type: "pick", who: { ref: "you" }, among, filter, n: { count: { kind: "permanents", filter, whose: among }, half }, action: "bounce" }];
+  }
+  // Gut, True Soul Zealot: "you may sacrifice another creature or an artifact": an artifact or a creature other than the
+  // source, and the source too while it's an artifact (rulings).
+  if ((m = /^[Ss]acrifice another creature or an artifact$/.exec(s)) && !ctx.spell) {
+    const filter = pickFilter("artifact or creature");
+    return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, notSourceUnlessArtifact: true, text: "other creature or an artifact" }, n: 1, action: "sacrifice" }] : null;
   }
   // "You may sacrifice another creature" (Cavalier of Night): one other than the source (a permanent's ability).
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {

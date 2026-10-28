@@ -156,6 +156,7 @@ export function parseCostKeyword(
   assist?: true;
   faceDown?: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string };
   madness?: string;
+  madnessLife?: number;
   miracle?: string;
   suspend?: { n: number; cost: string };
   plot?: string;
@@ -232,8 +233,10 @@ export function parseCostKeyword(
   if ((m = /^Madness(?: |—)(.+?)\.?$/.exec(line))) {
     // "Madness—Pay six {C}" (Emrakul, the World Anew): that many {C}, a mana cost (CR 107.4c, 202.1).
     const pay = new RegExp(`^Pay ${NUM} (\\{C\\})$`).exec(m[1]!);
-    const cost = pay ? pay[2]!.repeat(num(pay[1]!)) : m[1]!;
-    return /^(\{[^}]+\})+$/.test(cost) && plainMana(cost) ? { madness: cost } : "fail";
+    // "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend): the mana and the life, both paid as it's cast.
+    const life = /^((?:\{[^}]+\})+), Pay (\d+) life$/.exec(m[1]!);
+    const cost = pay ? pay[2]!.repeat(num(pay[1]!)) : life ? life[1]! : m[1]!;
+    return /^(\{[^}]+\})+$/.test(cost) && plainMana(cost) ? { madness: cost, ...(life ? { madnessLife: Number(life[2]) } : {}) } : "fail";
   }
   // Suspend N—[cost] (CR 702.62a); "Suspend X—{X}{U}. X can't be 0." isn't modeled.
   if ((m = /^Suspend (\d+)—((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[2]!) ? { suspend: { n: Number(m[1]), cost: m[2]! } } : "fail";

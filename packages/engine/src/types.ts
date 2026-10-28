@@ -2221,6 +2221,8 @@ export interface Resolving {
       tokens?: number;
       /** Or that they discard this many cards (Bandit's Talent's "discards two cards unless ..."). */
       discards?: number;
+      /** Or that its controller sacrifices the source (Icy Prison's "sacrifice ~ unless any player pays {3}"). */
+      losesSource?: true;
       /** "If a player does" / "If no one does" (see the punisher effect). */
       mode?: "ifAny" | "ifNone";
     };

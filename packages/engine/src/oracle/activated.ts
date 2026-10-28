@@ -48,7 +48,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // Sandstone Deadfall: "Sacrifice two lands and ~", Zombie Assassin: "Exile two cards from your graveyard and ~": the
     // same costs as "Sacrifice ~ and two lands", "Exile two cards from your graveyard, Exile ~" (paid in any order, CR 601.2h).
     .replace(/(^|, )Sacrifice (an?|two|three) ([a-z]+) and ~(?=[,:])/, "$1Sacrifice ~ and $2 $3")
-    .replace(/(^|, )(Exile (?:a|one|two|three) cards? from your graveyard) and ~(?=[,:])/, "$1$2, Exile ~");
+    .replace(/(^|, )(Exile (?:a|one|two|three) cards? from your graveyard) and ~(?=[,:])/, "$1$2, Exile ~")
+    // The Heralds: "Sacrifice a white creature, a blue creature, and a black creature": one cost, three different creatures
+    // (rulings); Urborg Panther: "Sacrifice a creature named Feral Shadow, a creature named Breathstealer, and ~": the
+    // permanent itself and one of each of the others.
+    .replace(/(^|, )Sacrifice (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), and (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*|~)(?=:)/, (_, pre: string, a: string, b: string, c: string) => (c === "~" ? `${pre}Sacrifice ~, Sacrifice ${a}; and ${b}` : `${pre}Sacrifice ${a}; ${b}; and ${c}`));
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
   const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Tap enchanted (?:creature|land)|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove a counter from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard another card named ~|Discard X cards|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) untapped [^,:]+? you control|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
   // "Waterbend {N}" (CR 701.67a) is paying {N}, part of which tapped artifacts and creatures can pay.
@@ -95,6 +99,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       // Sage of Hours: however many there are, none included (rulings); see StackItem.countersRemoved.
       if (removeCounters) return "fail";
       removeCounters = { counter: counterKind(c[1]!), n: 0, all: true };
+    } else if ((c = /^Remove X ([+-]1\/[+-]1|[a-z]+) counters from ~$/.exec(part))) {
+      // The Bakus: "Remove X ki counters from ~": X announced, then that many removed (CR 107.3a, 601.2b).
+      if (removeCounters) return "fail";
+      removeCounters = { counter: counterKind(c[1]!), n: 0, x: true };
     } else if (/^Remove /.test(part)) {
       const rc = removeCounterCost(part);
       if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
@@ -115,6 +123,14 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const both = a?.kind === "object" && b?.kind === "object" ? (pickFilter(`${c[1]} or ${c[2]}`) ?? { kind: "object" as const, anyOf: [a, b], text: `${c[1]} or ${c[2]}` }) : null;
       if (!a || !b || !both || a.kind !== "object" || b.kind !== "object") return "fail";
       extra.push({ kind: "sacrifice", filter: { ...both, text: `${c[1]} and a ${c[2]}` }, n: 2, oneOfEach: [a, b] });
+    } else if ((c = /^Sacrifice (an? [^,]+), (?:(an? [^,]+), )?and (an? [^,]+)$/.exec(part))) {
+      // The Heralds, Urborg Panther (kept as one part above): one permanent for each, all different (rulings on Sphinx's Herald;
+      // a multicolored creature pays for one of them only, CR 602.2b).
+      const items = [c[1]!, c[2], c[3]!].filter((x): x is string => !!x).map((x) => x.replace(/^an? /, ""));
+      const specs = items.map((x) => pickFilter(x));
+      if (specs.some((f) => f?.kind !== "object")) return "fail";
+      const anyOf = specs as TargetSpec[];
+      extra.push({ kind: "sacrifice", filter: { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: items.length === 2 ? `${items[0]} and a ${items[1]}` : `${items[0]}, a ${items[1]}, and a ${items[2]}` }, n: items.length, oneOfEach: anyOf });
     } else if ((c = /^Sacrifice another (\w+) or an? (\w+(?: token)?)$/.exec(part))) {
       // "Sacrifice another creature or an artifact" (Street Urchin): this permanent too if it's an artifact (rulings).
       // "Sacrifice another creature or a Treasure" (Skullport Merchant): a card type or a subtype, either one. "Or a Blood
@@ -413,7 +429,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // Slogurk, the Overslime: "Remove three +1/+1 counters from ~: Return it to its owner's hand": "it" is ~, the only
   // object the ability names.
   if (/^Remove \w+ [^,:]*counters? from ~$/.test(costs)) effectText = effectText.replace(/^Return it to its owner's hand\.$/, "Return ~ to its owner's hand.");
-  const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
+  const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ")
+    // Blademane Baku: "For each counter removed, ~ gets +2/+0 until end of turn" after "Remove X ki counters from ~".
+    .replace(/^For each counter removed, (~ gets [+-]\d+\/[+-]\d+ until end of turn)\.$/, removeCounters?.x ? "$1 for each counter removed this way." : "$&").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   if (uncopyable) body.uncopyable = true;
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
@@ -421,10 +439,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // libraries isn't compiled.
   // A cost that mills moves a card from a library: it uses the stack (CR 605.1a; Millikin rulings).
   const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || bottomOwn || keyword || halfLife || untapSelf))) return "fail";
+  // "Remove X storage counters from ~: Add X mana ..." (Crucible of the Spirit Dragon, Petalmane Baku): an X for a mana
+  // ability isn't announced anywhere yet.
+  if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || bottomOwn || keyword || halfLife || untapSelf || removeCounters?.x))) return "fail";
   if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
-  if (usesX(body) && !symbols.includes("X") && !energyX && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
+  if (usesX(body) && !symbols.includes("X") && !energyX && !removeCounters?.x && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
   // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
   // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.

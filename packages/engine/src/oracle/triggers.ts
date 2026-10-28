@@ -428,7 +428,10 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
     return body ? { event: "opponentDealtDamageBySource", body, minDamage: num(single[1]!) } : "fail";
   }
   const m0 = /^Whenever a source you control deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage to a player, (.+)$/.exec(line);
-  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
+  // Talon of Pain: "a source you control other than ~"; Night Dealings: "to another player", every other player being an
+  // opponent in this free-for-all game (CR 102.3).
+  const m1 = m0 ? null : /^Whenever a source you control( other than ~)? deals (noncombat )?damage to (?:an opponent|another player), (.+)$/.exec(line);
+  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : m1 ? ([m1[0], m1[2], m1[3]] as const) : null;
   if (!m) return null;
   let text = m[2]!;
   if (/\b(it|its|that source|that creature|from your graveyard)\b/.test(text)) return "fail";
@@ -440,7 +443,7 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   let body = parseBody(text, { eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
-  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}) };
+  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}), ...(m1?.[1] ? { otherSource: true as const } : {}) };
 }
 
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {

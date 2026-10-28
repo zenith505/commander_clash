@@ -354,6 +354,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || !options || ctx.targets.length !== before) return null;
     return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: fx, mode: "ifNone", thenText: m[1]!.replace(/^They\b/, "they").replace(/^That creature\b/, "that creature") }];
   }
+  // Icy Prison: "sacrifice ~ unless any player pays {3}": each player in turn order may pay, the caster too; sacrificed
+  // only if no one does (CR 101.4).
+  if ((m = /^[Ss]acrifice ~ unless any player (pays (?:\{[^}]+\})+)$/.exec(s))) {
+    const options = parsePunisherOptions(m[1]!, ctx);
+    if (!options) return null;
+    return [{ type: "punisher", who: { ref: "eachPlayer" }, options, effects: [sacrificeSelf], mode: "ifNone", thenText: "sacrifices ~" }];
+  }
   // Nakaya Shade: "~ gets +1/+1 until end of turn unless any player pays {2}" (each player gets the option as it
   // resolves, rulings); Barbarian Bully: "~ gets +2/+2 until end of turn unless a player has ~ deal 4 damage to them":
   // each player in turn order, the caster too, the pump only if no one does (CR 101.4).
@@ -659,7 +666,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The Tabernacle at Pendrell Vale's granted "At the beginning of your upkeep, destroy this creature unless you pay {1}":
   // pay to keep it, or it's destroyed (and can be regenerated).
-  if ((m = /^[Dd]estroy ~ unless you pay (\{\d+\})$/.exec(s))) return [{ type: "may", effects: [], pay: { mana: m[1]! }, otherwise: [{ type: "destroy", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~` }];
+  // Cosmic Horror: "destroy ~ unless you pay {3}{B}{B}{B}".
+  if ((m = /^[Dd]estroy ~ unless you pay ((?:\{(?:\d+|[WUBRGC])\})+)$/.exec(s))) return [{ type: "may", effects: [], pay: { mana: m[1]! }, otherwise: [{ type: "destroy", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~` }];
   // Volatile Stormdrake: "sacrifice that creature unless you pay an amount of {E} equal to its mana value", the creature
   // it targeted (now yours): its mana value as this resolves.
   if ((m = /^[Ss]acrifice (that creature) unless you pay an amount of \{E\} equal to its mana value$/.exec(s)) && ctx.lastObjectTarget !== undefined) {

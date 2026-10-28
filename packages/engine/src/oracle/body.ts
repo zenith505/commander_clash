@@ -2174,7 +2174,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Reign of Terror: "Destroy all green creatures or all white creatures"; Lava Storm: "~ deals 2 damage to each attacking
     // creature or ~ deals 2 damage to each blocking creature": one or the other, chosen as it resolves (CR 608.2d).
-    const orAll = /^(Destroy all (?:[a-z]+ )?creatures) or all ((?:[a-z]+ )?creatures)$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
+    // Essence Filter: "Destroy all enchantments or all nonwhite enchantments".
+    const orAll = /^(Destroy all (?:[a-z]+ )?(?:creatures|enchantments)) or all ((?:[a-z]+ )?(?:creatures|enchantments))$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
     if (orAll) {
       const halves = [orAll[1]!, /^Destroy/.test(orAll[1]!) ? `Destroy all ${orAll[2]}` : orAll[2]!];
       const options = halves.map((h) => parseOne(h, ctx));
@@ -6865,6 +6866,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // toughness as it last existed (CR 608.2h).
     // Demonic Junker: "If a creature you controlled was destroyed this way, ...": controlled as it was destroyed
     // (CR 608.2h).
+    // Cosmic Horror: "destroy ~ unless you pay {3}{B}{B}{B}. If ~ is destroyed this way, it deals 7 damage to you": only
+    // if it was destroyed, not regenerated or indestructible (rulings); the damage from it as it last existed (CR 608.2h).
+    const selfDestroyed = /^If ~ is destroyed this way, it deals (\d+) damage to you$/.exec(s);
+    const prevMay = effects[effects.length - 1];
+    if (selfDestroyed && prevMay?.type === "may" && prevMay.otherwise?.length === 1 && prevMay.otherwise[0]!.type === "destroy" && prevMay.otherwise[0]!.what.ref === "self") {
+      const inner = parseOne(`~ deals ${selfDestroyed[1]} damage to you`, ctx);
+      if (!inner) return null;
+      prevMay.otherwise.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      continue;
+    }
     const ifDestroyed = /^If a creature (you controlled was|is) destroyed this way, (.+)$/.exec(s);
     if (ifDestroyed) {
       const prev = effects[effects.length - 1];

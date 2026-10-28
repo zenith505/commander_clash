@@ -15318,6 +15318,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "74466fa6-34d9-42f9-8590-c7f1fa672bf5",
+  "name": "Skullmane Baku",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Whenever you cast a Spirit or Arcane spell, you may put a ki counter on this creature.\n{1}, {T}, Remove X ki counters from this creature: Target creature gets -X/-X until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d3d8dd6e-a80b-4063-a542-ff67ef8dad4f",
   "name": "Skullwinder",
   "manaCost": "{2}{G}",

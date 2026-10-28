@@ -600,8 +600,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     {
       const t = e.exceptTarget !== undefined ? ctx.targets[e.exceptTarget] : undefined;
       const except = t?.kind === "object" ? { id: t.id, zc: t.zc ?? s.objects[t.id]?.zoneChanges ?? 0 } : undefined;
-      (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller, ...(except ? { except } : {}) });
-      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
+      const of = e.ofPlayer ? players(s, e.ofPlayer, ctx)[0] : undefined;
+      if (e.ofPlayer && of === undefined) return;
+      (s.cantAttackThisTurn ??= []).push({ filter: of !== undefined ? { ...e.filter, controlledBy: of } : e.filter, controller: ctx.controller, ...(except ? { except } : {}) });
+      log(s, of !== undefined ? `Creatures ${player(s, of).name} controls can't attack this turn.` : `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
       return;
     }
     case "costModThisTurn":

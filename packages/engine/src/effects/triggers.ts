@@ -2305,6 +2305,9 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).
     ...((t.transformsAt ?? s.objects[t.sourceId]?.transforms) ? { sourceTransforms: t.transformsAt ?? s.objects[t.sourceId]!.transforms } : {}),
   });
+  // Soul Scourge: the player targeted is remembered as it's put on the stack (rulings on Laquatus's Champion).
+  const linking = t.index >= 0 && triggerOf(s, t)?.linksTarget ? targets.find((x) => x.kind === "player") : undefined;
+  if (linking?.kind === "player") (s.linkedPlayer ??= {})[`${t.sourceId}@${t.sourceZc ?? 0}`] = linking.id;
   // Firebender Ascension's trigger is about this one, now on the stack.
   if (t.tag) for (const q of s.triggerQueue) if (q.causeTag === t.tag) q.cause = s.stack[s.stack.length - 1]!.id;
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);

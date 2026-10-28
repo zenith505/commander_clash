@@ -262,6 +262,13 @@ export type Count =
   | { kind: "lifeGainedThisTurn" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
+  /**
+   * Chroma: the mana symbols of one color in mana costs, a hybrid symbol of that color counting once (rulings): of the cards
+   * in your graveyard (Umbra Stalker), of the permanent a static ability affects (Light from Within), of what was sacrificed
+   * (`of`, Fiery Bombardment), of the cards revealed from your hand (Phosphorescent Feast) or from your library this way
+   * (Sanity Grinding).
+   */
+  | { kind: "manaSymbols"; color: Color; in?: "graveyard" | "affected" | "revealedFromHand" | "revealed"; of?: ObjRef }
   /** "For each Aura attached to it", "each Equipment attached to it". */
   | { kind: "attachedToSelf"; subtypes: string[] }
   /** "Enchanted creature gets +1/+1 for each Aura and Equipment attached to it" (Mantle of the Ancients): attached to the permanent the static ability's effect is applied to. */
@@ -1059,6 +1066,8 @@ export type MostStat = { what: "life" } | { what: "hand" } | { what: "control"; 
 
 export type PlayerRef =
   | { ref: "you" }
+  /** "When ~ leaves the battlefield, that player gains 3 life" (Soul Scourge): the player its enters ability targeted (TriggeredAbility.linksTarget). */
+  | { ref: "linkedPlayer" }
   /** "Each player ~ attacked this turn" (Angel of Destiny): the players (not planeswalkers) the source attacked this turn, as this object. */
   | { ref: "attackedThisTurnBySelf" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
@@ -1474,6 +1483,8 @@ export type Modification =
    * for "with toughness greater than its power", checked as the damage is assigned.
    */
   | { kind: "assignsToughness"; ifGreater?: true }
+  /** Loot, the Anomaly: "If ~'s power is negative, ~ assigns combat damage as though ~'s power were positive" (only the damage assigned; its power is unchanged, rulings). */
+  | { kind: "assignsAbsPower" }
   /** "Can attack as though it didn't have defender" (CR 702.3b). */
   | { kind: "attackDespiteDefender"; /** Only players who attacked you during their last turn (Weathered Sentinels). */ vsAttackedYou?: true }
   /**
@@ -2194,7 +2205,7 @@ export type Effect =
    */
   | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
-  | { type: "exileHand"; until: "nextTurn" }
+  | { type: "exileHand"; until?: "nextTurn"; /** Wormfang Behemoth: "When ~ leaves the battlefield, return the exiled cards to their owner's hand" (CR 607.2a; set by compile). */ linked?: boolean }
   /**
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
@@ -2928,7 +2939,7 @@ export type Effect =
    * hand and the rest on the bottom" (Explosive Revelation).
    */
   | { type: "revealedUntilToBottom"; hand?: true }
-  | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
+  | { type: "revealTop"; /** "Reveal the top ten cards of your library" (Sanity Grinding, Stomping Slabs): they stay there as "the revealed cards" (ResolvingInfo.revealedUntil). */ n?: number; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
   /** "Return ~ to its owner's hand" as the spell resolves (Cerebral Eruption): it goes there, not to the graveyard, as it finishes resolving (GameObject.toHandOnResolve). */
   | { type: "spellToHand" }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
@@ -3057,7 +3068,7 @@ export type Effect =
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec; /** Eunuchs' Intrigues: "Other creatures they control": controlled by this player, as it resolves, except the creature that player just chose (ObjRef "created"). */ ofPlayer?: PlayerRef; exceptChosen?: true }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
-  | { type: "cantAttackRule"; filter: TargetSpec; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number }
+  | { type: "cantAttackRule"; filter: TargetSpec; /** "Creatures that player controls" (Oriss, Samite Guardian): those that player controls. */ ofPlayer?: PlayerRef; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
   | { type: "cantBeBlockedRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
@@ -3804,6 +3815,8 @@ export type SpellCondition =
   | { kind: "movedLinkedIs"; filter: TargetSpec }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */
   | { kind: "revealedSharesCreatureType" }
+  /** "If a card named ~ was revealed this way" (Stomping Slabs): one of the cards a revealTop of several revealed is, by its printed characteristics. */
+  | { kind: "revealedTopIs"; filter: TargetSpec }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
   | { kind: "milledIs"; filter: TargetSpec }
   /** "If you exiled a land card this way" after exiling the top cards to play (Bonehoard Dracosaur): one of them is. */
@@ -4220,6 +4233,8 @@ export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn"
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** Soul Scourge: the player this enters ability targets is "that player" of its leaves ability, even if it's still on the stack or never resolves (rulings on Laquatus's Champion). */
+  linksTarget?: true;
   /** "Where X is the number of nonland cards milled this way" (The Wise Mothman): X is the event's amount, known as it triggers, so it can count targets ("up to X target creatures"). */
   eventX?: true;
   /** For "permanentIsDealtDamage": what has to be dealt damage. */

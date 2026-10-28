@@ -779,7 +779,7 @@ line blocks.
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
    that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Ancient Imperiosaur, Everything Comes
    to Dust and Knight-Errant of Eos (what convoked them); Nissa's two-sentence "Nth time" branches; Rose Room
-   Treasurer, Soulbright Flamekin; Eivor and Sludge Titan ("and/or" after a mill); Spinal Parasite, Brightflame,
+   Treasurer, Soulbright Flamekin; Eivor and Sludge Titan ("and/or" after a mill); Brightflame,
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or
@@ -1555,7 +1555,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Shrine); Avatar of Discord ("unless you discard two cards" with one card in hand: a partial payment question);
   Polar Kraken and Phyrexian Soulgorger (cumulative upkeep paid by sacrificing); Stand United (an "if" effect that
   pauses for a scry); Nissa's Defeat (its target phrase); Wargling (an ability word before "until end of turn,");
-  Phoenix Fleet Airship ("permanents named ~"); Galactus and Kookus (a name with ~ in it); Festering Newt, Ruin in
+  Phoenix Fleet Airship ("permanents named ~"); Galactus (a name with ~ in it); Festering Newt, Ruin in
   Their Wake, Rix Maadi Guildmage, Dragon Hunter, Will of the All-Hunter, Foe-liage, Inflame and Executioner's Swing
   (each needs a check not modeled: which creatures were dealt damage this turn, "if it's blocking", Dragons as
   though reach, lands entering during your turn).
@@ -2074,6 +2074,33 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   longer asks for one. +18 (26,932 of 31,936).
 - Known limit there: the "no creatures" state trigger is checked when a player would get priority, so a creature
   flickered in the middle of a resolution (rulings on Drop of Honey with Momentary Blink) doesn't make it trigger.
+- Round B27 (harder skipped cards, least played first): negative printed power and toughness (Char-Rumbler, Spinal
+  Parasite, Loot, the Anomaly; a creature with power 0 or less assigns no combat damage, CR 510.1a) and Loot's "assigns
+  combat damage as though his power were positive" (only combat damage, rulings; a toughness rule still comes first).
+  Chroma, counting mana symbols of a color like devotion, a hybrid symbol once for each of its colors (CR 700.5,
+  rulings on Sanity Grinding): in the mana costs of permanents you control (Heartlash Cinder, Outrage Shaman,
+  Primalcrux, Springjack Shepherd), cards in your graveyard (Umbra Stalker), each creature's own (Light from Within),
+  the sacrificed creature's (Fiery Bombardment), the revealed cards' (Phosphorescent Feast, Sanity Grinding with "Then
+  put the cards you revealed this way on the bottom in any order"). Grandeur, "Discard another card named ~" (Baru,
+  Korlash, Linessa with her one-at-a-time creature, artifact, enchantment and land, Oriss's "can't cast spells, and
+  creatures that player controls can't attack this turn" as a rule for the turn, Page, Skoa, Tarox; browser test).
+  "If a card named ~ was revealed this way" (Stomping Slabs), Lammastide Weave's "gain life equal to its mana value",
+  Vigean Intuition's "Choose a card type ... Put all cards of the chosen type", Thought Hemorrhage's damage for each
+  card with the chosen name revealed. "Exile a creature card from your graveyard" as a cost read back as "the exiled
+  card's power / mana value", a "*" by its characteristic-defining ability (CR 604.3; Corpse Lunge, Corpse Explosion,
+  Draconic Intervention, Dread Defiler, Necropolis), and "Exile another creature card from your graveyard" (Gallia,
+  Scrapheap Scrounger, Helbrute's Sarcophagus). Linked leaves-the-battlefield returns (CR 607.2a): "that player gains
+  N life" (Soul Scourge, Laquatus's Champion: the target of the enters trigger, rulings), Wormfang Behemoth's "exile all
+  cards from your hand ... return the exiled cards", Saprazzan Bailiff. Also "named" tokens and creatures as costs
+  (Jungle Patrol's Wood, Bubbling Cauldron's Festering Newt, Kyscu Drake) and Kookus ("Keeper of Kookus" keeps its
+  name; "deals 3 damage to you and attacks this turn if able"). +39 (26,971 of 31,936).
+- Skipped there: Hypnox and Realm Razer (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
+  round that checks "if you cast it from your hand" and "under their owners' control"), Gravegouger, Wormfang Newt and
+  Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Morbid Bloom and Scour the
+  Desert ("the exiled card's toughness" after a targeted exile, not a cost), Phyrexian Devourer (a power state
+  trigger), Detention Sphere (left to Lane A, near the top). Known limit: a "*" creature card's power outside the
+  battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
+  the stack); characteristics() still shows it as 0 there.
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
@@ -2096,7 +2123,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
   before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch
   Paladin, Dragon's Disciple, Dream Salvage, Misinformation, Obscura Interceptor, Rewrite History, Wight, Frenzy Sliver,
-  Mondo Gecko, Baru, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
+  Mondo Gecko, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
   Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Lo and Li, Chisei,
   Withercrown, Throne of Makindi, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
   Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
@@ -2109,7 +2136,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Witch Hunt, Bridge from
-  Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex, Corpse Explosion,
+  Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex,
   Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 470 are still unsupported there, its skips
   included): Sandman's Quicksand (mayhem), Aeon Engine, Workshop Elders, Turtle Van, Haunting Imitation, The Fugitive

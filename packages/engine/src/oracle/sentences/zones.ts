@@ -382,8 +382,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // controller chooses, CR 508.4).
   // Phoenix Chick: "... tapped and attacking with a +1/+1 counter on it" (it enters with it, CR 614.1c).
   // Retrofitted Transmogrant: "{3}{B}: Return ~ from your graveyard to the battlefield tapped with two +1/+1 counters on it".
-  // Relentless X-ATM092: "... tapped with a finality counter on it" (CR 122.1h).
-  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) (\+1\/\+1|finality) counters? on it)?$/.exec(s))) {
+  // Relentless X-ATM092: "... tapped with a finality counter on it" (CR 122.1h). Gallia, Tragic Host: "on her" (~).
+  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?( and attacking)?( with (a|two|three) (\+1\/\+1|finality) counters? on (?:it|~))?$/.exec(s))) {
     // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
     const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
     if ((m[3] || m[4]) && (m[1] === "your hand" || ctx.auraCard)) return null;
@@ -622,6 +622,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
   }
+  // Saprazzan Bailiff: "Return all artifact and enchantment cards from all graveyards to their owners' hands": each card
+  // that's either, to its owner's hand.
+  if ((m = /^[Rr]eturn all (artifact|creature|enchantment|instant|sorcery|land) and (artifact|creature|enchantment|instant|sorcery|land) cards from all graveyards to their owners' hands$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[1]} or ${m[2]} card`);
+    return filter ? [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...filter, text: `${m[1]} and ${m[2]} card` }, toHand: true }] : null;
+  }
   // Demigod of Revenge: "return all cards named ~ from your graveyard to the battlefield" (its cast trigger): the source's
   // name (CR 201.5); the spell itself is on the stack, not there (rulings).
   if (/^[Rr]eturn all cards named ~ from your graveyard to the battlefield$/.test(s)) {
@@ -801,7 +807,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const flashback = all.what === "cards with flashback";
     const kind = /^(.+?) cards$/.exec(all.what);
     // "All cards": the whole graveyard.
-    const filter = flashback || all.what === "cards" ? undefined : kind ? parseSearchFilter(`${kind[1]} card`) : null;
+    // "All artifact and enchantment cards" (Saprazzan Bailiff): each card that's either.
+    const filter = flashback || all.what === "cards" ? undefined : kind ? parseSearchFilter(`${kind[1]!.replace(/^(artifact|creature|enchantment|instant|sorcery|land) and (artifact|creature|enchantment|instant|sorcery|land)$/, "$1 or $2")} card`) : null;
     const w = all.whose;
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
@@ -998,6 +1005,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Admonition Angel: "When ~ leaves the battlefield, return all cards exiled with it to the battlefield under their owners'
   // control": the same.
   if (/^[Rr]eturn all cards exiled with (?:it|~) to the battlefield under their owners' control$/.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "battlefield" }];
+  // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
+  // leaves ability.
+  if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one
@@ -1153,6 +1163,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // Oriss, Samite Guardian: "Creatures that player controls can't attack this turn", after a target player: the creatures
+  // they control when attackers are declared, ones that arrive later too (a rule for the turn, not a change to the
+  // creatures there now, CR 611.2c).
+  if (/^Creatures that player controls can't attack this turn$/.test(s)) {
+    const of = parsePlayer("that player", ctx);
+    if (of?.ref === "target") return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" }, ofPlayer: of }];
+  }
   // Intimidation Bolt: "~ deals 3 damage to target creature. Other creatures can't attack this turn.": every creature but
   // that one, also ones that arrive later, and all of them if it left the battlefield (rulings).
   if (/^Other creatures can't attack this turn$/.test(s) && ctx.spell && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)

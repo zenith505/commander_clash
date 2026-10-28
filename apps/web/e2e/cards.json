@@ -16737,6 +16737,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e195f2f8-2db7-46b8-948c-c3c27f2e5825",
+  "name": "Tarox Bladewing",
+  "manaCost": "{2}{R}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying, haste\nGrandeur — Discard another card named Tarox Bladewing: Tarox Bladewing gets +X/+X until end of turn, where X is its power.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Grandeur",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f07f98bb-4190-4643-aeb9-c5eaf358c97c",
   "name": "Tawnos's Weaponry",
   "manaCost": "{2}",

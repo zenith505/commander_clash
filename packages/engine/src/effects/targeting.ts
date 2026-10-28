@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
+import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -425,6 +425,22 @@ export function spellPT(s: GameState, item: StackItem, key: "power" | "toughness
   const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
   const amount = def?.[key];
   return amount === undefined ? undefined : evalAmount(s, amount, { controller: item.controller, sourceId: o.id });
+}
+
+/**
+ * A creature card's power or toughness in a graveyard, hand, library or exile: its printed one, or from its
+ * characteristic-defining ability, which works in every zone (CR 604.3); Corpse Lunge's "the exiled card's power".
+ */
+export function cardPT(s: GameState, o: GameObject, key: "power" | "toughness"): number {
+  const d = defOf(s, o);
+  const printed = d[key] ?? "0";
+  if (/^-?\d+$/.test(printed)) return Number.parseInt(printed, 10);
+  const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
+  const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
+  const amount = def?.[key];
+  const now = characteristics(s, o)[key]; // with the counters on it (CR 122.1a)
+  if (amount === undefined) return now;
+  return evalAmount(s, amount, { controller: o.owner, sourceId: o.id }) + now - (key === "power" ? basePower(d) : baseToughness(d));
 }
 
 /**

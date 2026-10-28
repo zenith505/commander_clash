@@ -303,6 +303,21 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (nb) return parseCount(nb[1]!, ctx, true);
   }
   const count = (c: Count): AmountExpr => ({ count: c });
+  // Chroma: "the number of red mana symbols in the mana costs of permanents you control" counts as devotion does (hybrid
+  // symbols of that color count, rulings; CR 700.5); "of cards in your graveyard" (Umbra Stalker), "in its mana cost" in
+  // a static ability (Light from Within: each permanent's own), "in the sacrificed creature's mana cost" (Fiery
+  // Bombardment), "in those cards' mana costs" after revealing cards from your hand (Phosphorescent Feast).
+  if (each && (m = /^(white|blue|black|red|green) mana symbols? in (.+)$/i.exec(p))) {
+    const color = COLOR_WORDS[m[1]!.toLowerCase()]!;
+    const where = m[2]!;
+    if (/^the mana costs of permanents you control$/i.test(where)) return count({ kind: "devotion", colors: [color] });
+    if (/^the mana costs of cards in your graveyard$/i.test(where)) return count({ kind: "manaSymbols", color, in: "graveyard" });
+    if (/^its mana cost$/i.test(where) && ctx === null) return count({ kind: "manaSymbols", color, in: "affected" });
+    if (/^the sacrificed creature's mana cost$/i.test(where) && ctx) return count({ kind: "manaSymbols", color, of: { ref: "sacrificed" } });
+    if (/^those cards' mana costs$/i.test(where) && ctx?.revealedFromHand) return count({ kind: "manaSymbols", color, in: "revealedFromHand" });
+    if (/^the mana costs of the revealed cards$/i.test(where) && ctx?.revealedTopN) return count({ kind: "manaSymbols", color, in: "revealed" });
+    return null;
+  }
   // "Draw cards equal to the result", "where X is the result" (CR 706.2), "the total of those results" (Neverwinter Hydra).
   if (!each && /^(?:the result|the total of those results)$/i.test(p)) return count({ kind: "rollResult" });
   // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
@@ -590,7 +605,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
   if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the exiled card's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
@@ -801,6 +816,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
+  // Corpse Lunge: "the exiled card's power" after an "exile a creature card from your graveyard" cost; compile() checks it has one.
+  if (x === "the exiled card's") return { ref: "sacrificed", exiledCost: true };
   if (x === "that card's" && ctx.revealedTop) return { ref: "revealed" };
   if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
   // Pyretic Rebirth: "... ~ deals damage equal to that card's mana value to up to one target creature": the one card targeted.

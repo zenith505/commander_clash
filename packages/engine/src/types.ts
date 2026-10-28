@@ -1553,6 +1553,8 @@ export interface GameState {
   resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  /** Soul Scourge, Laquatus's Champion: the player its enters ability targeted, by "sourceId@zc", for "that player" in its leaves ability (rulings). */
+  linkedPlayer?: Record<string, PlayerId>;
   /**
    * Animate Dead: the creature an Aura with "enchant creature card in a graveyard" put onto the battlefield, by
    * `${Aura id}@${its zone changes}` (its "enchant creature put onto the battlefield with ~", and "that creature" of its
@@ -2045,6 +2047,8 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** The cards it revealed, for "each green mana symbol in those cards' mana costs" (Phosphorescent Feast). */
+  revealedFromHandIds?: ObjectId[];
   /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
   parley?: { land: number; nonland: number };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */

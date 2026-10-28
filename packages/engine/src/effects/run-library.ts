@@ -169,6 +169,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, id ? `${p.name} reveals ${defOf(s, obj(s, id)).name} at random from their hand.` : `${p.name} has no card in hand to reveal.`);
         return;
       }
+      if (e.n !== undefined) {
+        // All of them if there are fewer (rulings on Sanity Grinding); they stay on top for now.
+        const ids = p.library.slice(0, e.n);
+        s.resolving!.revealedUntil = ids;
+        log(s, ids.length ? `${p.name} reveals the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library (${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}).` : `${p.name} has no cards in their library to reveal.`);
+        return;
+      }
       const id = p.library[0];
       s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
       if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);

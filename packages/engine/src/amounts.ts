@@ -263,6 +263,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
       return ctx.event?.groupPower ?? 0;
+    case "totalPowerOf":
+      return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
       return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
     case "exchangedLifeDifference": {
@@ -894,6 +896,8 @@ function describeCount(c: Count): string {
     case "stillExiled":
       return "#those cards still exiled";
     case "eventGroupPower":
+      return "the total power of those creatures";
+    case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":
       return "the life you lost";

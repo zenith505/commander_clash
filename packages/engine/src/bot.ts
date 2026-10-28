@@ -134,9 +134,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
       const printed = triggerBody(s, t);
-      // "You may choose both instead" (SOLDIER Military Program): one or both, now.
-      const range = t.both ? modeRange(printed, true) : undefined;
-      const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0], max: range[1] } } : printed;
+      // "You may choose both instead" (SOLDIER Military Program): one or both, now. "Each mode must target a different
+      // player" (Vindictive Lich): no more than there are players to target (the question's range).
+      const range = t.both ? modeRange(printed, true) : printed.modal?.distinctTargets ? [pend.min, pend.max] : undefined;
+      const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0]!, max: range[1]! } } : printed;
       return [{ type: "chooseModes", player: pid, modes: chooseModes(s, pid, body, true, t.sourceId)!.modes }];
     }
     if (pend.kind === "chooseTargets") {

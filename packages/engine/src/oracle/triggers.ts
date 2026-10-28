@@ -419,6 +419,9 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   const m = m0 ? ([m0[0], undefined, m0[2]] as const) : /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
   if (!m) return null;
   let text = m[2]!;
+  // Fear of Burning Alive: "..., if there are four or more card types among cards in your graveyard, ...": an
+  // intervening if, read with the others (parseTrigger).
+  if (/^if [^,]+, /.test(text)) return null;
   if (/\b(it|its|that source|that creature|from your graveyard)\b/.test(text)) return "fail";
   const thatMuch = /\bthat (?:much|many|amount of)\b/.test(text);
   if (thatMuch) {
@@ -556,6 +559,16 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
   if (mariner) {
     const unless = { cost: mariner[1]! };
     return { event: "permanentBecomesTarget", targeted: { by: "opponent", orYou: true }, subjectFilter: { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", text: "permanent you control" }, body: { targets: [], effects: [{ type: "counterUnlessPays", unless }], text: `counter that spell or ability unless its controller pays ${mariner[1]}.` } };
+  }
+  // Surrak, Elusive Hunter: "Whenever a creature you control or a creature spell you control becomes the target of a spell
+  // or ability an opponent controls, draw a card": once for each of them it targets, a spell on the stack too.
+  const surrak = /^Whenever a creature you control or a creature spell you control becomes the target of a spell or ability an opponent controls, (.+)$/.exec(line);
+  if (surrak) {
+    if (/\b(?:it|its|that creature|that spell)\b/.test(surrak[1]!)) return "fail";
+    const body = parseBody(surrak[1]!, {});
+    const spell = parseTargetPhrase("creature spell");
+    if (!body || spell?.kind !== "spell") return "fail";
+    return { event: "permanentBecomesTarget", targeted: { by: "opponent", orSpell: { ...spell, text: "creature spell you control" } }, subjectFilter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" }, body };
   }
   // Silverfur Partisan: "becomes the target of an instant or sorcery spell": a spell of either type.
   // Fugitive Druid: "becomes the target of an Aura spell": a spell with that subtype.

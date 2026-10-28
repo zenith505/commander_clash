@@ -454,6 +454,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const theirs = what && what === ctx.lastGroup && what.ref === "each" && what.of?.ref === "target" && ctx.targets[what.of.index]?.kind === "player";
     return what && theirs ? [{ type: "skipUntap", what }] : null;
   }
+  // Change of Plans: "Each of X target creatures you control connive. You may have any number of them phase out.": the
+  // targets still on the battlefield, chosen after they've all connived (rulings), none too.
+  if (/^You may have any number of them phase out$/.test(s) && ctx.lastTargets) {
+    const what = parseObject("them", ctx);
+    return what?.ref === "target" ? [{ type: "phaseOut", what, anyNumber: true }] : null;
+  }
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
   if ((m = /^(.+?) phases? out$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
@@ -778,6 +784,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const first = ctx.targets.length;
     const x: AmountExpr = { count: { kind: "x" } };
     addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures$/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), atMost: true }, many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
+  }
+  // Grove's Bounty: "Distribute X +1/+1 counters among any number of target creatures you control": the spell's X, all of
+  // it, chosen with the targets, each getting at least one (rulings, CR 601.2d).
+  // Broodlord: "When ~ enters, distribute X +1/+1 counters among any number of other target creatures you control": the X it
+  // was cast with, divided as the ability is put on the stack (rulings).
+  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures you control)$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
+    if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
+    const first = ctx.targets.length;
+    const x: AmountExpr = { count: { kind: "x" } };
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!) }, many: "any" });
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
     return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];

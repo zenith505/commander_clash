@@ -1994,7 +1994,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const returned = e.attachToCreated ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield" && objIsType(s, o, "Creature")) : undefined;
       // "Put it onto the battlefield attacking" (Senu): only during combat, attacking what its controller chooses as it
       // enters (CR 508.4, rulings); outside combat it just enters (CR 506.3d).
-      const attackOptions = e.attacking && inCombat(s) && entering.some((o) => isType(defOf(s, o), "Creature")) ? attackChoices(s, ctx.controller, ctx.sourceId) : [];
+      // Shark Shredder: "attacking that player", the trigger's player, if they're still in the game.
+      const foe = e.attackingEvent ? ctx.event?.player : undefined;
+      const attackOptions = e.attacking && inCombat(s) && entering.some((o) => isType(defOf(s, o), "Creature")) ? (e.attackingEvent ? (foe !== undefined && foe !== ctx.controller && !player(s, foe).lost ? [{ key: String(foe), label: player(s, foe).name, player: foe }] : []) : attackChoices(s, ctx.controller, ctx.sourceId)) : [];
       const sc = (s.resolving!.scratch ??= {});
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, entering.find((o) => isType(defOf(s, o), "Creature"))!).name} attacks` };

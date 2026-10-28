@@ -187,6 +187,8 @@ export type Count =
   | { kind: "linkedExiled" }
   /** "The total power of those creatures": the ones that died in a "one or more ... die" event, as they last existed (The Skullspore Nexus). */
   | { kind: "eventGroupPower" }
+  /** "The total power of creatures goaded this way" (Havoc Eater): the targets `of` names still on the battlefield as it resolves (illegal ones weren't goaded, CR 608.2b), a negative power taking some off. */
+  | { kind: "totalPowerOf"; of: ObjRef }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
   | { kind: "movedLinkedThisWay" }
   /** "For each of those cards that are still exiled" (Dragonhawk): the cards the creating ability exiled, filled in when its delayed trigger is made (CR 400.7). */
@@ -2295,6 +2297,8 @@ export type Effect =
       atNextEndStep?: true;
       /** "Put it onto the battlefield attacking" (Senu): during combat, attacking what its controller chooses (CR 508.4). */
       attacking?: true;
+      /** With `attacking`: "It enters tapped and attacking that player" (Shark Shredder): the trigger's event player only. */
+      attackingEvent?: true;
     }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
@@ -2468,7 +2472,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3308,7 +3312,7 @@ export type Effect =
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
-  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true }
+  | { type: "phaseOut"; what: ObjRef; /** Oubliette: "until ~ leaves the battlefield. Tap that creature as it phases in this way." (CR 610.3): it phases in tapped only then, not in an untap step. */ untilSourceLeaves?: true; /** "You may have any number of them phase out" (Change of Plans): the controller picks which of them, none too. */ anyNumber?: true }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**
@@ -4207,7 +4211,7 @@ export interface TriggeredAbility {
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
-  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true };
+  targeted?: { spell?: true; /** "Of an instant or sorcery spell" (Silverfur Partisan): a spell with one of these card types. */ spellTypes?: string[]; /** "Of an Aura spell" (Fugitive Druid): a spell with one of these subtypes. */ spellSubtypes?: string[]; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean; /** "Whenever you or a permanent you control becomes the target ..." (Unsettled Mariner): this ability's controller as a target too, once for each spell or ability (rulings). */ orYou?: true; /** "Whenever a creature you control or a creature spell you control becomes the target ..." (Surrak, Elusive Hunter): a spell of yours this matches (TargetSpec kind "spell") too, once for each spell or ability. */ orSpell?: TargetSpec };
   /**
    * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
@@ -5353,7 +5357,8 @@ export interface CompiledCard {
    * "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." (Phantom Centaur): every bit
    * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.
    */
-  phantom?: boolean;
+  /** `whileCounter`: "while it has a +1/+1 counter on it" (Undergrowth Champion): only then. */
+  phantom?: boolean | "whileCounter";
   /**
    * "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove that many +1/+1
    * counters from ~" (Ugin's Conjurant, CR 615.5): all of it prevented, as many counters as it has removed (rulings);
@@ -5809,7 +5814,7 @@ export interface CompiledCard {
   /** "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master, CR 602.2b applies 601.2f). */
   ninjutsuLess?: number;
   /** "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): these abilities for its controller's cards in hand that match (CR 113.6, 702.49a). */
-  handGrants?: { filter: TargetSpec; activated: ActivatedAbility[] }[];
+  handGrants?: { filter: TargetSpec; activated: ActivatedAbility[]; /** "In each player's hand" (Homing Sliver): every player's cards, not only its controller's. */ everyHand?: true }[];
   /** The Master, Multiplied: "Triggered abilities you control can't cause you to sacrifice or exile creature tokens you control." */
   ownTriggersSpareTokens?: true;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */

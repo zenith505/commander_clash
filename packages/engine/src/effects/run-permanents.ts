@@ -362,6 +362,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "phaseOut": {
       // Only what's on the battlefield: "it" may have left (CR 702.26b).
       const ids = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id);
+      if (e.anyNumber) {
+        // Change of Plans: which of them, chosen as it resolves (rulings: after they've connived), none too.
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.chosen?.[ctx.controller]) {
+          if (!ids.length) return;
+          sc.queue = [ctx.controller];
+          sc.chosen = {};
+          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "phaseOut", what: "of those creatures", options: ids, count: ids.length, min: 0 };
+          return "paused";
+        }
+        const picked = sc.chosen[ctx.controller]!.filter((id) => ids.includes(id));
+        sc.chosen = undefined;
+        sc.queue = undefined;
+        if (picked.length) phaseOut(s, picked);
+        return;
+      }
       if (e.untilSourceLeaves) {
         // Oubliette: with the source gone already, nothing happens (rulings, CR 610.3a).
         const me = objects(s, { ref: "self" }, ctx)[0];

@@ -289,13 +289,17 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell. At the beginning of your next main phase, add an amount of {C} equal to that spell's mana
   // value." (Mana Drain): the amount is that spell's mana value as this resolves (CR 608.2h), remembered by the delayed
   // trigger; it triggers at the next main phase of yours to begin (rulings).
-  if ((m = /^At the beginning of your next main phase, (add .+)$/.exec(s))) {
+  // Plasm Capture: "At the beginning of your next first main phase, add X mana in any combination of colors, where X is
+  // that spell's mana value": your next precombat main phase to begin (rulings), X its mana value with the X it was cast
+  // with (CR 202.3e), remembered the same way.
+  if ((m = /^At the beginning of your next (first )?main phase, (add .+)$/.exec(s))) {
     const before = ctx.targets.length;
-    const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
+    const when = m[1] ? "yourNextFirstMain" : "yourNextMain";
+    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), ctx);
     const add = inner?.length === 1 ? inner[0] : undefined;
     if (add?.type !== "addMana" || ctx.targets.length !== before) return null;
-    if (add.times === undefined || typeof add.times === "number") return [{ type: "delayed", when: "yourNextMain", effects: inner!, text: m[1]! }];
-    return [{ type: "delayed", when: "yourNextMain", effects: [{ ...add, times: { count: { kind: "eventAmount" } } }], text: m[1]!, event: { amount: add.times } }];
+    if (add.times === undefined || typeof add.times === "number") return [{ type: "delayed", when, effects: inner!, text: m[2]! }];
+    return [{ type: "delayed", when, effects: [{ ...add, times: { count: { kind: "eventAmount" } } }], text: m[2]!, event: { amount: add.times } }];
   }
   // "Its controller may draw up to two cards at the beginning of the next turn's upkeep" (Arcane Denial): the countered
   // spell's controller as this resolves (CR 608.2h), remembered by the delayed trigger as its event player.

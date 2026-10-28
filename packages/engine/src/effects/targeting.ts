@@ -5,7 +5,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
-import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
+import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -1041,7 +1041,21 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
   if (again !== undefined) return `"${body.modal.modes[again]!.text}" has already been chosen${body.modal.unchosen === "turn" ? " this turn" : ""}`;
   const legal = legalModes(s, body, controller, src, sourceId);
   const bad = modes.find((i) => !legal[i]);
-  return bad === undefined ? null : `can't choose "${body.modal.modes[bad]!.text}": no legal targets`;
+  if (bad !== undefined) return `can't choose "${body.modal.modes[bad]!.text}": no legal targets`;
+  // "Each mode must target a different player" (CR 115.3): the chosen modes' targets all together.
+  if (body.modal.distinctTargets && body.modal.min < body.modal.max && !hasLegalTargets(s, withModes(body, modes).targets, controller, src, sourceId)) return "each mode must target a different player";
+  return null;
+}
+
+/**
+ * "Choose one or more. Each mode must target a different player" (Vindictive Lich): no more modes than there are players
+ * its modes could target (rulings). Modes chosen in a fixed number ("you may choose two") keep their range.
+ */
+export function distinctModeCap(s: GameState, body: AbilityBody, controller: PlayerId, max: number, src?: SourceQuality, sourceId?: ObjectId): number {
+  const m = body.modal;
+  if (!m?.distinctTargets || m.min >= m.max) return max;
+  const players = new Set(m.modes.flatMap((mode) => mode.targets.flatMap((spec) => legalTargets(s, spec, controller, undefined, src, sourceId).flatMap((t) => (t.kind === "player" ? [t.id] : [])))));
+  return Math.max(m.min, Math.min(max, players.size));
 }
 
 // ---------------------------------------------------------------------------

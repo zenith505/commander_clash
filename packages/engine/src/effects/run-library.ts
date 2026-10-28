@@ -1139,7 +1139,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           } else if (to.zone === "battlefield") {
             // "With X additional +1/+1 counters on it" (CR 614.1c).
             const extra = to.counters ? Math.max(0, amountNow(s, to.counters.n, ctx)) : 0;
-            moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
+            // "Under target player's control" (Yavimaya Dryad).
+            const under = to.under ? players(s, to.under, ctx)[0] : undefined;
+            moveObject(s, id, "battlefield", { controller: under ?? pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
           // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.

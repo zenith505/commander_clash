@@ -2048,6 +2048,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // ED-E, Lonesome Eyebot: "Whenever you attack, if ... quest counters on ~, put a quest counter on it": "it" can only be
+    // ~, the one object the trigger names.
+    .replace(/^(Whenever you attack, if [^,]* on ~, put an? [a-z]+ counter on) it\.$/, "$1 ~.")
     // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
     // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
     .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
@@ -3147,6 +3150,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (untapped) {
     const t = parseTrigger(`When ~ enters, ${untapped[1]}`);
     return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifEnteredUntapped: true };
+  }
+  // "Whenever ~ deals 4 or more damage, ..." (Spinneret and Spiderling): one damage event, all it deals at once to any
+  // number of recipients (CR 120.3, the event summed per source as for "whenever ~ deals damage"), at least that much.
+  const selfMin = /^Whenever ~ deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage, (.+)$/.exec(line);
+  if (selfMin) {
+    const t = parseTrigger(`Whenever ~ deals damage, ${selfMin[2]}`);
+    return !t || t === "fail" || t.event !== "selfDealsDamage" || t.minDamage ? "fail" : { ...t, minDamage: num(selfMin[1]!) };
   }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);

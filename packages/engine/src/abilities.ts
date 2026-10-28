@@ -906,6 +906,8 @@ export interface SearchDest {
   attachToSelf?: true;
   /** "Exile the other with a silver counter on it" (Karn, Scion of Urza): a counter of this kind on each card exiled (CR 122.1). */
   counter?: CounterKind;
+  /** "Put it onto the battlefield tapped under target player's control" (Yavimaya Dryad): that player controls it, the searcher still its owner's library's searcher. */
+  under?: PlayerRef;
 }
 
 /** Inclusive bounds; either end may be open. */
@@ -1625,7 +1627,8 @@ export type StaticCondition =
    */
   | { kind: "subjectDamagedBy"; subtypes: string[]; spell: boolean }
   /** A number compared to fixed bounds: "as long as your devotion to black is less than five" (Theros gods, CR 700.5). */
-  | { kind: "amount"; amount: Amount; min?: number; max?: number }
+  /** `moreThan`: "if the number of attacking creatures is greater than the number of quest counters on ~" (ED-E): both counted now. */
+  | { kind: "amount"; amount: Amount; min?: number; max?: number; moreThan?: Amount }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
@@ -4439,7 +4442,7 @@ export interface TriggeredAbility {
   damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
-  /** For "sourceYouControlDamagesOpponent" and "opponentDealtDamageBySource": "deals 5 or more damage" at once (Dragonborn Champion). */
+  /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource" and "selfDealsDamage": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling). */
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;
@@ -6206,6 +6209,8 @@ export interface CompiledCard {
   castTargetLess?: { n: number; filter: TargetSpec }[];
   /** "Spells your opponents cast that target one or more commanders you control cost {3} more to cast" (Esior): once per spell. */
   commanderTargetTax?: number;
+  /** Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target", "Spells your opponents cast cost {1} more ...": `n` generic mana (negative: less) for each different player or object the spell targets (rulings). */
+  perTargetCost?: { opponents: boolean; n: number }[];
   /** "Spells your opponents cast that target a Merfolk you control cost {2} more to cast", `abilities`: "Abilities your opponents activate that target ..." (Kopala, Warden of Waves): once per spell or ability. */
   opponentsTargetTax?: { n: number; filter: TargetSpec; abilities?: true }[];
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */

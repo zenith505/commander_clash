@@ -1451,8 +1451,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
-      addHosted(o, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
+      add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
+      addHosted(o, (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
       // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
       if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount }), o);
       // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.

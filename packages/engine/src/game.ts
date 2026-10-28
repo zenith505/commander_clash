@@ -4591,6 +4591,21 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
       if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
       if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
     }
+  // Hinata, Dawn-Crowned: {1} less (or more) for each target, counting each different player or object it targets once,
+  // however many times the spell says "target" (rulings; CR 601.2c before 601.2f).
+  const targetCount = new Set((how.targets ?? []).flatMap((t) => (t.kind === "none" ? [] : [`${t.kind}:${t.id}`]))).size;
+  if (targetCount && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const per = abilitiesOf(s, src).perTargetCost;
+      if (!per) continue;
+      const by = controllerOf(s, src);
+      for (const c of per) {
+        if (c.opponents ? !opponents(s, by).includes(pid) : by !== pid) continue;
+        if (c.n < 0) mods.less += -c.n * targetCount;
+        else mods.more += c.n * targetCount;
+      }
+    }
   // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
   // will enchant (CR 303.4a), chosen before the cost is worked out (CR 601.2c, 601.2f).
   const auraTarget = how.targets?.[0]?.kind === "object" ? how.targets[0].id : undefined;
@@ -9826,6 +9841,14 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
     });
   for (const other of s.battlefield) if (s.objects[other]!.attachedTo && !s.objects[s.objects[other]!.attachedTo!]) s.objects[other]!.attachedTo = undefined;
   invalidateCharacteristics(s);
+  // "Then, if there are any objects still controlled by that player, those objects are exiled" (CR 800.4a): a permanent
+  // someone else owns that was put onto the battlefield under their control (Yavimaya Dryad's Forest, rulings).
+  const still = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+  for (const id of still) {
+    log(s, `${defOf(s, obj(s, id)).name} is exiled (its controller left the game).`);
+    moveObject(s, id, "exile");
+  }
+  if (still.length) invalidateCharacteristics(s);
   for (const o of attackers(s)) if (o.attacking === pid) clearCombat(o);
   s.passedInSuccession = s.passedInSuccession.filter((id) => id !== pid);
   // Odric's controller leaving while declaring for someone: that player declares their own blockers.

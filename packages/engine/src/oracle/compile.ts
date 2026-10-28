@@ -615,7 +615,8 @@ export function compile(d: CardDef): CompiledCard {
     // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
     // 714.2b) or a modal choice.
     // "10,000 Needles — " (Jumbo Cactuar) starts with a number.
-    const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
+    // "ED-E My Love — " (ED-E, Lonesome Eyebot) has the card's name in it, so it reads "~ My Love — ".
+    const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?|~ [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
     // "... faces a villainous choice — " (CR 701.55a) is the instruction itself.
     if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!) && !/\bfaces? a villainous choice$/.test(word[1]!)) line = line.slice(word[0].length);
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
@@ -3489,6 +3490,13 @@ export function compile(d: CardDef): CompiledCard {
     if (costWhile) {
       const cond = parseStaticCondition(costWhile[2]!, { affects: { kind: "self" }, mods: [], text: "" });
       if (!cond || !conditionalAbility(d, `${costWhile[1]}.`, out, cond)) out.unsupported.push(raw);
+      continue;
+    }
+    // Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target" (CR 601.2f, with the targets chosen in
+    // 601.2c).
+    const perTarget = /^Spells (you|your opponents) cast cost \{(\d+)\} (less|more) to cast for each target\.$/.exec(line);
+    if (perTarget) {
+      out.perTargetCost = [...(out.perTargetCost ?? []), { opponents: perTarget[1] !== "you", n: Number(perTarget[2]) * (perTarget[3] === "less" ? -1 : 1) }];
       continue;
     }
     const cost = parseCostChange(line);

@@ -176,6 +176,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (sr?.type !== "search" || sr.n !== 1 || sr.dest.zone !== "battlefield") return null;
     return [sr, { type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" } }];
   }
+  // Yavimaya Dryad: "Search your library for a Forest card, put it onto the battlefield tapped under target player's
+  // control, then shuffle": you own it, that player controls it (CR 108.3, 110.2); you may target yourself (rulings).
+  const under = /^(Search your library for an? [^,]+ card, put it onto the battlefield(?: tapped)?) under (target player|target opponent)'s control(, then shuffle)$/.exec(s);
+  if (under) {
+    const fx = parseSearch(under[1]! + under[3]!);
+    const sr = fx?.length === 1 ? fx[0]! : undefined;
+    if (sr?.type !== "search" || sr.n !== 1 || sr.upTo || sr.dest.zone !== "battlefield" || sr.others || sr.landTo || sr.cardTo) return null;
+    const who = parsePlayer(under[2]!, ctx);
+    return who ? [{ ...sr, dest: { ...sr.dest, under: who } }] : null;
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That

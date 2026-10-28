@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { applyAction, botActions, controllerOf, graveyardWays, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, power, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, controllerOf, graveyardWays, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, playerLoses, power, spellCost, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -84,6 +84,10 @@ const theMasterOfLaketown = card("The Master of Lake-town", "Legendary Creature 
 const harperRecruiter = card("Harper Recruiter", "Creature — Human Warrior", "{2}{W}", {"cmc":3,"power":"3","toughness":"1","keywords":["Flying"],"oracleText":"Flying\nWhenever this creature attacks, look at the top four cards of your library. You may reveal a Cleric card, a Rogue card, a Warrior card, and/or a Wizard card from among them and put those cards into your hand. Put the rest on the bottom of your library in a random order.","colors":["W"],"colorIdentity":["W"]});
 const serumcoreChimera = card("Serum-Core Chimera", "Creature — Phyrexian Chimera", "{2}{U}{R}", {"cmc":4,"power":"2","toughness":"4","keywords":["Flying"],"oracleText":"Flying\nWhenever you cast a noncreature spell, put an oil counter on this creature.\nRemove three oil counters from this creature: Draw a card. Then you may discard a nonland card. When you discard a card this way, this creature deals 3 damage to target creature or planeswalker. Activate only as a sorcery.","colors":["R","U"],"colorIdentity":["R","U"]});
 const mastersCouncillors = card("Master's Councillors", "Creature — Human Advisor", "{1}{U}", {"cmc":2,"power":"1","toughness":"3","keywords":["Vigilance","Mill"],"oracleText":"Vigilance\nThis creature gets +2/+0 for each graveyard with seven or more cards in it.\nWhenever you draw your second card each turn, target player mills three cards. (They put the top three cards of their library into their graveyard.)","colors":["U"],"colorIdentity":["U"]});
+const spinneretAndSpiderling = card("Spinneret and Spiderling", "Legendary Creature — Spider Human Hero", "{R}", {"cmc":1,"power":"1","toughness":"2","keywords":[],"oracleText":"Whenever you attack with two or more Spiders, put a +1/+1 counter on Spinneret and Spiderling.\nWhenever Spinneret and Spiderling deals 4 or more damage, exile the top card of your library. Until the end of your next turn, you may play that card.","colors":["R"],"colorIdentity":["R"]});
+const edeLonesomeEyebot = card("ED-E, Lonesome Eyebot", "Legendary Artifact Creature — Robot", "{3}", {"cmc":3,"power":"2","toughness":"1","keywords":["ED-E My Love","Flying"],"oracleText":"Flying\nED-E My Love — Whenever you attack, if the number of attacking creatures is greater than the number of quest counters on ED-E, put a quest counter on it.\n{2}, Sacrifice ED-E: Draw a card, then draw an additional card for each quest counter on ED-E.","colors":[],"colorIdentity":[]});
+const yavimayaDryad = card("Yavimaya Dryad", "Creature — Dryad", "{1}{G}{G}", {"cmc":3,"power":"2","toughness":"1","keywords":["Landwalk","Forestwalk"],"oracleText":"Forestwalk (This creature can't be blocked as long as defending player controls a Forest.)\nWhen this creature enters, you may search your library for a Forest card, put it onto the battlefield tapped under target player's control, then shuffle.","colors":["G"],"colorIdentity":["G"]});
+const hinataDawncrowned = card("Hinata, Dawn-Crowned", "Legendary Creature — Kirin Spirit", "{1}{U}{R}{W}", {"cmc":4,"power":"4","toughness":"4","keywords":["Flying","Trample"],"oracleText":"Flying, trample\nSpells you cast cost {1} less to cast for each target.\nSpells your opponents cast cost {1} more to cast for each target.","colors":["R","U","W"],"colorIdentity":["R","U","W"]});
 const shireiShizosCaretaker = card("Shirei, Shizo's Caretaker", "Legendary Creature — Spirit", "{4}{B}", {"cmc":5,"power":"2","toughness":"2","keywords":[],"oracleText":"Whenever a creature with power 1 or less is put into your graveyard from the battlefield, you may return that card to the battlefield at the beginning of the next end step if Shirei is still on the battlefield.","colors":["B"],"colorIdentity":["B"]});
 const ALL = [psychomancer, shardOfTheVoidDragon, slagstoneRefinery, blex, zaskSkitteringSwarmlord, firstDayOfClass, beckCall, cryptek, talionsMessenger, inTheTrenches, theMasterOfLaketown, shireiShizosCaretaker];
 
@@ -330,5 +334,94 @@ describe("Round 201", () => {
     expect(power(s, s.objects[m]!)).toBe(3);
     into(s, ap, rock("Test Mine 6"), "graveyard");
     expect(power(s, s.objects[m]!)).toBe(5);
+  });
+
+  it("Spinneret and Spiderling: two Spiders attacking add a counter; 4 or more damage at once exiles the top card to play", () => {
+    const { s: s0, ap, opp } = setup([]);
+    supported(spinneretAndSpiderling);
+    const sp = putOnBattlefield(s0, ap, spinneretAndSpiderling);
+    const other = putOnBattlefield(s0, ap, creature("Test Spider", "Spider", 1));
+    // Three damage: no trigger.
+    const s1 = structuredClone(s0);
+    s1.objects[sp]!.counters["+1/+1"] = 1;
+    const top1 = s1.players[ap]!.library[0]!;
+    let s = toStep(act(passUntil(s1, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: sp, defender: opp }, { attacker: other, defender: opp }] }), "end", ap);
+    expect(s.players[opp]!.life).toBe(40 - 3 - 1);
+    expect(s.objects[top1]!.zone).toBe("library");
+    // Four: the counter from attacking with two Spiders makes it 4/5.
+    s0.objects[sp]!.counters["+1/+1"] = 2;
+    const top = s0.players[ap]!.library[0]!;
+    s = toStep(act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: sp, defender: opp }, { attacker: other, defender: opp }] }), "end", ap);
+    expect(s.objects[sp]!.counters["+1/+1"]).toBe(3);
+    expect(s.players[opp]!.life).toBe(40 - 4 - 1);
+    expect(s.objects[top]!.zone).toBe("exile");
+  });
+
+  it("ED-E: a quest counter only while more creatures attack than it has counters; sacrificed, it draws one more for each", () => {
+    const { s: s0, ap, opp } = setup([]);
+    supported(edeLonesomeEyebot);
+    const e = putOnBattlefield(s0, ap, edeLonesomeEyebot);
+    const bear = putOnBattlefield(s0, ap, creature("Test Bear", "Bear", 2));
+    s0.objects[e]!.counters.quest = 1;
+    const attackBoth = (s: GameState) => resolveAll(act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: e, defender: opp }, { attacker: bear, defender: opp }] }));
+    let s = attackBoth(structuredClone(s0));
+    expect(s.objects[e]!.counters.quest).toBe(2);
+    // Two counters, two attackers: no trigger (rulings).
+    s0.objects[e]!.counters.quest = 2;
+    s = attackBoth(s0);
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    expect(s.objects[e]!.counters.quest).toBe(2);
+    s = toStep(s, "main2", ap);
+    const hand = s.players[ap]!.hand.length;
+    s.players[ap]!.manaPool.C = 2;
+    s = resolveAll(run(s, planActivate(s, ap, e, 0)));
+    expect(s.objects[e]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+  });
+
+  it("Yavimaya Dryad: the Forest enters tapped under the target player's control, and is exiled if that player leaves", () => {
+    const { s: s0, ap, ids, opp } = setup([yavimayaDryad]);
+    supported(yavimayaDryad);
+    const f = into(s0, ap, card("Test Forest", "Land — Forest"), "library");
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    // The bot gives the Forest to itself.
+    const bot = botActions(s, ap).find((a) => a.type === "chooseTargets");
+    expect(bot).toMatchObject({ targets: [{ kind: "player", id: ap }] });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] });
+    s = resolveAll(s);
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [f] }));
+    expect(s.objects[f]!.zone).toBe("battlefield");
+    expect(s.objects[f]!.tapped).toBe(true);
+    expect(s.objects[f]!.owner).toBe(ap);
+    expect(controllerOf(s, s.objects[f]!)).toBe(opp);
+    // CR 800.4a: objects still controlled by a player who leaves are exiled.
+    playerLoses(s, opp, "test");
+    expect(s.objects[f]!.zone).toBe("exile");
+  });
+
+  it("Hinata: {1} less for each different target of your spells, {1} more for an opponent's; colored mana stays", () => {
+    const tap2 = card("Test Tap Two", "Instant", "{3}{U}", { cmc: 4, oracleText: "Tap up to two target creatures." });
+    const { s, ap, ids, opp } = setup([tap2, ping]);
+    supported(hinataDawncrowned);
+    putOnBattlefield(s, ap, hinataDawncrowned);
+    const a = putOnBattlefield(s, opp, creature("Test Bear", "Bear", 2));
+    const b = putOnBattlefield(s, opp, creature("Test Elf", "Elf", 1));
+    const extra = (pid: PlayerId, id: ObjectId, targets: TargetChoice[]) => spellCost(s, pid, s.objects[id]!, 0, [], { targets }).extra;
+    expect(extra(ap, ids[0]!, [])).toBe(3);
+    expect(extra(ap, ids[0]!, [tgt(a)])).toBe(2);
+    expect(extra(ap, ids[0]!, [tgt(a), tgt(b)])).toBe(1);
+    // The same creature twice is one target (rulings).
+    expect(extra(ap, ids[0]!, [tgt(a), tgt(a)])).toBe(2);
+    // {R} can't be reduced.
+    const pc = spellCost(s, ap, s.objects[ids[1]!]!, 0, [], { targets: [tgt(a)] });
+    expect(pc.extra).toBe(0);
+    expect(pc.cost.symbols).toEqual([{ kind: "colored", color: "R" }]);
+    // An opponent's spell: {1} more for each.
+    const theirs = into(s, opp, tap2, "hand");
+    expect(extra(opp, theirs, [tgt(a), tgt(b)])).toBe(5);
+    expect(extra(opp, theirs, [{ kind: "player", id: ap }])).toBe(4);
   });
 });

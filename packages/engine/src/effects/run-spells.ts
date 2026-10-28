@@ -152,6 +152,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
+      if (e.when === "becomesBlocked") {
+        // Barreling Attack: "When that creature becomes blocked this turn, it gets ...": about that permanent as it is now
+        // (CR 603.7c, 400.7), each time it becomes blocked this turn (CR 603.7b); its source is the spell (603.7d).
+        for (const o of objects(s, e.of!, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          addDelayed(s, "becomesBlocked", ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+          s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
+        }
+        return;
+      }
       if (e.when === "lostControl") {
         // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
         for (const o of objects(s, e.of!, ctx)) {
@@ -977,6 +987,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
+  if (item.kind === "spell" && s.resolving) s.resolving.spellCountered = true;
   if (item.kind === "spell") fireEvent(s, { type: "spellCountered", by: ctx.controller });
 }
 

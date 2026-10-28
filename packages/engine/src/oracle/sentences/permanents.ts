@@ -115,6 +115,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Until end of turn, ~'s base power becomes equal to the number of Towns you control" (PuPu UFO): its power set in
   // layer 7b (CR 613.4b), the number counted as it resolves (rulings).
   // The body has moved the "Until end of turn, " to the end.
+  // Riptide Mangler: "~'s base power becomes equal to target creature's power" (lasting indefinitely): that creature's
+  // power as it resolves, locked in then (CR 608.2h), set in layer 7b; later effects that set it win (rulings).
+  if ((m = /^~'s base power becomes equal to (target creature)'s power$/.exec(s))) {
+    const of = parseObject(m[1]!, ctx);
+    if (of?.ref !== "target") return null;
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: { count: { kind: "power", of } } }], duration: "game" }];
+  }
   if ((m = /^~'s base power becomes equal to (the number of .+) until end of turn$/.exec(s))) {
     const n = parseCount(m[1]!, ctx);
     if (!n) return null;
@@ -309,6 +316,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // of this turn, whatever zone it goes to; ~ is this ability's source as it is now (a new object after a zone change).
   if (/^When (?:that|the) creature leaves the battlefield this turn, sacrifice ~$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.spell && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
     return [{ type: "delayed", when: "leaves", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "sacrifice", what: { ref: "self" } }], text: "sacrifice ~", thisTurn: true }];
+  // Barreling Attack: "When that creature becomes blocked this turn, it gets +1/+1 until end of turn for each creature
+  // blocking it": a delayed trigger about the target (CR 603.7), its blockers counted as it resolves (rulings).
+  if ((m = /^When that creature becomes blocked this turn, it gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "becomesBlocked", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "pumpPerBlocker", what: { ref: "subject" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: false }], text: `it gets ${m[1]}/${m[2]} until end of turn for each creature blocking it`, thisTurn: true }];
   // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
@@ -469,14 +480,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // opponent clashed with, whatever creatures they control when that step comes, as for Misstep.
   if (/^Creatures that player controls don't untap during the player's next untap step$/.test(s) && ctx.clashOpp) return [{ type: "noUntapNext", who: { ref: "clashOpponent" }, types: ["Creature"] }];
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
-  if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {
+  // Telekinesis: "It doesn't untap during its controller's next two untap steps": the next two it would untap in.
+  if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next (two )?untap steps?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     // "Tap all creatures your opponents control. Those creatures don't untap ..." (Cone of Cold): the group just tapped.
     const tapped = what && what === ctx.lastGroup && /^(?:those creatures|they)$/i.test(m[1]!);
     // Tangle: "Each attacking creature doesn't untap during its controller's next untap step": those attacking as it
     // resolves (CR 611.2c).
     const attackers = /^each attacking creature$/i.test(m[1]!);
-    return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what }] : null;
+    return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what, ...(m[2] ? { n: 2 } : {}) }] : null;
   }
   // Sleep: "Tap all creatures target player controls. Those creatures don't untap during that player's next untap step":
   // the creatures that player controls, so their controller's untap step.
@@ -552,11 +564,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Get Out: "Return one or two target creatures and/or enchantments you own to your hand": targets you own (CR 108.3),
   // to their owner's hand, yours.
-  if ((m = /^Return ((?:one or two |up to (?:one|two|three) )?target (?!.*\bspells?\b).+?) you own to your hand$/.exec(s))) {
+  // Obelisk of Undoing: "Return target permanent you both own and control to your hand": yours both ways (CR 108.3-4).
+  if ((m = /^Return ((?:one or two |up to (?:one|two|three) )?target (?!.*\bspells?\b).+?) you (both own and control|own) to your hand$/.exec(s))) {
     const before = ctx.targets.length;
-    const fx = parseSentence(`Return ${m[1]} to their owners' hands`, ctx);
+    const both = m[2] !== "own";
+    const fx = parseSentence(`Return ${m[1]}${both ? " you control" : ""} to their owners' hands`, ctx);
     const added = ctx.targets.slice(before);
-    if (!fx || !added.length || added.some((t) => t.kind !== "object" || t.owner || t.controller)) {
+    if (!fx || !added.length || added.some((t) => t.kind !== "object" || t.owner || (both ? t.controller !== "you" : t.controller))) {
       ctx.targets.length = before;
       return null;
     }
@@ -770,7 +784,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = parseCount(m[2]!, ctx, true);
     return n ? [{ type: "removeCounters", what: { ref: "self" }, counter: counterKind(m[1]!), n }] : null;
   }
-  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
+  // Venarian Gold: "remove a sleep counter from that creature", the enchanted creature as it resolves.
+  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+|enchanted creature)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
@@ -1045,7 +1060,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
-  // Switching power and toughness (layer 7d).
+  // Switching power and toughness (layer 7d). Valakut Fireboar: "Whenever ~ attacks, switch its power and toughness".
+  if (ctx.selfIt && /^[Ss]witch its power and toughness until end of turn$/.test(s)) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }];
   if ((m = /^Switch (.+?)'s? power and toughness until end of turn$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }] : null;
@@ -1205,9 +1221,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // artifact. That token gains haste." (Cogwork Assembler), "Populate. The token created this way gains haste." (Determined
   // Iteration), "Those tokens gain haste" (Mirror March): keywords with no duration last for as long as it stays on
   // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
-  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
+  // Cocoon: "that creature gains flying", the creature it enchants (locked in as it resolves, CR 611.2c).
+  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way|Enchanted creature) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
-    const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
+    const mods = what && (what.ref === "target" || what.ref === "created" || (what.ref === "attached" && m[1] === "Enchanted creature")) ? parseChanges(m[2]!) : null;
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || (x.kind === "addAbility" && what.ref === "created"))) return [{ type: "continuous", what, mods, duration: "game" }];
   }

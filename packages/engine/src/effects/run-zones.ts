@@ -225,6 +225,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id, zc: o.zoneChanges ?? 0, kind: k });
         continue;
       }
+      // Nulltread Gargantuan: on top of its owner's library.
+      if (e.action === "libraryTop") {
+        log(s, `${player(s, pid).name} puts ${defOf(s, o).name} on top of its owner's library.`);
+        moveObject(s, id, "library", { top: true });
+        continue;
+      }
       if (e.action === "exile") {
         log(s, `${player(s, pid).name} exiles ${defOf(s, o).name}.`);
         // As it last existed, for "the power of the creature they exiled" (Olórin's Searing Light, CR 608.2h).
@@ -239,8 +245,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const ch = characteristics(s, o);
         (s.resolving.sacrificedThisWay ??= []).push({ id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types], subtypes: [...ch.subtypes], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), ...(o.isCommander ? { commander: true as const } : {}) });
       }
-      if (e.action === "bounce" && s.resolving) (s.resolving.bouncedThisWay ??= []).push({ id, subtypes: [...characteristics(s, o).subtypes] });
+      const bounced = e.action === "bounce" && s.resolving ? { id, subtypes: [...characteristics(s, o).subtypes] } : undefined;
+      if (bounced) (s.resolving!.bouncedThisWay ??= []).push(bounced);
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
+      if (bounced && s.objects[id]?.zone === "hand") (bounced as { returned?: true }).returned = true;
     }
 }
 
@@ -1810,7 +1818,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : `${p.name} reveals no cards.`);
           return;
         }
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: e.must ? 1 : 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
         return "paused";
       }
       const chosen = sc.found.filter((id) => e.orControl && s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === p.id);

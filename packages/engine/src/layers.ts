@@ -895,6 +895,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
     case "defendingHasRad":
       return src.attacking !== undefined && (s.players[src.attacking]?.rad ?? 0) > 0;
+    case "defenderMostCreatures": {
+      if (src.attacking === undefined) return false;
+      const count = (p: PlayerId) => s.battlefield.filter((id) => { const c = chars.get(id); return !!c && c.controller === p && c.types.includes("Creature"); }).length;
+      const theirs = count(src.attacking);
+      return s.turnOrder.every((p) => s.players[p]!.lost || count(p) <= theirs);
+    }
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];
       return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);
@@ -1172,24 +1178,32 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "control": {
       // "Defending player" is the player the source is attacking (CR 506.2); it has none otherwise.
       // "An opponent controls seven or more lands": any one opponent.
-      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
+      // "Activate only during combat and only if defending player controls ..." (Kjeldoran Guard): the player the source is
+      // attacking, or else any one of the defending players, the active player's opponents (CR 508.5a, 802.2).
+      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "anyDefending" ? (src.attacking !== undefined ? [src.attacking] : s.turnOrder.filter((p) => p !== s.activePlayer && !s.players[p]!.lost)) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.
         const names = new Set<string>();
         const byName = new Map<string, number>();
+        const byType = new Map<string, number>();
+        let everyType = 0;
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
           if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
           if (!objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
-          if (cond.sameName) {
+          if (cond.sameCreatureType) {
+            if (c.allCreatureTypes) everyType++;
+            else for (const st of new Set(c.subtypes.filter((x) => CREATURE_TYPES.has(x)))) byType.set(st, (byType.get(st) ?? 0) + 1);
+          } else if (cond.sameName) {
             if (!s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
           } else if (!cond.differentNames) n++;
           else if (!s.objects[id]!.faceDown) names.add(c.name);
         }
         if (cond.differentNames) n = names.size;
         if (cond.sameName) n = Math.max(0, ...byName.values());
+        if (cond.sameCreatureType) n = everyType + Math.max(0, ...byType.values());
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
       });
     }

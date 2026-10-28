@@ -7,7 +7,12 @@
 // (In the Trenches), "Whenever a player loses life" and "for each graveyard with seven or more cards in it" (The Master of
 // Lake-town), "you may return that card ... at the beginning of the next end step if ~ is still on the battlefield"
 // (Shirei, Shizo's Caretaker), four types in "a Cleric card, a Rogue card, a Warrior card, and/or a Wizard card" (Harper
-// Recruiter).
+// Recruiter), "When you discard a card this way" in an activated ability (Serum-Core Chimera), "+2/+0 for each graveyard
+// with seven or more cards" (Master's Councillors), "Whenever ~ deals 4 or more damage" (Spinneret and Spiderling), "if
+// the number of attacking creatures is greater than the number of quest counters on ~" (ED-E), "under target player's
+// control" and CR 800.4a (Yavimaya Dryad), "for each target" (Hinata), "among monocolored permanents" (Tarnation
+// Vista), "for each card type among those cards" (Polluted Cistern), "phase out at the beginning of the next end step"
+// (Vronos).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
@@ -45,7 +50,7 @@ const settle = (s: GameState, targets: TargetChoice[] = [], may = true) => {
   }
   return s;
 };
-/** Passes (no blocks, "you may" answered as `may`) until `step` of `ap`'s turn with an empty stack, or another question. */
+/** Passes (no blocks, "you may" answered as `may`, discarding down to hand size) until `step` of `ap`'s turn with an empty stack, or another question. */
 const toStep = (s: GameState, step: GameState["step"], ap: PlayerId, may = true) => {
   for (let i = 0; i < 800; i++) {
     if (s.step === step && s.activePlayer === ap && !s.stack.length && !s.triggerQueue.length && !s.pending) return s;
@@ -53,6 +58,7 @@ const toStep = (s: GameState, step: GameState["step"], ap: PlayerId, may = true)
     if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
     else if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: p.player, attacks: [] });
     else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes: may });
+    else if (p?.kind === "discardToHandSize") s = act(s, { type: "discard", player: p.player, objectIds: s.players[p.player]!.hand.slice(0, p.count) });
     else if (p) return s;
     else s = act(s, { type: "passPriority", player: waitingOn(s)! });
   }
@@ -88,6 +94,13 @@ const spinneretAndSpiderling = card("Spinneret and Spiderling", "Legendary Creat
 const edeLonesomeEyebot = card("ED-E, Lonesome Eyebot", "Legendary Artifact Creature — Robot", "{3}", {"cmc":3,"power":"2","toughness":"1","keywords":["ED-E My Love","Flying"],"oracleText":"Flying\nED-E My Love — Whenever you attack, if the number of attacking creatures is greater than the number of quest counters on ED-E, put a quest counter on it.\n{2}, Sacrifice ED-E: Draw a card, then draw an additional card for each quest counter on ED-E.","colors":[],"colorIdentity":[]});
 const yavimayaDryad = card("Yavimaya Dryad", "Creature — Dryad", "{1}{G}{G}", {"cmc":3,"power":"2","toughness":"1","keywords":["Landwalk","Forestwalk"],"oracleText":"Forestwalk (This creature can't be blocked as long as defending player controls a Forest.)\nWhen this creature enters, you may search your library for a Forest card, put it onto the battlefield tapped under target player's control, then shuffle.","colors":["G"],"colorIdentity":["G"]});
 const hinataDawncrowned = card("Hinata, Dawn-Crowned", "Legendary Creature — Kirin Spirit", "{1}{U}{R}{W}", {"cmc":4,"power":"4","toughness":"4","keywords":["Flying","Trample"],"oracleText":"Flying, trample\nSpells you cast cost {1} less to cast for each target.\nSpells your opponents cast cost {1} more to cast for each target.","colors":["R","U","W"],"colorIdentity":["R","U","W"]});
+const tarnationVista = card("Tarnation Vista", "Land", "", {"cmc":0,"keywords":[],"oracleText":"This land enters tapped. As it enters, choose a color.\n{T}: Add one mana of the chosen color.\n{1}, {T}: For each color among monocolored permanents you control, add one mana of that color.","colors":[],"colorIdentity":[]});
+const ROOM = "\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)";
+const pollutedCistern = scry("split", [
+  { name: "Polluted Cistern", mana_cost: "{1}{B}", type_line: "Enchantment — Room", oracle_text: `Whenever one or more cards are put into your graveyard from your library, each opponent loses 1 life for each card type among those cards.${ROOM}` },
+  { name: "Dim Oubliette", mana_cost: "{4}{B}", type_line: "Enchantment — Room", oracle_text: `When you unlock this door, mill three cards, then return a creature card from your graveyard to the battlefield.${ROOM}` },
+]);
+const vronosMaskedInquisitor = card("Vronos, Masked Inquisitor", "Legendary Planeswalker — Vronos", "{3}{U}{U}", {"cmc":5,"loyalty":"5","keywords":[],"oracleText":"+1: Up to two other target planeswalkers you control phase out at the beginning of the next end step. (Treat them and anything attached to them as though they don't exist until your next turn.)\n−2: For each opponent, return up to one target nonland permanent that player controls to its owner's hand.\n−7: Target artifact you control becomes a 9/9 Construct artifact creature and gains vigilance, indestructible, and \"This creature can't be blocked.\"","colors":["U"],"colorIdentity":["U"]});
 const shireiShizosCaretaker = card("Shirei, Shizo's Caretaker", "Legendary Creature — Spirit", "{4}{B}", {"cmc":5,"power":"2","toughness":"2","keywords":[],"oracleText":"Whenever a creature with power 1 or less is put into your graveyard from the battlefield, you may return that card to the battlefield at the beginning of the next end step if Shirei is still on the battlefield.","colors":["B"],"colorIdentity":["B"]});
 const ALL = [psychomancer, shardOfTheVoidDragon, slagstoneRefinery, blex, zaskSkitteringSwarmlord, firstDayOfClass, beckCall, cryptek, talionsMessenger, inTheTrenches, theMasterOfLaketown, shireiShizosCaretaker];
 
@@ -423,5 +436,60 @@ describe("Round 201", () => {
     const theirs = into(s, opp, tap2, "hand");
     expect(extra(opp, theirs, [tgt(a), tgt(b)])).toBe(5);
     expect(extra(opp, theirs, [{ kind: "player", id: ap }])).toBe(4);
+  });
+
+  it("Tarnation Vista: one mana of each color among monocolored permanents you control", () => {
+    const { s: s0, ap } = setup([]);
+    supported(tarnationVista);
+    const v = putOnBattlefield(s0, ap, tarnationVista);
+    s0.objects[v]!.tapped = false;
+    putOnBattlefield(s0, ap, card("Test Red", "Creature — Goblin", "{R}", { power: "1", toughness: "1", colors: ["R"] }));
+    putOnBattlefield(s0, ap, card("Test Red Two", "Creature — Goblin", "{R}", { power: "1", toughness: "1", colors: ["R"] }));
+    putOnBattlefield(s0, ap, card("Test Green", "Creature — Elf", "{G}", { power: "1", toughness: "1", colors: ["G"] }));
+    putOnBattlefield(s0, ap, card("Test Gold", "Creature — Wizard", "{U}{B}", { power: "1", toughness: "1", colors: ["U", "B"] }));
+    s0.players[ap]!.manaPool.C = 1;
+    const s = act(s0, { type: "activateMana", player: ap, objectId: v, mana: "R", ability: 1 });
+    const pool = s.players[ap]!.manaPool;
+    expect([pool.R, pool.G, pool.U ?? 0, pool.B ?? 0, pool.C ?? 0]).toEqual([1, 1, 0, 0, 0]);
+  });
+
+  it("Polluted Cistern: each opponent loses 1 life for each card type among the cards milled", () => {
+    const mill = card("Test Mill", "Sorcery", "{U}", { cmc: 1, oracleText: "Mill four cards." });
+    const { s: s0, ap, ids } = setup([mill]);
+    supported(pollutedCistern);
+    const r = putOnBattlefield(s0, ap, pollutedCistern);
+    s0.objects[r]!.unlocked = [0];
+    invalidateCharacteristics(s0);
+    // Artifact, Creature, Land, Instant: four types, the Bear adding none the Golem hasn't.
+    for (const d of [golem(), creature("Test Bear", "Bear", 2), card("Test Land", "Land"), ping]) into(s0, ap, d, "library");
+    const opps = s0.turnOrder.filter((p) => p !== ap);
+    const s = resolveAll(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.players[ap]!.graveyard.length).toBe(5);
+    for (const o of opps) expect(s.players[o]!.life).toBe(40 - 4);
+  });
+
+  it("Vronos: +1 phases out two other planeswalkers at the next end step; they phase in on your next turn", () => {
+    const { s: s0, ap } = setup([]);
+    supported(vronosMaskedInquisitor);
+    const v = putOnBattlefield(s0, ap, vronosMaskedInquisitor);
+    s0.objects[v]!.counters.loyalty = 5;
+    const walker = (n: string) => {
+      const id = putOnBattlefield(s0, ap, card(n, "Legendary Planeswalker — Test", "{3}", { cmc: 3, loyalty: "3" }));
+      s0.objects[id]!.counters.loyalty = 3;
+      return id;
+    };
+    const a = walker("Test Walker A");
+    const b = walker("Test Walker B");
+    let s = resolveAll(run(s0, planActivate(s0, ap, v, 0, [tgt(a), tgt(b)])));
+    expect(s.objects[v]!.counters.loyalty).toBe(6);
+    // Still here until the end step.
+    expect(s.battlefield).toEqual(expect.arrayContaining([a, b]));
+    s = resolveAll(passUntil(s, "end", ap));
+    expect(s.battlefield).not.toContain(a);
+    expect(s.battlefield).not.toContain(b);
+    s = toStep(s, "main1", ap);
+    expect([s.step, s.activePlayer, s.pending?.kind]).toEqual(["main1", ap, undefined]);
+    expect(s.battlefield).toEqual(expect.arrayContaining([a, b]));
+    expect(s.objects[a]!.counters.loyalty).toBe(3);
   });
 });

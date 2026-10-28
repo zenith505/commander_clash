@@ -1908,6 +1908,79 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b2c53124-e422-4786-8135-67c350d71a36",
+  "name": "Blex, Vexing Pest // Search for Blex",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Pest // Sorcery",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Pest"
+  ],
+  "oracleText": "Other Pests, Bats, Insects, Snakes, and Spiders you control get +1/+1.\nWhen Blex dies, you gain 4 life.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Blex, Vexing Pest",
+    "manaCost": "{2}{G}",
+    "typeLine": "Legendary Creature — Pest",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Pest"
+    ],
+    "oracleText": "Other Pests, Bats, Insects, Snakes, and Spiders you control get +1/+1.\nWhen Blex dies, you gain 4 life.",
+    "power": "3",
+    "toughness": "2",
+    "colors": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/c/2/c204b7ca-0904-40fa-b20c-92400fae20b8.jpg?1783927336",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/c/2/c204b7ca-0904-40fa-b20c-92400fae20b8.jpg?1783927336"
+   },
+   {
+    "name": "Search for Blex",
+    "manaCost": "{2}{B}{B}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Look at the top five cards of your library. You may put any number of them into your hand and the rest into your graveyard. You lose 3 life for each card you put into your hand this way.",
+    "colors": [
+     "B"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/c/2/c204b7ca-0904-40fa-b20c-92400fae20b8.jpg?1783927336",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/c/2/c204b7ca-0904-40fa-b20c-92400fae20b8.jpg?1783927336"
+   }
+  ]
+ },
+ {
   "oracleId": "a731f5bc-892c-4857-9590-4fa31c1caf00",
   "name": "Blind Hunter",
   "manaCost": "{2}{W}{B}",

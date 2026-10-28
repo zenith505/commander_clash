@@ -607,7 +607,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const inner: Effect[] | null = sac ? (sacWhat ? [{ type: "sacrifice", what: sacWhat, ...(/controller/.test(sac[1]!) ? { byController: true as const } : {}) }] : null) : withSelfIt(() => parseSentence(m![1]!.replace(/^./, (c) => c.toUpperCase()), ctx));
     // Silent Assassin: "{3}{B}: Destroy target blocking creature at end of combat": the target chosen now, destroyed by the
     // delayed trigger (CR 603.7); made during the end of combat step, it waits for the next one (rulings).
-    const ownTarget = inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before });
+    // Vronos, Masked Inquisitor: "Up to two other target planeswalkers you control phase out at the beginning of the next
+    // end step": the same, the targets chosen as it's activated, each phasing out then if it's still the same object.
+    const ownTarget =
+      (inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before })) ||
+      (inner?.length === 1 && inner[0]!.type === "phaseOut" && inner[0]!.what.ref === "target" && inner[0]!.what.index === before && ctx.targets.length > before && /^the beginning of the next end step$/.test(m[2]!));
     if (!inner || (ctx.targets.length !== before && !ownTarget)) return null;
     const refs = new Set<string>();
     const whats = new Set<string>();

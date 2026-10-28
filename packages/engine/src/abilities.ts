@@ -195,6 +195,8 @@ export type Count =
   | { kind: "linkedExiled" }
   /** "The total power of those creatures": the ones that died in a "one or more ... die" event, as they last existed (The Skullspore Nexus). */
   | { kind: "eventGroupPower" }
+  /** "For each card type among those cards" (Polluted Cistern): the cards of a "one or more cards are put into your graveyard" event (CR 205.2a). */
+  | { kind: "eventGroupCardTypes" }
   /** "The total power of creatures goaded this way" (Havoc Eater): the targets `of` names still on the battlefield as it resolves (illegal ones weren't goaded, CR 608.2b), a negative power taking some off. */
   | { kind: "totalPowerOf"; of: ObjRef }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
@@ -4856,8 +4858,8 @@ export type ManaProduce =
    * the card its linked imprint ability exiled, CR 607.2a). None if there's no such color (CR 106.5, rulings).
    */
   | { kind: "colorsAmong"; filter?: TargetSpec; linked?: true; /** "Any of this creature's colors" (Katilda's): its own. */ self?: true; /** "Among legendary creature cards in your graveyard" (The Grey Havens): cards there, not permanents. */ inYard?: true }
-  /** "For each color among permanents you control, add one mana of that color" (Bloom Tender, Faeburrow Elder). */
-  | { kind: "eachColorAmong" }
+  /** "For each color among permanents you control, add one mana of that color" (Bloom Tender, Faeburrow Elder); `monocolored`: "among monocolored permanents" (Tarnation Vista, CR 105.2b). */
+  | { kind: "eachColorAmong"; monocolored?: true }
   /**
    * "Choose a color. Add an amount of mana of that color equal to your devotion to that color." (Nykthos, Shrine to Nyx,
    * CR 700.5): the color chosen as it resolves, then the devotion to it.

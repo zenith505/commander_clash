@@ -1,7 +1,7 @@
 # Roadmap
 
-27,190 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,021 of
+27,212 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,040 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -713,6 +713,30 @@ line blocks.
    the permanents destroyed this way), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower, Fishing
    Gear, Phyrexian Dreadnought. Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
    Firesong and Sunspeaker's "red instant and sorcery spells" isn't read yet.
+   Round 201 went on from the top: "is put into a graveyard from the battlefield or is put into exile from the
+   battlefield" (Psychomancer, Shard of the Void Dragon, Slagstone Refinery), "you may put any number of them into your
+   hand ... You lose 3 life for each card you put into your hand this way" (Search for Blex; the dig picker shows the
+   life it will cost), "you may play lands and cast Insect spells from your graveyard" (Zask), a spell's "Whenever ...
+   this turn" paragraph followed by another (First Day of Class, Beck // Call fused), "when that creature dies this
+   turn, return it ... tapped" (Cryptek), "When you discard a card this way" (Talion's Messenger, Serum-Core Chimera),
+   "Activate only as a sorcery and only once" (In the Trenches), "Whenever a player loses life" and "for each graveyard
+   with seven or more cards in it" (The Master of Lake-town, Master's Councillors), "... at the beginning of the next
+   end step if ~ is still on the battlefield" (Shirei), four types in "a Cleric card, a Rogue card, a Warrior card,
+   and/or a Wizard card" (Harper Recruiter), "Whenever ~ deals 4 or more damage" (Spinneret and Spiderling), "if the
+   number of attacking creatures is greater than the number of quest counters on ~" (ED-E), "put it onto the
+   battlefield tapped under target player's control" (Yavimaya Dryad), "cost {1} less to cast for each target"
+   (Hinata), "each color among monocolored permanents you control" (Tarnation Vista), "for each card type among those
+   cards" (Polluted Cistern), "phase out at the beginning of the next end step" (Vronos). Rules fixes: a player who
+   leaves the game now has the permanents they control but don't own exiled (CR 800.4a), and four regex guards that
+   held backspace characters instead of `\b` now work (no card changed). A browser test clicks through Search for
+   Blex's picker.
+   Out after round 201 (looked at, not done): Dauntless Bodyguard ("choose another creature you control" as it
+   enters), Lord of the Forsaken and Mm'menon (mana that can only be spent on spells cast from a given zone), Choco,
+   Seeker of Paradise (two different picks from one look), Doomsday Confluence ("choose X" modes tied to X), Scrap
+   Welder (targets "with mana value less than X", X set by a sacrifice cost), The Ancient One ("its mana value" about
+   the card discarded, in a reflexive trigger), Savage Summoning (flash and "can't be countered" for the next creature
+   spell), Rocco, Street Chef, Grolnok, Golden Guardian. Still missing from CR 800.4a: a spell someone else owns on the
+   stack under a leaving player's control is removed rather than exiled.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

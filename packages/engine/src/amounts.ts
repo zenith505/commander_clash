@@ -293,6 +293,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
       return ctx.event?.groupPower ?? 0;
+    case "eventGroupCardTypes": {
+      // The cards' own types, as Tarmogoyf's count reads a graveyard (a card that has left counts as it was, CR 608.2h).
+      const types = new Set((ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] ? defOf(s, s.objects[g.id]!).types : [])));
+      return types.size;
+    }
     case "totalPowerOf":
       return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
@@ -968,6 +973,8 @@ function describeCount(c: Count): string {
       return "#those cards still exiled";
     case "eventGroupPower":
       return "the total power of those creatures";
+    case "eventGroupCardTypes":
+      return "#card types among those cards";
     case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":

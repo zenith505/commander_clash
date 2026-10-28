@@ -1804,6 +1804,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Polluted Cistern: "each opponent loses 1 life for each card type among those cards": the cards put there, card types
+  // only (CR 205.2a), each as it last existed in the graveyard if it has left (CR 608.2h).
+  if (/^each opponent loses 1 life for each card type among those cards\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && !batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eachOpponent" }, n: { count: { kind: "eventGroupCardTypes" } } }], text: rest.replace(/\.$/, "") } };
   // Colossal Grave-Reaver: "put one of them onto the battlefield": one you choose of those cards still in the graveyard
   // (CR 400.7), under your control.
   if (/^put one of them onto the battlefield\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)

@@ -3883,7 +3883,7 @@ function LibrarySearch({
               : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
               : pending.reveal
-                ? `${pending.source}: you may reveal ${pending.what} from your hand`
+                ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
                 : pending.fromHand && pending.exile

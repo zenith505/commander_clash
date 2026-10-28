@@ -2275,7 +2275,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   wasn't a creature counts, CR 205.1b), Pick the Brain and Invasive Surgery with delirium (checked after the exile or
   the counter, rulings), Hour of Glory (the God's controller exiles those cards from their hand). A search for a card
   with a stated quality may find nothing (CR 701.23b). Bots pick the target whose name their library still has (and
-  don't cast Bifurcate without one) and reveal a card with a copy left. +17 (27,168 of 31,936 with main).
+  don't cast Bifurcate without one) and reveal a card with a copy left. Browser tests for Assembly Hall's reveal and
+  Doubling Chant's search. +17 (27,168 of 31,936 with main).
 - Out after round B30: March of Burgeoning Life ("with mana value less than X": a target bound to X), Mishra,
   Artificer Prodigy ("graveyard, hand, and/or library": one card looked for in several zones), Clarion Ultimatum
   ("Choose five permanents you control"), Retraced Image and Mitotic Manipulation ("the same name as a permanent":

@@ -958,7 +958,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const filter4 = filter3?.chosen === "name" ? bindChosen(filter3, ctx.chosen) : filter3;
       const names = e.sameName && namesFrom(s, e.sameName, ctx);
       // Doubling Chant: one card for each of those permanents, with its name (the found cards matched to them one to one).
-      const perName = e.sameName && "each" in e.sameName && e.sameName.each ? (names || []).map((n) => ({ ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: [n], text: `${filter4?.text.replace(/ with the same name as .+$/, "") ?? "card"} named ${n}` })) : undefined;
+      const single = (filter4?.text.replace(/ with the same name as .+$/, "") ?? "card").replace(/\bcards\b/, "card");
+      const perName = e.sameName && "each" in e.sameName && e.sameName.each ? (names || []).map((n) => ({ ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: [n], text: `${single} named ${n}` })) : undefined;
       const oneOfEach = perName ?? e.oneOfEach;
       const filter = names ? { ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: names, ...(names.length === 1 && filter4 ? { text: filter4.text.replace(/ with the same name as .+$/, ` named ${names[0]}`) } : {}) } : filter4;
       const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
@@ -1030,7 +1031,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const agent = !yardOnly && libOf(p.id) === p ? searchAgent(s, p.id) : undefined;
         if (agent?.exileFor !== undefined) sc.searchExileFor = agent.exileFor;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
-        const what = perName ? `up to one card with the same name as each of ${perName.length} permanents (${perName.map((f) => f.namedAny[0]).join(", ")})` : e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
+        const what = perName ? `up to one ${single} for each of these names: ${perName.map((f) => f.namedAny[0]).join(", ")}` : e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
           player: agent?.controller ?? p.id,

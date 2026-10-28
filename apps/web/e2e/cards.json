@@ -1093,6 +1093,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8da9f975-519d-455a-80c1-2b468cad79a1",
+  "name": "Assembly Hall",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{4}, {T}: Reveal a creature card in your hand. Search your library for a card with the same name as that card, reveal it, put it into your hand, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "abbcb153-0763-44c6-964f-b4ff0eb64257",
   "name": "Atraxa, Grand Unifier",
   "manaCost": "{3}{G}{W}{U}{B}",
@@ -4649,6 +4671,32 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "be48877f-97b1-4a10-a618-cbc57515e617",
+  "name": "Doubling Chant",
+  "manaCost": "{5}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each creature you control, you may search your library for a creature card with the same name as that creature. Put those cards onto the battlefield, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m12",
+  "releasedAt": "2011-07-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

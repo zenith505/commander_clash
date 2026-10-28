@@ -2199,6 +2199,17 @@ function parseStaticLine(line: string): StaticAbility | null {
     const n = Number(ownTax[3]);
     return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n, ...per }, ...(ownTax[2] ? [{ kind: "ownBlockTax" as const, n, ...per }] : [])], text: line };
   }
+  // Exalted Dragon: "~ can't attack unless you sacrifice a land"; Leviathan: "... unless you sacrifice two Islands";
+  // Floodtide Serpent: "... unless you return an enchantment you control to its owner's hand": costs to attack, paid as
+  // attackers are declared (CR 508.1g-i), with permanents of yours.
+  const ownCost = /^~ can't attack unless you (sacrifice|return) (an?|two|three) (.+?)( you control to its owner's hand)?$/.exec(text);
+  if (ownCost && (ownCost[1] === "return") === !!ownCost[4]) {
+    const n = /^an?$/.test(ownCost[2]!) ? 1 : num(ownCost[2]!);
+    const spec = parseTargetPhrase(n === 1 ? ownCost[3]! : ownCost[3]!.replace(/s$/, ""));
+    if (spec?.kind !== "object" || spec.controller || !n) return null;
+    const filter: TargetSpec = { ...spec, controller: "you", text: n === 1 ? ownCost[3]! : ownCost[3]!.replace(/s$/, "") };
+    return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: ownCost[1] === "return" ? "bounce" : "sacrifice", filter, n }], text: line };
+  }
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
   const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);
   if (counterTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, perCounter: true, ...(counterTax[1] ? { planeswalkers: true as const } : {}) }], text: line };

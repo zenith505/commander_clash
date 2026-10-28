@@ -309,6 +309,16 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
+  // Repentant Vampire: "Threshold — As long as ..., ~ is white and has "{T}: ..."": white instead of its other colors
+  // (layer 5, rulings: not white and black) and the ability (layer 6) while the condition holds.
+  const hued = /^~ (is (?:white|blue|black|red|green) and has ".+")$/.exec(statement);
+  if (hued) {
+    const mods = parseStaticMods(hued[1]!);
+    if (!mods) return null;
+    const self: StaticAbility = { affects: { kind: "self" }, mods, text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   // Idol of False Gods: "it's a 0/0 creature in addition to its other types and it has annihilator 2".
   const itsA = /^it's (an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types)(?: and it (has .+))?$/.exec(statement);
   if (itsA) statement = `~ is ${itsA[1]}${itsA[2] ? ` and ${itsA[2]}` : ""}`;
@@ -809,6 +819,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const g = parseGroup(`all ${m[2]}`);
     return g ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!), ...(g.other ? { other: true as const } : {}) } : null;
   }
+  // Tenacious Hunter: "as long as a creature has a -1/-1 counter on it": any player's creature (rulings).
+  if ((m = /^a creature has an? ([+-]1\/[+-]1|[a-z]+) counter on it$/.exec(text))) {
+    const g = parseGroup(`all creatures with ${m[1]} counters on them`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 1 } : null;
+  }
   // Spirit Mirror: "if there are no Reflection tokens on the battlefield": anyone's.
   if ((m = /^there are no (.+) on the battlefield$/.exec(text))) {
     const g = parseGroup(`all ${m[1]}`);
@@ -1064,6 +1079,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
   // Nightkin Ambusher: "~ can't be blocked as long as defending player has a rad counter": the player it's attacking.
   if (text === "defending player has a rad counter" && st.affects.kind === "self") return { kind: "defendingHasRad" };
+  // Hooded Horror: counted as blockers are declared (rulings), you among the players.
+  if (text === "defending player controls the most creatures or is tied for the most" && st.affects.kind === "self") return { kind: "defenderMostCreatures" };
   if (text === "an opponent was dealt combat damage by a legendary creature this turn") return { kind: "opponentCombatDamagedByLegendary" };
   if ((m = /^a player was dealt combat damage by an? ([A-Z][a-z]+) this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature") return { kind: "playerCombatDamaged", subtype: m[1]! };
   // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
@@ -1611,6 +1628,16 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(m[5]!)];
     return a && b ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }, ...b] : null;
   }
+  // Wayward Angel: "gets +3/+3, is black, has trample, and has "..."": the same, with a keyword before the granted ability.
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), is (white|blue|black|red|green), ((?:has|have) [a-z ]+), and ((?:has|have) ".+")$`).exec(rest))) {
+    const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(`${m[5]!} and ${m[6]!.replace(/^(?:has|have) /, "")}`)];
+    return a && b ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }, ...b] : null;
+  }
+  // Repentant Vampire: "is white and has "..."": white instead of its other colors (layer 5), and the ability (layer 6).
+  if ((m = /^is (white|blue|black|red|green) and ((?:has|have) ".+")$/.exec(rest))) {
+    const b = parseStaticMods(m[2]!);
+    return b ? [{ kind: "setColors", colors: [COLOR_WORDS[m[1]!]!] }, ...b] : null;
+  }
   // Grave Servitude: "Enchanted creature gets +3/-1 and is black": black instead of its other colors (layer 5).
   if ((m = new RegExp(`^(gets? ${PT}/${PT}) and is (white|blue|black|red|green)$`).exec(rest))) {
     const a = parseStaticMods(m[1]!);
@@ -1827,7 +1854,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const parts = [m[1]!, m[2]!, m[3]!].map((p) => parseStaticMods(p));
     return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
   }
-  if ((m = /^can't be the target of (.+)$/.exec(rest))) {
+  // Spellbane Centaur: "Creatures you control can't be the targets of blue spells or abilities from blue sources".
+  if ((m = /^can't be the targets? of (.+)$/.exec(rest))) {
     const by = parseUntargetable(m[1]!);
     return by ? [{ kind: "untargetable", by }] : null;
   }
@@ -1858,7 +1886,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   if (/^can't be blocked by creatures with greater power$/.test(rest)) return [{ kind: "cantBeBlockedByGreaterPower" }];
   // Temple Thief: "can't be blocked by enchanted creatures or enchantment creatures": by either kind.
-  if ((m = /^can't be blocked by ([a-z]+ creatures) or ([a-z]+ creatures)$/.exec(rest))) {
+  // Doorman: "can't be blocked by creatures with power 2 or less and/or Walls": by either kind, or one that's both.
+  if ((m = /^can't be blocked by ([a-z]+ creatures|creatures with power \d+ or less) (?:or|and\/or) ([a-z]+ creatures|[A-Z][a-z]+s)$/.exec(rest))) {
     const [a, b] = [parseStaticMods(`can't be blocked by ${m[1]}`), parseStaticMods(`can't be blocked by ${m[2]}`)];
     return a?.length === 1 && b?.length === 1 && a[0]!.kind === "cantBeBlockedBy" && b[0]!.kind === "cantBeBlockedBy" ? [...a, ...b] : null;
   }

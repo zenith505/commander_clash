@@ -555,7 +555,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "skipUntap":
       // Its controller's next untap step skips it, then it untaps as usual (CR 502.3).
-      for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
+      // "Next two untap steps" (Telekinesis): the one after that too, whoever controls it then (rulings); another effect
+      // that skips the next one overlaps this one's first.
+      for (const o of objects(s, e.what, ctx)) {
+        o.skipNextUntap = true;
+        if ((e.n ?? 1) > 1) o.skipMoreUntaps = Math.max(o.skipMoreUntaps ?? 0, e.n! - 1);
+      }
       return;
     case "noUntapNext":
       for (const pid of players(s, e.who, ctx)) {
@@ -658,8 +663,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sc.counterKind = undefined;
       }
       for (const o of objects(s, e.what, ctx)) {
+        // Clockwork Beast: fewer, up to the total allowed (the "up to X" lets its controller put fewer, rulings).
+        const m = e.maxTotal !== undefined ? Math.min(n, e.maxTotal - (o.counters[kind] ?? 0)) : n;
+        if (m <= 0) continue;
         invalidateCharacteristics(s);
-        const put = by !== undefined ? withPutter(by, () => putCounters(s, o, kind, n)) : putCounters(s, o, kind, n);
+        const put = by !== undefined ? withPutter(by, () => putCounters(s, o, kind, m)) : putCounters(s, o, kind, m);
         log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
         // "Each creature that had a +1/+1 counter put on it this way" (Fangs of Kalonia): not one a replacement kept them off.
         if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind });

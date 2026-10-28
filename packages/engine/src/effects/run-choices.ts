@@ -668,6 +668,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"
             ? !!s.resolving!.unlessPaid
+            : e.cond.kind === "spellCountered"
+            ? !!s.resolving!.spellCountered
             : e.cond.kind === "targetPlayerIsYou"
             ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && t.id === ctx.controller)(ctx.targets[e.cond.index])
             : e.cond.kind === "targetWasYours"
@@ -1125,9 +1127,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
 const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
-function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number } {
+function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number; losesSource?: true } {
   const [f] = e.effects;
   if (e.effects.length !== 1 || !f) return {};
+  if (f.type === "sacrifice" && f.what.ref === "self") return { losesSource: true };
   if (f.type === "loseLife" && typeof f.n === "number") return { lose: f.n };
   if (f.type === "damage" && typeof f.amount === "number") return { lose: f.amount };
   if (f.type === "createToken") return { tokens: 1 };

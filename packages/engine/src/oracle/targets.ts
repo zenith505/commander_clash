@@ -331,6 +331,10 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 }
 
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  // Sanguine Praetor: "each creature with the same mana value as the sacrificed creature"; Endemic Plague: "all creatures
+  // that share a creature type with the sacrificed creature": compared with the creature as it last existed (CR 608.2h).
+  const kin = /^(?:each creature|all creatures) (with the same mana value as|that shares? a creature type with) the sacrificed creature$/i.exec(p.trim());
+  if (kin) return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: p.trim().replace(/^(?:each|all) /i, "") }, sacrificedKin: /mana value/.test(kin[1]!) ? "manaValue" : "creatureType" };
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
@@ -527,6 +531,11 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const g = parseGroup(subjectAnd[1]!);
     return g?.other && !/ (?:with|that|who|which) /i.test(subjectAnd[1]!) ? { ref: "each", filter: g.filter, andSubject: true } : null;
   }
+  // "Sacrifice ~: Enchanted creature and other creatures that share a creature type with it get +1/+1 until end of turn"
+  // (Crown of Vigor): what the Aura enchanted, as it last existed once it's sacrificed, and every other creature sharing
+  // a creature type with it as this resolves (CR 608.2h).
+  if (!ctx.spell && /^enchanted creature and other creatures that share a creature type with it$/i.test(x))
+    return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature that shares a creature type with enchanted creature" }, andAttached: true };
   // "It and other creatures you control that share a creature type with it each get +2/+0 ... until end of turn" (Haunted
   // One): the source while it's still there, and the others as this resolves (CR 611.2c).
   // "~ and Drakes you control each get +X/+X" (Alandra, Sky Dreamer): the same, the source counted once if it's one too.
@@ -1034,6 +1043,14 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [{ kind: "object", combat: "attackingOrBlocking", text: "attacking or blocking creature" }, { kind: "object", tapped: true, text: "tapped creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "attacking, blocking, or tapped creature") };
   }
+  // Tetsuo Umezawa: "target tapped or blocking creature": either one.
+  const tappedOrBlocking = /^(target )?tapped or blocking creature$/.exec(phrase.trim());
+  if (tappedOrBlocking) {
+    const rest = parseTargetPhrase(`${tappedOrBlocking[1] ?? ""}creature`, opts);
+    if (rest?.kind !== "object" || rest.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", tapped: true, text: "tapped creature" }, { kind: "object", combat: "blocking", text: "blocking creature" }];
+    return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "tapped or blocking creature") };
+  }
   // Silumgar Assassin: "target creature with power 3 or less an opponent controls": the same as "target creature an
   // opponent controls with power 3 or less".
   const withThenCtl = /^((?:target )?[a-z ]*?creature) (with (?:power|toughness|mana value) \d+ or (?:less|greater)) (an opponent controls|you control|you don't control)$/.exec(phrase.trim());
@@ -1058,6 +1075,12 @@ export function parseTargetPhrase(
   if (twoKinds && twoKinds[2] !== twoKinds[3]) {
     const anyOf = [twoKinds[2]!, twoKinds[3]!].map((w) => parseTargetPhrase(`${w} creature`, opts));
     if (anyOf.every((x) => x?.kind === "object" && !x.anyOf)) return { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase()}` };
+  }
+  // Nissa's Defeat: "Forest, green enchantment, or green planeswalker": a permanent that's any of them.
+  const landHued = /^(target )?(Plains|Island|Swamp|Mountain|Forest), (white|blue|black|red|green) enchantment, or (white|blue|black|red|green) planeswalker$/.exec(phrase.trim());
+  if (landHued) {
+    const anyOf = [landHued[2]!, `${landHued[3]} enchantment`, `${landHued[4]} planeswalker`].map((w) => parseTargetPhrase(w, opts));
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().replace(/^target /, "")}` };
   }
   // Bumi Bash: "land creature or nonbasic land": a permanent that's either one, or both.
   const landOr = /^(target )?(land|artifact) creature or nonbasic land$/.exec(phrase.trim());

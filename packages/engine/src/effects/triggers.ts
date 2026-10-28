@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -1477,7 +1477,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.by !== undefined)
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
     // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
     // controller that player is an opponent of, once for each source (rulings).
@@ -2166,6 +2166,16 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       if (!hasLegalTargets(s, body.targets, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId)) {
         log(s, `${def.name}'s ability has no legal targets and is removed.`);
         s.triggerQueue.shift();
+        continue;
+      }
+      // "Target creature an opponent controls chosen at random" (Scab-Clan Giant): picked among the legal ones as it's put
+      // on the stack, each with an equal chance (rulings).
+      if (body.targets.length === 1 && body.targets[0]!.random) {
+        const legal = legalTargets(s, body.targets[0]!, t.controller, undefined, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
+        const pick = legal[Math.floor(nextRandom(s) * legal.length)]!;
+        log(s, `${def.name}'s ability targets ${pick.kind === "player" ? player(s, pick.id).name : defOf(s, obj(s, pick.id)).name}, chosen at random.`);
+        pushTrigger(s, t, [pick]);
+        added = true;
         continue;
       }
       // "Any number of target creatures" with none to choose and nothing else to target: zero targets (CR 115.6).

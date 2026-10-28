@@ -652,9 +652,10 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     return filter === null ? null : { kind: "exileFromHand", n: num(m[1]!), ...(filter ? { filter } : {}) };
   }
   // "Tap an untapped creature you control" (Lashknife), "tap four untapped creatures you control with flying" (Sephara).
-  if ((m = new RegExp(`^tap ${NUM} untapped (.+?) you control( with .+)?$`, "i").exec(text))) {
+  // "Tap an untapped red creature you control other than ~" (Impelled Giant): not the source.
+  if ((m = new RegExp(`^tap ${NUM} untapped (.+?) you control( with .+?)?( other than ~)?$`, "i").exec(text))) {
     const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? m[2]!.split(" ").map(singularWord).join(" ") : m[2]}${m[3] ?? ""}`);
-    return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}` }, n: num(m[1]!) } : null;
+    return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}${m[4] ? " other than ~" : ""}` }, n: num(m[1]!), ...(m[4] ? { other: true } : {}) } : null;
   }
   // "Collect evidence 3" (CR 701.59a): exile cards from your graveyard with total mana value 3 or more.
   if ((m = /^collect evidence (\d+)$/i.exec(text))) return { kind: "collectEvidence", n: Number(m[1]) };

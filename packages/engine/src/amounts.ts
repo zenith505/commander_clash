@@ -337,6 +337,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "bouncedThisWayCount":
+      return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "preventedByRule":
+      return s.preventedTally?.[c.rule] ?? 0;
     case "sacrificedThisWayGreatestPower":
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
     case "putThisWay":
@@ -626,7 +630,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const st = ctx.stationed;
       const o = st && s.objects[st.id];
       if (!st) return 0;
-      return Math.max(0, o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc ? characteristics(s, o).power : st.power);
+      if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc) return Math.max(0, characteristics(s, o).power);
+      // As it last existed on the battlefield (CR 608.2h), if that's recorded; else as it was tapped.
+      const lk = s.lastKnown?.[st.id];
+      return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
     }
     case "power":
     case "toughness":
@@ -915,6 +922,10 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "bouncedThisWayCount":
+      return "#returned";
+    case "preventedByRule":
+      return "#damage prevented";
     case "sacrificedThisWayGreatestPower":
       return "the greatest power sacrificed";
     case "putThisWay":

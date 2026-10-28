@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, addEffect, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, invalidateCharacteristics, isFullySupported, objIsType, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, characteristics, invalidateCharacteristics, isFullySupported, objIsType, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -75,11 +75,16 @@ const avenWindreader = card("Aven Windreader", "Creature — Bird Soldier Wizard
 const cerebralEruption = card("Cerebral Eruption", "Sorcery", "{2}{R}{R}", {"cmc":4,"oracleText":"Target opponent reveals the top card of their library. Cerebral Eruption deals damage equal to the revealed card's mana value to that player and each creature that player controls. If a land card is revealed this way, return Cerebral Eruption to its owner's hand."});
 const petraSphinx = card("Petra Sphinx", "Creature — Sphinx", "{2}{W}{W}{W}", {"cmc":5,"power":"3","toughness":"4","oracleText":"{T}: Target player chooses a card name, then reveals the top card of their library. If that card has the chosen name, that player puts it into their hand. If it doesn't, the player puts it into their graveyard."});
 const vexingArcanix = card("Vexing Arcanix", "Artifact", "{4}", {"cmc":4,"colors":[],"oracleText":"{3}, {T}: Target player chooses a card name, then reveals the top card of their library. If that card has the chosen name, that player puts it into their hand. Otherwise, they put it into their graveyard and this artifact deals 2 damage to them."});
+const alloyGolem = card("Alloy Golem", "Artifact Creature — Golem", "{6}", {"cmc":6,"power":"4","toughness":"4","colors":[],"oracleText":"As this creature enters, choose a color.\nThis creature is the chosen color. (It's still an artifact.)"});
+const shimmerwildsGrowth = card("Shimmerwilds Growth", "Enchantment — Aura", "{1}{G}", {"cmc":2,"keywords":["Enchant"],"oracleText":"Enchant land\nAs this Aura enters, choose a color.\nEnchanted land is the chosen color.\nWhenever enchanted land is tapped for mana, its controller adds an additional one mana of the chosen color."});
+const winnow = card("Winnow", "Instant", "{1}{W}", {"cmc":2,"oracleText":"Destroy target nonland permanent if another permanent with the same name is on the battlefield.\nDraw a card."});
+const prematureBurial = card("Premature Burial", "Sorcery", "{1}{B}", {"cmc":2,"oracleText":"Destroy target nonblack creature that entered since your last turn ended."});
+const arsenalThresher = card("Arsenal Thresher", "Artifact Creature — Construct", "{2}{W/B}{U}", {"cmc":4,"power":"2","toughness":"2","oracleText":"As this creature enters, you may reveal any number of other artifact cards from your hand. This creature enters with a +1/+1 counter on it for each card revealed this way."});
 
 describe("Lane B round 24", () => {
   it("supports every card of the round", () => {
     supported(woodElemental, dracoplasm, shimatsuTheBloodcloaked, minionOfTheWastes, namelessRace, phyrexianProcessor, brokenVisage, kalitasBloodchiefOfGhet, ritualOfTheReturned,
-      avenWindreader, cerebralEruption, petraSphinx, vexingArcanix);
+      avenWindreader, cerebralEruption, petraSphinx, vexingArcanix, alloyGolem, shimmerwildsGrowth, winnow, prematureBurial, arsenalThresher);
   });
 
   it("Wood Elemental: only untapped Forests can be sacrificed as it enters, and its P/T is how many were (rulings)", () => {
@@ -312,5 +317,73 @@ describe("Lane B round 24", () => {
     s = settle(activateNow(s1, ap1, arcanix1, 0, [ply(opp1)]), at("chooseOption", opp1));
     if (s.pending?.kind === "chooseOption") s = settle(act(s, { type: "chooseOption", player: opp1, choice: "Forest" }));
     expect(life(s, opp1)).toBe(40);
+  });
+  it("Alloy Golem is the color chosen as it enters, and still an artifact (layer 5)", () => {
+    const { s: s0, ap, ids } = setup([alloyGolem]);
+    let s = settle(castNow(s0, ap, ids[0]!), at("chooseOption", ap));
+    expect(s.pending?.kind === "chooseOption" && s.pending.what).toBe("color");
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "Red" }));
+    const c = characteristics(s, s.objects[ids[0]!]!);
+    expect(c.colors).toEqual(["R"]);
+    expect(c.types).toContain("Artifact");
+  });
+
+  it("Shimmerwilds Growth makes the enchanted land the chosen color, and it adds one more mana of that color", () => {
+    const { s: s0, ap, ids } = setup([shimmerwildsGrowth]);
+    const forest = mine(s0, ap, "Forest")[0]!;
+    pool(s0, ap, { G: 1, C: 1 });
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(forest)]), at("chooseOption", ap));
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "Blue" }));
+    expect(s.objects[ids[0]!]!.attachedTo).toBe(forest);
+    expect(characteristics(s, s.objects[forest]!).colors).toEqual(["U"]);
+    s = act(s, { type: "activateMana", player: ap, objectId: forest, mana: "G" });
+    s = settle(s);
+    expect(s.players[ap]!.manaPool.G).toBe(1);
+    expect(s.players[ap]!.manaPool.U).toBe(1);
+  });
+
+  it("Winnow destroys its target only if another permanent has the same name, and draws a card either way", () => {
+    const { s: s0, ap, ids, opp } = setup([winnow]);
+    const bear = putOnBattlefield(s0, opp, greenBear());
+    putOnBattlefield(s0, ap, greenBear());
+    const beast = putOnBattlefield(s0, opp, bigBeast());
+    pool(s0, ap, { W: 1, C: 1 });
+    const hand = s0.players[ap]!.hand.length;
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(bear)]));
+    expect(zone(s, bear)).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand); // Winnow left, a card drawn
+    const { s: s1, ap: ap1, ids: ids1, opp: opp1 } = setup([winnow]);
+    const lone = putOnBattlefield(s1, opp1, bigBeast());
+    pool(s1, ap1, { W: 1, C: 1 });
+    s = settle(castNow(s1, ap1, ids1[0]!, [tgt(lone)]));
+    expect(zone(s, lone)).toBe("battlefield");
+    expect(zone(s0, beast)).toBe("battlefield");
+  });
+
+  it("Premature Burial can target only a nonblack creature that entered since your last turn ended", () => {
+    const { s: s0, ap, ids, opp } = setup([prematureBurial]);
+    const old = putOnBattlefield(s0, opp, greenBear());
+    const fresh = putOnBattlefield(s0, opp, bigBeast());
+    s0.players[ap]!.lastTurnBegan = s0.turn - 4;
+    s0.objects[old]!.enteredTurn = s0.turn - 4; // during your last turn: before it ended
+    s0.objects[fresh]!.enteredTurn = s0.turn - 2; // an opponent's turn since then
+    pool(s0, ap, { B: 1, C: 1 });
+    expect(() => castNow(s0, ap, ids[0]!, [tgt(old)])).toThrow();
+    const s = settle(castNow(s0, ap, ids[0]!, [tgt(fresh)]));
+    expect(zone(s, fresh)).toBe("graveyard");
+    expect(zone(s, old)).toBe("battlefield");
+  });
+
+  it("Arsenal Thresher enters with a +1/+1 counter for each other artifact card revealed from the hand", () => {
+    const relic = () => card("Iron Relic", "Artifact", "{2}", { cmc: 2, oracleText: "{T}: Add {C}." });
+    const { s: s0, ap, ids } = setup([arsenalThresher, relic(), relic(), greenBear()]);
+    pool(s0, ap, { W: 1, U: 1, C: 2 });
+    let s = settle(castNow(s0, ap, ids[0]!), at("pickPermanents", ap));
+    const p = s.pending;
+    expect(p?.kind === "pickPermanents" && [...p.options].sort()).toEqual([ids[1]!, ids[2]!].sort());
+    expect(p?.kind === "pickPermanents" && p.prompt).toMatch(/other artifact cards/);
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [ids[1]!, ids[2]!] }));
+    expect(pt(s, ids[0]!)).toBe("4/4");
+    expect([zone(s, ids[1]!), zone(s, ids[2]!)]).toEqual(["hand", "hand"]);
   });
 });

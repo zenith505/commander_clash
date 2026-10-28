@@ -4852,6 +4852,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Winnow: "Destroy target nonland permanent if another permanent with the same name is on the battlefield": any nonland
+    // permanent may be the target; the name is checked as it resolves (CR 608.2b).
+    const winnow = /^(Destroy target nonland permanent) if another permanent with the same name is on the battlefield$/.exec(s);
+    if (winnow) {
+      const before = ctx.targets.length;
+      const fx = parseOne(winnow[1]!, ctx);
+      if (!fx || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetSharesName", index: before }, effects: fx });
+      continue;
+    }
     // Wretched Banquet: "Destroy target creature if it has the least power or is tied for least power among creatures on
     // the battlefield": any creature may be the target; its power is checked as it resolves (rulings).
     const leastIf = /^(Destroy target creature) if it has the least power or is tied for least power among creatures on the battlefield$/.exec(s);

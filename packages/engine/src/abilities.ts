@@ -564,6 +564,8 @@ export interface TargetSpec {
   attackingWhom?: "eventPlayer" | PlayerId;
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
+  /** "That entered since your last turn ended" (Premature Burial): it entered after the last turn of the spell's controller ended (in a turn after it). */
+  enteredSinceYourLastTurn?: true;
   /** "All Curses attached to you" (Witchbane Orb): Auras enchanting the player whose ability or spell this is (CR 303.4). */
   attachedToYou?: true;
   /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
@@ -3746,6 +3748,8 @@ export type SpellCondition =
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "If another permanent with the same name is on the battlefield" (Winnow): as target `index`, checked as it resolves. */
+  | { kind: "targetSharesName"; index: number }
   /** "Destroy target creature if no other creature has greater power" (Getaway Glamer): that creature as it is now, still a legal target, against every other creature on the battlefield. */
   | { kind: "targetGreatestPower"; index: number }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
@@ -5377,6 +5381,12 @@ export interface CompiledCard {
   startYourEngines?: boolean;
   /** Amplify N (CR 702.38a): as it enters, reveal cards from your hand that share a creature type with it; N +1/+1 counters for each. */
   amplify?: number;
+  /**
+   * "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a +1/+1 counter on it
+   * for each card revealed this way." (Arsenal Thresher): amplify 1's choice, of these cards instead of ones sharing a
+   * creature type with it.
+   */
+  amplifyFilter?: TargetSpec;
   /**
    * Devour N (CR 702.82a, c): "As this object enters, you may sacrifice any number of [creatures]. This permanent
    * enters with N +1/+1 counters on it for each [one] sacrificed this way." `n: "devoured"`: Thromok's "Devour X,

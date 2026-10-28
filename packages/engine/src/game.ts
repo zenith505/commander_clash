@@ -7810,6 +7810,8 @@ export const shareCreatureType = (a: Set<string> | "all", b: Set<string> | "all"
 
 /** Amplify's choice (CR 702.38a): cards in its controller's hand that share a creature type with it. */
 export function amplifyOptions(s: GameState, o: GameObject): ObjectId[] {
+  const filter = compileCard(defOf(s, o)).amplifyFilter;
+  if (filter) return player(s, controllerOf(s, o)).hand.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id))));
   const mine = creatureTypesOf(s, o);
   return player(s, controllerOf(s, o)).hand.filter((id) => shareCreatureType(mine, creatureTypesOf(s, obj(s, id))));
 }
@@ -7824,7 +7826,7 @@ function amplifyChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { 
   const shown = ids.filter((id) => s.objects[id]?.zone === "hand");
   if (shown.length && n) {
     const put = putCounters(s, o, "+1/+1", n * shown.length, true);
-    log(s, `${player(s, controllerOf(s, o)).name} reveals ${shown.map((id) => nameOf(s, id)).join(", ")}: ${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"} (amplify).`);
+    log(s, `${player(s, controllerOf(s, o)).name} reveals ${shown.map((id) => nameOf(s, id)).join(", ")}: ${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}${compileCard(d).amplifyFilter ? "" : " (amplify)"}.`);
   }
   invalidateCharacteristics(s);
   if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
@@ -7875,7 +7877,9 @@ function askEntersChoice(s: GameState): boolean {
         devourChosen(s, o, [], c.enters);
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id };
+      // Not devour itself (Wood Elemental, Dracoplasm, Shimatsu): what the sacrifice does, said in the prompt.
+      const said = devour!.defines === "count" ? "its power and toughness are how many" : devour!.defines === "total" ? "it gets their total power and toughness" : devour!.n === 1 && devour!.filter.text === "permanent" ? "a +1/+1 counter for each" : undefined;
+      s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id, ...(said ? { prompt: `sacrifice any number of ${devour!.filter.text}s as it enters (${said}): click them, then sacrifice.` } : {}) };
       return true;
     }
     if (c.what === "amplify") {
@@ -7886,7 +7890,8 @@ function askEntersChoice(s: GameState): boolean {
         amplifyChosen(s, o, [], c.enters);
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id };
+      const own = compileCard(defOf(s, o)).amplifyFilter;
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: own ? own.text : "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id, ...(own ? { prompt: `reveal any number of other ${own.text}s from your hand (a +1/+1 counter for each): click them, then reveal.` } : {}) };
       return true;
     }
     if (c.what === "controlOpponent") {

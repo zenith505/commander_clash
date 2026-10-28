@@ -1314,6 +1314,14 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.name = m.name;
       return;
     case "setColors":
+      // "~ is the chosen color" (Alloy Golem), "Enchanted land is the chosen color" (Shimmerwilds Growth): a static ability's,
+      // the color chosen as its source entered (CR 614.12); with none chosen, nothing changes. (A resolved effect's color
+      // is bound as it resolves, without `chosen`.)
+      if (m.chosen === true) {
+        const col = e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined;
+        if (col) c.colors = [col];
+        return;
+      }
       c.colors = [...m.colors];
       return;
     case "addColors":

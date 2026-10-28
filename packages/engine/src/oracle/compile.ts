@@ -1311,6 +1311,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
       continue;
     }
+    // Arsenal Thresher: "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a
+    // +1/+1 counter on it for each card revealed this way.": amplify 1's choice (CR 702.38a, 614.12), of artifact cards.
+    if (line === "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a +1/+1 counter on it for each card revealed this way.") {
+      if (out.amplify) out.unsupported.push(raw);
+      else [out.amplify, out.amplifyFilter] = [1, { kind: "card", types: ["Artifact"], text: "artifact card" }];
+      continue;
+    }
     // "As ~ enters, pay any amount of life." (Minion of the Wastes; CR 614.12, 119.4), with Nameless Race's "The amount you
     // pay can't be more than the total number of white nontoken permanents your opponents control plus the total number of
     // white cards in their graveyards."

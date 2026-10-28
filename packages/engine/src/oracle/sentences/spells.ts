@@ -164,6 +164,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who }] : null;
   }
+  // Smoke Teller, Aven Soulgazer: "Look at target face-down creature": only its controller sees what it is, as this
+  // resolves (CR 708.5, rulings).
+  if (/^Look at target face-down creature$/.test(s)) return [{ type: "lookAtFaceDown", what: { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], faceDown: true, text: "target face-down creature" }) } }];
   if ((m = /^(.+?) reveals? (?:their|his or her) hand$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }] : null;
@@ -620,6 +623,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const index = addTarget(ctx, { kind: "spell", text: "target spell" });
     return [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "poison", who: { ref: "targetController", index } } }, min: 1 }, effects: [{ type: "counterSpell", index }] }];
   }
+  // Hisoka, Minamo Sensei: "Counter target spell if it has the same mana value as the discarded card": any spell can be
+  // targeted; the discard cost's card decides (compile checks there is one).
+  if (/^Counter target spell if it has the same mana value as the discarded card$/i.test(s) && ctx.activated) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvDiscarded: true }];
   if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).

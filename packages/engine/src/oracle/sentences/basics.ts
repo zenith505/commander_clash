@@ -486,9 +486,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, exchange: true }];
   }
   // "Shuffle all creature cards from your graveyard into your library" (Rooting Kavu, Barishi): those cards only.
-  if ((m = /^[Ss]huffle all (?:(.+?) )?cards from your graveyard into your library$/.exec(s))) {
-    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
-    if (filter === null || /\bthat\b/.test(m[1] ?? "")) return null;
+  // Elvish Soultiller: "Shuffle all creature cards of the chosen type ..." (after "choose a creature type"): that type.
+  if ((m = /^[Ss]huffle all (?:(.+?) )?cards( of the chosen type)? from your graveyard into your library$/.exec(s))) {
+    const base = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (base === null || /\bthat\b/.test(m[1] ?? "") || (m[2] && !base)) return null;
+    const filter = base && m[2] ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base;
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, ...(filter ? { filter } : {}) }];
   }
   // Repopulate: "Shuffle all creature cards from target player's graveyard into that player's library": theirs.
@@ -554,6 +556,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       if ("what" in y) {
         refs.add((y.what as ObjRef).ref);
         whats.add(JSON.stringify(y.what));
+      }
+      // Sawtooth Ogre: "~ deals 1 damage to that creature at end of combat": about the trigger's creature (and ~ as the
+      // source, which deals it even if it has left the battlefield, rulings).
+      if (y.type === "damage" && "ref" in y.to && y.to.ref === "subject") {
+        refs.add("subject");
+        whats.add(JSON.stringify(y.to));
       }
       if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
       if (y.type === "delayed") players = false;
@@ -922,6 +930,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Each player chooses a creature type$/.test(s)) return [{ type: "choose", choice: "creatureType", each: true }];
   // "Choose a number between 0 and 10." (Expel the Interlopers): as it resolves, kept for the rest (CR 608.2d).
   if ((m = /^Choose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
+  // Terraformer: "Choose a basic land type. Each land you control becomes that type until end of turn."
+  if (/^Choose a basic land type$/.test(s)) return [{ type: "choose", choice: "basicLandType" }];
   // "Choose odd or even." (Extinction Event): as it resolves; "of the chosen quality" after it (zero is even).
   if (/^Choose odd or even$/i.test(s)) return [{ type: "choose", choice: "parity" }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
@@ -1031,6 +1041,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // two target creatures this turn".
   // Kurbis, Harvest Celebrant: "... this turn to another target creature with a +1/+1 counter on it".
   s = s.replace(/^(Prevent all (?:combat )?damage that would be dealt) this turn to (up to (?:one|two|three) target creatures?|(?:another )?target creature(?: with an? \S+ counter on it)?)$/i, "$1 to $2 this turn");
+  // Songstitcher: "Prevent all combat damage that would be dealt this turn by target attacking creature with flying".
+  s = s.replace(/^(Prevent all combat damage that would be dealt) this turn by (target attacking creature with flying)$/i, "$1 by $2 this turn");
   const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
   if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
@@ -1055,8 +1067,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Redirection shields (CR 614.9): "The next 1 damage that would be dealt to ~ this turn is dealt to target creature
   // you control instead" (the en-Kor), "... dealt this turn to target white creature you control is dealt to ~ instead".
   if ((m = new RegExp(`^The next ${NUMX} damage that would be dealt (this turn )?to (.+?)( this turn)? is dealt to (.+) instead$`, "i").exec(s)) && !m[2] !== !m[4]) {
-    const from = /^(~|any target|target .+)$/i.test(m[3]!) ? parseDamageRecipient(m[3]!, ctx) : null;
-    const to = from && /^(~|any target|any other target|another target|target .+|another target .+)$/i.test(m[5]!) ? parseDamageRecipient(m[5]!, ctx) : null;
+    // Ward of Piety: "... dealt to enchanted creature ..."; Vassal's Duty: "... is dealt to you instead"; Personal
+    // Incarnation: "... is dealt to its owner instead" (~'s owner, CR 108.3).
+    const from = /^(~|any target|target .+)$/i.test(m[3]!) ? parseDamageRecipient(m[3]!, ctx) : m[3] === "enchanted creature" && !ctx.spell ? parseObject(m[3], ctx) : null;
+    const to = !from ? null : /^(~|any target|any other target|another target|target .+|another target .+)$/i.test(m[5]!) ? parseDamageRecipient(m[5]!, ctx) : m[5] === "you" ? ({ ref: "you" } as const) : m[5] === "its owner" && m[3] === "~" ? ({ ref: "selfOwner" } as const) : null;
     return from && to ? [{ type: "redirectNext", n: amt(m[1]!), from, to }] : null;
   }
   // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
@@ -1230,12 +1244,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseLife", who, n: { count: { kind: "lifeLostThisTurn", who: who.ref === "eachOpponent" || who.ref === "eachPlayer" ? { ref: "eachOne" } : who } } }] : null;
   }
-  // "Target player gains twice X life" (Heliod's Intervention): X times 2.
-  if ((m = /^(.+?) (gains?|loses?) twice X life$/i.exec(s))) {
+  // "Target player gains twice X life" (Heliod's Intervention): X times 2. "You gain three times X life" (Martyr of Sands).
+  if ((m = /^(.+?) (gains?|loses?) (twice|three times) X life$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;
     const x = amt("X") as AmountExpr;
-    return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: { ...x, times: 2 } }];
+    return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: { ...x, times: m[3] === "twice" ? 2 : 3 } }];
   }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

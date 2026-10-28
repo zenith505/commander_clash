@@ -14,6 +14,7 @@ import {
   waitingOn,
   untapChoiceProblem,
   blockCost,
+  blocksMayCost,
   livingPlayers,
   abilityProblem,
   faceUpWays,
@@ -37,6 +38,7 @@ import {
   provokerOf,
   lureBinds,
   withoutCompany,
+  blockWithoutCompany,
   tapCostCandidates,
   craftCandidates,
   untapViaMana,
@@ -486,6 +488,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
     }
+    // "Enters with your choice of a flying counter or a first strike counter": evasion first, then what wins fights.
+    if (pend.kind === "chooseOption" && pend.what === "counterChoice") {
+      const rank = ["flying", "deathtouch", "menace", "trample", "+1/+1", "first strike", "hexproof", "lifelink", "reach", "vigilance"];
+      const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+    }
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
       const best = [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
@@ -508,6 +516,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (next?.type === "if" && next.cond.kind === "amountsCompare" && opps.length && JSON.stringify(next.cond.a).includes('"chosenPlayer"') && next.effects.some((e) => e.type === "draw")) {
         const most = [...opps].sort((a, b) => player(s, Number(b)).hand.length - player(s, Number(a)).hand.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: most }];
+      }
+      // A permanent that counts the chosen player's cards (Nyxathid, Sewer Nemesis) or hurts them on their upkeep (Black
+      // Vise, The Rack): the opponent that makes it biggest or hurts most.
+      const entering = pend.objectId !== undefined ? s.objects[pend.objectId] : undefined;
+      const chosenScore = entering && opps.length ? chosenPlayerScore(s, entering, pid) : undefined;
+      if (chosenScore) {
+        const top = [...opps].sort((a, b) => chosenScore(Number(b)) - chosenScore(Number(a)))[0]!;
+        return [{ type: "chooseOption", player: pid, choice: top }];
       }
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
@@ -716,6 +732,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const t = s.resolving?.item.targets?.[0];
       return [{ type: "chooseOption", player: pid, choice: t?.kind === "player" && t.id === pid ? "1" : "0" }];
     }
+    // Reign of Terror, Lava Storm: what costs the opponents most, net of what we'd lose.
+    const either = pend.kind === "chooseOption" && pend.what === "either" && s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "either" && pend.options.every((o, i) => e.labels[Number(o)] === pend.labels?.[i])) : undefined;
+    if (pend.kind === "chooseOption" && either?.type === "either" && either.options.every((o) => o.every((e) => e.type === "destroy" || e.type === "damage"))) {
+      const v = (o: string) => groupValue(s, pid, { targets: [], effects: either.options[Number(o)]!, text: "" }) ?? 0;
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => v(b) - v(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -900,7 +922,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -2418,8 +2440,8 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
-              : c.kind === "tap"
-                ? 0 // "Tap X untapped ... you control" is an activated ability's cost only
+              : c.kind === "tap" || c.kind === "reveal"
+                ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand" are activated abilities' costs only
                 : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }
@@ -3803,6 +3825,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      // Dragon Whelp: not a fourth time, which would sacrifice it at the end step.
+      if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "activatedTimes" && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= e.cond.n - 1)) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
@@ -5103,6 +5127,29 @@ function chooseManifest(s: GameState, pid: PlayerId, cards: string[], max: numbe
 }
 
 /** Cycle (CR 702.29a) lands we don't need and spells we're far from casting, or use their channel abilities and the like. */
+/**
+ * Forecast (CR 702.57): during our own upkeep, with the stack empty, reveal a card from our hand for its ability when it
+ * does something and has a good target. The card stays in hand; "only once each turn" is checked by the rules.
+ */
+function chooseForecast(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer !== pid || s.step !== "upkeep" || s.stack.length) return null;
+  for (const id of player(s, pid).hand) {
+    const abilities = abilitiesOf(s, obj(s, id)).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.keyword !== "Forecast" || doesNothingNow(s, id, ab.body)) continue;
+      const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
+      if (ab.body.targets.length && !targets) continue;
+      // Sky Hussar: "Tap two untapped white and/or blue creatures you control".
+      const costs = abilityCosts(s, pid, obj(s, id), ab, targets ?? []);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, targets ?? undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
 function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
   const lands = s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
   for (const id of player(s, pid).hand) {
@@ -5350,17 +5397,31 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
  * left out, the last chosen first (the chump blocks and extras), with any attacker then left with too few blockers.
  */
 function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
-  if (a.type !== "declareBlockers" || !blockCost(s, 1)) return [a];
+  if (a.type !== "declareBlockers" || !blocksMayCost(s, pid)) return [a];
   let blocks = a.blocks;
   for (;;) {
     const blockers = [...new Set(blocks.map((b) => b.blocker))];
-    const taps = blockers.length ? planMana(s, pid, parseManaCost(blockCost(s, blockers.length))) : [];
+    const cost = blockCost(s, blockers.length, blockers);
+    const taps = cost ? planMana(s, pid, parseManaCost(cost)) : [];
     if (taps) return [...taps, { ...a, blocks }];
-    const drop = blockers[blockers.length - 1]!;
+    // Qal Sisma Behemoth: the last one chosen that costs something to block.
+    const drop = [...blockers].reverse().find((b) => !!blockCost(s, 1, [b]))!;
     blocks = blocks.filter((b) => b.blocker !== drop);
     blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
     if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks = [];
+    blocks = withCompany(s, blocks);
+  }
+}
+
+/** Orcish Conscripts: leave out blockers without enough other blockers with them, until the rest are legal (CR 509.1b). */
+function withCompany<B extends { blocker: ObjectId; attacker: ObjectId }>(s: GameState, blocks: B[]): B[] {
+  const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  for (let out = blocks; ; ) {
+    if (!blockWithoutCompany(s, out, earlier)) return out;
+    const lonely = out.find((b) => (characteristics(s, obj(s, b.blocker)).blockWithOthers ?? 0) > earlier + new Set(out.map((x) => x.blocker)).size - 1)!;
+    out = out.filter((b) => b.blocker !== lonely.blocker);
+    out = out.filter((b) => out.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
   }
 }
 
@@ -5464,7 +5525,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // One that can't block alone doesn't block by itself (CR 506.5).
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
   if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks.length = 0;
-  return { type: "declareBlockers", player: pid, blocks };
+  const kept = withCompany(s, blocks);
+  return { type: "declareBlockers", player: pid, blocks: kept };
 }
 
 const LAND_COLOR: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };
@@ -5500,4 +5562,25 @@ function orderOwnGraveyard(s: GameState, cards: ObjectId[]): ObjectId[] {
     order.splice(over < 0 ? order.length : over + 1, 0, id);
   }
   return order;
+}
+
+/**
+ * "As ~ enters, choose a player/an opponent" for a permanent whose own power and toughness count the chosen player's
+ * cards (Nyxathid's -1/-1 per card in their hand, Sewer Nemesis's graveyard), or whose "at the beginning of the chosen
+ * player's upkeep" trigger deals damage (Black Vise, The Rack): a score for each player, higher is better for us.
+ * Undefined when the permanent's abilities don't depend on the chosen player that way.
+ */
+function chosenPlayerScore(s: GameState, o: GameObject, pid: PlayerId): ((x: PlayerId) => number) | undefined {
+  const c = compileCard(defOf(s, o));
+  const asEvent = <T>(v: T): T => JSON.parse(JSON.stringify(v).replaceAll('{"ref":"selfChosenPlayer"}', '{"ref":"eventPlayer"}'));
+  const pts = (c.statics ?? []).filter((st) => st.affects.kind === "self").flatMap((st) => st.mods).filter((m) => (m.kind === "modifyPT" || m.kind === "definePT") && JSON.stringify(m).includes('"selfChosenPlayer"'));
+  const hurts = (c.triggers ?? []).filter((t) => t.chosenPlayersTurn).flatMap((t) => t.body.effects).filter((e) => e.type === "damage" && JSON.stringify(e.to) === '{"ref":"eventPlayer"}');
+  if (!pts.length && !hurts.length) return undefined;
+  return (x) => {
+    const ctx = { controller: pid, sourceId: o.id, event: { player: x } };
+    let n = 0;
+    for (const m of pts) if (m.kind === "modifyPT" || m.kind === "definePT") n += (m.power ? evalAmount(s, asEvent(m.power), ctx) : 0) + (m.toughness ? evalAmount(s, asEvent(m.toughness), ctx) : 0);
+    for (const e of hurts) if (e.type === "damage") n += Math.max(0, evalAmount(s, e.amount, ctx));
+    return n;
+  };
 }

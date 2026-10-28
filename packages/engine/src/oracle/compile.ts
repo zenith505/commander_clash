@@ -343,7 +343,9 @@ export function normalizeSelf(d: CardDef): string {
     // The card named Exile: "Exile target nonwhite attacking creature" is the keyword action, not the card (its name
     // followed by "target" is never the card).
     const verb = /^[A-Z][a-z]+$/.test(full) ? "(?! target\\b)" : "";
-    t = t.replace(new RegExp(esc(full) + verb, "g"), "~");
+    // Aurochs: "for each other attacking Aurochs" is the creature type that is also its name (CR 205.3m), not the card.
+    const typed = CREATURE_TYPES.has(full) ? "(?<!attacking )" : "";
+    t = t.replace(new RegExp(typed + esc(full) + verb, "g"), "~");
   }
   // Shortened names (CR 201.5c): "Gylwain" for "Gylwain, Casting Director", and for a legendary card with no comma,
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token
@@ -503,6 +505,21 @@ export function compile(d: CardDef): CompiledCard {
       // Questing Druid: "Whenever you cast a spell that's white, blue, black, or red": a spell that's any of those colors,
       // as "a white, blue, black, or red spell" says (CR 105.2).
       .replace(/^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )*(?:white|blue|black|red|green),? or (?:white|blue|black|red|green)), /m, "Whenever you cast a $1 spell, ")
+      // Tek, Tribal Golem: "~ gets +0/+2 as long as you control a Plains, has flying as long as you control an Island, ...
+      // and has trample as long as you control a Forest": a static ability for each clause, each with its own condition,
+      // the verb carried over where a clause leaves it out ("haste as long as you control a Goblin").
+      .replace(/^~ (?:has|gets) [^\n]+? as long as you control an? [A-Z][a-z]+(?:, (?:and )?[^\n]+? as long as you control an? [A-Z][a-z]+){2,}\.$/m, (line) => {
+        let verb = "";
+        return line
+          .slice(2, -1)
+          .split(/, (?:and )?/)
+          .map((part) => {
+            const v = /^(has|gets) /.exec(part);
+            if (v) verb = v[1]!;
+            return `~ ${v ? part : `${verb} ${part}`}.`;
+          })
+          .join("\n");
+      })
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // The Genjus: "Enchant Forest" ... "Enchanted Forest becomes ...": the land it's attached to, which is a Forest while
@@ -1118,6 +1135,15 @@ export function compile(d: CardDef): CompiledCard {
       const per = othersPlural[5] ? parseCount(othersPlural[5], null, true) : undefined;
       if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || per === null) out.unsupported.push(raw);
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), ...(spentFrom ? { perSpentFrom: spentFrom as "treasure" | "artifact" } : {}), ...(per ? { per } : {}), text: line });
+      continue;
+    }
+    // "~ enters with your choice of a reach counter or a vigilance counter on it" (Flycatcher Giraffid), "~ escapes with your
+    // choice of a +1/+1 counter or a flying counter on it" (Tizerus Charger): chosen as it enters, not as it was cast (CR
+    // 614.1c, 614.12; rulings on Tizerus Charger).
+    const counterChoice = new RegExp(`^~ (enters|escapes) with your choice of an? ${COUNTER} counter or an? ${COUNTER} counter on it\\.$`).exec(line);
+    if (counterChoice) {
+      if (out.entersCounterChoice || counterChoice[2] === counterChoice[3]) out.unsupported.push(raw);
+      else out.entersCounterChoice = { counters: [counterKind(counterChoice[2]!), counterKind(counterChoice[3]!)], ...(counterChoice[1] === "escapes" ? { escaped: true as const } : {}) };
       continue;
     }
     const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
@@ -3844,6 +3870,7 @@ export function compile(d: CardDef): CompiledCard {
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
+  if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
   // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
   const overload = out.altCosts?.find((a) => a.kind === "overload");
@@ -4190,10 +4217,16 @@ function checkCastingLinks(out: CompiledCard) {
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // Sower of Discord's trigger is about the two players chosen as it entered, and only that.
   if (out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") !== !!out.entersChooseTwoPlayers) bad = true;
+  // "The chosen player's upkeep", "whenever the chosen player casts" (Black Vise, Sewer Nemesis): the player its
+  // "As ~ enters, choose a player" chose.
+  if (out.triggers.some((tr) => tr.chosenPlayersTurn || tr.cast?.by === "chosen") && !out.entersChoosePlayer) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
   if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
+  // Hisoka's "the same mana value as the discarded card": an activated ability's discard cost of one card.
+  const mvDiscIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ifMvDiscarded":true');
+  if (mvDiscIn(out.spell) || mvDiscIn(out.triggers) || mvDiscIn(out.statics) || out.activated.some((ab) => mvDiscIn(ab) && !ab.costs?.some((c) => c.kind === "discard" && c.n === 1))) bad = true;
   // "If evidence was collected" needs the "you may collect evidence N" it's linked to (CR 701.59c): in the spell, or its
   // permanent's enters trigger.
   const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');

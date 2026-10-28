@@ -2928,8 +2928,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Lurking Jackals: "When an opponent has 10 or less life", Opal Avenger: "When you have 10 or less life", Veiled
   // Crocodile: "When a player has no cards in hand", Hidden Predators: "When an opponent controls a creature with power 4
   // or greater", Endangered Armodon: "When you control a creature with toughness 2 or less", Goblins of the Flarg: "When
-  // you control a Dwarf".
-  const st = new RegExp(`^When (you control no .+?|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
+  // you control a Dwarf". Drop of Honey: "When there are no creatures on the battlefield": anyone's; it's sacrificed even if
+  // one is back by the time it resolves (rulings).
+  const st = new RegExp(`^When (you control no .+?|there are no creatures on the battlefield|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or (?:more|less) life|an opponent has ${NUM} or less life|a player has no cards in hand|(?:you|an opponent) controls? an? (?:[A-Z][a-z]+|creature with (?:power|toughness) ${NUM} or (?:greater|less))|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

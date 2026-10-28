@@ -26,6 +26,8 @@ import {
   attackablePermanentProblem,
   attackProblem,
   attackCost,
+  attackCostOptions,
+  attackCostsPayable,
   attackTaxOf,
   attackYouLimit,
   combatLimit,
@@ -304,6 +306,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
+    // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
+    if (pend.kind === "pickPermanents" && pend.attackCost) {
+      const rest = s.declaring?.costs?.slice(1) ?? [];
+      const ids: ObjectId[] = [];
+      for (const id of [...pend.options].sort((a, b) => permanentWorth(s, pid, a) - permanentWorth(s, pid, b))) {
+        if (ids.length < pend.count && attackCostsPayable(s, pid, rest, [...ids, id])) ids.push(id);
+      }
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
@@ -2940,8 +2951,14 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const given = new Set((s.resolving.countersPutThisWay ?? []).map((c) => c.id));
     return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   }
-  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+  // Drop of Honey, Purging Scythe: a tied creature of anyone's to destroy or damage: an opponent's, worth the most to them;
+  // else our least useful one.
+  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}')) {
+    const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
+    return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
+  }
+  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   if ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created") return [...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
@@ -5394,6 +5411,14 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can only attack alone (Master of Cruelties) stays home when others attack (CR 506.5).
   if (attacks.length > 1) attacks = attacks.filter((a) => !characteristics(s, obj(s, a.attacker)).onlyAttacksAlone);
+  // Exalted Dragon, Leviathan: they attack when the lands to sacrifice are spare (seven left after), and only if all such
+  // costs can be paid together (CR 508.1i). Floodtide Serpent's returning an enchantment isn't weighed: it stays home.
+  const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+  const costsOf = (a: { attacker: ObjectId }) => characteristics(s, obj(s, a.attacker)).ownAttackCosts;
+  const spare = (a: { attacker: ObjectId }) => costsOf(a).every((c) => c.action === "sacrifice" && attackCostOptions(s, pid, c).every((id) => objIsType(s, obj(s, id), "Land")));
+  attacks = attacks.filter((a) => !costsOf(a).length || spare(a));
+  const landsPaid = attacks.reduce((n, a) => n + costsOf(a).reduce((t, c) => t + c.n, 0), 0);
+  if (landsPaid && (lands - landsPaid < 7 || !attackCostsPayable(s, pid, attacks.flatMap(costsOf)))) attacks = attacks.filter((a) => !costsOf(a).length);
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");

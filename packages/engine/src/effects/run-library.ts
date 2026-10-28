@@ -327,6 +327,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           sc.queue.shift();
           continue;
         }
+        // "Discards X cards" with X 0 (Cabal Shrine): nothing to choose or discard.
+        if (!e.hand && n <= 0) {
+          sc.chosen![pid] = [];
+          sc.queue.shift();
+          continue;
+        }
         if (!e.hand && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
           return "paused";

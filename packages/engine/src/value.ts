@@ -110,6 +110,15 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
       v = v ?? 0;
       continue;
     }
+    // By Invitation Only: "Each player sacrifices that many creatures of their choice", the number we'd choose: each
+    // loses their least useful ones.
+    if (e.type === "pick" && e.action === "sacrifice" && typeof e.n === "object" && e.n.count.kind === "chosenNumber") {
+      const n = chosen?.number ?? 0;
+      const who = e.who.ref === "eachPlayer" ? livingPlayers(s) : e.who.ref === "eachOpponent" ? opponents(s, pid) : [];
+      for (const p of who) add(s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && objectMatches(s, { ...e.filter, controller: "you" }, o, p, false)).sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, n), true);
+      v = v ?? 0;
+      continue;
+    }
     if (e.type === "damage") {
       const amount = estimate(e.amount);
       if (e.to.ref === "each") add(group(e.to), true, (o) => (lethalDamage(s, o) <= amount ? 1 : 0.2));

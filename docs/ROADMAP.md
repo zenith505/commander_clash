@@ -1,7 +1,7 @@
 # Roadmap
 
-26,805 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,835 of
+26,846 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,867 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -472,6 +472,40 @@ line blocks.
    Killer Service ("you may pay {2} and sacrifice a token": a paid "may" with a sacrifice in it), Vivi's Persistence
    ("whenever your commander enters or attacks" from the graveyard: "your commander attacks" isn't parsed), Abundant
    Harvest ("choose land or nonland": a new choice).
+   Round 188 went on from the top: "choose odd or even" (Extinction Event, Mutinous Massacre, Twins of Discord,
+   Zimone's Hypothesis, Thanos, Gollum, Ashling's Prerogative; zero is even; new Odd/Even buttons with a browser test),
+   "sacrifice two untapped lands instead" (Lotus Vale, Scorched Ruins; both picked together, browser test) and "an
+   untapped Mountain / Island" (Balduvian Trading Post, Soldevi Excavations), Gatta and Luzzu (damage prevented
+   becomes +1/+1 counters), "that player / target opponent becomes the monarch" (M'Baku, Starscream), Sapling of
+   Colfenor, Gix's Command ("on up to one creature", anyone's), Thunderous Velocipede, Kibo ("each player creates" a
+   named token), Botanical Brawler ("the first time +1/+1 counters have been put on that permanent this turn"),
+   Wolverine ("double all damage ~ would deal", "if ~ dealt damage to another creature this turn"), Elvish Guidance
+   ("an additional {G} for each Elf on the battlefield"), Ringwraiths ("when the Ring tempts you" from the graveyard),
+   Slime Against Humanity, Morningtide's Light ("until your next turn, prevent all damage that would be dealt to you").
+   Fixed: "until your next turn" damage effects (Lightning, Army of One) now end when that turn begins; before, they
+   came back on every other player's turn.
+   Out after round 188 (looked at, not done): Protean Hydra (a trigger on counters removed by any cause), Caustic Bronco
+   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Staff of Eden ("card not
+   named ~" as a graveyard target needs the source's name bound; "permanents you control but don't own" count),
+   Haakon (cast only from the graveyard), Earthshape, Sigarda's Splendor ("note your life total"), Basri Ket's -2,
+   Ochre Jelly, Kamahl's Druidic Vow, Green Sun's Twilight, Industrial Advancement, Froghemoth.
+   Round 189 went on from the top: "copy that spell X times" (Storm King's Thunder, with X kept from the Thunder;
+   Photon Blast Barrage), "choose one. If ..., (you may) choose both instead" on triggers (SOLDIER Military Program
+   with "up to two Soldiers you control" picked as it resolves, browser test; Disciple of Perdition; Prophetic Titan,
+   where delirium means both), "then if it has exactly four +1/+1 counters on it" (Ayara's Oathsworn), a group dealing
+   damage equal to each one's power (Bartz and Boko, Moonlight Hunt), "its controller searches ... with a stun counter
+   on it" (Magmatic Hellkite), Saffi Eriksdotter (only into your graveyard), Vraska the Unseen's +1 ("whenever a
+   creature deals combat damage to ~"), Cult Conscript ("a non-Skeleton creature died under your control this turn"),
+   Game Over ("a player's life total is less than or equal to half their starting life total"), Tainted Sigil,
+   Henrika's back face ("with flying, deathtouch, and/or lifelink"), Celeborn the Wise, By Invitation Only (browser
+   test).
+   Out after round 189 (looked at, not done): Belt of Giant Strength (equip cost less by the target's power), Retribution
+   of the Ancients ("remove X +1/+1 counters from among creatures you control" as a cost), Pact Weapon and Jace, Mirror
+   Mage ("draw a card and reveal it", now in Lane B's round B19, to reuse), Verdeloth the Ancient, Faerie Fencing, Flame
+   Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler, Pyrrhic Strike and Surge
+   of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Icebreaker Kraken, Mass
+   Diminish, Display of Power, Jason Bright, Spider-Man 2099, Blood for Bones, Quakebringer, Widespread Brutality,
+   Belligerent Yearling, Lorthos, Zidane, Discerning Financier, Dragonspark Reactor, Eight-and-a-Half-Tails.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1893,8 +1927,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creatures with flanking" (Telim'Tor) and "Other creatures you control with flanking" (Cavalry Master); "~ and each
   other creature with the same name as it" (Cylian Sunsinger); Chaos Harlequin; Harsh Deceiver; Homarid Warrior;
   Disappear; Domineer; Fulgent Distraction; Songstitcher; Viscerid Drone ("sacrifice a creature and a (snow) Swamp").
-  New browser tests: forecast from the hand menu in your upkeep, and Orcish Conscripts' block button. +34 (26,743 with
-  round 187).
+  New browser tests: forecast from the hand menu in your upkeep, and Orcish Conscripts' block button. +34 (26,784 with
+  rounds 188 and 189).
 - Skipped there, with reasons: Paladin of Prahv (forecast making a delayed "whenever target creature deals damage this
   turn" trigger); Peer Pressure ("controls more creatures of the chosen type than each other player"); Illusionary
   Presence and Talara's Bane (a landwalk / a creature card's toughness chosen from a revealed hand); Flay and Venarian
@@ -1913,7 +1947,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   enchanted creature/land" as a cost, which a summoning-sick creature can pay (CR 302.6; Nature's Chosen, Veteran's
   Voice, Earthlore, Krovikan Plague, Tourach's Gate). Snow as a supertype changed in layer 4 (Melting, Arcum's
   Weathervane, Thermal Flux). Tek and Tribal Golem's "has X as long as you control a Y, ..." lists. "Look at target
-  face-down creature" (Smoke Teller, Aven Soulgazer; only the looking player's log names it, CR 708.5). +32 (26,775).
+  face-down creature" (Smoke Teller, Aven Soulgazer; only the looking player's log names it, CR 708.5). +32 (26,816 with rounds 188 and 189).
 - Skipped there, with reasons: Goblin Flotilla (a block trigger set up only for this combat by a pay-or-not); Infinite
   Authority (a delayed end step check on "if that creature was destroyed this way").
 - Round B22 (harder skipped cards, least played first): a color change on a spell (CR 112.4): "Target spell or
@@ -1937,7 +1971,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   able" (Crashing Boars); "that player reveals the top two cards of their library. You choose one of those cards and
   put it into their graveyard" (Balshan Beguiler); "they lose 5 life and you sacrifice this enchantment" (Pillar Tombs
   of Aku), with the world rule (CR 704.5k), which wasn't in the engine before. New browser tests: Qal Sisma Behemoth's
-  Block button, Personal Incarnation's owner-only ability on Ana's side, Pillar Tombs' choice. +30 (26,805).
+  Block button, Personal Incarnation's owner-only ability on Ana's side, Pillar Tombs' choice. +30 (26,846 with rounds 188 and 189).
 - Skipped there, with reasons: Oppressive Rays and Gloom (an activation tax that also applies to mana abilities);
   Gabriel Angelfire (rampage as a chosen ability); Goblin Sappers (one delayed trigger destroying two creatures);
   Nissa's Defeat (its Nissa rider); Martyrdom (a granted ability with "Only you may activate"); Exalted Dragon,

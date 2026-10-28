@@ -4866,6 +4866,10 @@ export interface ManaAbility {
   discardHand?: true;
   /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
   instantOnly?: true;
+  /** "Activate only as a sorcery" (Grinning Ignus): only when its controller could cast a sorcery (CR 307.1), so never while paying. */
+  sorceryOnly?: true;
+  /** "Return ~ to its owner's hand" as part of the cost (Grinning Ignus): never used by automatic payment. */
+  returnSelf?: true;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */

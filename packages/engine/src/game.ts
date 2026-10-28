@@ -4070,6 +4070,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
+  if (ab.returnSelf) {
+    log(s, `${p.name} returns ${name} to its owner's hand for mana.`);
+    moveObject(s, id, "hand");
+  }
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;

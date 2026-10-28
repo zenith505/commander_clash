@@ -44,12 +44,13 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: Choose a color\. Add one mana of that color for each ([^.]+? counter) on ~\./, ": Add X mana of any one color, where X is the number of $1s on ~.")
     // Doubling Cube: a mana ability (rulings), adding as much again of each type of mana in the pool.
     .replace(/: Double the amount of each type of unspent mana you have\.$/, ": Add as much again of each type of unspent mana you have.");
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Return ~ to its owner's hand|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
   let tap = false;
   let sacrificeSelf = false;
+  let returnSelf = false;
   let manaCost = "";
   let lifeCost: number | undefined;
   let energyCost: number | undefined;
@@ -76,6 +77,8 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     else if (c === "{T}") tap = true;
     else if (c === "Discard your hand" && !discardHand) discardHand = true;
     else if (c === "Sacrifice ~") sacrificeSelf = true;
+    // "Return ~ to its owner's hand" (Grinning Ignus): paid with the rest (CR 602.2b, 605.3a).
+    else if (c === "Return ~ to its owner's hand" && !returnSelf) returnSelf = true;
     // "Exert ~" (CR 701.43a): it won't untap during its controller's next untap step.
     else if (c === "Exert ~" && !exert) exert = true;
     else if (/^Pay \d+ life$/.test(c)) lifeCost = Number(/\d+/.exec(c)![0]);
@@ -86,7 +89,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
-  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
+  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(returnSelf ? { returnSelf: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
@@ -162,7 +165,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     else if ((m2 = /^Activate only ([^.]+)\.$/.exec(extra)) && !out.activateIf && !out.oncePerTurn) {
       // "Activate only if you control a Swamp", "... only once each turn", "... only during an opponent's turn" (CR 602.5b).
       const clauses = parseOnlyClauses(m2[1]!);
-      if (!clauses || clauses.sorcery) return null;
+      if (!clauses) return null;
+      // "Activate only as a sorcery" (Grinning Ignus): still a mana ability (CR 605.1a, rulings), so it isn't used to pay.
+      if (clauses.sorcery) out.sorceryOnly = true;
       if (clauses.once) out.oncePerTurn = true;
       if (clauses.cond) out.activateIf = clauses.cond;
     }

@@ -4,11 +4,12 @@
 // be blocked as long as its power is 3 or less" (Thieves' Tools), "As ~ enters, roll X d6" for its counters (Neverwinter
 // Hydra), "For each creature, its controller sacrifices it unless they pay X life" (Killing Wave), "Then if there are three
 // or more collection counters on it, sacrifice it. If you do, draw a card, then you may search ..." (Charitable Levy),
-// "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant).
+// "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant), a
+// mana ability that returns its source to hand, as a sorcery (Grinning Ignus).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, characteristics, invalidateCharacteristics, objHasKeyword, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, characteristics, defOf, manaOptions, planManaAbility, invalidateCharacteristics, objHasKeyword, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -47,7 +48,8 @@ const killingWave = card("Killing Wave", "Sorcery", "{X}{B}", {"cmc":1,"keywords
 const charitableLevy = card("Charitable Levy", "Enchantment", "{1}{W}", {"cmc":2,"keywords":[],"oracleText":"Noncreature spells cost {1} more to cast.\nWhenever a player casts a noncreature spell, put a collection counter on this enchantment. Then if there are three or more collection counters on it, sacrifice it. If you do, draw a card, then you may search your library for a Plains card, put it onto the battlefield tapped, then shuffle.","colors":["W"],"colorIdentity":["W"]});
 const edeaPossessedSorceress = card("Edea, Possessed Sorceress", "Legendary Creature — Human Warlock", "{2}{U}{B}{R}", {"cmc":5,"power":"2","toughness":"5","keywords":["Ward"],"oracleText":"Ward {2}\nAt the beginning of combat on your turn, gain control of target creature an opponent controls until end of turn. Untap that creature. It gains haste until end of turn.\nWhenever a creature you control but don't own dies, return it to the battlefield under its owner's control and you draw a card.","colors":["B","R","U"],"colorIdentity":["B","R","U"]});
 const sarkhanDragonAscendant = card("Sarkhan, Dragon Ascendant", "Legendary Creature — Human Druid", "{1}{R}", {"cmc":2,"power":"2","toughness":"2","keywords":["Behold","Treasure"],"oracleText":"When Sarkhan enters, you may behold a Dragon. If you do, create a Treasure token. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nWhenever a Dragon you control enters, put a +1/+1 counter on Sarkhan. Until end of turn, Sarkhan becomes a Dragon in addition to his other types and gains flying.","colors":["R"],"colorIdentity":["R"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant];
+const grinningIgnus = card("Grinning Ignus", "Creature — Elemental", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":[],"oracleText":"{R}, Return this creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery.","colors":["R"],"colorIdentity":["R"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -359,5 +361,36 @@ describe("Round 198", () => {
     for (const a of botActions(s, ap)) s = act(s, a);
     expect(treasures(s, ap)).toBe(1);
     expect(s.objects[pick!]!.zone).toBe("battlefield");
+  });
+
+  const poolOf = (s: GameState, pid: PlayerId) => Object.entries(s.players[pid]!.manaPool).filter(([, n]) => n).map(([m, n]) => `${m}${n}`).join(" ");
+  it("Grinning Ignus: {R} and returning it to hand add {C}{C}{R}, a mana ability (rulings); then it's cast again from the pool", () => {
+    const { s: s0, ap } = setup([]);
+    for (const p of Object.values(s0.players)) p.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+    const ignus = putOnBattlefield(s0, ap, grinningIgnus);
+    const x = manaOptions(s0, s0.objects[ignus]!)[0]!;
+    let s = run(s0, planManaAbility(s0, ap, ignus, x.ability, x.mana, undefined, x.extra, x.combo));
+    expect(s.objects[ignus]!.zone).toBe("hand");
+    expect(poolOf(s, ap)).toBe("R1 C2");
+    expect(s.stack.length).toBe(0);
+    s = run(s, planCast(s, ap, ignus));
+    expect(poolOf(s, ap)).toBe("");
+    s = resolveAll(s);
+    expect(s.objects[ignus]!.zone).toBe("battlefield");
+  });
+
+  it("Grinning Ignus: only as a sorcery, so not with a spell on the stack, and never used to pay automatically", () => {
+    const bear = creature("Test Bear", "Bear", 2, 2, "{1}{G}");
+    const { s: s0, ap, ids } = setup([bear, creature("Test Cub", "Bear", 2, 2, "{1}{R}")]);
+    for (const p of Object.values(s0.players)) p.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+    const ignus = putOnBattlefield(s0, ap, grinningIgnus);
+    const s = run(s0, planCast(s0, ap, ids[0]!));
+    expect(s.stack.length).toBe(1);
+    expect(planManaAbility(s, ap, ignus, 0, "C")).toBeNull();
+    // One untapped Mountain: {1}{R} only with Ignus's mana, which paying never takes.
+    const s1 = structuredClone(s0);
+    for (const id of s1.battlefield) if (s1.objects[id]!.controller === ap && id !== ignus) s1.objects[id]!.tapped = true;
+    s1.objects[s1.battlefield.find((id) => s1.objects[id]!.controller === ap && defOf(s1, s1.objects[id]!).name === "Mountain")!]!.tapped = false;
+    expect(planCast(s1, ap, ids[1]!)).toBeNull();
   });
 });

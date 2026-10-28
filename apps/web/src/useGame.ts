@@ -209,18 +209,19 @@ function hasInstantPlay(s: GameState): boolean {
 /**
  * A spell or ability that can be used only at this time and can be paid for now (CR 506.8, 602.5b): "Cast this spell
  * only during the declare attackers step and only if you've been attacked this step", "Activate only during your
- * upkeep", from your hand, the battlefield or your graveyard (Eternal Dragon).
+ * upkeep", from your hand (forecast), the battlefield or your graveyard (Eternal Dragon).
  */
 function hasTimedPlay(s: GameState): boolean {
   const me = s.players[HUMAN]!;
   for (const id of me.hand) if (timedCondition(compileCard(cardOf(s, id)).castOnly) && planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
-  for (const id of [...s.battlefield, ...me.graveyard]) {
+  // Forecast works from your hand (CR 702.57a).
+  for (const id of [...s.battlefield, ...me.graveyard, ...me.hand]) {
     const o = obj(s, id);
     if (o.zone === "battlefield" ? controllerOf(s, o) !== HUMAN : o.owner !== HUMAN) continue;
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      if (!timedCondition(ab.activateIf) || (ab.zone === "graveyard") !== (o.zone === "graveyard") || doesNothingNow(s, id, ab.body)) continue;
+      if (!timedCondition(ab.activateIf) || (ab.zone ?? "battlefield") !== o.zone || doesNothingNow(s, id, ab.body)) continue;
       if (planActivate(s, HUMAN, id, i)) return true;
     }
   }

@@ -291,6 +291,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "bounce", what: { ref: "self" } }, { type: "bounce", what }] : null;
   }
+  // Disappear: "Return enchanted creature and ~ to their owners' hands": the creature, then the Aura, before any state-based
+  // action could put the Aura into its owner's graveyard (CR 608.2c, 704.3).
+  if (/^Return enchanted creature and ~ to their owners' hands$/.test(s) && !ctx.spell) return [{ type: "bounce", what: { ref: "attached" } }, { type: "bounce", what: { ref: "self" } }];
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
   // Seasons Past: "Put ~ on the bottom of its owner's library", likewise the resolving spell itself (CR 608.2n).

@@ -103,6 +103,12 @@ function refPlayers(s: GameState, ref: PlayerRef, ctx: AmountCtx): PlayerId[] {
   if (ref.ref === "eachOpponent") return s.turnOrder.filter((id) => id !== ctx.controller && !s.players[id]!.lost);
   // "Among lands that player controls" in an intervening if (Mask of Intolerance): the trigger's player.
   if (ref.ref === "eventPlayer") return ctx.event?.player !== undefined ? [ctx.event.player] : [];
+  // "The chosen player" in a static ability (Sewer Nemesis): the one chosen as the permanent entered; none once that
+  // player has left the game (rulings).
+  if (ref.ref === "selfChosenPlayer") {
+    const p = selfObject(s, ctx)?.chosen?.player;
+    return p !== undefined && !s.players[p]!.lost ? [p] : [];
+  }
   return [];
 }
 
@@ -280,7 +286,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "destroyedThisWay":
     case "exiledThisWay":
       // As they last existed on the battlefield (CR 608.2h).
-      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
+      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).length;
     case "discardedThisWay": {
       if (c.filter) return (s.resolving?.discardedAll ?? []).filter((id) => !!s.objects[id] && printedMatches(c.filter!, defOf(s, s.objects[id]!))).length;
       const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
@@ -906,7 +912,7 @@ function describeCount(c: Count): string {
     case "discoveredBelow":
       return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":
-      return `#${c.filter.text} destroyed`;
+      return `#${c.filter.text} ${c.died ? "that died" : "destroyed"}`;
     case "exiledThisWay":
       return `#${c.filter.text} exiled`;
     case "cardsInGraveyard":

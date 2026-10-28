@@ -549,7 +549,7 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -1299,7 +1299,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
   // it as it would exist on the battlefield (CR 614.12, rulings).
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -3125,6 +3125,13 @@ function beginStep(s: GameState, step: Step): void {
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
       (s.turnLog ??= {}).upkeeps = (s.turnLog.upkeeps ?? 0) + 1;
+      // "Until your next upkeep" (Erhnam Djinn): it ends as that player's next upkeep begins, before its triggers; for a
+      // player who left the game, at the next upkeep (CR 800.4m).
+      const ending = s.effects.filter((e) => e.duration === "yourNextUpkeep" && ((e.turnOf === ap && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)));
+      if (ending.length) {
+        s.effects = s.effects.filter((e) => !ending.includes(e));
+        invalidateCharacteristics(s);
+      }
       fireEvent(s, { type: "step", step: "upkeep", active: ap });
       break;
     }
@@ -4043,7 +4050,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     const shown = revealable(s, o, ab.produces).slice(0, combo!);
     log(s, shown.length ? `${p.name} reveals ${shown.map((c) => nameOf(s, c)).join(", ")} for ${name}.` : `${p.name} reveals no cards for ${name}.`);
   }
-  if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  if (ab.oncePerTurn || ab.sacrificeIfActivated) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  // Farrelite Priest: the fourth activation this turn and each one after it make a delayed trigger that sacrifices it
+  // (rulings on Dragon Whelp); one made during an end step waits for the next turn's (CR 603.7).
+  if (ab.sacrificeIfActivated && o.zone === "battlefield" && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + i).length >= ab.sacrificeIfActivated)
+    addDelayed(s, "nextEndStep", p.id, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~" });
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
   if (ab.sacrificeSelf) {
@@ -6403,6 +6414,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Derevi: only from the command zone (rulings).
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
+  else if (ab.ownerOnly && o.owner !== pid) return `only ${d.name}'s owner may activate that ability`;
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
@@ -6435,6 +6447,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
   if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
+  if (ab.tapAttached) {
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    if (!host || host.zone !== "battlefield") return `${d.name} isn't attached to anything`;
+    if (host.tapped) return `${nameOf(s, host.id)} is tapped`;
+  }
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -6846,6 +6863,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     log(s, `${p.name} exerts ${d.name}.`);
     fireEvent(s, { type: "exerted", id: o.id });
   }
+  if (ab.tapAttached && o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield") tapPermanent(s, obj(s, o.attachedTo));
   if (ab.unattachCost && o.attachedTo) {
     log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
     fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });
@@ -6892,6 +6910,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
+    ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
@@ -7444,7 +7463,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
-    if (pend.what === "riot" || pend.what === "unleash") {
+    if (pend.what === "counterChoice") {
+      // "Enters with your choice of a reach counter or a vigilance counter on it" (CR 614.1c, 614.12).
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
+      const put = putCounters(s, o, choice, 1, true);
+      log(s, `${pend.source} enters with ${put ? `a ${choice} counter` : `no ${choice} counter`}.`);
+    } else if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
       else if (pend.what === "riot")
@@ -7466,7 +7490,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -7991,6 +8015,11 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
+    if (c.what === "counterChoice") {
+      const counters = compileCard(defOf(s, o)).entersCounterChoice?.counters ?? [];
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.map((k) => `a ${k} counter`).join(" or ")}` };
+      return true;
+    }
     if (c.what === "number") {
       const r = c.range ?? { min: 0, max: 999 };
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "number", options: [String(r.min)], numberRange: r, objectId: o.id, prompt: r.max === 999 ? "choose a number" : `choose a number between ${r.min} and ${r.max}` };
@@ -8244,10 +8273,20 @@ export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: Pl
   return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : ownAttackTax(s, a.attacker);
 }
 
-/** What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d). */
-export function blockCost(s: GameState, n: number): string {
+/**
+ * What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d), and what
+ * blocking with each of `blockers` costs itself (Qal Sisma Behemoth, Cowed by Wisdom, CR 509.1d-e).
+ */
+export function blockCost(s: GameState, n: number, blockers: ObjectId[] = []): string {
   const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0);
-  return per && n ? `{${per * n}}` : "";
+  const own = blockers.reduce((t, id) => t + (s.objects[id]?.zone === "battlefield" ? characteristics(s, obj(s, id)).ownBlockTax : 0), 0);
+  const total = (n ? per * n : 0) + own;
+  return total ? `{${total}}` : "";
+}
+
+/** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth)? */
+export function blocksMayCost(s: GameState, pid: PlayerId): boolean {
+  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0);
 }
 
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
@@ -8310,8 +8349,23 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
  */
 export function withoutCompany(s: GameState, id: ObjectId, attacks: { attacker: ObjectId }[]): string | null {
   const o = obj(s, id);
+  const others = characteristics(s, o).attackWithOthers;
+  if (others && new Set(attacks.filter((a) => a.attacker !== id).map((a) => a.attacker)).size < others) return `${nameOf(s, id)} can't attack unless at least ${others} other creatures attack`;
   for (const f of characteristics(s, o).attackOnlyWith ?? [])
     if (!attacks.some((a) => a.attacker !== id && objectMatches(s, f, obj(s, a.attacker), controllerOf(s, o), false))) return `${nameOf(s, id)} can't attack unless ${f.text} also attacks`;
+  return null;
+}
+
+/**
+ * Orcish Conscripts: "can't block unless at least two other creatures block": the creatures blocking this combat, these
+ * blocks and those other defending players declared before (`earlier`), not counting it (CR 509.1b).
+ */
+export function blockWithoutCompany(s: GameState, blocks: { blocker: ObjectId }[], earlier: number): string | null {
+  const ids = [...new Set(blocks.map((b) => b.blocker))];
+  for (const id of ids) {
+    const others = characteristics(s, obj(s, id)).blockWithOthers;
+    if (others && earlier + ids.length - 1 < others) return `${nameOf(s, id)} can't block unless at least ${others} other creatures block`;
+  }
   return null;
 }
 
@@ -8709,6 +8763,8 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
   const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
   if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
+  const unaccompanied = blockWithoutCompany(s, blocks, earlier);
+  if (unaccompanied) throw new RulesError(unaccompanied);
   // "No more than one creature can block each combat" (Silent Arbiter), counting every defending player's blockers
   // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
   const limit = combatLimit(s, "block");
@@ -8727,7 +8783,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   const req = taxed || ((earlier + seen.size >= limit || mineEarlier + seen.size >= mineLimit) && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
-  const tax = blockCost(s, seen.size);
+  const tax = blockCost(s, seen.size, [...seen.keys()]);
   // Odric: the blocks' controller chooses whether to pay their cost; if they don't, another set must be proposed (rulings).
   if (tax && p.id !== chooser.id) {
     s.pending = {
@@ -8798,7 +8854,8 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
-  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
+  // One that has to pay to block (Qal Sisma Behemoth) is never obliged to (CR 509.1c).
+  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !characteristics(s, o).ownBlockTax && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
@@ -9286,6 +9343,19 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
           changed = true;
         }
       }
+    // World rule (704.5k): of two or more world permanents, all but the one that has been one for the shortest time go to
+    // the graveyard; on a tie, all of them. That time is read from when each entered (its timestamp).
+    const worlds = s.battlefield.filter((id) => characteristics(s, obj(s, id)).supertypes.includes("World"));
+    if (worlds.length > 1) {
+      const newest = Math.max(...worlds.map((id) => obj(s, id).timestamp));
+      const kept = worlds.filter((id) => obj(s, id).timestamp === newest);
+      for (const id of worlds) {
+        if (kept.length === 1 && id === kept[0]) continue;
+        log(s, `${characteristics(s, obj(s, id)).name} is put into the graveyard (world rule).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    }
     if (attachmentSBAs(s)) changed = true;
     if (battleSBAs(s)) changed = true; // 704.5v-y
     if (!s.pending && s.entersChoices?.length && askEntersChoice(s)) return;

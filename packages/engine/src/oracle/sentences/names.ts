@@ -47,9 +47,12 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = /^That player discards all nonland cards with the same name as another card in their hand$/.exec(s)) && ctx.lastPlayerTarget !== undefined)
     return [{ type: "discard", who: { ref: "target", index: ctx.lastPlayerTarget }, n: 0, hand: true, filter: { kind: "card", notTypes: ["Land"], text: "nonland card" }, nameTwice: true }];
   // "Target player reveals their hand and discards all Trap cards" (Trapfinder's Trick): every card like that there.
-  if ((m = /^(Target player|Target opponent) reveals their hand and discards all (.+?) cards$/.exec(s))) {
+  // Tsabo's Decree: "... discards all creature cards of the chosen type" (after "Choose a creature type"): the type
+  // chosen as it resolves.
+  if ((m = /^(Target player|Target opponent) reveals their hand and discards all (.+?) cards( of the chosen type)?$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    const filter = parseSearchFilter(`${m[2]} card`);
+    const base = parseSearchFilter(`${m[2]} card`);
+    const filter = base && m[3] ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base;
     return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
   }
   // "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"

@@ -69,6 +69,14 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     const spec: TargetSpec = { kind: "any", text: "any other target", ...(before.length ? { distinctFrom: before } : { notSource: true }) };
     return { ref: "anyTarget", index: addTarget(ctx, spec) };
   }
+  // Captain's Maneuver: "target creature, planeswalker, or player", "another target creature, planeswalker, or player": a
+  // player, creature or planeswalker (not a battle), the second one different from the first (CR 115.3).
+  const cpp = /^(another )?target creature, planeswalker, or player$/i.exec(p);
+  if (cpp) {
+    const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "player" ? [i] : []));
+    if (cpp[1] && !before.length) return null;
+    return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], text: p.toLowerCase(), ...(cpp[1] ? { distinctFrom: before } : {}) }) };
+  }
   // Lozhan, Dragons' Legacy: "any target that isn't a commander": any player, or a creature, planeswalker or battle that
   // isn't a commander (rulings).
   if (/^any target that isn't a commander$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", commander: false, text: p }) };
@@ -336,7 +344,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
   // "Each creature you control named ~" (Gruff Triplets): with the source's name (CR 201.5), as it last existed if it's gone.
   // Genasi Enforcers: "Creatures you control named ~ get +1/+0 until end of turn".
-  const namedSelf = /^(each (?:other )?[a-z]+ you control|[a-z]+s you control) named ~$/i.exec(x);
+  // Cylian Sunsinger: "~ and each other creature with the same name as it": every creature named ~ (CR 201.2), anyone's.
+  const namedSelf = /^(each (?:other )?[a-z]+ you control|[a-z]+s you control) named ~$/i.exec(x) ?? (/^~ and each other creature with the same name as it$/i.test(x) ? ["", "each creature"] : null);
   if (namedSelf) {
     const each = parseObjectNow(namedSelf[1]!, ctx, cards);
     return each?.ref === "each" && each.filter.named === undefined ? { ...each, filter: { ...each.filter, named: "~", text: `${each.filter.text ?? namedSelf[1]} named ~` } } : null;
@@ -454,16 +463,23 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const attachedThat = /^all (Auras|Equipment) attached to that creature$/i.exec(x);
   // Street Sweeper: "destroy all Auras attached to target land": the Auras, not the land. Strip Bare: "Destroy all Auras
   // and Equipment attached to target creature"; Disarm: "Unattach all Equipment from target creature".
-  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature)$/i.exec(x) : null;
+  // Fulgent Distraction: "all Equipment attached to them": to each of the creatures targeted before.
+  const attachedTarget = !cards ? /^all (Auras|Equipment|Auras and Equipment) attached to (target land|target creature|them)$/i.exec(x) : null;
   if (attachedTarget) {
     const t = parseObjectNow(attachedTarget[2]!, ctx, cards);
-    if (t?.ref !== "target" || t.n) return null;
+    if (t?.ref !== "target" || (t.n && attachedTarget[2] !== "them") || t.sameName || t.sharesColor || t.attachedToo) return null;
     const kind = attachedTarget[1]!;
     const filter: TargetSpec =
       kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" }
       : kind === "Equipment" ? { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" }
       : { kind: "object", subtypes: ["Aura", "Equipment"], text: "Aura or Equipment" };
     return { ...t, attachedToo: { filter, only: true } };
+  }
+  // Treefolk Mystic: "Whenever ~ blocks or becomes blocked by a creature, destroy all Auras attached to that creature": the
+  // Auras on the trigger's creature as it resolves.
+  if (attachedThat && !cards && ctx.subject && !ctx.targets.length) {
+    const kind = attachedThat[1]!;
+    return { ref: "attachedToSubject", filter: kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" } };
   }
   if ((andAttached || attachedThat) && !cards) {
     const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
@@ -1261,8 +1277,9 @@ export function parseTargetPhrase(
     extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : attached[1] === "land" ? { types: ["Land"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
     p = p.slice(0, attached.index);
   }
-  // "creature an opponent controls that was dealt damage this turn"
-  const hurt = / that was dealt damage this turn$/.exec(p);
+  // "creature an opponent controls that was dealt damage this turn"; Giant Shark: "a creature that has been dealt damage this
+  // turn", the same.
+  const hurt = / that (?:was|has been) dealt damage this turn$/.exec(p);
   if (hurt) {
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
@@ -1417,11 +1434,12 @@ export function parseTargetPhrase(
     // cycling too (CR 702.29e; the card data lists "Cycling" with it).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
-  } else if ((m = / with modular( you control)?$/.exec(p))) {
+  } else if ((m = / with (modular|flanking)( you control)?$/.exec(p))) {
     // Arcbound Overseer: "each creature you control with modular": modular as the card data lists it (CR 702.43a), on
-    // the battlefield's characteristics (lost with all abilities, layer 6).
-    extra.keywords = ["Modular"];
-    p = p.slice(0, m.index) + (m[1] ?? "");
+    // the battlefield's characteristics (lost with all abilities, layer 6). Telim'Tor: "attacking creatures with
+    // flanking" (CR 702.25a), granted flanking too.
+    extra.keywords = [capital(m[1]!)];
+    p = p.slice(0, m.index) + (m[2] ?? "");
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");

@@ -968,7 +968,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Karakyk Guardian: "~ has hexproof as long as it hasn't dealt damage yet": since it became this object (CR 400.7).
   if (/^(?:~|it) hasn't dealt damage yet$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "hasDealtDamage", not: true };
   // The Tarrasque: "~ has haste and ward {10} as long as it was cast": it entered as a spell, cast from any zone (rulings).
-  if (/^(?:~|it) was cast$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "cast" };
+  // Only for a static ability's own effect: "When ~ enters, if it was cast" is the trigger's `ifCast`.
+  if (/^(?:~|it) was cast$/.test(text) && st.mods.length && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "cast" };
   // Cactuar: "if ~ didn't enter the battlefield this turn".
   if (/^~ didn't enter (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn", not: true };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come

@@ -590,6 +590,8 @@ export interface GameObject {
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
+  /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife): how much was paid, for "the life paid as it entered". */
+  lifePaidAsEntered?: number;
   /**
    * Cast bestowed (CR 702.103b): as a spell and as the permanent it becomes, it's an Aura with enchant creature, not a
    * creature (see defOf). It stops being bestowed when it becomes unattached or resolves with an illegal target (702.103e-f).

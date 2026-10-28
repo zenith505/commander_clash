@@ -992,6 +992,7 @@ export function moveObject(
     registerRoom(s, cardIdOf(o));
   }
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
+  if (to === "battlefield") o.lifePaidAsEntered = undefined; // and for "the life paid as it entered"
   if (to === "battlefield") o.mutations = undefined; // and for "the number of times ~ has mutated"
   o.counters = {};
   o.counterTimestamps = undefined;
@@ -7407,6 +7408,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       s.entersChoices!.unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "tributePay", ...(entry?.enters ? { enters: entry.enters } : {}) });
       return;
     }
+    if (pend.what === "lifeAsEnters") {
+      // "As ~ enters, pay any amount of life" (CR 614.12, 119.4): that much life is paid now, as it enters.
+      const n = Number(choice);
+      if (n) loseLife(s, p.id, n);
+      o.lifePaidAsEntered = n;
+      log(s, `${p.name} pays ${n} life as ${pend.source} enters.`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "tributePay") {
       const n = compileCard(defOf(s, o)).tribute ?? 0;
       if (choice === "pay") {
@@ -7480,7 +7491,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "lifeAsEnters" || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -7752,16 +7763,30 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
   const devour = compileCard(d).devour;
   s.leftTogether = undefined; // sacrificed all at once
   let n = 0;
+  // Dracoplasm: "the total power of those creatures ... their total toughness", as they last existed (CR 608.2h).
+  const totals = { power: 0, toughness: 0 };
+  for (const id of ids) {
+    const x = s.objects[id];
+    if (x?.zone === "battlefield" && devour?.defines === "total") {
+      totals.power += power(s, x);
+      totals.toughness += toughness(s, x);
+    }
+  }
   for (const id of ids) {
     const x = s.objects[id];
     if (x?.zone !== "battlefield") continue;
-    log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} to ${d.name}'s devour.`);
+    log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} ${devour?.defines || devour?.n === 1 ? "as" : "to"} ${d.name}${devour?.defines || devour?.n === 1 ? " enters" : "'s devour"}.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
     n++;
   }
   s.leftTogether = undefined;
   o.devoured = n;
-  if (n && devour) {
+  if (devour?.defines === "total") {
+    // Its power and toughness become those totals (layer 7b, CR 613.4b) for as long as it's on the battlefield.
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: d.name, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "setPT", power: totals.power, toughness: totals.toughness }] });
+    log(s, `${d.name} enters as a ${totals.power}/${totals.toughness}.`);
+  }
+  if (n && devour && devour.n) {
     invalidateCharacteristics(s);
     const put = putCounters(s, o, "+1/+1", n * (devour.n === "devoured" ? n : devour.n), true);
     log(s, `${d.name} devours ${n} and enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
@@ -8008,6 +8033,22 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "counterChoice") {
       const counters = compileCard(defOf(s, o)).entersCounterChoice?.counters ?? [];
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.map((k) => `a ${k} counter`).join(" or ")}` };
+      return true;
+    }
+    if (c.what === "lifeAsEnters") {
+      // "Pay any amount of life" (CR 119.4): no more than its controller's life (none with a "can't lose life" effect),
+      // nor than Nameless Race's cap, counted now.
+      const you = controllerOf(s, o);
+      const cap = compileCard(defOf(s, o)).entersPayLife?.max;
+      const max = Math.max(0, Math.min(payableLife(s, you), cap === undefined ? Infinity : evalAmount(s, cap, { controller: you, sourceId: o.id })));
+      if (!max) {
+        q.shift();
+        o.lifePaidAsEntered = 0;
+        log(s, `${player(s, you).name} pays no life as ${defOf(s, o).name} enters.`);
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "lifeAsEnters", options: ["0"], numberRange: { min: 0, max }, objectId: o.id, prompt: `pay any amount of life as it enters (up to ${max})` };
       return true;
     }
     if (c.what === "number") {

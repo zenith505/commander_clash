@@ -574,6 +574,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
       return same ? (o.devoured ?? 0) : 0;
     }
+    case "lifePaidAsEntered": {
+      // "The life paid as it entered" (Minion of the Wastes): the source as that permanent, also after it left (CR 608.2h).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o) return 0;
+      const zc = o.zoneChanges ?? 0;
+      const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
+      return same ? (o.lifePaidAsEntered ?? 0) : 0;
+    }
     case "mutations": {
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!o) return 0;

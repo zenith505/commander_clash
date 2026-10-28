@@ -1294,6 +1294,36 @@ export function compile(d: CardDef): CompiledCard {
       else out.devour = { n: "devoured", filter: { kind: "object", types: ["Creature"], text: "creature" } };
       continue;
     }
+    // "As ~ enters, sacrifice any number of permanents. ~ enters with that many +1/+1 counters on it." (Shimatsu), "...
+    // untapped Forests." (Wood Elemental, with its CDA below), "... creatures. ~'s power becomes the total power of those
+    // creatures and its toughness becomes their total toughness." (Dracoplasm): devour's choice as it enters (CR
+    // 614.1c, 614.12), before it's on the battlefield, so not of itself (rulings on Shimatsu, Wood Elemental).
+    const asSac = /^As ~ enters, sacrifice any number of (permanents|creatures|untapped Forests)\.(?: (~ enters with that many \+1\/\+1 counters on it|~'s power becomes the total power of those creatures and its toughness becomes their total toughness)\.)?$/.exec(line);
+    if (asSac) {
+      const filter: TargetSpec =
+        asSac[1] === "permanents" ? { kind: "object", text: "permanent" }
+        : asSac[1] === "creatures" ? { kind: "object", types: ["Creature"], text: "creature" }
+        : { kind: "object", subtypes: ["Forest"], tapped: false, text: "untapped Forest" };
+      const rider = asSac[2]?.startsWith("~ enters") ? "counters" : asSac[2] ? "total" : undefined;
+      // Each wording goes with its own rider: Forests alone (their count is the P/T), counters for permanents, totals for creatures.
+      const fits = asSac[1] === "untapped Forests" ? !rider : asSac[1] === "permanents" ? rider === "counters" : rider === "total";
+      if (out.devour || !fits) out.unsupported.push(raw);
+      else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
+      continue;
+    }
+    // "As ~ enters, pay any amount of life." (Minion of the Wastes; CR 614.12, 119.4), with Nameless Race's "The amount you
+    // pay can't be more than the total number of white nontoken permanents your opponents control plus the total number of
+    // white cards in their graveyards."
+    const asLife = /^As ~ enters, pay any amount of life\.(?: The amount you pay can't be more than (.+)\.)?$/.exec(line);
+    if (asLife) {
+      const cap = asLife[1] === "the total number of white nontoken permanents your opponents control plus the total number of white cards in their graveyards" ? parseCount("the number of white nontoken permanents your opponents control plus the number of white cards in your opponents' graveyards", null) : null;
+      if (out.entersPayLife || (asLife[1] && !cap)) out.unsupported.push(raw);
+      else {
+        out.entersPayLife = cap ? { max: cap } : {};
+        out.entersOptions = [...(out.entersOptions ?? []), "lifeAsEnters"];
+      }
+      continue;
+    }
     // Mirage's flash Auras and enchantments: castable any time, sacrificed in the next cleanup step if that wasn't a
     // time a sorcery could have been cast (see castSpell).
     if (line === "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step.") {

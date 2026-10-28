@@ -365,6 +365,8 @@ export type Count =
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** "The life paid as it entered" (Minion of the Wastes, Phyrexian Processor): the source's GameObject.lifePaidAsEntered. */
+  | { kind: "lifePaidAsEntered" }
   /** "For each Aura you controlled that was attached to it" (Hateful Eidolon): the dead creature's, as it last existed (CR 603.10a). */
   | { kind: "aurasYouControlledAttached" }
   /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
@@ -3598,7 +3600,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -5375,8 +5377,18 @@ export interface CompiledCard {
    * Devour N (CR 702.82a, c): "As this object enters, you may sacrifice any number of [creatures]. This permanent
    * enters with N +1/+1 counters on it for each [one] sacrificed this way." `n: "devoured"`: Thromok's "Devour X,
    * where X is the number of creatures devoured this way".
+   * "As ~ enters, sacrifice any number of untapped Forests / permanents / creatures" (CR 614.1c, 614.12) is the same
+   * choice: Shimatsu's "enters with that many +1/+1 counters" is n 1; with `defines` there are no counters (n 0), and
+   * its power and toughness come from what was sacrificed: "count", Wood Elemental's "equal to the number of Forests
+   * sacrificed as it entered" (its CDA reads GameObject.devoured); "total", Dracoplasm's "power becomes the total
+   * power of those creatures and its toughness becomes their total toughness" (a layer 7b effect from then on).
    */
-  devour?: { n: number | "devoured"; filter: TargetSpec };
+  devour?: { n: number | "devoured"; filter: TargetSpec; defines?: "count" | "total" };
+  /**
+   * "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor; CR 614.12, 119.4): the amount, kept
+   * as GameObject.lifePaidAsEntered. `max`: Nameless Race's "The amount you pay can't be more than ...".
+   */
+  entersPayLife?: { max?: Amount };
   /**
    * "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." (Phantom Centaur): every bit
    * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.

@@ -1752,6 +1752,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Mount Doom: chosen as it resolves (CR 608.2d), then the rest destroyed at once.
       const sc = (s.resolving!.scratch ??= {});
       const all = () => s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      if (e.random) {
+        // Last One Standing: one at random, then the rest at once, with nothing in between (rulings).
+        const options = all();
+        if (!options.length) return;
+        const keep = options[Math.floor(nextRandom(s) * options.length)]!;
+        log(s, `${src} chooses ${nameOf(s, keep)} at random.`);
+        for (const id of options.filter((x) => x !== keep)) destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+        return;
+      }
       if (!sc.chosen?.[ctx.controller]) {
         const options = all();
         if (!options.length) return;

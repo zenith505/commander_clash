@@ -1,7 +1,7 @@
 # Roadmap
 
-27,206 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,999 of
+27,246 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,009 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -665,6 +665,28 @@ line blocks.
    damage, not only combat), Phyrexian Soulgorger (cumulative upkeep that sacrifices creatures), Mariposa Military Base
    (rad counters as it enters tapped). Smaller gaps: bots never activate Grinning Ignus; Celestial Reunion, Countersculpt,
    Kindle the Inner Flame, Molten Exhale and Theorist's Sanctum (behold as a cost or a replacement) are still out.
+   Round 199 went on from the top: "as long as you control an artifact creature or a Plan" (Doctor Doom; Plan is now a
+   subtype, so The Masters of Evil's search works), "each creature you control that's a Food or a Golem" (Brenard,
+   Ginger Sculptor), "each creature that didn't enter this turn" (Let the Galaxy Burn), "prevent all combat damage that
+   other creatures would deal this turn" (Haze Frog: its own damage isn't prevented), "choose a creature at random,
+   then destroy the rest" (Last One Standing), "choose X cards in your hand and discard the rest" (Breakthrough), "both
+   on top of your library or both on the bottom" (Dream Cache), "you may have your life total become the number of
+   charge counters on ~" (Eternity Vessel), "as long as you control another Elf, you may play an additional land"
+   (Thranduil's Company), "a noncreature spell or a Dragon spell" (Runescale Stormbrood), "deals combat damage to a
+   planeswalker" (Zagras), "you may pay life equal to its power. If you do, put that many counters" (Madame Null),
+   "as though it had flash if X is 3 or less" (Silver Scrutiny), "scry that many cards plus one instead" (Kenessos),
+   "as long as enchanted permanent is a creature, it gets +1/+1 for each" (Born to Drive), "creatures you control
+   that are enchanted by Auras you control have base power and toughness 4/4" (Archon of the Wild Rose), "attach any
+   number of Auras and Equipment you control to it" (Heavenly Blademaster, the Ardenn picker on itself), "spells your
+   opponents cast that target ~ cost {1} less" and "spells you cast that target enchanted player cost {1} less"
+   (Accursed Witch // Infectious Curse), "Equipment named A, B, and C have indestructible" (Shield of Kaldra), "a
+   tenth of the creatures they control, rounded up" (Legate Lanius), "a spell with the same name as a card in their
+   graveyard" (Dragonlord Kolaghan: not a copy, not face down), "a creature you control with flash or haste is dealt
+   damage" (Sonic the Hedgehog). Browser tests click through the Blademaster's attach picker and Dream Cache's
+   top-or-bottom choice.
+   Out after round 199 (looked at, not done): Jaws, Relentless Predator (no "is sacrificed or destroyed" event),
+   Iron Monger (no "whenever you connive" trigger). Bots answer Eternity Vessel's "you may" only when it raises their
+   life.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

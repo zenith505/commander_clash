@@ -1997,7 +1997,7 @@ function targetIndexOf(e: Effect): number | undefined {
   const refs = [("what" in e ? e.what : undefined), ("who" in e ? e.who : undefined), ("to" in e ? e.to : undefined), ("a" in e ? e.a : undefined), ("b" in e ? e.b : undefined)];
   for (const r of refs) if (r && "index" in r && (r.ref === "target" || r.ref === "anyTarget")) return r.index;
   if (e.type === "counterSpell") return e.index;
-  if (e.type === "attachAny") return e.host;
+  if (e.type === "attachAny") return e.self ? undefined : e.host;
   return undefined;
 }
 
@@ -3149,6 +3149,9 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Eternity Vessel: "you may have your life total become the number of charge counters on ~": when that's more life.
+  const set = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "setLife" && e.effects[0]!.who.ref === "you" ? e.effects[0]! : undefined;
+  if (r && set?.type === "setLife" && set.amount) return evalAmount(s, set.amount, { controller: pid, sourceId: r.item.sourceId }) > player(s, pid).life;
   // "You may get two rad counters" (Tato Farmer): milling ourselves, while the library and life can take it.
   if (e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "getRad" && x.who.ref === "you")) return player(s, pid).library.length >= 20 && player(s, pid).life >= 12;
   // Descendants' Fury: "you may sacrifice one of them. If you do, reveal cards ... until you reveal a creature card that
@@ -4403,7 +4406,7 @@ function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Ef
 function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
   const item = s.resolving?.item;
   const e = item?.body?.effects.find((x) => x.type === "attachAny");
-  const t = e?.type === "attachAny" ? item!.targets?.[e.host] : undefined;
+  const t = e?.type === "attachAny" ? (e.self && item?.sourceId ? ({ kind: "object", id: item.sourceId } as const) : item!.targets?.[e.host]) : undefined;
   if (!t || (t.kind !== "object" && t.kind !== "player")) return [];
   const host = t.kind === "object" ? s.objects[t.id] : undefined;
   const ourHost = host ? controllerOf(s, host) === pid : t.id === pid;

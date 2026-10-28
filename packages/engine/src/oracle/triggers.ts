@@ -713,6 +713,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // 108.3), a card they took over or stole.
   const notOwned = / (?:they|you) (?:don't|doesn't) own$/.exec(what);
   if (notOwned) what = what.slice(0, notOwned.index);
+  // Dragonlord Kolaghan: "a creature or planeswalker spell with the same name as a card in their graveyard": the caster's
+  // graveyard as the spell becomes cast (rulings); a face-down spell has no name (CR 708.2).
+  const nameInYard = m[1] === "an opponent" ? / with the same name as a card in their graveyard$/.exec(what) : null;
+  if (nameInYard) what = what.slice(0, nameInYard.index);
   // Folk Hero's "Whenever you cast a spell that shares a creature type with this creature": one creature type in common,
   // a changeling having every one (CR 702.73a).
   const shares = / that shares a creature type with ~$/.exec(what);
@@ -764,6 +768,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
   // Chalice of the Void: "a spell with mana value equal to the number of charge counters on ~", as it's cast (rulings).
+  // Runescale Stormbrood: "a noncreature spell or a Dragon spell" is "a noncreature or Dragon spell".
+  what = what.replace(/^(non[a-z]+|[A-Z][a-z]+) spell or an? ([A-Z][a-z]+|non[a-z]+)$/, "$1 or $2");
   const parsed0 = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" || /^the number of [a-z]+ counters on ~$/.test(t) ? parseCount(t, null) : null) });
   // Firespitter Whelp: "a noncreature or Dragon spell": either kind (TargetSpec.anyOf).
   // Mindsparker: "a white or blue instant or sorcery spell": one of those colors and one of those types.
@@ -813,7 +819,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -830,7 +836,8 @@ function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | nu
   // "Whenever a creature is dealt damage, ~ deals that much damage to that creature's controller" (Repercussion): anyone's.
   // Termination Facilitator: "Whenever a creature or planeswalker an opponent controls with a bounty counter on it is dealt
   // damage, destroy it": one with that counter as it's dealt the damage.
-  const m = /^Whenever an? (.+?) (?:(you control|an opponent controls(?: with an? [a-z]+ counter on it)?) )?is dealt damage, (.+)$/.exec(line);
+  // Sonic the Hedgehog: "a creature you control with flash or haste": either keyword, as it's dealt the damage.
+  const m = /^Whenever an? (.+?) (?:(you control(?: with [a-z]+ or [a-z]+)?|an opponent controls(?: with an? [a-z]+ counter on it)?) )?is dealt damage, (.+)$/.exec(line);
   if (!m) return null;
   const whose = m[2];
   if (!whose && m[1] !== "creature") return null;
@@ -1138,6 +1145,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // planeswalker"; Vraska, Swarm's Eminence: "... to a player or planeswalker, put a +1/+1 counter on that creature"; her
   // Assassin: "Whenever ~ deals damage to a planeswalker, destroy that planeswalker". Once for each recipient (CR 603.2c);
   // the creature has to have deathtouch as it deals the damage (rulings).
+  // Zagras, Thief of Heartbeats: "Whenever a creature you control deals combat damage to a planeswalker, destroy that
+  // planeswalker": combat damage only.
+  const combatTo = /^Whenever a creature you control deals combat damage to a planeswalker, /.test(line);
+  if (combatTo) line = line.replace(" deals combat damage to ", " deals damage to ");
   const dealsTo = /^Whenever (~|a creature you control(?: with (deathtouch))?) deals damage to a (planeswalker|player or planeswalker), (.+)$/.exec(line);
   if (dealsTo) {
     const what = dealsTo[3] === "planeswalker" ? "planeswalker" : "playerOrPlaneswalker";
@@ -1148,7 +1159,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const self = dealsTo[1] === "~";
     const filter = parseTargetPhrase(dealsTo[1]!.replace(/^a /, "").replace(/ you control/, "").replace(/^~$/, "creature"));
     if (filter?.kind !== "object") return "fail";
-    return { event: "yourCreatureDealsDamage", dealer: { filter: { ...filter, text: dealsTo[1]!.replace(/^a /, "") } }, damageTo: { what, ...(self ? { self: true as const } : {}), ...(dealt ? { subjectDealt: true as const } : {}) }, body };
+    return { event: "yourCreatureDealsDamage", dealer: { filter: { ...filter, text: dealsTo[1]!.replace(/^a /, "") } }, damageTo: { what, ...(self ? { self: true as const } : {}), ...(dealt ? { subjectDealt: true as const } : {}), ...(combatTo ? { combat: true as const } : {}) }, body };
   }
   // Brood Sliver: "Whenever a Sliver deals combat damage to a player, its controller may create a 1/1 colorless Sliver
   // creature token": anyone's Sliver, to any player; "its controller" is the Sliver's.

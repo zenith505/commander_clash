@@ -4377,7 +4377,10 @@ export function castProblem(
   // Timely Ward: with a commander among its targets; before they're chosen, a commander on the battlefield to target.
   const commanderTarget = !!compileCard(d).flashIfTargetsCommander && (targets ? targets.some((t) => t.kind === "object" && !!s.objects[t.id]?.isCommander && s.objects[t.id]!.zone === "battlefield") : s.battlefield.some((b) => obj(s, b).isCommander));
   const yoursTarget = !!compileCard(d).flashIfTargetsYours && (targets ? targets.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, s.objects[t.id]!) === pid) : s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid));
-  const instantSpeed = choices?.alt === "sneak" || yoursTarget || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
+  // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
+  // with that X announced (601.2b); before X is announced it counts as 0.
+  const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
+  const instantSpeed = choices?.alt === "sneak" || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -4554,7 +4557,17 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
+    // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast".
+    if (t?.zone === "battlefield" && !how.faceDown && opponents(s, controllerOf(s, t)).includes(pid)) mods.less += abilitiesOf(s, t).targetDiscount ?? 0;
   }
+  // Infectious Curse: "Spells you cast that target enchanted player cost {1} less to cast": each such Curse once.
+  const playersTargeted = new Set((how.targets ?? []).flatMap((t) => (t.kind === "player" ? [t.id] : [])));
+  if (playersTargeted.size && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const n = src.attachedToPlayer !== undefined && playersTargeted.has(src.attachedToPlayer) && controllerOf(s, src) === pid ? abilitiesOf(s, src).castTargetEnchantedPlayerLess : undefined;
+      if (n) mods.less += n;
+    }
   // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less"; Esior, Wardwing Familiar: "Spells your
   // opponents cast that target one or more commanders you control cost {3} more". Each such permanent once, with the
   // targets chosen before the cost is worked out (CR 601.2c, 601.2f).

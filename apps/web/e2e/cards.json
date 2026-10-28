@@ -4781,6 +4781,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "81338d64-8fc3-41ac-afc8-e2a79df1159b",
+  "name": "Dream Cache",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw three cards, then put two cards from your hand both on top of your library or both on the bottom of your library.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0ff7440b-b831-40a9-81c4-99d77bf93b8d",
   "name": "Dream Devourer",
   "manaCost": "{1}{B}",
@@ -8004,6 +8030,39 @@
   "set": "blc",
   "releasedAt": "2024-08-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "56940b6c-90ab-491b-a88a-4cd4a8adfbdb",
+  "name": "Heavenly Blademaster",
+  "manaCost": "{5}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying, double strike\nWhen this creature enters, you may attach any number of Auras and Equipment you control to it.\nOther creatures you control get +1/+1 for each Aura and Equipment attached to this creature.",
+  "power": "3",
+  "toughness": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

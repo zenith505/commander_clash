@@ -185,9 +185,12 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
   // sources and red sources would deal this turn" (Luminesce).
   if ((m = /^Prevent all (combat )?damage that (.+?) would deal(?: to (.+?))? this turn$/i.exec(s))) {
     if (/^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(m[2]!)) return undefined;
-    const by = sourceGroup(m[2]!);
+    // Haze Frog: "Prevent all combat damage that other creatures would deal this turn": all creatures but its source as it
+    // is now, including ones that arrive later (rulings, CR 611.2c).
+    const others = /^other creatures$/i.test(m[2]!) && !ctx.spell;
+    const by = sourceGroup(others ? "creatures" : m[2]!);
     const to = m[3] ? protectedGroup(m[3]) : undefined;
-    return by && to !== null ? rule({ ...(m[1] ? { combat: "only" as const } : {}), by: { filter: by }, ...(to ? { to } : {}) }) : null;
+    return by && to !== null ? rule({ ...(m[1] ? { combat: "only" as const } : {}), by: { filter: by, ...(others ? { notSelf: true as const } : {}) }, ...(to ? { to } : {}) }) : null;
   }
   // Mirrorwood Treefolk: "The next time damage would be dealt to ~ this turn, that damage is dealt to any target instead";
   // Glarecaster: "... to ~ and/or you ...": the next damage event to either, from all its sources together (CR 615.8,

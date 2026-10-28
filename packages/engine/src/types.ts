@@ -36,7 +36,7 @@ export interface DamageRule {
    * `chosen`: the source chosen (CR 609.7a), as the object it was then; `spell`: it was a spell, so the permanent it
    * becomes is that source too. `filter`: what the source has to be when it would deal the damage (CR 609.7b).
    */
-  by?: { chosen?: { id: ObjectId; zc: number; spell?: true }; filter?: TargetSpec };
+  by?: { chosen?: { id: ObjectId; zc: number; spell?: true }; filter?: TargetSpec; /** Haze Frog: not damage from this object (the rule's source, as it was when the rule was made). */ not?: { id: ObjectId; zc: number } };
   /** What's left of "the next N damage" (CR 615.7). */
   left?: number;
   /** "The next time": it applies to the next damage event it can, then it's used up (CR 615.8). */

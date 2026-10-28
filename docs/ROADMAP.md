@@ -1,7 +1,7 @@
 # Roadmap
 
-26,987 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,962 of
+27,004 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,977 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -626,6 +626,27 @@ line blocks.
    Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (its token
    is named like part of it), Toggo, Goblin Weaponsmith (a quoted ability inside a quoted ability), Domineering Will,
    Immerwolf, Frenzied Saddlebrute.
+   Round 196 went on from the top: "amass Orcs 5, mill five cards, then" (Sauron, Lord of the Rings), "Add X {G} or X
+   {W}" (Brigid, Clachan's Heart), "target opponent reveals cards ... until they reveal a land card. Put that card onto
+   the battlefield tapped under your control and the rest into their graveyard" (Sméagol, Helpful Guide), "choose target
+   ... card in your graveyard. You may sacrifice an artifact" (Daretti, Rocketeer Engineer), "a creature you control
+   with power 2 or less deals combat damage" (Subira, Tulzidi Caravanner), "flip a coin for each creature that isn't a
+   Demon, Devil, or Imp. Destroy each creature whose coin comes up tails" (Rakdos, the Showstopper), "the total number of
+   rad counters among players" (Vault 12), "Any number of target lands you control become 0/0 Elemental creatures"
+   (Nissa, Sage Animist), "Exchange your hand and library" (Mordenkainen), "creatures that player controls without
+   flying can't block this turn" (The Motherlode, Excavator), "If you search your library this way, put ~ on the bottom"
+   (Unlucky Cabbage Merchant), "They don't untap during their controllers' next untap steps" (Dragon Turtle), "Until end
+   of turn, you may have ~ become an X/X ..." (Ebony Fly), "that's still a planeswalker" (Gideon, Ally of Zendikar and
+   Gideon, Martial Paragon) and Equipment tokens named Stoneforged Blade / "Return it to your hand at the beginning of the
+   next end step" (Nahiri, the Lithomancer and Nahiri, the Harbinger).
+   Out after round 196 (looked at, not done): Tamiyo, the Moon Sage (emblem returns each card put into your graveyard),
+   Tamiyo, Compleated Sage (a token named after her short name), Proteus Staff ("the rest on the bottom in any order"),
+   Sidisi, Regent of the Mire (sacrifice a creature with mana value X as a cost), Umbris, Fear Manifest, Unidentified
+   Hovership ("the exiled card's owner manifests dread"), Geth's Summons, Sphinx of Foresight (opening-hand reveal),
+   Gideon Jura (+2: creatures attack him if able), Eruth, Tranquil Frillback, Yusri, Blitzball Stadium, Underdark Rift,
+   Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
+   Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
+   tails for the others without asking.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1407,8 +1428,7 @@ line blocks.
      graveyard, copy with haste).
    Left from the delayed-triggers-with-a-duration round ("until end of turn, whenever ...", CR 603.7b):
    - Only cast, dies and combat-damage-to-a-player events can be such a trigger; still out: tapped for mana (High
-     Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Subira ("a creature you control with power 2 or
-     less" as the dealer), Spiritualize and the rest of the 11 unsupported ones.
+     Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Spiritualize and the rest of the 11 unsupported ones.
    - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Loki,
      Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
      that targets" (Danitha, Sword of Hope), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).

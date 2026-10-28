@@ -2990,6 +2990,12 @@ export type Effect =
    * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
    * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
    */
+  /**
+   * "Flip a coin for each creature that isn't a Demon, Devil, or Imp. Destroy each creature whose coin comes up tails."
+   * (Rakdos, the Showstopper): one coin for each permanent that fits as it resolves, which only comes up heads or tails
+   * (no one wins or loses it, CR 705.2); those that come up tails are destroyed at the same time (rulings).
+   */
+  | { type: "flipCoinEach"; filter: TargetSpec }
   | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
@@ -3073,7 +3079,7 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef; /** "Into your library": yours is shuffled even if no card is put into it. */ yours?: true; /** "Target player shuffles ... into their library" (Memory's Journey): that player's is, the same way. */ who?: PlayerRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
-  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). */ exchange?: true }
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). With `hand`, "exchange your hand and library" (Mordenkainen): to the hand. */ exchange?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens

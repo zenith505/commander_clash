@@ -516,7 +516,9 @@ export function parseBecomes(text: string): Modification[] | null {
   }
   // "... that's still a land" keeps its card types, like "It's still a land." after it (CR 205.1b).
   let still = false;
-  if ((m = /^(.+?) that(?:'s| is) still an? land$|^(.+?) that are still lands$/i.exec(rest))) {
+  // Gideon, Ally of Zendikar: "a 5/5 Human Soldier Ally creature with indestructible that's still a planeswalker" (CR
+  // 205.1b): a planeswalker creature, dealt damage as both (CR 120.3c-d).
+  if ((m = /^(.+?) that(?:'s| is) still an? (?:land|planeswalker)$|^(.+?) that are still lands$/i.exec(rest))) {
     rest = (m[1] ?? m[2])!;
     still = true;
   }

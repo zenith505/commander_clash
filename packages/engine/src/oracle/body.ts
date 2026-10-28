@@ -909,6 +909,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^((?:Put|Return) [^.]*target [^.]+ from [^.]*graveyards? (?:to|onto) the battlefield under your control)\. (?:Each of them|It) enters with an additional ([+-]1\/[+-]1) counter on it\./, "$1 with an additional $2 counter on it.");
   // Killian, Decisive Mentor: "tap up to one target creature and goad it": two instructions, in order.
   text = text.replace(/^([Tt]ap (?:up to one )?target creature) and goad it\./, "$1. Goad it.");
+  // Sauron, Lord of the Rings: "amass Orcs 5, mill five cards, then return a creature card from your graveyard to the
+  // battlefield": one instruction after another; the creature card may be one that was there before the mill (rulings).
+  text = text.replace(/^amass ([A-Z][a-z]+) (\d+), mill (\w+) cards, then /, "amass $1 $2. Mill $3 cards, then ");
+  // Daretti, Rocketeer Engineer: "choose target artifact card in your graveyard. You may sacrifice an artifact. If you do,
+  // return the chosen card to the battlefield." The card is targeted as the ability is put on the stack and the sacrifice
+  // chosen as it resolves (rulings): the same as "You may sacrifice an artifact. If you do, return target ...".
+  text = text.replace(/^[Cc]hoose target ([a-z]+ card) in your graveyard\. You may sacrifice (an? [a-z]+)\. If you do, return the chosen card to the battlefield\./, "You may sacrifice $2. If you do, return target $1 from your graveyard to the battlefield.");
+  // The Motherlode, Excavator: "destroy target nonbasic land defending player controls, and creatures that player controls
+  // without flying can't block this turn": two instructions, "that player" being the defending player.
+  text = text.replace(/\b([Dd]estroy target [a-z ]+ defending player controls), and creatures that player controls (without flying )?can't block this turn\./, "$1. Creatures defending player controls $2can't block this turn.");
+  // Dragon Turtle: "tap it and up to one target creature an opponent controls. They don't untap during their controllers'
+  // next untap steps." Both tapped, then neither untaps; with no target chosen, only ~ (rulings).
+  text = text.replace(/^[Tt]ap (?:it|~) and (up to one target creature an opponent controls)\. They don't untap during their controllers' next untap steps\./, "Tap ~. Tap $1. ~ doesn't untap during its controller's next untap step. That creature doesn't untap during its controller's next untap step.");
+  // Ebony Fly: "Roll a d6. Until end of turn, you may have ~ become an X/X Insect artifact creature with flying, where X is
+  // the result." Chosen as it resolves, after the roll (rulings): the same as "You may have ~ become ... until end of turn".
+  text = text.replace(/(^|\. )Until end of turn, you may have ~ become ([^.,]+), where X is the result\./, "$1You may have ~ become $2 until end of turn, where X is the result.");
+  // Nahiri, the Lithomancer: "Create a colorless Equipment artifact token named Stoneforged Blade. It has indestructible,
+  // "...," and equip {0}." One instruction: the token is created with them (see sentences/tokens.ts).
+  text = text.replace(/(^|\. )(Create a colorless Equipment artifact token named [A-Z][\w'-]*(?: [A-Z][\w'-]*)*)\. It has ([a-z]+), ("[^"]+") and (equip \{\d+\})\./, "$1$2 with $3, $4 and $5.");
+  // Nahiri, the Harbinger: "Search your library for an artifact or creature card, put it onto the battlefield, then shuffle.
+  // It gains haste. Return it to your hand at the beginning of the next end step." A delayed trigger about the permanent
+  // found (CR 603.7), the same as "At the beginning of the next end step, return it to its owner's hand" (yours: it came
+  // from your library).
+  text = text.replace(/(^|\. )(Search your library for [^.]+, put it onto the battlefield, then shuffle\. It gains haste\.) Return it to your hand at the beginning of the next end step\./, "$1$2 At the beginning of the next end step, return it to its owner's hand.");
   // Cruel Ultimatum: "Target opponent sacrifices a creature of their choice, discards three cards, then loses 5 life. You
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
@@ -1364,6 +1388,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());
   if (sylvan && sylvan[1] === sylvan[2])
     return { targets: [], effects: [{ type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: num(sylvan[1]!) }, { type: "drawnPayOrTop", n: num(sylvan[2]!), life: Number(sylvan[3]) }], text: `draw ${sylvan[1]} additional cards` }], text };
+  // Unlucky Cabbage Merchant: "you may search your library for a basic land card and put it onto the battlefield tapped. If
+  // you search your library this way, put ~ on the bottom of its owner's library, then shuffle." In that order: the shuffle
+  // comes after ~ goes to the bottom, and only if the library was searched (CR 701.23, 701.24).
+  const cabbage = /^[Yy]ou may search your library for (a basic land card) and put it onto the battlefield tapped\. If you search your library this way, put ~ on the bottom of its owner's library, then shuffle\.$/.exec(text.trim());
+  if (cabbage && !opts.spell) {
+    const found = parseBodyText(`Search your library for ${cabbage[1]}, put it onto the battlefield tapped, then shuffle.`, opts);
+    const search = found?.effects.length === 1 && found.effects[0]!.type === "search" ? found.effects[0] : undefined;
+    if (!search) return null;
+    return { targets: [], effects: [{ type: "may", effects: [{ ...search, noShuffle: true }, { type: "putInLibrary", what: { ref: "self" }, position: "bottom" }, { type: "shuffle", who: { ref: "you" } }], text: `search your library for ${cabbage[1]}` }], text };
+  }
   // Beseech the Mirror: "Search your library for a card, exile it face down, then shuffle. If ~ was bargained, you may cast
   // the exiled card without paying its mana cost if that spell's mana value is 4 or less. Put the exiled card into your
   // hand if it wasn't cast this way." Cast as it resolves (CR 608.2g); found (Opposition Agent) or not, nothing else.
@@ -8563,6 +8597,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "graveyard", who: { ref: "eventPlayer" }, yours: true });
       si += 2;
+      continue;
+    }
+    // Rakdos, the Showstopper: "flip a coin for each creature that isn't a Demon, Devil, or Imp. Destroy each creature
+    // whose coin comes up tails." One coin for each, the losers destroyed together (rulings).
+    const flipEach = /^[Ff]lip a coin for each (creature[^.]*)$/.exec(s);
+    if (flipEach && sentences[si + 1]?.replace(/\.$/, "") === "Destroy each creature whose coin comes up tails") {
+      const each = parseObject(`each ${flipEach[1]}`, ctx);
+      if (each?.ref !== "each" || each.filter.kind !== "object") return null;
+      effects.push({ type: "flipCoinEach", filter: each.filter });
+      si++;
+      continue;
+    }
+    // Sméagol, Helpful Guide: "target opponent reveals cards from the top of their library until they reveal a land card.
+    // Put that card onto the battlefield tapped under your control and the rest into their graveyard." The same, the
+    // target's library and graveyard; with no land card, every card revealed goes to the graveyard (CR 701.20a).
+    const targetReveals = /^[Tt]arget (opponent|player) reveals cards from the top of their library until they reveal an? ([a-z]+ card)$/.exec(s);
+    const putYours = /^Put that card onto the battlefield( tapped)? under your control and the rest into their graveyard$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (targetReveals && putYours) {
+      const filter = parseSearchFilter(targetReveals[2]!);
+      const who = parsePlayer(`target ${targetReveals[1]}`, ctx);
+      if (!filter || filter.kind !== "card" || !filter.types?.length || !who) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "graveyard", who, yours: true, ...(putYours[1] ? { tapped: true as const } : {}) });
+      si++;
       continue;
     }
     const theirs = /^(Its controller|That creature's controller|That permanent's controller) reveals cards from the top of their library until they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?$/.exec(s);

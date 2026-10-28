@@ -1139,6 +1139,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`, { chosen: true });
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
   }
+  // The Motherlode, Excavator: "creatures that player controls without flying can't block this turn" (that player being the
+  // defending player): a rule for the turn, so also creatures that lose flying or come under their control later
+  // (rulings).
+  if ((m = /^[Cc]reatures defending player controls( without flying)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
+    const of = parsePlayer("defending player", ctx);
+    return filter?.kind === "object" && of ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` }, ofPlayer: of }] : null;
+  }
   // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.
   if ((m = /^([A-Z][a-z]+)s can't block this turn$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], text: `${m[1]}s` } }];
   // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until

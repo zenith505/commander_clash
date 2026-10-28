@@ -102,6 +102,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Iridescent Hornbeetle: "for each +1/+1 counter you've put on creatures under your control this turn", as they were
   // put, even on creatures that have left since (rulings).
   if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
+  // Vault 12: The Necropolis: "the total number of rad counters among players" (CR 728, 122.1), every player's together.
+  if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis

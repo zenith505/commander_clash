@@ -1242,7 +1242,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Depthshaker Titan: "Any number of target noncreature artifacts you control become 3/3 artifact creatures": each of
   // them, as with one target (no duration: for as long as each stays on the battlefield, CR 611.2a).
-  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five)) target .+?) become (\d+\/\d+) ((?:[a-z]+ )*)creatures$/.exec(s))) {
+  // Nissa, Sage Animist: "Untap up to six target lands. They become 6/6 Elemental creatures. They're still lands." The same.
+  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five|six)) target .+?|They) become (\d+\/\d+) ((?:[a-z]+ |[A-Z][a-z]+ )*)creatures$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes a ${m[2]} ${m[3]}creature`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

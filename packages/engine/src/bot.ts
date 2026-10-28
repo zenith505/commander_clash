@@ -6,7 +6,7 @@ import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
+import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
   applyInPlace,
@@ -134,7 +134,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "declareBlockers") return pend.defender !== undefined ? [blocksForOpponent(s, pid, pend.defender)] : payForBlocks(s, pid, chooseBlocks(s, pid));
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
-      const body = triggerBody(s, t);
+      const printed = triggerBody(s, t);
+      // "You may choose both instead" (SOLDIER Military Program): one or both, now.
+      const range = t.both ? modeRange(printed, true) : undefined;
+      const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0], max: range[1] } } : printed;
       return [{ type: "chooseModes", player: pid, modes: chooseModes(s, pid, body, true, t.sourceId)!.modes }];
     }
     if (pend.kind === "chooseTargets") {
@@ -429,6 +432,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (pend.min === undefined && !pend.anyNumber && ids.length < pend.count) ids.push(...pend.options.filter((id) => !ids.includes(id)).slice(0, pend.count - ids.length));
       return [{ type: "pickPermanents", player: pid, ids }];
     }
+    // SOLDIER Military Program: "a +1/+1 counter on each of up to two Soldiers you control": as many as it allows, our own.
+    if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count > 1 && s.resolving?.item.controller === pid)
+      return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "counters", pend.counter) }];
     // Orzhov Advokist: the counters on our best creature, unless its controller is the only opponent we could attack.
     if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count === 1) {
       const giver = s.resolving?.item.controller;
@@ -1346,9 +1352,12 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
   // Lake of the Dead costs a Swamp: last, and never with no Swamp to sacrifice (it would only go to the graveyard).
   const sacInstead = (id: ObjectId) => compileCard(defOf(s, obj(s, id))).entersSacrificeInstead;
   const rank = (a: Extract<Action, { type: "playLand" }>) => (obj(s, a.objectId).zone === "graveyard" ? 0 : sacInstead(a.objectId) ? 3 : spellFace(a.objectId) ? 2 : 1);
+  // Lotus Vale costs two untapped lands: only with five or more lands, so it still adds mana.
   options.splice(0, options.length, ...options.filter((x) => {
     const f = sacInstead(x.action.objectId);
-    return !f || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, f, obj(s, id), pid, false));
+    const n = compileCard(defOf(s, obj(s, x.action.objectId))).entersSacrificeInsteadN ?? 1;
+    const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+    return !f || (mine.filter((id) => objectMatches(s, f, obj(s, id), pid, false)).length >= n && (n === 1 || mine.filter((id) => objIsType(s, obj(s, id), "Land")).length >= 5));
   }));
   options.sort((a, b) => rank(a.action) - rank(b.action));
   if (options.some((x) => rank(x.action) < 2)) return (options.find((x) => !x.tapped && rank(x.action) < 2) ?? options.find((x) => rank(x.action) < 2))!.action;
@@ -3386,7 +3395,30 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
 /** Turnabout's first option (oracle/body.ts). */
 const TURNABOUT_TAP = "Tap all its untapped permanents of the chosen type";
 
+/**
+ * "Choose odd or even": while a spell or ability resolves (Extinction Event, Twins of Discord, Zimone's Hypothesis), the
+ * quality whose creatures are worth more to opponents than to us; as a permanent enters (Ashling's Prerogative, Gollum),
+ * the quality of most of our own creature cards' mana values.
+ */
+function chooseParity(s: GameState, pid: PlayerId): string {
+  const odd = (n: number) => Math.abs(n) % 2 === 1;
+  const r = s.resolving;
+  if (r) {
+    const f = allEffects(r.body.effects).map((e) => ("what" in e && e.what && typeof e.what === "object" && "filter" in e.what ? e.what.filter : "filter" in e ? e.filter : undefined)).find((x): x is TargetSpec => !!x && typeof x === "object" && !!(x as TargetSpec).parity);
+    const of = f?.parity?.of ?? "manaValue";
+    const score = (want: boolean) => s.battlefield.reduce((n, id) => {
+      const o = obj(s, id);
+      if (!objIsType(s, o, "Creature") || id === r.item.sourceId || odd(of === "power" ? power(s, o) : defMv(defOf(s, o))) !== want) return n;
+      return n + (controllerOf(s, o) === pid ? -1 : 1) * worth(s, pid, o);
+    }, 0);
+    return score(true) >= score(false) ? "odd" : "even";
+  }
+  const mine = [...player(s, pid).hand, ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid)].map((id) => defOf(s, obj(s, id))).filter((d) => isType(d, "Creature"));
+  return mine.filter((d) => odd(defMv(d))).length > mine.length / 2 ? "odd" : "even";
+}
+
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
+  if (what === "parity") return chooseParity(s, pid);
   if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);

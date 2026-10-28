@@ -332,7 +332,10 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     if (t.ofChosen && !made.includes(chosen!)) continue;
     let picks: { extra: ManaType[]; adds: ManaType[] }[];
     const a = t.adds;
-    if (a.kind === "fixed") picks = [{ extra: [], adds: a.mana }];
+    if (a.kind === "fixed") {
+      const n = a.times === undefined ? 1 : evalAmount(s, a.times, { controller: ctl, ...(src ? { sourceId: src.id } : {}) });
+      picks = [{ extra: [], adds: Array.from({ length: n }, () => a.mana).flat() }];
+    }
     else if (a.kind === "chosenColor") picks = [{ extra: [], adds: [chosen!] }];
     else if (a.kind === "produced") {
       // One of the types it made, picked if it made several (rulings on Mana Flare).

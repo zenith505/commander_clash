@@ -10,7 +10,7 @@ import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
-import { objectMatches } from "./targeting";
+import { bindChosen, objectMatches } from "./targeting";
 import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
@@ -614,7 +614,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const of = e.ofPlayer ? players(s, e.ofPlayer, ctx)[0] : undefined;
       if (e.ofPlayer && of === undefined) return;
       const chosen = e.exceptChosen ? objects(s, { ref: "created" }, ctx)[0] : undefined;
-      const filter = of !== undefined ? { ...e.filter, controlledBy: of } : e.filter;
+      // "Of that quality" (Twins of Discord): the choice made as it resolved.
+      const filter = bindChosen(of !== undefined ? { ...e.filter, controlledBy: of } : e.filter, ctx.chosen);
       (s.cantBlockThisTurn ??= []).push({ filter, controller: ctx.controller, ...(chosen ? { except: { id: chosen.id, zc: chosen.zoneChanges ?? 0 } } : {}) });
       log(s, `${of !== undefined ? `${chosen ? "Other c" : "C"}reatures ${player(s, of).name} controls` : `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)}`} can't block this turn.`);
       return;

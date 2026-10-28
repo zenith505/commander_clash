@@ -411,6 +411,7 @@ function turnLogSummary(s: GameState, t: TurnLog | undefined) {
     // Erdwal Illuminator: only the first investigation each turn matters.
     investigated: Object.fromEntries(Object.entries(t.investigated ?? {}).map(([k, v]) => [k, Math.min(v, 2)])),
     creatureCounterPutters: t.creatureCounterPutters,
+    damagedCreature: t.damagedCreature && [...t.damagedCreature].sort(),
   };
 }
 

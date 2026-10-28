@@ -7,7 +7,8 @@
 // "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant), a
 // mana ability that returns its source to hand, as a sorcery (Grinning Ignus), "Choose creature or land" for the cards
 // revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence),
-// "up to twice X target cards" (Erebos's Intervention), cheaper cycling (Fluctuator).
+// "up to twice X target cards" (Erebos's Intervention), cheaper cycling (Fluctuator), a color
+// of a permanent you control (Meteor Crater).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -57,7 +58,8 @@ const windingWay = card("Winding Way", "Sorcery", "{1}{G}", {"cmc":2,"keywords":
 const vivisPersistence = card("Vivi's Persistence", "Instant", "{1}{R}", {"cmc":2,"keywords":[],"oracleText":"Create a 0/1 black Wizard creature token with \"Whenever you cast a noncreature spell, this token deals 1 damage to each opponent.\"\nWhenever your commander enters or attacks, you may pay {2}. If you do, return this card from your graveyard to your hand.","colors":["R"],"colorIdentity":["R"]});
 const erebossIntervention = card("Erebos's Intervention", "Instant", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"Choose one —\n• Target creature gets -X/-X until end of turn. You gain X life.\n• Exile up to twice X target cards from graveyards.","colors":["B"],"colorIdentity":["B"]});
 const fluctuator = card("Fluctuator", "Artifact", "{2}", {"cmc":2,"keywords":[],"oracleText":"Cycling abilities you activate cost {2} less to activate.","colors":[],"colorIdentity":[]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator];
+const meteorCrater = card("Meteor Crater", "Land", "", {"cmc":0,"keywords":[],"oracleText":"{T}: Choose a color of a permanent you control. Add one mana of that color.","colors":[],"colorIdentity":[]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator, meteorCrater];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -494,5 +496,17 @@ describe("Round 198", () => {
     const s = resolveAll(run(s0, planActivate(s0, ap, ids[0]!, i)));
     expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
     expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+
+  it("Meteor Crater: one mana of a color of a permanent you control, never colorless (rulings)", () => {
+    const { s, ap, opp } = setup([]);
+    const crater = putOnBattlefield(s, ap, meteorCrater);
+    const colors = () => [...new Set(manaOptions(s, s.objects[crater]!).map((x) => x.mana))].sort();
+    expect(colors()).toEqual([]);
+    putOnBattlefield(s, opp, card("Test Their Red", "Enchantment", "{R}", { cmc: 1, colors: ["R"] }));
+    putOnBattlefield(s, ap, card("Test Green", "Creature — Elf", "{G}", { cmc: 1, power: "1", toughness: "1", colors: ["G"] }));
+    putOnBattlefield(s, ap, card("Test Azorius", "Artifact", "{W}{U}", { cmc: 2, colors: ["W", "U"] }));
+    invalidateCharacteristics(s);
+    expect(colors()).toEqual(["G", "U", "W"]);
   });
 });

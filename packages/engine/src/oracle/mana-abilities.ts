@@ -42,6 +42,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.")
     // "Choose a color. Add one mana of that color for each charge counter on ~." (Astral Cornucopia): the same.
     .replace(/: Choose a color\. Add one mana of that color for each ([^.]+? counter) on ~\./, ": Add X mana of any one color, where X is the number of $1s on ~.")
+    // Meteor Crater: "Choose a color of a permanent you control. Add one mana of that color.": one of the colors among
+    // them, never colorless (rulings), as for Mox Amber.
+    .replace(/: Choose a color of a permanent you control\. Add one mana of that color\.$/, ": Add one mana of any color among permanents you control.")
     // Doubling Cube: a mana ability (rulings), adding as much again of each type of mana in the pool.
     .replace(/: Double the amount of each type of unspent mana you have\.$/, ": Add as much again of each type of unspent mana you have.");
   const part = String.raw`\{[^}]+\}|Sacrifice ~|Return ~ to its owner's hand|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;

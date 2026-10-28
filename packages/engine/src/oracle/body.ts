@@ -1058,6 +1058,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // supertypes (rulings, CR 205.1a).
   text = text.replace(/(^|\. )[Ff]or each player, choose up to one other target (artifact or creature) that player controls\. For as long as ~ remains on the battlefield, the chosen permanents become Treasure artifacts with ("[^"]+") and lose all other abilities\./, "$1For each player, up to one other target $2 that player controls becomes a Treasure artifact with $3 and loses all other card types and abilities for as long as ~ remains on the battlefield.");
   text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
+  // Recursive Recruitment: "for every three cards in your graveyard" is "for each" group of three.
+  text = text.replace(/ for every (two|three|four|five) cards in your graveyard\./, " for each $1 cards in your graveyard.");
+  // Browse: "Look at the top five cards of your library, put one of them into your hand, and exile the rest": the look,
+  // then what's done with them.
+  text = text.replace(/(^|\. )Look at the top (\w+) cards of your library, put one of them into your hand, and exile the rest\./, "$1Look at the top $2 cards of your library. Put one of them into your hand and exile the rest.");
+  // Eye of Yawgmoth: "Reveal a number of cards from the top of your library equal to the sacrificed creature's power":
+  // that many off the top, X defined by the text (CR 107.3c).
+  text = text.replace(/(^|\. )Reveal a number of cards from the top of your library equal to ([^.]+)\./, "$1Reveal the top X cards of your library, where X is $2.");
+  // Growth Cycle: "Target creature gets +3/+3 until end of turn. It gets an additional +2/+2 until end of turn for each card
+  // named ~ in your graveyard": a second bonus, counted as it resolves (rulings: ~ is on the stack, not in the graveyard).
+  text = text.replace(/(gets [+-]\d+\/[+-]\d+ until end of turn\. It) gets an additional ([+-]\d+\/[+-]\d+ until end of turn for each )/, "$1 gets $2");
   // Tevesh Szat: "If you do, draw two cards, then draw another card if the sacrificed permanent was a commander."
   text = text.replace(/(^|\. )(If you do, draw (?:a card|two cards)), then draw another card if the sacrificed permanent was a commander\./, "$1$2. If the sacrificed permanent was a commander, draw a card.");
   // Mystic Reflection: "Choose target nonlegendary creature. The next time ..., they enter as copies of the chosen creature."
@@ -1888,6 +1899,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Ajani Goldmane: "Create a white Avatar creature token. It has "This creature's power and toughness are each equal to
   // your life total."": the token is created with that ability.
   text = text.replace(/(^|\. )(Create an? [^."]+? creature token)\. It has ("(?:This creature|~)'s power and toughness are each equal to [^"]+")\.?$/, "$1$2 with $3.");
+  // Broken Visage, Kalitas, Ritual of the Returned: "Create a black Spirit creature token. Its power is equal to that
+  // creature's power and its toughness is equal to that creature's toughness": one instruction (tokens.ts).
+  text = text.replace(/(^|\. |, )([Cc]reate) an? ([a-z]+ [A-Z][a-z]+ creature token)\. Its power is equal to (that creature|that card)'s power and its toughness is equal to \4's toughness\./, "$1$2 a 0/0 $3 with power and toughness equal to $4's.");
   // Inspired Ultimatum: "Target player gains 5 life, ~ deals 5 damage to any target, then you draw five cards": three
   // instructions, each with its own subject, in order.
   text = text.replace(/^Target player gains (\w+) life, ~ deals (\w+) damage to any target, then you draw (\w+) cards\./, "Target player gains $1 life. ~ deals $2 damage to any target. You draw $3 cards.");
@@ -4525,6 +4539,44 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Petra Sphinx, Vexing Arcanix: "Target player chooses a card name, then reveals the top card of their library. If that
+    // card has the chosen name, that player puts it into their hand. If it doesn't, the player puts it into their
+    // graveyard." / "Otherwise, they put it into their graveyard and ~ deals 2 damage to them.": the target player names a
+    // card as it resolves (rulings on Vexing Arcanix); with an empty library nothing else happens, no damage (rulings).
+    // (", then" splits the first sentence in two.)
+    const guessTop = /^([Tt]arget player) chooses a card name$/.exec(s) && /^Reveals the top card of their library$/.test(sentences[si + 1] ?? "") ? /^([Tt]arget player)/.exec(s) : null;
+    if (guessTop) {
+      const who = parsePlayer(guessTop[1]!, ctx);
+      const hit = /^If that card has the chosen name, that player puts it into their hand\.?$/.test(sentences[si + 2] ?? "");
+      const miss = /^(?:If it doesn't, the player puts it into their graveyard|Otherwise, they put it into their graveyard(?: and ~ deals (\d+) damage to them)?)\.?$/.exec(sentences[si + 3] ?? "");
+      if (!who || who.ref !== "target" || !hit || !miss) return null;
+      const named: TargetSpec = { kind: "card", chosen: "name", text: "card with the chosen name" };
+      const otherwise: Effect[] = [{ type: "putInGraveyard", what: { ref: "revealed" } }, ...(miss[1] ? [{ type: "damage" as const, amount: Number(miss[1]), to: who }] : [])];
+      effects.push(
+        { type: "choose", choice: "cardName", who, purpose: "guess" },
+        { type: "revealTop", who },
+        { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", text: "card" } }, effects: [{ type: "if", cond: { kind: "revealedIs", filter: named }, effects: [{ type: "bounce", what: { ref: "revealed" } }], otherwise }] },
+      );
+      si += 3;
+      continue;
+    }
+    // Aven Windreader: "Target player reveals the top card of their library." (CR 701.20a), on its own; Cerebral Eruption:
+    // "Target opponent reveals ...", then "the revealed card's mana value" and "If a land card is revealed this way, ...".
+    const theyRevealTop = /^([Tt]arget player|[Tt]arget opponent) reveals the top card of their library$/.exec(s);
+    if (theyRevealTop && (si === sentences.length - 1 || /\bthe revealed card's\b/.test(sentences[si + 1] ?? ""))) {
+      const who = parsePlayer(theyRevealTop[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealTop", who });
+      ctx.revealedTop = true;
+      continue;
+    }
+    // Cerebral Eruption: "If a land card is revealed this way, return ~ to its owner's hand.": the spell goes to its
+    // owner's hand from the stack as it finishes resolving, not to the graveyard (rulings).
+    const eruption = ctx.revealedTop && ctx.spell && /^If a land card is revealed this way, return ~ to its owner's hand$/.test(s);
+    if (eruption) {
+      effects.push({ type: "if", cond: { kind: "revealedIs", filter: { kind: "card", types: ["Land"], text: "land card" } }, effects: [{ type: "spellToHand" }] });
+      continue;
+    }
     // Elven Farsight: "Scry 3, then you may reveal the top card of your library. If a creature card is revealed this way,
     // draw a card.": the card on top after the scry, revealed only if you choose to (CR 701.20a).
     const farsight = /^[Yy]ou may reveal the top card of your library$/.test(s);
@@ -4951,6 +5003,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (fx?.length !== 1 || fx[0]!.type !== "preventNext" || filter?.kind !== "object" || ctx.targets.length !== before + 1) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: [{ ...fx[0]!, n: Number(shieldMore[2]) }], otherwise: fx });
       si++;
+      continue;
+    }
+    // Dead Ringers: "Destroy two target nonblack creatures unless either one is a color the other isn't. They can't be
+    // regenerated.": both exactly the same colors, or both colorless, checked as it resolves (rulings); otherwise nothing.
+    const ringers = /^(Destroy two target [a-z]+ creatures) unless either one is a color the other isn't$/.exec(s);
+    if (ringers) {
+      const before = ctx.targets.length;
+      const noRegen = /^They can't be regenerated\.?$/.test(sentences[si + 1] ?? "");
+      const fx = parseOne(ringers[1]!, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "destroy" || ctx.targets.length !== before + 2) return null;
+      effects.push({ type: "if", cond: { kind: "targetsSameColors", index: before, n: 2 }, effects: [{ ...fx[0]!, ...(noRegen ? { noRegen: true } : {}) }] });
+      if (noRegen) si++;
+      continue;
+    }
+    // Winnow: "Destroy target nonland permanent if another permanent with the same name is on the battlefield": any nonland
+    // permanent may be the target; the name is checked as it resolves (CR 608.2b).
+    const winnow = /^(Destroy target nonland permanent) if another permanent with the same name is on the battlefield$/.exec(s);
+    if (winnow) {
+      const before = ctx.targets.length;
+      const fx = parseOne(winnow[1]!, ctx);
+      if (!fx || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetSharesName", index: before }, effects: fx });
       continue;
     }
     // Wretched Banquet: "Destroy target creature if it has the least power or is tied for least power among creatures on
@@ -5587,6 +5661,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Ransack: "Look at the top five cards of target player's library. Put any number of them on the bottom of that library
+    // in any order and the rest on top of the library in any order.": you choose and order both (as a scry of their library).
+    if (yourLook && /^Put any number of them on the bottom of that library in any order and the rest on top of the library in any order\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: yourLook[2] === "target opponent", text: yourLook[2]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "orderTop", who: { ref: "target", index }, n: num(yourLook[1]!), mayBottom: true });
+      si++;
+      continue;
+    }
+    // Sealed Fate: "Look at the top X cards of target opponent's library. Exile one of those cards and put the rest back on
+    // top of that player's library in any order.": you choose the card and the order (rulings).
+    const xLook = !dig && ctx.spell ? /^[Ll]ook at the top X cards of (target player|target opponent)'s library$/.exec(s) : null;
+    if (xLook && /^Exile one of those cards and put the rest back on top of that player's library in any order\.?$/.test(sentences[si + 1] ?? "")) {
+      const index = addTarget(ctx, { kind: "player", opponent: xLook[1] === "target opponent", text: xLook[1]! });
+      ctx.lastPlayerTarget = index;
+      effects.push({ type: "dig", n: X, count: 1, upTo: false, required: true, into: "exile", rest: "keep", reveal: false, library: { ref: "target", index } }, { type: "orderTop", who: { ref: "target", index }, n: { count: { kind: "x" }, plus: -1 } });
+      si++;
+      continue;
+    }
     // Eye Spy: "Look at the top card of target player's library. You may put that card into their graveyard.": you choose
     // (it's not surveil, CR 701.25, as only the controller of the library surveils).
     const oneLook = !dig && /^[Ll]ook at the top card of (target player|target opponent)'s library$/.exec(s);
@@ -5721,6 +5814,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
         si = sentences.length;
+        continue;
+      }
+      // Knight of the Mists: "you may pay {U}. If you don't, destroy target Knight and it can't be regenerated": its target
+      // chosen as it's put on the stack, the destruction only if you don't pay (CR 608.2d).
+      const dont = !payFirst.payX && !payFirst.payLife ? /^If you don't, (.+?)( and it can't be regenerated)?$/.exec(s) : null;
+      if (dont && si + 1 === sentences.length) {
+        const inner = attempt(ctx, () => parseOne(capital(dont[1]!), ctx));
+        if (!inner || (dont[2] && (inner.length !== 1 || inner[0]!.type !== "destroy"))) return null;
+        effects.push({ type: "may", effects: [], pay: payFirst.pay, otherwise: dont[2] ? [{ ...inner[0]!, noRegen: true } as Effect] : inner, text: `${payFirst.text}. If you don't, ${dont[1]}${dont[2] ?? ""}` });
+        payFirst = null;
         continue;
       }
       const then = /^If you do, (.+)$/.exec(s);
@@ -8324,9 +8427,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "~ deals 2 damage to any target. If you're the monarch, it deals 7 damage instead." (Court of Ire): the same target.
       // The Destined Black Mage: "~ deals 1 damage to each opponent. If you have a full party, it deals 3 damage to each
       // opponent instead": the same players.
-      const moreDamage = /^(?:it|~) deals (\d+) damage(?: to (that creature|that player|that permanent or player|it|each opponent))?$/i.exec(t);
+      // Shower of Coals: "~ deals 4 damage to each of those permanents and/or players instead": the same up to three targets.
+      const moreDamage = /^(?:it|~) deals (\d+) damage(?: to (that creature|that player|that permanent or player|it|each opponent|each of those permanents and\/or players))?$/i.exec(t);
       const prevDamage0 = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
-      const prevDamage = prevDamage0 && (moreDamage?.[2] === "each opponent") === (prevDamage0.to.ref === "eachOpponent") ? prevDamage0 : null;
+      const several = (to: Extract<Effect, { type: "damage" }>["to"]) => to.ref === "anyTarget" && "n" in to && (to.n ?? 1) > 1;
+      const prevDamage = prevDamage0 && (moreDamage?.[2] === "each opponent") === (prevDamage0.to.ref === "eachOpponent") && (moreDamage?.[2] === "each of those permanents and/or players") === several(prevDamage0.to) ? prevDamage0 : null;
       if ((moreDamage && !prevDamage) || (unpreventable && !moreDamage)) return null;
       const inner = moreDamage && prevDamage ? [{ ...prevDamage, amount: num(moreDamage[1]!), ...(unpreventable ? { unpreventable: true as const } : {}) }] : those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"

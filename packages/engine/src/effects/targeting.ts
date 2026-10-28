@@ -135,6 +135,12 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.dealtCombatDamageToYou && !s.turnLog?.combatDamagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;
+  if (spec.enteredSinceYourLastTurn) {
+    // Your last turn: the one before this one if it's your turn now, else your most recent one (none yet: any).
+    const p = s.players[controller];
+    const last = s.activePlayer === controller ? p?.lastTurnBegan : p?.turnBegan;
+    if (o.enteredTurn === undefined || (last !== undefined && o.enteredTurn <= last)) return false;
+  }
   if (spec.attachedToYou && o.attachedToPlayer !== controller) return false;
   if (spec.combat === "attackingBattle" && !(o.attacking !== undefined && attackedBattle(s, o))) return false;
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;

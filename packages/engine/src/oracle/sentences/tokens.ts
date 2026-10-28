@@ -103,6 +103,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const tok = fx?.length === 1 ? fx[0] : undefined;
     return tok?.type === "createToken" && !tok.token.back ? [{ ...tok, token: { ...tok.token, colors: ["W", "U", "B", "R", "G"] } }] : null;
   }
+  // "Create a black Spirit creature token. Its power is equal to that creature's power and its toughness is equal to that
+  // creature's toughness" (body.ts joins them): fixed as it's created, from that creature as it last existed on the
+  // battlefield (rulings on Broken Visage, Kalitas) or that card as it last existed in the graveyard (Ritual of the Returned).
+  if ((m = /^([Cc]reate a 0\/0 [a-z]+ [A-Z][a-z]+ creature token) with power and toughness equal to (that creature|that card)'s$/.exec(s))) {
+    const fx = parseSentence(m[1]!, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    const [p, t] = [parseCount(`${m[2]}'s power`, ctx), parseCount(`${m[2]}'s toughness`, ctx)];
+    return tok?.type === "createToken" && !tok.pt && p && t ? [{ ...tok, pt: p, ptToughness: t }] : null;
+  }
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
     // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.

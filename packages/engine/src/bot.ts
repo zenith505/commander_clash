@@ -43,6 +43,7 @@ import {
   craftCandidates,
   untapViaMana,
   counterCostCandidates,
+  counterOnCandidates,
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
@@ -496,6 +497,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const rank = ["flying", "deathtouch", "menace", "trample", "+1/+1", "first strike", "hexproof", "lifelink", "reach", "vigilance"];
       const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+    }
+    // "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor): up to 7, keeping 12 life, and at
+    // least 1 while we can spare it (a 0/0 Minion dies at once).
+    if (pend.kind === "chooseOption" && pend.what === "lifeAsEnters") {
+      const life = player(s, pid).life;
+      const max = pend.numberRange?.max ?? 0;
+      const n = Math.max(Math.min(max, life > 5 ? 1 : 0), Math.min(max, life - 12, 7));
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
@@ -2810,6 +2819,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const picks = spareCounters(s, pid, obj(s, id), c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "putCounter") {
+      const pick = spareCounterHost(s, pid, c, targeted);
+      if (!pick) return null;
+      out.counterOn = [pick];
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -2978,7 +2991,18 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
 function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "pickPermanents" }>): ObjectId[] {
   const ok = pend.options.map((id) => obj(s, id)).filter((o) => !o.isCommander && !objIsType(s, o, "Land"));
   if (pend.objectId) {
-    const n = compileCard(defOf(s, obj(s, pend.objectId))).devour?.n;
+    const devour = compileCard(defOf(s, obj(s, pend.objectId))).devour;
+    // Wood Elemental's P/T is the number of untapped Forests sacrificed: those beyond the four lands we keep, at least one.
+    if (devour?.defines === "count") {
+      const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+      return pend.options.slice(0, Math.max(Math.min(1, pend.options.length), lands - 4));
+    }
+    // Dracoplasm's is their total: the cheap tokens, or else the least worth creature, since a 0/0 dies at once.
+    if (devour?.defines === "total") {
+      const tokens = ok.filter((o) => o.isToken && worth(s, pid, o) <= 4).map((o) => o.id);
+      return tokens.length ? tokens.slice(0, pend.count) : [...ok].sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, 1).map((o) => o.id);
+    }
+    const n = devour?.n;
     const per = typeof n === "number" ? n : 2;
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);
   }
@@ -3190,6 +3214,17 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
+  // Knight of the Mists: "you may pay {U}. If you don't, destroy target Knight": pay only when that would hit our own.
+  // Without a target (Chaos Spewer's "If you don't, blight 2"), it's always ours: pay (below).
+  if (e.pay && !e.effects.length && !e.keep && e.otherwise?.some((x) => allEffects([x]).some((y) => targetIndexOf(y) !== undefined))) {
+    let hurt = 0;
+    for (const inner of allEffects(e.otherwise)) {
+      const i = targetIndexOf(inner);
+      const t = i === undefined ? undefined : targets[i];
+      if (i !== undefined && t && t.kind !== "none" && r.legal[i]) hurt += harm[i] === isMine(s, pid, t) ? 1 : -1;
+    }
+    return hurt > 0;
+  }
   let v = 0;
   // "You may discard a card. If you do, draw a card": what follows counts too.
   const then = r.body.effects[r.next + 1];
@@ -4573,9 +4608,26 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = spareCounters(s, pid, o, c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "putCounter") {
+      const pick = spareCounterHost(s, pid, c, targeted);
+      if (!pick) return null;
+      out.counterOn = [pick];
     } else return null;
   }
   return out;
+}
+
+/**
+ * Where we'd put a -1/-1 counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): a creature of ours
+ * that survives it (toughness 2 or more), the least valuable, never our commander or a target; null if there's none.
+ */
+function spareCounterHost(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>, targeted: Set<string | number>): ObjectId | null {
+  if (c.counter !== "-1/-1") return null;
+  const pool = counterOnCandidates(s, pid, c)
+    .map((x) => obj(s, x))
+    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) >= 2)
+    .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  return pool[0]?.id ?? null;
 }
 
 /**

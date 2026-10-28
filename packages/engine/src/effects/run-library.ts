@@ -174,6 +174,18 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
       return;
     }
+    case "revealedUntilToBottom": {
+      // The revealed cards still in the library go to its bottom, ordered by their owner (CR 401.4); "the nonland card"
+      // goes to the hand first (Explosive Revelation).
+      const r = s.resolving!;
+      const seen = (r.revealedUntil ?? []).filter((id) => s.objects[id]?.zone === "library" && obj(s, id).owner === ctx.controller);
+      const hit = r.revealed && s.objects[r.revealed.id]?.zone === "library" && (obj(s, r.revealed.id).zoneChanges ?? 0) === r.revealed.zc ? r.revealed.id : undefined;
+      if (e.hand && hit && !r.scratch?.arranged) {
+        moveObject(s, hit, "hand");
+        log(s, `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, hit)).name} into their hand.`);
+      }
+      return toBottom(s, ctx.controller, seen.filter((id) => s.objects[id]?.zone === "library"), src, false);
+    }
     case "parleyReveal": {
       // Parley: each player reveals the top card of their library, in turn order (CR 101.4); an empty library reveals nothing.
       const counts = { land: 0, nonland: 0 };

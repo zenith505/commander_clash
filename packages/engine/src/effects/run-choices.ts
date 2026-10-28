@@ -677,6 +677,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((k) => !!k && (!!k.allCreatureTypes || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))(ctx.sacrificed?.[0])
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
+            : e.cond.kind === "activatedTimes"
+            ? ((src, index) => index !== undefined && !!src && (src.zoneChanges ?? 0) === s.resolving!.item.sourceZc && (src.activatedThisTurn ?? []).filter((n) => n === index).length >= (e.cond as { n: number }).n)(s.objects[s.resolving!.item.sourceId ?? ""], s.resolving!.item.activatedIndex)
             : e.cond.kind === "discardedIs"
             ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"

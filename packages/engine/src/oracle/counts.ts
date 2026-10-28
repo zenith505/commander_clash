@@ -573,7 +573,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Your Ring-bearer's power" (One Ring to Rule Them All): 0 without one (CR 701.54a, 107.1b).
   if ((m = /^your Ring-bearer's (power|toughness)$/.exec(p))) return count({ kind: m[1] as "power" | "toughness", of: { ref: "ringBearer" } });
   // Ninja's Blades: "draw a card, then discard a card. That player loses life equal to the discarded card's mana value."
-  if (/^the discarded card's mana value$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
+  // Pyromancy: "equal to the mana value of the discarded card" (a discard cost's card, X counted as 0, rulings).
+  if (/^(?:the discarded card's mana value|the mana value of the discarded card)$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
   // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
   if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".

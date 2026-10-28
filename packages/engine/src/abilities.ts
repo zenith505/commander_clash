@@ -2653,7 +2653,7 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend" | /** With `reveal`: the cards stay where they are for "that card's mana value" (Resolution.revealed) and a later revealedUntilToBottom (Erratic Explosion). */ "keep";
       /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
       suspend?: number;
       ownerCasts?: true;
@@ -2905,6 +2905,12 @@ export type Effect =
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   /** Parley: "Each player reveals the top card of their library." (ResolvingState.parley counts them.) */
   | { type: "parleyReveal" }
+  /**
+   * "Put the revealed cards on the bottom of your library in any order" after an exileUntilNonland "keep" (Erratic
+   * Explosion): those still in the library, ordered by their owner (CR 401.4). `hand`: "Put the nonland card into your
+   * hand and the rest on the bottom" (Explosive Revelation).
+   */
+  | { type: "revealedUntilToBottom"; hand?: true }
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
   | { type: "revealRevealed" }
@@ -3105,6 +3111,8 @@ export type Effect =
       ifKicked?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
       ifCostCardName?: true;
+      /** "Counter target spell if it has the same mana value as the discarded card" (Hisoka, Minamo Sensei): the discard cost's card, X as 0. */
+      ifMvDiscarded?: true;
       /** "When you cast this spell, ... counter ~" (Brain Gorgers): the spell that triggered it, not a target (`index` -1). */
       cause?: true;
       /**
@@ -3590,7 +3598,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
+export type EntersOption = "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -3619,6 +3627,8 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /** "If this ability has been activated four or more times this turn" (Dragon Whelp): this activated ability, counted as it resolves (rulings). */
+  | { kind: "activatedTimes"; n: number }
   /** "Exile up to one target creature card from a graveyard. If you exiled a card this way, ..." (Ardyn): target `index` is now in exile, moved there by this (CR 400.7). */
   | { kind: "targetExiled"; index: number }
   /** "If the player doesn't" after "target opponent may have you draw three cards" (Combustible Gearhulk): whether that player chose to (eachMay's choseThisWay). */
@@ -4773,6 +4783,8 @@ export interface ManaAbility {
   selfDamage?: number;
   /** "~ doesn't untap during your next untap step." */
   skipNextUntap?: boolean;
+  /** "If this ability has been activated four or more times this turn, sacrifice ~ at the beginning of the next end step" (Farrelite Priest): the N. */
+  sacrificeIfActivated?: number;
   /** "Activate only once each turn." (CR 602.5b) */
   oncePerTurn?: boolean;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object: see GameObject.activatedEver. */
@@ -4999,7 +5011,7 @@ export type AdditionalCost =
    * (CR 701.4a): an Elf card from your hand or an Elf permanent you control. `exile`: "behold a Kithkin and exile it": the
    * card or permanent is exiled, linked to the permanent the spell becomes (CR 607.2q).
    */
-  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true }
+  | { kind: "reveal"; filter: TargetSpec; n: number; orControl?: TargetSpec; exile?: true; /** "Reveal X red cards from your hand" (Martyr of Ashes): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
   | {
       kind: "exileFromHand";
@@ -5309,6 +5321,12 @@ export interface CompiledCard {
    * a +1/+1 counter. Chosen as it enters, by its controller.
    */
   entersOptions?: EntersOption[];
+  /**
+   * "~ enters with your choice of a flying counter or a first strike counter on it" (Helica Glider), "~ escapes with your
+   * choice of a +1/+1 counter or a flying counter on it" (Tizerus Charger, only when it escaped, CR 702.138c): chosen as it
+   * enters (CR 614.1c, 614.12), part of how it enters.
+   */
+  entersCounterChoice?: { counters: [CounterKind, CounterKind]; escaped?: true };
   /** Read ahead (CR 702.155): a Saga that enters with the chapter number its controller chooses in lore counters. */
   readAhead?: true;
   /** "As ~ enters, you may exchange ~'s text box and another creature's" (Deadpool, Trading Card; CR 612.5, 701.12h). */

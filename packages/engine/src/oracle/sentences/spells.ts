@@ -623,6 +623,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const index = addTarget(ctx, { kind: "spell", text: "target spell" });
     return [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "poison", who: { ref: "targetController", index } } }, min: 1 }, effects: [{ type: "counterSpell", index }] }];
   }
+  // Hisoka, Minamo Sensei: "Counter target spell if it has the same mana value as the discarded card": any spell can be
+  // targeted; the discard cost's card decides (compile checks there is one).
+  if (/^Counter target spell if it has the same mana value as the discarded card$/i.test(s) && ctx.activated) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvDiscarded: true }];
   if (/^Counter target spell if it was kicked$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifKicked: true }];
   // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
   // cost; any spell can be targeted (rulings).

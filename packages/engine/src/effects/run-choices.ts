@@ -679,6 +679,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? ((k) => !!k && (!!k.allCreatureTypes || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))(ctx.sacrificed?.[0])
             : e.cond.kind === "discardedThisWayIs"
             ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
+            : e.cond.kind === "activatedTimes"
+            ? ((src, index) => index !== undefined && !!src && (src.zoneChanges ?? 0) === s.resolving!.item.sourceZc && (src.activatedThisTurn ?? []).filter((n) => n === index).length >= (e.cond as { n: number }).n)(s.objects[s.resolving!.item.sourceId ?? ""], s.resolving!.item.activatedIndex)
             : e.cond.kind === "discardedIs"
             ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"
@@ -1103,6 +1105,7 @@ function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number
 
 /** The penalty, for its button: "Lose 3 life", "Ana may draw a card" (Rhystic Study). */
 function describePenalty(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: ResolveCtx): string {
+  if (e.penalty) return e.penalty.replace(/\{you\}/g, player(s, ctx.controller).name).replace(/~/g, ctx.sourceDef?.name ?? "it");
   if (e.thenText) return `${player(s, ctx.controller).name} ${e.thenText}`;
   const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
   if (typeof lose === "number") return `Lose ${lose} life`;

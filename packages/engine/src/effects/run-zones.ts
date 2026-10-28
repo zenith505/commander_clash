@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
+import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf } from "../cards";
 import { nameLandBan } from "../names";
 import { graveyardWays, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -2727,6 +2727,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${player(s, ctx.controller).name} looks at ${p.name}'s hand.`);
           log(s, `${p.name}'s hand: ${cards}.`, ctx.controller);
         }
+      }
+      return;
+    case "lookAtFaceDown":
+      // Only the player looking learns what it is; a creature that's been turned face up shows nothing new.
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield" || !o.faceDown) continue;
+        log(s, `${player(s, ctx.controller).name} looks at a face-down creature.`);
+        log(s, `That face-down creature is ${realDefOf(s, o).name}.`, ctx.controller);
       }
       return;
     case "noCombatDamage":

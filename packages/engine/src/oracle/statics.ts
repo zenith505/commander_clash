@@ -1203,7 +1203,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return conds.length === 1 ? conds[0]! : m[1] ? { kind: "allOf", conds } : { kind: "anyOf", conds };
   }
   // Narcolepsy: "if enchanted creature is untapped": the creature it's attached to, as it is now.
-  if ((m = /^enchanted creature is (tapped|untapped)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], tapped: m[1] === "tapped", text: `${m[1]} creature` } };
+  // Earthlore: "if enchanted land is untapped"; Nature's Chosen: "if enchanted creature is white and untapped".
+  if ((m = /^enchanted (creature|land) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
+    return { kind: "attachedIs", filter: { kind: "object", types: [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
   // Goblin Caves: "As long as enchanted land is a basic Mountain": the land it's attached to, as it is now (CR 205.4a).
   if ((m = /^enchanted land is a basic (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], subtypes: [m[1]!], text: `basic ${m[1]}` } };
   // Faerie Miscreant: "if you control another creature named ~": one other than it with its name (CR 201.2), as it is now.
@@ -1674,6 +1676,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Vantress Gargoyle: "can't attack unless defending player has seven or more cards in their graveyard".
   if ((m = new RegExp(`^can't attack unless defending player has ${NUM} or more cards in their graveyard$`).exec(rest))) return [{ kind: "cantAttackUnlessDefenderYard", n: num(m[1]!) }];
+  // Orcish Conscripts: "can't attack unless at least two other creatures attack", "can't block unless at least two other
+  // creatures block": declared in the same combat (CR 508.1c, 509.1b).
+  if ((m = new RegExp(`^can't (attack|block) unless at least ${NUM} other creatures (attack|block)$`).exec(rest)) && m[1] === m[3]) return [{ kind: m[1] === "attack" ? "cantAttackUnlessOthers" : "cantBlockUnlessOthers", n: num(m[2]!) }];
   // Scarred Puma: "can't attack unless a black or green creature also attacks": another one, declared with it (rulings,
   // CR 508.1c).
   if ((m = /^can't attack unless (an? .+) also attacks$/.exec(rest))) {
@@ -2130,6 +2135,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };
   if (/^All permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line };
   if (/^All cards that aren't on the battlefield, spells, and permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line, offFieldAll: true };
+  // Melting: "All lands are no longer snow": the supertype goes in layer 4 (CR 205.4a), lands that become snow later too.
+  if (/^All lands are no longer snow$/.test(text)) return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "loseTypes", types: ["Snow"] }], text: line };
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);
@@ -2139,8 +2146,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const noAbilities = /^Enchanted (creature|permanent|artifact|land)'s activated abilities can't be activated( unless they're mana abilities)?$/.exec(text);
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
-  // "You control enchanted creature." (Mind Control)
-  if (/^You control enchanted (creature|permanent|artifact|land|enchantment)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  // "You control enchanted creature." (Mind Control), "... enchanted artifact creature." (Domineer)
+  if (/^You control enchanted (creature|permanent|artifact|land|enchantment|artifact creature)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   // Ghostly Prison, Propaganda (CR 508.1g-h).
   // Sphere of Safety: "you or planeswalkers you control ... {X} for each of those creatures, where X is ...", counted now.
   const tax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+|X)\} for each (?:creature they control that's attacking you|of those creatures)(?:, where X is (.+))?$/.exec(text);
@@ -2152,9 +2159,16 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // Brainwash: "Enchanted creature can't attack unless its controller pays {3}"; Phyrexian Marauder: "~ can't attack unless
   // you pay {1} for each +1/+1 counter on it": paid as attackers are declared, whoever it attacks (CR 508.1g-h).
-  const ownTax = /^(Enchanted creature|~) can't attack unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it)?$/.exec(text);
-  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) : / its controller pays /.test(text)))
-    return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n: Number(ownTax[2]), ...(ownTax[3] ? { perPlusOne: true as const } : {}) }], text: line };
+  // Qal Sisma Behemoth: "~ can't attack or block unless you pay {2}"; Oppressive Rays: "Enchanted creature can't attack or
+  // block unless its controller pays {3}"; Myr Prototype: "... {1} for each +1/+1 counter on it"; Cowed by Wisdom: "...
+  // {1} for each card in your hand" (the Aura's controller's hand, counted as the cost is worked out): blocking costs it
+  // too, paid as blockers are declared (CR 509.1d-e).
+  const ownTax = /^(Enchanted creature|~) can't attack( or block)? unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it| for each card in your hand)?$/.exec(text);
+  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) : / its controller pays /.test(text)) && (ownTax[4] !== " for each card in your hand" || ownTax[1] !== "~")) {
+    const per = ownTax[4] === " for each +1/+1 counter on it" ? { perPlusOne: true as const } : ownTax[4] ? { amount: { count: { kind: "cardsInHand", who: { ref: "you" } } } as Amount } : {};
+    const n = Number(ownTax[3]);
+    return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n, ...per }, ...(ownTax[2] ? [{ kind: "ownBlockTax" as const, n, ...per }] : [])], text: line };
+  }
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
   const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);
   if (counterTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, perCounter: true, ...(counterTax[1] ? { planeswalkers: true as const } : {}) }], text: line };

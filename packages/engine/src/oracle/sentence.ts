@@ -425,6 +425,9 @@ export function parseChanges(text: string): Modification[] | null {
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
     // Amoeboid Changeling: "loses all creature types" (layer 4).
     else if (/^loses? all creature types$/i.test(p)) out.push({ kind: "loseCreatureTypes" });
+    // Arcum's Weathervane, Thermal Flux: "is no longer snow", "isn't snow until end of turn": the snow supertype goes
+    // (layer 4, CR 205.4a), its other types stay (rulings).
+    else if (/^(?:is|are) no longer snow$|^(?:isn't|aren't) snow$/i.test(p)) out.push({ kind: "loseTypes", types: ["Snow"] });
     // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
     // can't give them back either (rulings).
     else if ((m = /^loses? (.+?) and can't have (?:or gain )?(.+)$/i.exec(p))) {
@@ -493,6 +496,8 @@ export function parseBecomes(text: string): Modification[] | null {
   if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
   if (/^the chosen colors$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: "colors" }];
   if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
+  // "Becomes snow" (Arcum's Weathervane, Thermal Flux): it gains the supertype and keeps its others (CR 205.4a, rulings).
+  if (/^snow$/i.test(rest)) return [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Snow"] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
   // "Becomes an Island in addition to its other types" (Xolatoyac's flood counters): the land keeps its types and abilities
   // and has the basic land type's mana ability too (CR 305.6, 305.7; rulings).

@@ -231,6 +231,20 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
   if (yours) m[3] = m[3]!.replace(" during your turn, ", ", ");
   // "Whenever equipped creature becomes blocked by a creature, you may draw two cards" (Infiltration Lens): once for each
   // creature blocking it (rulings), which "that creature" would mean.
+  // Mammoth Harness, Barrow-Blade, Wooden Stake: "Whenever enchanted creature blocks or becomes blocked by a creature, ...":
+  // once for each creature it blocks or is blocked by (CR 509.3c-d), "that creature" and "the other creature" being that
+  // one. Dead-Iron Sledge: "destroy both creatures", the two of them as it triggered (rulings: moving the Equipment after
+  // that changes nothing).
+  const inBlock = m[2] === "creature" && !m[1] && !yours ? /^blocks or becomes blocked by (an? .+?), (.+)$/.exec(m[3]!) : null;
+  if (inBlock) {
+    const what = inBlock[1]!.replace(/^an? /, "");
+    const filter = what === "creature" ? undefined : parseTargetPhrase(what);
+    if (filter === null || (filter && filter.kind !== "object")) return "fail";
+    const text = inBlock[2]!.replace(/\bthe other creature\b/g, "that creature");
+    if (/\b(its?|enchanted|equipped)\b/i.test(text.replace(/^(destroy that creature\. )It (can't be regenerated\.)$/, "$1$2"))) return "fail";
+    const body = /^destroy both creatures\.$/.test(text) ? { targets: [], effects: [{ type: "destroy" as const, what: { ref: "eventGroup" as const } }], text } : parseBody(text, { subject: true });
+    return body ? { event: "selfBlocksOrBlockedByCreature", body, host: "attached", ...(filter ? { subjectFilter: { ...filter, text: what } } : {}) } : "fail";
+  }
   const byOne = m[2] === "creature" && !m[1] && !yours ? /^becomes blocked by a creature, (.+)$/.exec(m[3]!) : null;
   if (byOne) {
     if (/\b(it|its|that creature)\b/i.test(byOne[1]!)) return "fail";
@@ -543,9 +557,10 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 // "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
 // whose ability this is, so "another" changes nothing.
 // "An Aura, Equipment, or Vehicle spell" (Sram): a list, its commas before the spell's last word.
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
-const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
+// "The chosen player" (Sewer Nemesis): the player chosen as the permanent entered.
+const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted", "the chosen player": "chosen" } as const;
 
 /**
  * "When ~ becomes the target of a spell, sacrifice it", "Whenever ~ becomes the target of a spell or ability for the first
@@ -1979,6 +1994,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Writ of Passage: "Whenever enchanted creature attacks, if its power is 2 or less, ...": "its" is the enchanted creature's.
+    .replace(/^(Whenever enchanted creature attacks), if its (power|toughness) is /, "$1, if enchanted creature's $2 is ")
     // Electryte: "Whenever ~ deals combat damage to defending player": the only player an attacking creature can deal
     // combat damage to is the one it attacks (CR 506.2, 510.1), and a blocking one deals it to no player.
     .replace(/^Whenever ~ deals combat damage to defending player, /, "Whenever ~ deals combat damage to a player, ")
@@ -2628,6 +2645,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const text = oppStep[2]!.replace(/^(you may have that player gain control of ~ until end of turn\. If you do, untap ~, goad it, and it can't be sacrificed this turn\. If you don't, convert) it\.$/, "$1 ~.").replace(/^(you may have that player gain control of equipped creature until end of turn\. If you do, untap) it\.$/, "$1 equipped creature.");
     const body = parseBody(text.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
+  }
+  // Black Vise, The Rack: "At the beginning of the chosen player's upkeep, ..." of a permanent that chose a player as it
+  // entered (CR 614.12): an "each upkeep" trigger only on that player's turn; "that player" and "their" are that player.
+  const chosenStep = /^At the beginning of the chosen player's upkeep, (.+)$/.exec(line);
+  if (chosenStep) {
+    const body = parseBody(chosenStep[1]!, { eventPlayer: true });
+    return body ? { event: "eachUpkeep", body, chosenPlayersTurn: true } : "fail";
   }
   const enchanted = parseEnchantedPlayerTrigger(line);
   if (enchanted) return enchanted;

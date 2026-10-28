@@ -135,6 +135,12 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.dealtDamageToYou && !s.turnLog?.damagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.dealtCombatDamageToYou && !s.turnLog?.combatDamagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;
+  if (spec.enteredSinceYourLastTurn) {
+    // Your last turn: the one before this one if it's your turn now, else your most recent one (none yet: any).
+    const p = s.players[controller];
+    const last = s.activePlayer === controller ? p?.lastTurnBegan : p?.turnBegan;
+    if (o.enteredTurn === undefined || (last !== undefined && o.enteredTurn <= last)) return false;
+  }
   if (spec.attachedToYou && o.attachedToPlayer !== controller) return false;
   if (spec.combat === "attackingBattle" && !(o.attacking !== undefined && attackedBattle(s, o))) return false;
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
@@ -1065,9 +1071,19 @@ export function distinctModeCap(s: GameState, body: AbilityBody, controller: Pla
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" | "power"; greatest?: "power" | "manaValue"; action?: PickAction; anyController?: true; destroyable?: true }, pid: PlayerId, sourceId?: ObjectId, sourceZc?: number): ObjectId[] {
   // "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's.
   if (e.anyController && e.action === "counters") return s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
+  // Drop of Honey, Purging Scythe: "the creature with the least power" on the battlefield, anyone's, or tied for it; to be
+  // destroyed, one that can be if any of those can (rulings, CR 702.12b).
+  if (e.anyController && e.action === "choose" && e.least) {
+    const all = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), pid, false));
+    const stat = (id: ObjectId) => (e.least === "power" ? power(s, obj(s, id)) : toughness(s, obj(s, id)));
+    const min = Math.min(...all.map(stat));
+    const tied = all.filter((id) => stat(id) === min);
+    const can = e.destroyable ? tied.filter((id) => !objHasKeyword(s, obj(s, id), "Indestructible")) : tied;
+    return can;
+  }
   // "A creature that saddled it this turn": tapped for the source's saddle cost this turn, each the object it was then.
   if (e.filter.saddledSource) {
     const { saddledSource: _, ...filter } = e.filter;

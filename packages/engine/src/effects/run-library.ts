@@ -236,6 +236,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.parley = counts;
       return;
     }
+    case "spellToHand": {
+      // Cerebral Eruption: the spell itself, still on the stack as it resolves (rulings), returns to its owner's hand as it
+      // finishes resolving. A copy isn't a card and ceases to exist instead (CR 707.10a).
+      const o = s.resolving?.item.objectId ? s.objects[s.resolving.item.objectId] : undefined;
+      if (o?.zone === "stack" && !o.spellCopy) o.toHandOnResolve = true;
+      return;
+    }
     case "revealRevealed": {
       const rv = s.resolving?.revealed;
       const o = rv && s.objects[rv.id];
@@ -352,6 +359,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             s.pending = { kind: "discard", player: pid, count: Math.min(n, hand.length), source: src, upTo: true, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
             return "paused";
           }
+          sc.chosen![pid] = [];
+          sc.queue.shift();
+          continue;
+        }
+        // "Discards X cards" with X 0 (Cabal Shrine): nothing to choose or discard.
+        if (!e.hand && n <= 0) {
           sc.chosen![pid] = [];
           sc.queue.shift();
           continue;
@@ -654,6 +667,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.mayBottom) {
         const moved = new Set([...arranged.top, ...arranged.away]);
         lib.library = [...arranged.top, ...lib.library.filter((id) => !moved.has(id)), ...arranged.away];
+        const lookedN = arranged.top.length + arranged.away.length;
+        // Ransack: several cards, some on the bottom and the rest on top, each pile in the order chosen.
+        if (lookedN > 1) return void log(s, `${player(s, ctx.controller).name} looks at the top ${lookedN} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts ${arranged.away.length} on the bottom and ${arranged.top.length} on top.`);
         return void log(s, `${player(s, ctx.controller).name} looks at the top card of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library${arranged.away.length ? " and puts it on the bottom" : " and leaves it on top"}.`);
       }
       const looked = new Set(arranged.top);
@@ -1376,7 +1392,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           // "Any number of ... with total mana value 4 or less" (Ao, the Dawn Sky): the total is the limit.
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
-          const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
+          const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
         }
@@ -1467,6 +1483,10 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       } else if (e.rest === "hand") {
         if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "the other card" : `the other ${rest.length} cards`} into their hand.`);
         for (const id of rest) moveObject(s, id, "hand");
+      } else if (e.rest === "exile") {
+        // Face up (CR 406.3).
+        if (rest.length) log(s, `${p.name} exiles ${names(rest)}.`);
+        for (const id of rest) moveObject(s, id, "exile");
       } else {
         sc.moved = true;
         // Another player's library (Lonis, Cryptozoologist): the rest go to the bottom of theirs.

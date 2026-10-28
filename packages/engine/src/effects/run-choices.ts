@@ -2,9 +2,9 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
-import { controllerOf, staticConditionNow } from "../layers";
+import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
@@ -630,6 +630,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetSharesName"
+            ? // Winnow: another permanent on the battlefield has its name; a face-down permanent has none (CR 708.2).
+              ((o) => !!o && o.zone === "battlefield" && !o.faceDown && s.battlefield.some((id) => id !== o.id && !obj(s, id).faceDown && characteristics(s, obj(s, id)).name === characteristics(s, o).name))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
+            : e.cond.kind === "targetsSameColors"
+            ? targetsSameColors(s, ctx, e.cond.index, e.cond.n)
             : e.cond.kind === "targetGreatestPower"
             ? ((o) => !!o && o.zone === "battlefield" && objIsType(s, o, "Creature") && !s.battlefield.some((id) => id !== o.id && objIsType(s, obj(s, id), "Creature") && power(s, obj(s, id)) > power(s, o)))(ctx.legal[e.cond.index] ? objects(s, { ref: "target", index: e.cond.index }, ctx)[0] : undefined)
             : e.cond.kind === "flickeredIs"
@@ -723,6 +728,22 @@ function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetS
   if (o?.zone === "battlefield") return objectMatches(s, filter, o, ctx.controller, false);
   const card = s.objects[t.id];
   return !!card && card.zone === "graveyard" && (t.zc === undefined || (card.zoneChanges ?? 0) === t.zc) && printedMatches(filter, defOf(s, card));
+}
+
+/** Dead Ringers (SpellCondition "targetsSameColors"): each target's colors now, or as it last existed on the battlefield. */
+function targetsSameColors(s: GameState, ctx: ResolveCtx, index: number, n: number): boolean {
+  const sets: string[] = [];
+  for (let i = index; i < index + n; i++) {
+    const t = ctx.targets[i];
+    if (t?.kind !== "object") return false;
+    const o = s.objects[t.id];
+    const here = o?.zone === "battlefield" && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc);
+    const lk = s.lastKnown?.[t.id];
+    const colors = here ? characteristics(s, o).colors : lk && (t.zc === undefined || lk.zc === t.zc) ? lk.source?.colors : undefined;
+    if (!colors) return false;
+    sets.push([...colors].sort().join(""));
+  }
+  return sets.every((x) => x === sets[0]);
 }
 
 /** "If it was a creature card" (SpellCondition "targetCardWas"): the target card, wherever it went, by its printed characteristics. */
@@ -890,6 +911,11 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
+    // "Gain control of target land ... for as long as you control ~" (Orcish Squatters): over before it begins if you no
+    // longer control ~ (CR 611.2b), so it can't be done.
+    if (e.type === "continuous" && e.duration === "whileControlled" && !e.whileOnBattlefield && !(ctx.sourceId && whileControlledHolds(s, { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, controller: ctx.controller }))) return false;
+    // "You may have it assign no combat damage this turn" (Cloak of Confusion): only a creature still on the battlefield.
+    if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
     if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;

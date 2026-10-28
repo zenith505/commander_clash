@@ -506,6 +506,8 @@ export interface GameObject {
   enteredFromExile?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** A resolving spell's "return ~ to its owner's hand" (Cerebral Eruption): it goes there as it finishes resolving. */
+  toHandOnResolve?: true;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
   discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
@@ -590,6 +592,8 @@ export interface GameObject {
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
+  /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife): how much was paid, for "the life paid as it entered". */
+  lifePaidAsEntered?: number;
   /**
    * Cast bestowed (CR 702.103b): as a spell and as the permanent it becomes, it's an Aura with enchant creature, not a
    * creature (see defOf). It stops being bestowed when it becomes unattached or resolves with an illegal target (702.103e-f).
@@ -881,6 +885,8 @@ export interface StackItem {
   castMv?: number;
   /** The spell's colors as it was cast (Ramos, Dragon Engine), for when it has left the stack (CR 113.7a). */
   castColors?: Color[];
+  /** The spell's name as it was cast, a split card's half's (CR 709.3b); none face down (CR 708.2a). In `castItems` only. */
+  castName?: string;
   /** An amount "as you cast this spell" (Count asCast), counted as it became cast (rulings on Lifestream's Blessing). */
   asCast?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
@@ -1108,6 +1114,8 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
+  /** The permanent that gets the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully, CR 602.2b). */
+  counterOn?: ObjectId[];
   /** Waterbend as an additional cost to cast it (CR 701.67a): untapped artifacts and creatures you control, each paying {1}. */
   waterbend?: ObjectId[];
   /** Cards in hand revealed for "reveal a Pirate card from your hand". */
@@ -1320,7 +1328,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[] }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "keep": the rest are returned to their owners' hands (Consuming Tide). */ bounce?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[]; /** Birthing Ritual: the cards looked at, shown with the question. */ looked?: ObjectId[]; /** Paying `objectId`'s cost to attack (Exalted Dragon, CR 508.1i). */ attackCost?: true }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
@@ -1792,7 +1800,7 @@ export interface GameState {
   /** "Can't block with more than one creature this combat" (Mirri, Weatherlight Duelist): each player's limit, until the end of combat step ends. */
   blockLimits?: { player: PlayerId; n: number }[];
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
-  declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][]; /** Attackers that may still be exerted (CR 701.43d), and those that were. */ exert?: ObjectId[]; exerted?: ObjectId[] };
+  declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][]; /** Attackers that may still be exerted (CR 701.43d), and those that were. */ exert?: ObjectId[]; exerted?: ObjectId[]; /** Costs to attack that aren't mana still to pay (Exalted Dragon, CR 508.1g-i), attacker by attacker. */ costs?: AttackCostDue[] };
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
   mulligans?: MulliganState | null;
@@ -1904,6 +1912,14 @@ export interface TurnRule {
   rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof";
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
   byColors?: Color[];
+}
+
+/** A cost to attack with `id` that isn't mana (Exalted Dragon's "sacrifice a land", CR 508.1g): `n` permanents of its controller's. */
+export interface AttackCostDue {
+  id: ObjectId;
+  action: "sacrifice" | "bounce";
+  filter: TargetSpec;
+  n: number;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

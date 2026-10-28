@@ -26,6 +26,8 @@ import {
   attackablePermanentProblem,
   attackProblem,
   attackCost,
+  attackCostOptions,
+  attackCostsPayable,
   attackTaxOf,
   attackYouLimit,
   combatLimit,
@@ -43,6 +45,7 @@ import {
   craftCandidates,
   untapViaMana,
   counterCostCandidates,
+  counterOnCandidates,
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
@@ -306,6 +309,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
+    // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
+    if (pend.kind === "pickPermanents" && pend.attackCost) {
+      const rest = s.declaring?.costs?.slice(1) ?? [];
+      const ids: ObjectId[] = [];
+      for (const id of [...pend.options].sort((a, b) => permanentWorth(s, pid, a) - permanentWorth(s, pid, b))) {
+        if (ids.length < pend.count && attackCostsPayable(s, pid, rest, [...ids, id])) ids.push(id);
+      }
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
@@ -496,6 +508,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const rank = ["flying", "deathtouch", "menace", "trample", "+1/+1", "first strike", "hexproof", "lifelink", "reach", "vigilance"];
       const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+    }
+    // "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor): up to 7, keeping 12 life, and at
+    // least 1 while we can spare it (a 0/0 Minion dies at once).
+    if (pend.kind === "chooseOption" && pend.what === "lifeAsEnters") {
+      const life = player(s, pid).life;
+      const max = pend.numberRange?.max ?? 0;
+      const n = Math.max(Math.min(max, life > 5 ? 1 : 0), Math.min(max, life - 12, 7));
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
     }
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
@@ -2810,6 +2830,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const picks = spareCounters(s, pid, obj(s, id), c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "putCounter") {
+      const pick = spareCounterHost(s, pid, c, targeted);
+      if (!pick) return null;
+      out.counterOn = [pick];
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -2932,8 +2956,14 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const given = new Set((s.resolving.countersPutThisWay ?? []).map((c) => c.id));
     return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   }
-  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+  // Drop of Honey, Purging Scythe: a tied creature of anyone's to destroy or damage: an opponent's, worth the most to them;
+  // else our least useful one.
+  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}')) {
+    const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
+    return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
+  }
+  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   if ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created") return [...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
@@ -2978,7 +3008,18 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
 function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "pickPermanents" }>): ObjectId[] {
   const ok = pend.options.map((id) => obj(s, id)).filter((o) => !o.isCommander && !objIsType(s, o, "Land"));
   if (pend.objectId) {
-    const n = compileCard(defOf(s, obj(s, pend.objectId))).devour?.n;
+    const devour = compileCard(defOf(s, obj(s, pend.objectId))).devour;
+    // Wood Elemental's P/T is the number of untapped Forests sacrificed: those beyond the four lands we keep, at least one.
+    if (devour?.defines === "count") {
+      const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+      return pend.options.slice(0, Math.max(Math.min(1, pend.options.length), lands - 4));
+    }
+    // Dracoplasm's is their total: the cheap tokens, or else the least worth creature, since a 0/0 dies at once.
+    if (devour?.defines === "total") {
+      const tokens = ok.filter((o) => o.isToken && worth(s, pid, o) <= 4).map((o) => o.id);
+      return tokens.length ? tokens.slice(0, pend.count) : [...ok].sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, 1).map((o) => o.id);
+    }
+    const n = devour?.n;
     const per = typeof n === "number" ? n : 2;
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);
   }
@@ -3190,6 +3231,17 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
+  // Knight of the Mists: "you may pay {U}. If you don't, destroy target Knight": pay only when that would hit our own.
+  // Without a target (Chaos Spewer's "If you don't, blight 2"), it's always ours: pay (below).
+  if (e.pay && !e.effects.length && !e.keep && e.otherwise?.some((x) => allEffects([x]).some((y) => targetIndexOf(y) !== undefined))) {
+    let hurt = 0;
+    for (const inner of allEffects(e.otherwise)) {
+      const i = targetIndexOf(inner);
+      const t = i === undefined ? undefined : targets[i];
+      if (i !== undefined && t && t.kind !== "none" && r.legal[i]) hurt += harm[i] === isMine(s, pid, t) ? 1 : -1;
+    }
+    return hurt > 0;
+  }
   let v = 0;
   // "You may discard a card. If you do, draw a card": what follows counts too.
   const then = r.body.effects[r.next + 1];
@@ -4573,9 +4625,26 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = spareCounters(s, pid, o, c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "putCounter") {
+      const pick = spareCounterHost(s, pid, c, targeted);
+      if (!pick) return null;
+      out.counterOn = [pick];
     } else return null;
   }
   return out;
+}
+
+/**
+ * Where we'd put a -1/-1 counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): a creature of ours
+ * that survives it (toughness 2 or more), the least valuable, never our commander or a target; null if there's none.
+ */
+function spareCounterHost(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>, targeted: Set<string | number>): ObjectId | null {
+  if (c.counter !== "-1/-1") return null;
+  const pool = counterOnCandidates(s, pid, c)
+    .map((x) => obj(s, x))
+    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) >= 2)
+    .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  return pool[0]?.id ?? null;
 }
 
 /**
@@ -5354,6 +5423,14 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can only attack alone (Master of Cruelties) stays home when others attack (CR 506.5).
   if (attacks.length > 1) attacks = attacks.filter((a) => !characteristics(s, obj(s, a.attacker)).onlyAttacksAlone);
+  // Exalted Dragon, Leviathan: they attack when the lands to sacrifice are spare (seven left after), and only if all such
+  // costs can be paid together (CR 508.1i). Floodtide Serpent's returning an enchantment isn't weighed: it stays home.
+  const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+  const costsOf = (a: { attacker: ObjectId }) => characteristics(s, obj(s, a.attacker)).ownAttackCosts;
+  const spare = (a: { attacker: ObjectId }) => costsOf(a).every((c) => c.action === "sacrifice" && attackCostOptions(s, pid, c).every((id) => objIsType(s, obj(s, id), "Land")));
+  attacks = attacks.filter((a) => !costsOf(a).length || spare(a));
+  const landsPaid = attacks.reduce((n, a) => n + costsOf(a).reduce((t, c) => t + c.n, 0), 0);
+  if (landsPaid && (lands - landsPaid < 7 || !attackCostsPayable(s, pid, attacks.flatMap(costsOf)))) attacks = attacks.filter((a) => !costsOf(a).length);
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");

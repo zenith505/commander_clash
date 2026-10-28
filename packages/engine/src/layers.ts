@@ -149,6 +149,8 @@ export interface Characteristics {
   ownAttackTax: number;
   /** Generic mana to block with this creature (Qal Sisma Behemoth, Oppressive Rays). */
   ownBlockTax: number;
+  /** Costs to attack with this creature that aren't mana (Exalted Dragon's "sacrifice a land", CR 508.1g). */
+  ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -317,6 +319,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     blockTax: 0,
     ownAttackTax: 0,
     ownBlockTax: 0,
+    ownAttackCosts: [],
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -1009,8 +1012,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // An object with no name (face down) shares a name with nothing (CR 201.2a).
       const byName = new Map<string, number>();
       for (const [id, c] of chars)
-        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && c.name && !s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
+        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && !cond.notTypes?.some((t) => c.types.includes(t)) && !(cond.nontoken && s.objects[id]!.isToken) && c.name && !s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
       return [...byName.values()].some((n) => n >= cond.n);
+    }
+    case "allShareColor": {
+      // The colors the earlier layers left them (CR 613.1e), every player's.
+      let shared: Color[] | undefined;
+      for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) shared = (shared ?? c.colors).filter((k) => c.colors.includes(k));
+      return !!shared?.length;
     }
     case "handsEmpty":
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
@@ -1318,6 +1327,14 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.name = m.name;
       return;
     case "setColors":
+      // "~ is the chosen color" (Alloy Golem), "Enchanted land is the chosen color" (Shimmerwilds Growth): a static ability's,
+      // the color chosen as its source entered (CR 614.12); with none chosen, nothing changes. (A resolved effect's color
+      // is bound as it resolves, without `chosen`.)
+      if (m.chosen === true) {
+        const col = e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined;
+        if (col) c.colors = [col];
+        return;
+      }
       c.colors = [...m.colors];
       return;
     case "addColors":
@@ -1457,6 +1474,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "blockTax":
       c.blockTax += m.n;
+      return;
+    case "ownAttackCost":
+      c.ownAttackCosts = [...c.ownAttackCosts, { action: m.action, filter: m.filter, n: m.n }];
       return;
     case "ownAttackTax":
     case "ownBlockTax": {

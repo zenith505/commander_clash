@@ -787,6 +787,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const g = parseGroup(`all ${m[1]}`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 0, max: 0 } : null;
   }
+  // Common Cause: "Nonartifact creatures get +2/+2 as long as they all share a color".
+  if (text === "they all share a color" && st.affects.kind === "filter" && st.affects.spec && !st.affects.controller && !st.affects.other) return { kind: "allShareColor", filter: st.affects.spec };
+  // Tidal Influence: "Cast ~ only if no permanents named ~ are on the battlefield": anyone's, with the card's name (CR 201.5).
+  if (text === "no permanents named ~ are on the battlefield") {
+    const amount = parseCount("the number of permanents on the battlefield named ~", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, max: 0 } : null;
+  }
   // Biovisionary: "if you control four or more creatures named ~": with the source's name (CR 201.5), ~ itself among them.
   // Phoenix Fleet Airship: "if you control eight or more permanents named ~".
   if ((m = new RegExp(`^you control ${NUM} or more (creatures|permanents) named ~$`).exec(text))) {
@@ -802,6 +809,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // artifacts (rulings).
   if ((m = new RegExp(`^you control ${NUM} or more (artifacts|creatures|permanents) with the same name as one another$`).exec(text)))
     return { kind: "sameNamed", types: m[2] === "permanents" ? [] : [capital(m[2]!.slice(0, -1))], n: num(m[1]!) };
+  // Chrome Replicator: "if you control two or more nonland, nontoken permanents with the same name as one another".
+  if ((m = new RegExp(`^you control ${NUM} or more nonland,? nontoken permanents with the same name as one another$`).exec(text)))
+    return { kind: "sameNamed", types: [], notTypes: ["Land"], nontoken: true, n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
   if (/^you played a land this turn$/.test(text)) return { kind: "playedLandThisTurn" };
   if ((m = new RegExp(`^a player has ${NUM} or fewer cards in hand$`).exec(text))) return { kind: "someHandAtMost", n: num(m[1]!) };
@@ -866,6 +876,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // "If there are two or more ki counters on ~" (the Kamigawa flip cards).
   if ((m = new RegExp(`^there are ${NUM} or more ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
+  // Homarid, Tidal Influence: "As long as there is exactly one tide counter on ~", "there are exactly three tide counters".
+  if ((m = new RegExp(`^there (is|are) exactly ${NUM} ${COUNTER} counters? on ~$`).exec(text)) && (m[1] === "is") === (num(m[2]!) === 1) && (num(m[2]!) === 1) === !/counters on/.test(text))
+    return { kind: "selfCounters", counter: counterKind(m[3]!), min: num(m[2]!), max: num(m[2]!) };
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
@@ -2041,6 +2054,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     return { affects: { kind: "self" }, mods: [{ kind: "linkedCreature", part: "types" }, { kind: "linkedCreature", part: "pt" }], text: line };
   // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
   // chosen as it entered, added in the type-changing layer (CR 613.1d).
+  // "This creature is the chosen color. (It's still an artifact.)" (Alloy Golem), "Enchanted land is the chosen color"
+  // (Shimmerwilds Growth): the color chosen as it entered replaces its colors (layer 5, CR 105.3, 613.1e).
+  const chosenColor = /^(~|Enchanted land) is the chosen color$/.exec(text);
+  if (chosenColor) return { affects: chosenColor[1] === "~" ? { kind: "self" } : { kind: "attached" }, mods: [{ kind: "setColors", colors: [], chosen: true }], text: line };
   if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
   // Opalescence: "Each other non-Aura enchantment is a creature in addition to its other types and has base power and base
   // toughness each equal to its mana value" (Starfield of Nyx: "... you control"); March of the Machines: "Each
@@ -2172,6 +2189,17 @@ function parseStaticLine(line: string): StaticAbility | null {
     const per = ownTax[4] === " for each +1/+1 counter on it" ? { perPlusOne: true as const } : ownTax[4] ? { amount: { count: { kind: "cardsInHand", who: { ref: "you" } } } as Amount } : {};
     const n = Number(ownTax[3]);
     return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n, ...per }, ...(ownTax[2] ? [{ kind: "ownBlockTax" as const, n, ...per }] : [])], text: line };
+  }
+  // Exalted Dragon: "~ can't attack unless you sacrifice a land"; Leviathan: "... unless you sacrifice two Islands";
+  // Floodtide Serpent: "... unless you return an enchantment you control to its owner's hand": costs to attack, paid as
+  // attackers are declared (CR 508.1g-i), with permanents of yours.
+  const ownCost = /^~ can't attack unless you (sacrifice|return) (an?|two|three) (.+?)( you control to its owner's hand)?$/.exec(text);
+  if (ownCost && (ownCost[1] === "return") === !!ownCost[4]) {
+    const n = /^an?$/.test(ownCost[2]!) ? 1 : num(ownCost[2]!);
+    const spec = parseTargetPhrase(n === 1 ? ownCost[3]! : ownCost[3]!.replace(/s$/, ""));
+    if (spec?.kind !== "object" || spec.controller || !n) return null;
+    const filter: TargetSpec = { ...spec, controller: "you", text: n === 1 ? ownCost[3]! : ownCost[3]!.replace(/s$/, "") };
+    return { affects: { kind: "self" }, mods: [{ kind: "ownAttackCost", action: ownCost[1] === "return" ? "bounce" : "sacrifice", filter, n }], text: line };
   }
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
   const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);

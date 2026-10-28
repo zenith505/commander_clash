@@ -5,6 +5,7 @@ import { graveyardWays, freeCastable, canPlayLandNow, loseLife, opponents, tapPe
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
+import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
@@ -165,7 +166,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       // Imperial Edict ("Target opponent chooses a creature they control. Destroy that creature."): the question says what
       // happens to the one chosen.
       const after = e.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
-      const fate = (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : undefined;
+      // Drop of Honey, Purging Scythe: one of those tied for the least power or toughness, anyone's.
+      const tied = e.anyController && e.least ? `click a creature tied for the least ${e.least} (anyone's). ${src} ${after?.type === "destroy" ? "destroys it" : after?.type === "damage" ? `deals ${describeAmount(after.amount)} damage to it` : "chooses it"}.` : undefined;
+      const fate = tied ?? ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : undefined);
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, ...(fate ? { prompt: fate } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}) };
       return "paused";
     }
@@ -2359,7 +2362,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.found = [];
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value X" (Fix What's Broken, Immortal Servitude): exactly X.
-        const { xRange, ...rest } = bindChosen(e.filter, ctx.chosen);
+        // Demigod of Revenge: "all cards named ~", the source's name (CR 201.5).
+        const { xRange, ...rest } = bindChosen(e.filter.named === "~" ? { ...e.filter, named: ctx.sourceDef.name } : e.filter, ctx.chosen);
         const x = ctx.x ?? 0;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).

@@ -1206,6 +1206,12 @@ export function parseTargetPhrase(
     extra.attachedToYou = true;
     p = p.slice(0, toYou.index);
   }
+  // Premature Burial: "target nonblack creature that entered since your last turn ended".
+  const since = / that entered since your last turn ended$/.exec(p);
+  if (since) {
+    extra.enteredSinceYourLastTurn = true;
+    p = p.slice(0, since.index);
+  }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);
   if (entered) {

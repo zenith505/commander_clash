@@ -1477,7 +1477,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.by !== undefined)
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
     // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
     // controller that player is an opponent of, once for each source (rulings).

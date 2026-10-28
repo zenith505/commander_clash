@@ -82,7 +82,8 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
   }
   let v: number | null = null;
   const group = (r: ObjRef) => {
-    if (r.ref !== "each") return [];
+    // Sanguine Praetor, Endemic Plague: which ones depends on the creature sacrificed, not weighed (worth nothing to bots).
+    if (r.ref !== "each" || r.sacrificedKin) return [];
     const whose = r.of?.ref === "target" ? ofPick?.get(r.of.index) : undefined;
     if (r.of && whose === undefined) return [];
     const filter = bindChosen(r.filter, sourceId ? (obj(s, sourceId).chosen ?? chosen) : chosen);

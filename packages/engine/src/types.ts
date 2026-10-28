@@ -2017,6 +2017,8 @@ export interface Resolving {
   chosenFromYard?: { id: ObjectId; zc: number };
   /** The cards "exile the top two cards of your library. You may play them" exiled (Bonehoard Dracosaur). */
   impulsed?: ObjectId[];
+  /** "You may put a land card from among them into your hand" after a mill (Town Greeter): the cards it put there. */
+  putIntoHand?: ObjectId[];
   /** The cards its "hold" flicker exiled, for the search after it to put onto the battlefield with what it finds. */
   held?: { id: ObjectId; zc: number }[];
   /** The cards its mill instructions milled, as they are in the graveyard ("if a card with the chosen name was milled this way"). */

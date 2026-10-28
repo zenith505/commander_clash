@@ -1301,7 +1301,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const groupWatch = (o: GameObject, anyone = false, list?: TriggeredAbility[]) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) =>
-        ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
+        // Any player's attack (Killian, Decisive Mentor: "creatures that are enchanted by an Aura you control"): "you" is
+        // the watcher's controller.
+        ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), anyone ? controllerOf(s, o) : ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
       for (const t of list ?? abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
         if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;

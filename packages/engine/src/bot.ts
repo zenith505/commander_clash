@@ -2016,6 +2016,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const lands = player(s, pid).hand.filter((h) => h !== id && isType(defOf(s, obj(s, h)), "Land")).length;
     xs = xs.filter((x) => x !== undefined && x >= 1 && x <= lands);
   }
+  // Nissa, Steward of Elements: X loyalty, so X 0 would put it straight into the graveyard (CR 306.5b, 704.5i).
+  if (cost.hasX && d.loyalty === "X") xs = xs.filter((x) => x !== undefined && x >= 1);
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
     if (plan) return plan;
@@ -3456,6 +3458,13 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
       const o = obj(s, id);
       return controllerOf(s, o) === tp.id && characteristics(s, o).types.includes(ty) && !!o.tapped === (tp.id === pid) ? n + Math.max(1, worth(s, pid, o)) : n;
     }, 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
+  // Creeping Renaissance: "Return all cards of the chosen type from your graveyard to your hand": the type with the most
+  // cards there, a land worth half a spell.
+  const regrow = s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "returnAllFromGraveyard" && e.filter.chosen === "cardType");
+  if (what === "cardType" && regrow) {
+    const score = (ty: string) => s.players[pid]!.graveyard.reduce((n, id) => (defOf(s, obj(s, id)).types.includes(ty) ? n + (ty === "Land" ? 0.5 : 1) : n), 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   if (what === "cardType") {

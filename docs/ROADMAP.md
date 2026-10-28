@@ -1,7 +1,7 @@
 # Roadmap
 
-26,884 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,882 of
+26,901 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,895 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -527,6 +527,22 @@ line blocks.
    Inexorable, Yuffie, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
    Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
    Drowner of Truth, Command the Dreadhorde.
+   Round 191 went on from the top: base power and toughness "and are Juggernauts in addition to their other creature
+   types" (Graaz, Unstoppable Juggernaut), "the exiled card's power/toughness" (Lobelia Sackville-Baggins, with "that was
+   put there from the battlefield this turn"; Morbid Bloom, Scour the Desert), a chosen hand card revealed and put on the
+   bottom of its owner's library, then a draw (Vendilion Clique, browser test), "unless its controller pays twice {X}"
+   and "put up to two of them into your hand" (Thassa's Intervention; Shadow Prophecy, The Mana Rig), "whenever you put
+   a counter on a creature you control" once each turn (Mikey & Leo), "the first non-Lemur creature spell with flying
+   you cast during each of your turns" (Momo, Friendly Flier), "whenever one or more creatures that are enchanted by an
+   Aura you control attack", any player's attack, and "tap up to one target creature and goad it" (Killian, Decisive
+   Mentor), "choose a permanent type" (Creeping Renaissance, browser test), "if you didn't draw cards this way" (Mr.
+   Foxglove), "add twice that much {G}" (Fangorn, Tree Shepherd), "search your graveyard, hand, and library" and "with a
+   legendary Equipment attached to it" (Kassandra, Eagle Bearer), "if you put a Town card into your hand this way" (Town
+   Greeter), starting loyalty X (Nissa, Steward of Elements: CR 306.5b and 107.3m, so X 0 puts it into the graveyard;
+   the bot casts it for 1 or more).
+   Out after round 191 (looked at, not done): Jin Sakai, Ghost of Tsushima ("attacks a player, if no other creatures are
+   attacking that player"), Stiltzkin, Moogle Merchant ("target opponent gains control of another target permanent you
+   control. If they do, ...").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

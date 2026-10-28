@@ -617,6 +617,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || spec.chosen !== "type") return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1]} card of the chosen type` }, ...(m[2] === "your hand" ? { toHand: true as const } : {}) }];
   }
+  // Creeping Renaissance: "Choose a permanent type. Return all cards of the chosen type from your graveyard to your hand."
+  if (/^[Rr]eturn all cards of the chosen type from your graveyard to your hand$/.test(s)) return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", chosen: "type", text: "card of the chosen type" }, toHand: true }];
   // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
   const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
   if (yours) {
@@ -803,7 +805,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
   }
-  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
     const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;

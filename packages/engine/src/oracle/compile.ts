@@ -221,8 +221,9 @@ export function isFullySupported(d: CardDef): boolean {
   const cost = parseManaCost(d.manaCost);
   if (!cost.supported) return false;
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;
-  // A planeswalker needs a printed loyalty number to enter with (CR 306.5b); "X" loyalty isn't modeled.
-  if (d.types.includes("Planeswalker") && !/^\d+$/.test(d.loyalty ?? "")) return false;
+  // A planeswalker needs a printed loyalty number to enter with (CR 306.5b), or "X" with {X} in its mana cost: the X it
+  // was cast with (CR 107.3m; Nissa, Steward of Elements).
+  if (d.types.includes("Planeswalker") && !/^\d+$/.test(d.loyalty ?? "") && !(d.loyalty === "X" && cost.hasX)) return false;
   const c = compileCard(d);
   // Creatures, and Vehicles that can become creatures (CR 301.7a), need numbers for power and toughness,
   // or a characteristic-defining ability that says what a "*" is (CR 604.3).

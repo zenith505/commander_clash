@@ -3641,6 +3641,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e2375f13-fd45-4087-abd1-c884acc6c736",
+  "name": "Creeping Renaissance",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a permanent type. Return all cards of the chosen type from your graveyard to your hand.\nFlashback {5}{G}{G} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5e238e67-00f2-4656-bf69-0115e47321a5",
   "name": "Crimestopper Sprite",
   "manaCost": "{2}{U}",
@@ -18225,6 +18253,42 @@
   "commanderLegal": "legal",
   "set": "mkm",
   "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "244d4807-0802-41bc-9460-55ac38a28a72",
+  "name": "Vendilion Clique",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Faerie Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Wizard"
+  ],
+  "oracleText": "Flash\nFlying\nWhen Vendilion Clique enters, look at target player's hand. You may choose a nonland card from it. If you do, that player reveals the chosen card, puts it on the bottom of their library, then draws a card.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "mm2",
+  "releasedAt": "2015-05-22",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

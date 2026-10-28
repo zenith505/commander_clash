@@ -405,6 +405,17 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
     const then = revealedAction(named[1]!, ctx, true);
     return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
   }
+  // Nissa, Steward of Elements: "If it's a land card or a creature card with mana value less than or equal to the number of
+  // loyalty counters on ~, you may put that card onto the battlefield": either one, the count made as it resolves (with
+  // ~'s last known loyalty if it's gone, rulings). Not put, it stays on top (rulings).
+  const orBound = !first && /^If it's (an? [a-z]+ card) or (an? [a-z]+ card with mana value less than or equal to [^,]+), (.+)$/.exec(sentences[at] ?? "");
+  if (orBound) {
+    const a = parseSearchFilter(orBound[1]!.replace(/^an? /, ""));
+    const b = parseSearchFilter(orBound[2]!.replace(/^an? /, ""), (t) => parseBoundCount(t, ctx));
+    const then = a && b?.bound ? revealedAction(orBound[3]!, ctx) : null;
+    if (!then) return null;
+    return { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", anyOf: [a!, b!], text: `${orBound[1]!.replace(/^an? /, "")} or ${orBound[2]!.replace(/^an? /, "")}` } }, effects: then }, next: at + 1 };
+  }
   if (!first) return null;
   const filter0: TargetSpec | null = anyOfChosen ? { kind: "card", chosen: "type", text: "card of the chosen type" } : (parseSearchFilter(/ card with mana value /.test(first[2]!) ? first[2]!.replace(/^an? /, "") : `${first[2]!.replace(/^an? /, "")} card`) ?? null);
   const filter = filter0 && ofChosen && !anyOfChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
@@ -886,6 +897,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // control. Each of them enters with an additional -1/-1 counter on it." It enters with it (CR 614.1c), as with "...
   // under your control with an additional -1/-1 counter on it".
   text = text.replace(/^((?:Put|Return) [^.]*target [^.]+ from [^.]*graveyards? (?:to|onto) the battlefield under your control)\. (?:Each of them|It) enters with an additional ([+-]1\/[+-]1) counter on it\./, "$1 with an additional $2 counter on it.");
+  // Killian, Decisive Mentor: "tap up to one target creature and goad it": two instructions, in order.
+  text = text.replace(/^([Tt]ap (?:up to one )?target creature) and goad it\./, "$1. Goad it.");
   // Cruel Ultimatum: "Target opponent sacrifices a creature of their choice, discards three cards, then loses 5 life. You
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
@@ -4035,6 +4048,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       else sentences.splice(shuffleAt, 1);
       continue;
     }
+    // Kassandra, Eagle Bearer: "search your graveyard, hand, and library for a card named The Spear of Leonidas, put it
+    // onto the battlefield, then shuffle": one card from any of the three zones (CR 701.23); finding nothing is allowed,
+    // as the search is for a card with a stated quality (CR 701.23b).
+    const threeZones = /^[Ss]earch your graveyard, hand, and library for (a card named [^,]+), put it onto the battlefield, then shuffle$/.exec(s);
+    if (threeZones) {
+      const filter = parseSearchFilter(threeZones[1]!.replace(/^a /, ""));
+      if (!filter?.named) return null;
+      const fx: Effect = { type: "search", filter, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield" }, andGraveyard: true, andHand: true };
+      effects.push(fx);
+      noteLast(ctx, [fx]);
+      continue;
+    }
     // Doomsday: "Search your library and graveyard for five cards and exile the rest. Put the chosen cards on top of your
     // library in any order.": five from the two zones together, all of them if there are fewer (rulings, CR 701.23d); the
     // rest of both zones is exiled, then the five go on top in the order you choose, with no shuffle.
@@ -5256,6 +5281,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // Mr. Foxglove: "draw cards equal to ... If you didn't draw cards this way, you may put a creature card from your hand
+    // onto the battlefield": no card drawn in that draw (none when the count is 0 or less, rulings).
+    const noDraw = /^If you didn't draw cards this way, (.+)$/.exec(s);
+    if (noDraw) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "draw" || prev.who.ref !== "you" || typeof prev.n === "number") return null;
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(noDraw[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "drawnThisWay" } }, max: 0 }, effects: inner });
+      continue;
+    }
     // "Target opponent reveals their hand. You may choose a creature or battle card from it. If you do, that player
     // discards that card. If you don't, incubate 3." (Traumatic Revelation): one or none (rulings), then what follows
     // depends on which.
@@ -5265,9 +5302,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(mayChoose[1]!);
       if (prev?.type !== "lookAtHand" || filter === null) return null;
       const next = sentences[si + 1] ?? "";
-      const act = /^(?:If you do, )?(?:(that player discards that card|they discard it)(?:, then (?:they )?draws? a card)?|(?:that player exiles|exile) that card)$/i.exec(next);
+      // Vendilion Clique: "If you do, that player reveals the chosen card, puts it on the bottom of their library, then
+      // draws a card."
+      const act = /^(?:If you do, )?(?:(that player discards that card|they discard it|that player reveals the chosen card, puts it on the bottom of their library)(?:,? then (?:they )?draws? a card)?|(?:that player exiles|exile) that card)$/i.exec(next);
       if (!act || (/^If you do, (?:that player exiles|exile)/.test(next) && /^If a /.test(sentences[si + 2] ?? ""))) return null;
-      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: act[1] ? "discard" : "exile", optional: true });
+      const bottom = /bottom of their library/.test(act[1] ?? "");
+      if (bottom && !/ then draws a card$/.test(next)) return null;
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: bottom ? "libraryBottom" : act[1] ? "discard" : "exile", optional: true });
       si++;
       const took: Amount = { count: { kind: "tookFromHand" } };
       // "..., then draws a card": that player, only if they discarded.
@@ -7024,6 +7065,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
+    // Town Greeter: "mill four cards. You may put a land card from among them into your hand. If you put a Town card into
+    // your hand this way, you gain 2 life": the card put there, by its printed types.
+    const handThisWay = /^If you put an? ([A-Z][a-z]+|[a-z]+) card into your hand this way, (.+)$/.exec(s);
+    if (handThisWay) {
+      const last = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${handThisWay[1]} card`);
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(handThisWay[2]!), ctx);
+      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !inner || ctx.targets.length !== before || /(?:it|its|that card)/.test(handThisWay[2]!)) return null;
+      effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter }, effects: inner });
+      continue;
+    }
     // Return Upon the Tide: "Return target creature card from your graveyard to the battlefield. If it's an Elf, create two
     // 1/1 green Elf Warrior creature tokens": about the permanent it returned as, once it's on the battlefield (rulings).
     const returnedIs = /^If it's an? ([A-Z][a-z]+), (.+)$/.exec(s);
@@ -8456,9 +8509,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Choose artifact or enchantment. Destroy all permanents of the chosen type" (Season of Gathering): a card type,
     // chosen as it resolves (CR 608.2d); "the chosen type" in the next instruction is that one.
-    const typeChoice = new RegExp(`^Choose (${CARD_TYPE_WORD}(?:, ${CARD_TYPE_WORD})*,? or ${CARD_TYPE_WORD})$`).exec(s);
+    // Creeping Renaissance: "Choose a permanent type": one of the six (CR 110.4a).
+    const typeChoice = new RegExp(`^Choose (${CARD_TYPE_WORD}(?:, ${CARD_TYPE_WORD})*,? or ${CARD_TYPE_WORD}|a permanent type)$`).exec(s);
     if (typeChoice && sentences[si + 1]) {
-      const options = typeChoice[1]!.split(/,? or |, /).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+      const options = typeChoice[1] === "a permanent type" ? [...PERMANENT_TYPES] : typeChoice[1]!.split(/,? or |, /).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
       const asCardType = (v: unknown): unknown => (Array.isArray(v) ? v.map(asCardType) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "chosen" && x === "type" ? "cardType" : asCardType(x)])) : v);
       // Turnabout: "Tap all untapped permanents of the chosen type target player controls, or untap all tapped
       // permanents of that type that player controls": which one, chosen as it resolves too (rulings), after the type.
@@ -9529,6 +9583,8 @@ export function usesX(v: unknown): boolean {
 export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   let m: RegExpExecArray | null;
   if (text === "{X}") return { cost: "", generic: X };
+  // Thassa's Intervention: "twice {X}", generic mana.
+  if (text === "twice {X}") return { cost: "", generic: { count: { kind: "x" }, times: 2 } };
   if ((m = /^((?:\{(?:\d+|[WUBRGC])\})+)(?: and (\d+) life)?$/.exec(text))) return { cost: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
   // "Pay 5 life" (Dash Hopes): only with that much life (CR 119.4).
   if ((m = /^(\d+) life$/.exec(text))) return { cost: "", life: Number(m[1]) };

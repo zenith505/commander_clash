@@ -245,6 +245,10 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
       if (ac.subtypes.includes("Aura") && ac.controller === you) return true;
       continue;
     }
+    if (status === "legendaryEquipped") {
+      if (ac.subtypes.includes("Equipment") && ac.supertypes.includes("Legendary")) return true;
+      continue;
+    }
     if (status !== "enchanted" && ac.subtypes.includes("Equipment")) return true;
     if ((status === "enchanted" || status === "enchantedOrEquipped") && ac.subtypes.includes("Aura")) return true;
     if (status === "modified" && ac.subtypes.includes("Aura") && ac.controller === c.controller) return true;
@@ -609,7 +613,9 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
  */
 export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): TargetSpec {
   // Mistfolk: "target spell that targets ~": the source, as it is now (TargetSpec.targetsSource).
-  const spec: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
+  const spec1: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
+  // Nissa, Steward of Elements: "a land card or a creature card with mana value less than or equal to ...": one of them.
+  const spec: TargetSpec = spec1.anyOf?.some((x) => x.bound) ? { ...spec1, anyOf: spec1.anyOf.map((x) => bindBound(s, x, ctx)) } : spec1;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.

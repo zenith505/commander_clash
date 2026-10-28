@@ -351,10 +351,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Signature Slam: "each modified creature you control deals damage equal to its power to target creature you don't
   // control": each of them as this resolves, all at once, each the source of its own damage; none if the target is illegal.
-  if ((m = /^[Ee]ach (modified )?creature you control deals damage equal to its power to (target creature (?:you don't control|an opponent controls))$/.exec(s))) {
-    const a = parseObject(`each ${m[1] ?? ""}creature you control`, ctx);
+  // Bartz and Boko: "each other Bird you control" the same way. Moonlight Hunt: "Choose target creature you don't control.
+  // Each creature you control that's a Wolf or a Werewolf deals damage equal to its power to that creature" (body.ts).
+  if ((m = /^[Ee]ach ((?:modified )?creature you control|other [A-Z][a-z]+ you control|creature you control that's an? [A-Z][a-z]+ or an? [A-Z][a-z]+) deals damage equal to its power to (target creature (?:you don't control|an opponent controls))$/.exec(s))) {
+    const a = parseObject(`each ${m[1]}`, ctx);
     const b = a && parseObject(m[2]!, ctx);
-    return a?.ref === "each" && b?.ref === "target" && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
+    return a?.ref === "each" && a.filter.controller === "you" && b?.ref === "target" && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
   }
   // "Up to two target creatures you control each deal damage equal to their power to another target creature" (Band
   // Together), "... each get +1/+0 until end of turn. They each deal damage equal to their power to ..." (Tandem
@@ -510,7 +512,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCastSpell && /^[Cc]ounter (?:~|it|this spell)$/.test(s)) return [{ type: "counterSpell", index: -1, cause: true }];
   // Storm of Saruman: "copy it, except the copy isn't legendary" (CR 707.9b; a permanent spell's copy becomes a
   // nonlegendary token, CR 608.3f).
-  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?(, except the copy isn't legendary)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
+  // Storm King's Thunder: "copy that spell X times", the X of the spell that made the delayed trigger; Photon Blast
+  // Barrage: "When you cast ~, copy it X times", its own X (rulings: X copies, none if X is 0).
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice| X times)?(, except the copy isn't legendary)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] === " X times" ? X : m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
   // Bonus Round: "that player copies it and may choose new targets for the copy": the caster copies it and controls the
   // copy (rulings, CR 707.10).
   if (ctx.castSpell && /^[Tt]hat player copies (?:it|that spell) and may choose new targets for the copy$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, byController: true }];

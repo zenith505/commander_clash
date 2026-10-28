@@ -149,10 +149,15 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true, ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}) };
       return "paused";
     }
-    if (!n) {
+    if (!n || (e.upTo && !options.length)) {
       sc.chosen![pid] = [];
       sc.queue.shift();
       continue;
+    }
+    // "Put a +1/+1 counter on each of up to two Soldiers you control": as many as they like, up to that many.
+    if (e.upTo) {
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: Math.min(n, options.length), min: 0, ...(e.counter ? { counter: e.counter.kind } : {}), ...(e.prompt ? { prompt: e.prompt.replace(/~/g, src) } : {}) };
+      return "paused";
     }
     // "Each player who can't discards a card" (Plaguecrafter): who had none.
     if (!options.length) (r.couldntPick ??= []).push(pid);

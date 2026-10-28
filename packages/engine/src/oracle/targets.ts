@@ -1425,14 +1425,17 @@ export function parseTargetPhrase(
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");
-  } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
-    // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
+  } else if ((m = /(?:^| )(with|without) ([a-z ]+?|[a-z]+(?:, [a-z]+)+, and\/or [a-z]+)( you control| you don't control| an opponent controls)?$/.exec(p))) {
+    // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough. "With flying, deathtouch,
+    // and/or lifelink" (Henrika, Infernal Seer): any of them.
+    const listed = m[1] === "with" ? /^((?:[a-z]+, )+)and\/or ([a-z]+)$/.exec(m[2]!) : null;
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
     // "Creatures without flying or islandwalk" (Stormtide Leviathan): with neither.
     const neither = m[1] === "without" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
-    const kws = either ?? neither ? [(either ?? neither)![1]!, (either ?? neither)![2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
-    if (!kws || kws.some((k) => !k) || kws.length !== (either || neither ? 2 : 1)) return null;
-    if (either) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
+    const anyNames = listed ? [...listed[1]!.split(", ").filter(Boolean), listed[2]!] : either ? [either[1]!, either[2]!] : undefined;
+    const kws = anyNames ? anyNames.map((k) => keywordOf(k)) : neither ? [neither[1]!, neither[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
+    if (!kws || kws.some((k) => !k) || kws.length !== (anyNames ? anyNames.length : neither ? 2 : 1)) return null;
+    if (anyNames) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
     else if (m[1] === "with") extra.keywords = kws as string[];
     else extra.notKeywords = kws as string[];
     // "Creature without flying you don't control" (Street Spasm): whose it is, read below.

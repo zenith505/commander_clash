@@ -98,6 +98,8 @@ export interface AmountExpr {
 export type Count =
   /** The X chosen while casting or activating it (CR 107.3a), or the spell's X for its permanent's ETB (CR 107.3m). */
   | { kind: "x" }
+  /** "Choose a number between 0 and 13. Each player sacrifices that many creatures" (By Invitation Only): the number chosen (Chosen.number). */
+  | { kind: "chosenNumber" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
   /** "Where X is the greatest power among creatures you controlled as you cast this spell" (Lifestream's Blessing): counted once, as it's cast (StackItem.asCast). */
@@ -376,7 +378,7 @@ export type Count =
   | { kind: "artifactsToGraveyardThisTurn" }
   /** "If an enchantment was put into your graveyard from the battlefield this turn" (Kami of Transience): 1 if one was, as it last existed there (a token too, CR 111.7), else 0. */
   | { kind: "typeToYourGraveyardThisTurn"; type: string }
-  | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string }
+  | { kind: "diedThisTurn"; yours?: true; nontoken?: true; /** "For each Zubera that died this turn": of this creature type as it last existed. */ subtype?: string; /** "A non-Skeleton creature died under your control this turn" (Cult Conscript): not of this type as it last existed. */ notSubtype?: string }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /**
@@ -1767,7 +1769,7 @@ export type StaticCondition =
    * total", "your life total is greater than or equal to your starting life total" (CR 903.7: 40): your life total now.
    */
   /** `opponent`: an opponent's life total instead (Bloodghast's "an opponent has 10 or less life"). */
-  | { kind: "life"; min?: number; max?: number; opponent?: true; /** "If each player has 10 or less life" (Cryptolith Fragment): every player still in the game. */ everyone?: true }
+  | { kind: "life"; min?: number; max?: number; opponent?: true; /** "If each player has 10 or less life" (Cryptolith Fragment): every player still in the game. */ everyone?: true; /** "If a player's life total is ..." (Game Over): any player still in the game, you too. */ anyone?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
   /** "As long as white is the most common color among all permanents or is tied for most common" (Ruham Djinn): see mostCommonColors. */
@@ -2112,7 +2114,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true; /** "On each of up to two Soldiers you control" (SOLDIER Military Program): up to `n`, none too. */ upTo?: true }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -2463,7 +2465,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3816,6 +3818,8 @@ export interface AbilityBody {
     both?: "teamwork" | "commander" | "kicked" | "control";
     /** "If you control a Wizard as you cast ~, you may choose two instead" (Flame of Anor): both "control", checked as it's cast. */
     bothIf?: StaticCondition;
+    /** "If there are four or more card types among cards in your graveyard, choose both instead" (Prophetic Titan): both, not one or both. */
+    bothExactly?: true;
     repeat?: true;
     pawprints?: number[];
     escalate?: { mana?: string; cost?: AdditionalCost; text: string };
@@ -3852,6 +3856,7 @@ export type TriggerEvent =
   /** "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject; see TriggeredAbility.dealtFilter. */
   | "permanentIsDealtDamage"
   | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
+  | "creatureDealsCombatDamageToSelf" // "Whenever a creature deals combat damage to ~" (Vraska the Unseen): once for each creature dealing it combat damage, which "that creature" means
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
   | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter

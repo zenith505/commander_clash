@@ -319,6 +319,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield under your control", thisTurn: true }] : null;
   }
+  // Saffi Eriksdotter: "Sacrifice ~: When target creature is put into your graveyard this turn, return that card to the
+  // battlefield": the same, only if it goes to your graveyard, so only one you own (CR 404.1, 400.3). Returned under your
+  // control, the player putting it there, who owns it (CR 110.2). Once: back on the battlefield it's a new object (rulings).
+  if (/^When target creature is put into your graveyard this turn, return that card to the battlefield$/.test(s) && !ctx.spell) {
+    const what = parseObject("target creature", ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield", thisTurn: true, intoYourGraveyard: true }] : null;
+  }
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
   if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);
@@ -607,6 +614,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Put (a|two|three) \+1\/\+1 counters? on (a|up to one) creature$/i.exec(s)) && (m[1] === "a") === !/counters/.test(s)) {
     const pick: Effect = { type: "pick", who: { ref: "you" }, filter: pickFilter("creature")!, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1] === "a" ? "1" : m[1]!) }, anyController: true };
     return m[2] === "a" ? [pick] : [{ type: "may", effects: [pick], text: s.charAt(0).toLowerCase() + s.slice(1) }];
+  }
+  // SOLDIER Military Program: "Put a +1/+1 counter on each of up to two Soldiers you control": chosen as it resolves, not
+  // targeted, none to two of them.
+  if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on each of up to (two|three) (?!target )(.+?)s you control$`, "i").exec(s)) && (m[1] === "a") === !/counters/.test(s) && pickFilter(m[4]!)) {
+    const filter = pickFilter(m[4]!)!;
+    const counter = { kind: counterKind(m[2]!), n: amt(m[1]!) };
+    return [{ type: "pick", who: { ref: "you" }, filter, n: num(m[3]!), action: "counters", counter, upTo: true, prompt: `~: click up to ${m[3]} ${m[4]}s of yours to put ${m[1] === "a" ? `a ${counter.kind} counter` : `${m[1]} ${counter.kind} counters`} on each.` }];
   }
   // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {

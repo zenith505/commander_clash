@@ -6,7 +6,7 @@ import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, faceUpDefOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
+import { withModes, modeRange, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
   applyInPlace,
@@ -133,7 +133,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "declareBlockers") return pend.defender !== undefined ? [blocksForOpponent(s, pid, pend.defender)] : payForBlocks(s, pid, chooseBlocks(s, pid));
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
-      const body = triggerBody(s, t);
+      const printed = triggerBody(s, t);
+      // "You may choose both instead" (SOLDIER Military Program): one or both, now.
+      const range = t.both ? modeRange(printed, true) : undefined;
+      const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0], max: range[1] } } : printed;
       return [{ type: "chooseModes", player: pid, modes: chooseModes(s, pid, body, true, t.sourceId)!.modes }];
     }
     if (pend.kind === "chooseTargets") {
@@ -428,6 +431,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (pend.min === undefined && !pend.anyNumber && ids.length < pend.count) ids.push(...pend.options.filter((id) => !ids.includes(id)).slice(0, pend.count - ids.length));
       return [{ type: "pickPermanents", player: pid, ids }];
     }
+    // SOLDIER Military Program: "a +1/+1 counter on each of up to two Soldiers you control": as many as it allows, our own.
+    if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count > 1 && s.resolving?.item.controller === pid)
+      return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "counters", pend.counter) }];
     // Orzhov Advokist: the counters on our best creature, unless its controller is the only opponent we could attack.
     if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count === 1) {
       const giver = s.resolving?.item.controller;

@@ -1,7 +1,7 @@
 # Roadmap
 
-26,733 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,848 of
+26,750 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,862 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -489,6 +489,23 @@ line blocks.
    named ~" as a graveyard target needs the source's name bound; "permanents you control but don't own" count),
    Haakon (cast only from the graveyard), Earthshape, Sigarda's Splendor ("note your life total"), Basri Ket's -2,
    Ochre Jelly, Kamahl's Druidic Vow, Green Sun's Twilight, Industrial Advancement, Froghemoth.
+   Round 189 went on from the top: "copy that spell X times" (Storm King's Thunder, with X kept from the Thunder;
+   Photon Blast Barrage), "choose one. If ..., (you may) choose both instead" on triggers (SOLDIER Military Program
+   with "up to two Soldiers you control" picked as it resolves, browser test; Disciple of Perdition; Prophetic Titan,
+   where delirium means both), "then if it has exactly four +1/+1 counters on it" (Ayara's Oathsworn), a group dealing
+   damage equal to each one's power (Bartz and Boko, Moonlight Hunt), "its controller searches ... with a stun counter
+   on it" (Magmatic Hellkite), Saffi Eriksdotter (only into your graveyard), Vraska the Unseen's +1 ("whenever a
+   creature deals combat damage to ~"), Cult Conscript ("a non-Skeleton creature died under your control this turn"),
+   Game Over ("a player's life total is less than or equal to half their starting life total"), Tainted Sigil,
+   Henrika's back face ("with flying, deathtouch, and/or lifelink"), Celeborn the Wise, By Invitation Only (browser
+   test).
+   Out after round 189 (looked at, not done): Belt of Giant Strength (equip cost less by the target's power), Retribution
+   of the Ancients ("remove X +1/+1 counters from among creatures you control" as a cost), Pact Weapon and Jace, Mirror
+   Mage ("draw a card and reveal it", now in Lane B's round B19, to reuse), Verdeloth the Ancient, Faerie Fencing, Flame
+   Discharge, Steer Clear ("if you controlled a ... as you cast this spell"), Depth Defiler, Pyrrhic Strike and Surge
+   of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Icebreaker Kraken, Mass
+   Diminish, Display of Power, Jason Bright, Spider-Man 2099, Blood for Bones, Quakebringer, Widespread Brutality,
+   Belligerent Yearling, Lorthos, Zidane, Discerning Financier, Dragonspark Reactor, Eight-and-a-Half-Tails.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

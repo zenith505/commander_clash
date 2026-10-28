@@ -2368,6 +2368,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d64e96bf-6815-462c-93b4-c9c22dc43eda",
+  "name": "By Invitation Only",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a number between 0 and 13. Each player sacrifices that many creatures of their choice.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2031bc31-81cc-407a-8615-29832f586bbc",
   "name": "Calciform Pools",
   "manaCost": "",
@@ -13903,6 +13929,32 @@
   "set": "m10",
   "releasedAt": "2009-07-17",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3e2034ee-adc5-4a24-9605-c9722bf813c1",
+  "name": "SOLDIER Military Program",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of combat on your turn, choose one. If you control a commander, you may choose both instead.\n• Create a 1/1 white Soldier creature token.\n• Put a +1/+1 counter on each of up to two Soldiers you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -494,6 +494,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Card types among cards in all graveyards" (Tarmogoyf), "in your graveyard", "in your opponents' graveyards" (CR 205.2a).
   if ((m = /^card types? among cards in (your|all|your opponents') graveyards?$/i.exec(p)))
     return count({ kind: "graveyardCardTypes", who: { ref: m[1] === "your" ? "you" : m[1] === "all" ? "eachPlayer" : "eachOpponent" } as PlayerRef });
+  // The Shrines: "the number of cards in all graveyards with the same name as that spell" in a cast trigger (Aven Shrine;
+  // "as the spell", Cephalid Shrine): the name it has on the stack (a split card's half's, CR 709.3b), as it was cast.
+  if (/^cards in all graveyards with the same name as (?:that|the) spell$/i.test(p) && ctx?.castSpell)
+    return count({ kind: "cardsInGraveyard", who: { ref: "eachPlayer" }, sameNameAsCast: true });
   // "Cards named ~ in all graveyards" (Kindle), "for each card named ~ in each graveyard" (Rite of Flame), "in your graveyard".
   if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
     return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });

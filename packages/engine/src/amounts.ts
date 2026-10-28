@@ -365,7 +365,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // copies, CR 707.2).
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const own = () => (src?.zone === "battlefield" ? characteristics(s, src).name : (ctx.sourceName ?? (src ? defOf(s, src).name : "")));
-      const filter = c.filter && (c.filter.named === "~" ? { ...c.filter, named: own() } : bindChosen(c.filter, ctx.chosen));
+      // The Shrines: the cast spell's name (none for a face-down spell: nothing has it).
+      const cast = c.sameNameAsCast ? (ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castName : undefined) : undefined;
+      if (c.sameNameAsCast && cast === undefined) return 0;
+      const filter0 = c.filter && (c.filter.named === "~" ? { ...c.filter, named: own() } : bindChosen(c.filter, ctx.chosen));
+      const filter = cast !== undefined ? { ...(filter0 ?? { kind: "card" as const, text: "card" }), named: cast } : filter0;
       const affected = c.affectedController && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const whose = c.affectedController ? (affected ? [view(affected)?.controller ?? controllerOf(s, affected)] : []) : refPlayers(s, c.who, ctx);
       if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
@@ -940,6 +944,7 @@ function describeCount(c: Count): string {
       return `#${c.filter.text} exiled`;
     case "cardsInGraveyard":
       if (c.greatestPower) return `the greatest power among ${c.filter ? c.filter.text.replace(/^target /, "") : "card"}s in graveyard`;
+      if (c.sameNameAsCast) return "#cards with that spell's name in all graveyards";
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":
       return "life";

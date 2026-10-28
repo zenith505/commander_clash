@@ -1,6 +1,6 @@
 # Roadmap
 
-27,007 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,025 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,943 of
 9,979 (89%).
 
@@ -2155,10 +2155,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("Then if there are four or more tide counters on ~, remove them" and an Island mana trigger); Taste of Paradise
   ("pay {1}{G} any number of times" as an additional cost). Known bot gaps: bots target Dead Ringers
   without matching colors, and Ransack's target is chosen as for any library effect.
+- Round B26 (harder skipped cards, least played first): the Shrines' "X is the number of cards in all graveyards
+  with the same name as that spell" (Aven, Nantuko, Dwarven, Cabal and Cephalid Shrine; the name the spell had as it
+  was cast, CR 709.3b; a face-down spell has none, CR 708.2a). "Whenever ~ attacks and isn't blocked, you may ... If
+  you do, ~ assigns no combat damage this turn" (CR 510.1; Floral Spuzzem, where "if you do" means the artifact was
+  destroyed, so an indestructible one doesn't stop the damage, CR 702.12b; Kukemssa Pirates, Orcish Squatters with
+  "for as long as you control ~", Goblin Vandal's "pay {R}. If you do, destroy ... and", Rysorian Badger's "gain 1 life
+  for each card exiled this way and", Cloak of Confusion's "you may have it assign no combat damage"). Costs to attack
+  that aren't mana, "~ can't attack unless you sacrifice a land / two Islands / return an enchantment you control to
+  its owner's hand" (CR 508.1g-i; Exalted Dragon, Leviathan, Floodtide Serpent): attacks are refused unless every
+  cost can be paid at once, each permanent paying only one cost; you click what to pay as attackers are declared
+  (browser test); bots attack with Exalted Dragon only with seven or more lands left, sacrificing the least useful.
+  "Destroy the creature with the least power. It can't be regenerated. If two or more creatures are tied for least
+  power, you choose one of them" (Drop of Honey, Porphyry Nodes; not targeted, anyone's, never an indestructible one
+  when one of those tied can be destroyed, rulings) and "~ deals 2 damage to the creature with the least toughness"
+  (Purging Scythe): click one of those tied (browser test); bots pick an opponent's, the most valuable. "When there are
+  no creatures on the battlefield, sacrifice ~" (CR 603.8; also Task Mage Assembly). Fixed: a discard of 0 cards no
+  longer asks for one. +18 (27,025 of 31,936 with Lane A round 194).
+- Known limit there: the "no creatures" state trigger is checked when a player would get priority, so a creature
+  flickered in the middle of a resolution (rulings on Drop of Honey with Momentary Blink) doesn't make it trigger.
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
-  Fire (a number chosen as a cost), Forethought Amulet; Exalted Dragon (an attack cost that isn't mana).
+  Fire (a number chosen as a cost), Forethought Amulet; Shrouded Serpent ("defending player may pay").
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
   cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
@@ -2168,9 +2187,9 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame
   Discharge (modified creatures as you cast it), Rayami, Touch of Moonglove, Library of Lat-Nam, Carrion Rats,
   Shifting Loyalties, Madcap Experiment, Wall of Resurgence, Silhana Wayfinder, Resolute Strike, Forgestoker Dragon,
-  Aven Shrine, Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
+  Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
   Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Haunted Plate
-  Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Porphyry Nodes, Gnarlbark Elm, Time to Feed,
+  Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Gnarlbark Elm, Time to Feed,
   Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,
   Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dense Foliage, Dralnu's Crusade.
   Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):

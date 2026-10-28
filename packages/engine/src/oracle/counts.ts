@@ -50,6 +50,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Unlicensed Hearse: "the number of cards exiled with it" ("with ~"), the cards its one exile ability exiled (CR 607.2a,
   // linked by compile.ts).
   if (/^the number of cards exiled with (?:it|~)$/.test(p)) return { count: { kind: "linkedExiled" } };
+  // Wood Elemental: "the number of Forests sacrificed as it entered", what its "As ~ enters, sacrifice any number of
+  // untapped Forests" sacrificed (CompiledCard.devour), as devour's count. Only its own abilities know it.
+  if (/^the number of Forests sacrificed as (?:it|~) entered$/.test(p) && (ctx === null || ctx.selfIt)) return { count: { kind: "devoured" } };
+  // Minion of the Wastes, Phyrexian Processor: "the life paid as it entered" ("as ~ entered"), by its "As ~ enters, pay any
+  // amount of life" (CompiledCard.entersPayLife).
+  if (/^the life paid as (?:it|~) entered$/.test(p) && (/~/.test(p) || ctx === null || ctx.selfIt)) return { count: { kind: "lifePaidAsEntered" } };
   // Mana Cannons: "where X is the number of colors that spell is", in a cast trigger: as Ramos's "that spell's colors".
   if (/^the number of colors that spell is$/i.test(p) && ctx?.castSpell) return { count: { kind: "castSpellColors" } };
   // "The number of other Squirrels, Bats, Lizards, and Rats you control" (Valley Rotcaller): each that's any of them,
@@ -210,6 +216,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(?:the number of )?(.+?) votes?$/i.exec(p)) && ctx?.vote?.options?.includes(m[1]!)) return { count: { kind: "votes", option: m[1]! } };
   // "For each player who chose fortune" (Seize the Spotlight): how many chose that word.
   if ((m = /^player who chose ([a-z]+)$/.exec(p)) && ctx?.chooseWords?.includes(m[1]!)) return { count: { kind: "choseWord", option: m[1]! } };
+  // Recursive Recruitment: "for every three cards in your graveyard": each whole group of three, rounded down.
+  if (each && (m = /^(two|three|four|five) cards in your graveyard$/.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" } }, per: num(m[1]!) };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
   // After "Remove all +1/+1 counters from ~" paid as a cost (StackItem.countersRemoved): "for each +1/+1 counter removed
@@ -299,6 +307,21 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (nb) return parseCount(nb[1]!, ctx, true);
   }
   const count = (c: Count): AmountExpr => ({ count: c });
+  // Chroma: "the number of red mana symbols in the mana costs of permanents you control" counts as devotion does (hybrid
+  // symbols of that color count, rulings; CR 700.5); "of cards in your graveyard" (Umbra Stalker), "in its mana cost" in
+  // a static ability (Light from Within: each permanent's own), "in the sacrificed creature's mana cost" (Fiery
+  // Bombardment), "in those cards' mana costs" after revealing cards from your hand (Phosphorescent Feast).
+  if (each && (m = /^(white|blue|black|red|green) mana symbols? in (.+)$/i.exec(p))) {
+    const color = COLOR_WORDS[m[1]!.toLowerCase()]!;
+    const where = m[2]!;
+    if (/^the mana costs of permanents you control$/i.test(where)) return count({ kind: "devotion", colors: [color] });
+    if (/^the mana costs of cards in your graveyard$/i.test(where)) return count({ kind: "manaSymbols", color, in: "graveyard" });
+    if (/^its mana cost$/i.test(where) && ctx === null) return count({ kind: "manaSymbols", color, in: "affected" });
+    if (/^the sacrificed creature's mana cost$/i.test(where) && ctx) return count({ kind: "manaSymbols", color, of: { ref: "sacrificed" } });
+    if (/^those cards' mana costs$/i.test(where) && ctx?.revealedFromHand) return count({ kind: "manaSymbols", color, in: "revealedFromHand" });
+    if (/^the mana costs of the revealed cards$/i.test(where) && ctx?.revealedTopN) return count({ kind: "manaSymbols", color, in: "revealed" });
+    return null;
+  }
   // "Draw cards equal to the result", "where X is the result" (CR 706.2), "the total of those results" (Neverwinter Hydra).
   if (!each && /^(?:the result|the total of those results)$/i.test(p)) return count({ kind: "rollResult" });
   // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
@@ -488,6 +511,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Card types among cards in all graveyards" (Tarmogoyf), "in your graveyard", "in your opponents' graveyards" (CR 205.2a).
   if ((m = /^card types? among cards in (your|all|your opponents') graveyards?$/i.exec(p)))
     return count({ kind: "graveyardCardTypes", who: { ref: m[1] === "your" ? "you" : m[1] === "all" ? "eachPlayer" : "eachOpponent" } as PlayerRef });
+  // The Shrines: "the number of cards in all graveyards with the same name as that spell" in a cast trigger (Aven Shrine;
+  // "as the spell", Cephalid Shrine): the name it has on the stack (a split card's half's, CR 709.3b), as it was cast.
+  if (/^cards in all graveyards with the same name as (?:that|the) spell$/i.test(p) && ctx?.castSpell)
+    return count({ kind: "cardsInGraveyard", who: { ref: "eachPlayer" }, sameNameAsCast: true });
   // "Cards named ~ in all graveyards" (Kindle), "for each card named ~ in each graveyard" (Rite of Flame), "in your graveyard".
   if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
     return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });
@@ -803,6 +830,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
+  // Corpse Lunge: "the exiled card's power" after an "exile a creature card from your graveyard" cost, with no card
+  // targeted (Lobelia's, below); compile() checks it has that cost.
+  if (x === "the exiled card's" && !ctx.targets.some((t) => t.kind === "card")) return { ref: "sacrificed", exiledCost: true };
   if (x === "that card's" && ctx.revealedTop) return { ref: "revealed" };
   if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
   // Pyretic Rebirth: "... ~ deals damage equal to that card's mana value to up to one target creature": the one card targeted.

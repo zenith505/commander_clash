@@ -522,6 +522,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
   switch (ref.ref) {
     case "you":
       return [ctx.controller];
+    case "linkedPlayer": {
+      // The leaves ability triggered after the source moved: its enters ability was the object before (CR 400.7).
+      const pid = s.linkedPlayer?.[`${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`];
+      return pid !== undefined && !player(s, pid).lost ? [pid] : [];
+    }
     case "eachOpponent":
       return opponents(s, ctx.controller);
     case "eachPlayer":
@@ -1162,6 +1167,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealedUntilToBottom":
     case "parleyReveal":
     case "revealRevealed":
+    case "spellToHand":
     case "discard":
     case "takeFromHand":
     case "scry":
@@ -1279,9 +1285,10 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     }
     return;
   }
-  if (o.buyback) {
+  if (o.buyback || o.toHandOnResolve) {
+    const how = o.buyback ? " (buyback)" : "";
     moveObject(s, id, "hand");
-    if (o.zone === "hand") log(s, `${d.name} returns to ${player(s, o.owner).name}'s hand (buyback).`);
+    if (o.zone === "hand") log(s, `${d.name} returns to ${player(s, o.owner).name}'s hand${how}.`);
     return;
   }
   moveObject(s, id, "graveyard");
@@ -1326,7 +1333,7 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return out;
   }
-  if (to.ref === "self" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "eventGroup" || to.ref === "targetHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
+  if (to.ref === "self" || to.ref === "created" || to.ref === "subject" || to.ref === "attached" || to.ref === "allCreatures" || to.ref === "each" || to.ref === "blockingIt" || to.ref === "eventGroup" || to.ref === "targetHost" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }

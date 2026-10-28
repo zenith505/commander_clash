@@ -1364,6 +1364,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, doubleIfXAtLeast: Number(twiceX[1]) };
       continue;
     }
+    // Neverwinter Hydra: "As ~ enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of
+    // those results": the X chosen, the dice rolled as it enters, part of the replacement (CR 614.1c, 706.2).
+    if (line === "As ~ enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of those results." && !isSpell) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, rollD: 6 };
+      continue;
+    }
     // Banquet Guests: "~ enters with twice X +1/+1 counters on it": the X chosen, times two (a replacement, CR 614.1c).
     if (line === "~ enters with twice X +1/+1 counters on it." && !isSpell) {
       if (out.entersWithCounters) out.unsupported.push(raw);

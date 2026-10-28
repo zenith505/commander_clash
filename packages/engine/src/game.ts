@@ -18,6 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { countersBanned, countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
@@ -1119,7 +1120,8 @@ export function moveObject(
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
-    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
+    // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
+    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
       s.battlefield = s.battlefield.filter((x) => x !== id);
@@ -1401,7 +1403,9 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
     return;
   }
   const ewc = printed.entersWithCounters?.afterChoice ? undefined : printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  const n0 = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
+  const n = ewc?.rollD && n0 > 0 ? rollDice(s, o.controller, ewc.rollD, n0, realDefOf(s, o).name).result : n0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 

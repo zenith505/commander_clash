@@ -4954,6 +4954,8 @@ function Controls({
                 ? `separate all permanents ${theirs ?? "you"} control${theirs ? "s" : ""} into two piles: click the ones for the first pile (the rest form the second). ${theirs ?? "You"} sacrifice${theirs ? "s" : ""} all permanents in the pile of ${theirs ? "their" : "your"} choice.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
+                : pending.action === "keep" && pending.payLife !== undefined
+                ? `click the creatures of yours to keep, paying ${pending.payLife} life for each (up to ${pending.count}). The rest are sacrificed.`
                 : pending.action === "keep" && pending.maxTotalPower !== undefined
                 ? `click any number of your creatures with total power ${pending.maxTotalPower} or less to keep (now ${totalPower}). The rest are sacrificed.`
                 : pending.action === "keep"

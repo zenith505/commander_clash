@@ -476,6 +476,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (total + pw(id) <= pend.maxTotalPower) (ids.push(id), (total += pw(id)));
       return [{ type: "pickPermanents", player: pid, ids }];
     }
+    // Killing Wave: our best creatures, each while it's worth the life it costs (the more, the closer to 0), never all of it.
+    if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.payLife !== undefined) {
+      const ids: ObjectId[] = [];
+      let life = player(s, pid).life;
+      for (const id of [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) {
+        const n = pend.payLife;
+        if (ids.length >= pend.count || (n > 0 && (n >= life || worth(s, pid, obj(s, id)) < n * (1 + 15 / Math.max(1, life - n))))) continue;
+        ids.push(id);
+        life -= n;
+      }
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     // A secret number, without looking at the others' (Wheel of Misfortune): 1 to get a new hand when ours is nearly empty
     // and we can take the damage, otherwise 0 (no damage, keep our hand). Menacing Ogre: its controller with plenty of

@@ -1,7 +1,8 @@
 // Round 198: targets "of the chosen type" on a permanent's abilities, the creature type chosen as it entered (Dawn-Blessed
 // Pennant, Kindred Boon, From the Rubble), "unless its controller has ~ deal damage to them equal to ~'s power" (Combustion
 // Man), "card not named ~" targets and "for each permanent you control but don't own" (Staff of Eden, Vault's Key), "can't
-// be blocked as long as its power is 3 or less" (Thieves' Tools).
+// be blocked as long as its power is 3 or less" (Thieves' Tools), "As ~ enters, roll X d6" for its counters (Neverwinter
+// Hydra), "For each creature, its controller sacrifices it unless they pay X life" (Killing Wave).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -39,7 +40,9 @@ const kindredBoon = card("Kindred Boon", "Enchantment", "{2}{W}{W}", {"cmc":4,"k
 const fromTheRubble = card("From the Rubble", "Enchantment", "{4}{W}{W}", {"cmc":6,"keywords":[],"oracleText":"As this enchantment enters, choose a creature type.\nAt the beginning of your end step, return target creature card of the chosen type from your graveyard to the battlefield with a finality counter on it. (If a creature with a finality counter on it would die, exile it instead.)","colors":["W"],"colorIdentity":["W"]});
 const staffOfEdenVaultsKey = card("Staff of Eden, Vault's Key", "Legendary Artifact", "{6}", {"cmc":6,"keywords":[],"oracleText":"When Staff of Eden enters, put target legendary permanent card not named Staff of Eden, Vault's Key from a graveyard onto the battlefield under your control.\n{T}: Draw a card for each permanent you control but don't own.","colors":[],"colorIdentity":[]});
 const thievesTools = card("Thieves' Tools", "Artifact — Equipment", "{1}{B}", {"cmc":2,"keywords":["Treasure","Equip"],"oracleText":"When this Equipment enters, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nEquipped creature can't be blocked as long as its power is 3 or less.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)","colors":["B"],"colorIdentity":["B"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools];
+const neverwinterHydra = card("Neverwinter Hydra", "Creature — Hydra", "{X}{X}{G}{G}", {"cmc":2,"power":"0","toughness":"0","keywords":["Trample","Ward"],"oracleText":"As this creature enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of those results.\nTrample\nWard {4} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {4}.)","colors":["G"],"colorIdentity":["G"]});
+const killingWave = card("Killing Wave", "Sorcery", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"For each creature, its controller sacrifices it unless they pay X life.","colors":["B"],"colorIdentity":["B"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -188,5 +191,62 @@ describe("Round 198", () => {
       if (big) expect(block().objects[wall]!.blocking).toBeTruthy();
       else expect(block).toThrow();
     }
+  });
+  it("Neverwinter Hydra: X d6 rolled as it enters, the total in +1/+1 counters, and the roll is an event", () => {
+    const { s: s0, ap, ids } = setup([neverwinterHydra]);
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 3));
+    s = resolveAll(s);
+    const n = s.objects[ids[0]!]!.counters["+1/+1"] ?? 0;
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(n).toBeGreaterThanOrEqual(3);
+    expect(n).toBeLessThanOrEqual(18);
+    expect(s.log.some((l) => /rolls 3 d6 for Neverwinter Hydra/.test(l.text))).toBe(true);
+  });
+
+  it("Neverwinter Hydra: with X 0 nothing is rolled and it dies as a 0/0", () => {
+    const { s: s0, ap, ids } = setup([neverwinterHydra]);
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 0));
+    s = resolveAll(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+  });
+
+  it("Killing Wave: each player keeps the creatures they pay X life for; the rest are sacrificed at once", () => {
+    const { s: s0, ap, opp, ids } = setup([killingWave]);
+    s0.players[ap]!.hand = [ids[0]!];
+    const mine = [putOnBattlefield(s0, ap, creature("Test Ox", "Ox", 2)), putOnBattlefield(s0, ap, creature("Test Yak", "Yak", 2))];
+    const theirs = [putOnBattlefield(s0, opp, creature("Test Elk", "Elk", 2)), putOnBattlefield(s0, opp, creature("Test Emu", "Bird", 2))];
+    s0.players[opp]!.life = 5;
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 3));
+    s = resolveAll(s);
+    // The active player first.
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "keep", payLife: 3, count: 2, min: 0 });
+    s = act(s, { type: "pickPermanents", player: ap, ids: [mine[0]!] });
+    // An opponent with 5 life can pay for one.
+    for (let i = 0; i < 5 && s.pending?.kind === "pickPermanents" && s.pending.player !== opp; i++) s = act(s, { type: "pickPermanents", player: s.pending.player, ids: [] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: opp, count: 1 });
+    expect(() => act(s, { type: "pickPermanents", player: opp, ids: theirs })).toThrow();
+    s = act(s, { type: "pickPermanents", player: opp, ids: [theirs[1]!] });
+    for (let i = 0; i < 5 && s.pending?.kind === "pickPermanents"; i++) s = act(s, { type: "pickPermanents", player: s.pending.player, ids: [] });
+    s = resolveAll(s);
+    expect(s.players[ap]!.life).toBe(37);
+    expect(s.players[opp]!.life).toBe(2);
+    expect(mine.map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "graveyard"]);
+    expect(theirs.map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "battlefield"]);
+  });
+
+  it("Killing Wave: a bot keeps a creature only when it's worth the life", () => {
+    const { s: s0, ap, opp, ids } = setup([killingWave]);
+    const small = putOnBattlefield(s0, opp, creature("Test Elk", "Elk", 1));
+    const big = putOnBattlefield(s0, opp, creature("Test Wurm", "Wurm", 7, 7, "{5}{G}{G}"));
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 4));
+    s = resolveAll(s);
+    for (let i = 0; i < 6 && s.pending?.kind === "pickPermanents"; i++) {
+      if (s.pending.player === opp) for (const a of botActions(s, opp)) s = applyAction(s, a);
+      else s = act(s, { type: "pickPermanents", player: s.pending.player, ids: [] });
+    }
+    s = resolveAll(s);
+    expect(s.objects[big]!.zone).toBe("battlefield");
+    expect(s.objects[small]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(36);
   });
 });

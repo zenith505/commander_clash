@@ -1258,6 +1258,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
   }
+  // Killing Wave: "For each creature, its controller sacrifices it unless they pay X life": each player chooses which of
+  // theirs to keep, paying X life for each, the active player first and each knowing the choices before theirs; then
+  // they all pay and sacrifice at the same time (rulings). No more than they can pay for (CR 119.4).
+  if ((m = /^For each creature, its controller sacrifices it unless they pay (X|\d+) life$/.exec(s))) {
+    const among: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+    return [{ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter: among, n: 0, upTo: true }], among, payLife: m[1] === "X" ? { count: { kind: "x" } } : Number(m[1]) }];
+  }
   // "Each player chooses from among the permanents they control an artifact, a creature, an enchantment, and a land,
   // then sacrifices the rest" (Cataclysm), "... an artifact, a creature, an enchantment, and a planeswalker from among the
   // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous

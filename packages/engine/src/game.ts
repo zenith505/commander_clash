@@ -6607,6 +6607,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
   if (!ab.mana)
     for (const id of s.battlefield) {
       const src = obj(s, id);
+      if (ab.cycling && controllerOf(s, src) === pid) less += abilitiesOf(s, src).cyclingLess ?? 0;
       const z = controllerOf(s, src) === pid ? abilitiesOf(s, src).youActivateLess : undefined;
       if (!z) continue;
       less += z.n;

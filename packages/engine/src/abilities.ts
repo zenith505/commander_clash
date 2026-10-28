@@ -5926,6 +5926,8 @@ export interface CompiledCard {
    * reduce the mana in that cost to less than one mana." Any such ability its controller activates, from any zone (rulings).
    */
   youActivateLess?: { n: number; atLeastOne?: true };
+  /** Fluctuator: "Cycling abilities you activate cost {2} less to activate", from any zone (CR 702.29f: typecycling too). */
+  cyclingLess?: number;
   /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two

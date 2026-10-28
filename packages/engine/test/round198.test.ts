@@ -7,10 +7,12 @@
 // "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant), a
 // mana ability that returns its source to hand, as a sorcery (Grinning Ignus), "Choose creature or land" for the cards
 // revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence),
-// "up to twice X target cards" (Erebos's Intervention).
+// "up to twice X target cards" (Erebos's Intervention), cheaper cycling (Fluctuator).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { activationCost } from "../src/game";
+import { compileCard } from "../src";
 import { applyAction, botActions, parseManaCost, planMana, characteristics, defOf, manaOptions, planManaAbility, invalidateCharacteristics, objHasKeyword, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -54,7 +56,8 @@ const grinningIgnus = card("Grinning Ignus", "Creature — Elemental", "{2}{R}",
 const windingWay = card("Winding Way", "Sorcery", "{1}{G}", {"cmc":2,"keywords":[],"oracleText":"Choose creature or land. Reveal the top four cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard.","colors":["G"],"colorIdentity":["G"]});
 const vivisPersistence = card("Vivi's Persistence", "Instant", "{1}{R}", {"cmc":2,"keywords":[],"oracleText":"Create a 0/1 black Wizard creature token with \"Whenever you cast a noncreature spell, this token deals 1 damage to each opponent.\"\nWhenever your commander enters or attacks, you may pay {2}. If you do, return this card from your graveyard to your hand.","colors":["R"],"colorIdentity":["R"]});
 const erebossIntervention = card("Erebos's Intervention", "Instant", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"Choose one —\n• Target creature gets -X/-X until end of turn. You gain X life.\n• Exile up to twice X target cards from graveyards.","colors":["B"],"colorIdentity":["B"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention];
+const fluctuator = card("Fluctuator", "Artifact", "{2}", {"cmc":2,"keywords":[],"oracleText":"Cycling abilities you activate cost {2} less to activate.","colors":[],"colorIdentity":[]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -465,5 +468,31 @@ describe("Round 198", () => {
     s = resolveAll(s);
     expect(pt(s, ox)).toEqual([1, 1]);
     expect(s.players[ap]!.life).toBe(life + 3);
+  });
+
+  it("Fluctuator: cycling abilities you activate cost {2} less, typecycling too, generic mana only (CR 702.29f); not an opponent's", () => {
+    const miscalculation = card("Miscalculation", "Instant", "{1}{U}", {"cmc":2,"keywords":["Cycling"],"oracleText":"Counter target spell unless its controller pays {2}.\nCycling {2} ({2}, Discard this card: Draw a card.)","colors":["U"],"colorIdentity":["U"]});
+    const malboro = card("Malboro", "Creature — Plant Horror", "{4}{B}{B}", {cmc: 6,"power":"4","toughness":"4","keywords":["Swampcycling"],"oracleText":"Swampcycling {2} ({2}, Discard this card: Search your library for a Swamp card, reveal it, put it into your hand, then shuffle.)"});
+    const blue = card("Test Blue Cycler", "Creature — Ox", "{3}", { cmc: 3, power: "2", toughness: "2", keywords: ["Cycling"], oracleText: "Cycling {1}{U} ({1}{U}, Discard this card: Draw a card.)" });
+    const { s: s0, ap, opp, ids } = setup([miscalculation, malboro, blue]);
+    putOnBattlefield(s0, opp, fluctuator);
+    const cost = (s: GameState, id: ObjectId) => {
+      const o = s.objects[id]!;
+      const i = compileCard(defOf(s, o)).activated.findIndex((a) => a.cycling);
+      return activationCost(s, ap, o, compileCard(defOf(s, o)).activated[i]!).symbols.map((x) => JSON.stringify(x)).join("");
+    };
+    // An opponent's Fluctuator does nothing for you.
+    expect(cost(s0, ids[0]!)).toBe(JSON.stringify({ kind: "generic", amount: 2 }));
+    putOnBattlefield(s0, ap, fluctuator);
+    expect(cost(s0, ids[0]!)).toBe("");
+    expect(cost(s0, ids[1]!)).toBe("");
+    expect(cost(s0, ids[2]!)).toBe(JSON.stringify({ kind: "colored", color: "U" }));
+    // Cycled for nothing, with every land tapped.
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === ap) s0.objects[id]!.tapped = true;
+    const hand = s0.players[ap]!.hand.length;
+    const i = compileCard(miscalculation).activated.findIndex((a) => a.cycling);
+    const s = resolveAll(run(s0, planActivate(s0, ap, ids[0]!, i)));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand);
   });
 });

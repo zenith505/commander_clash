@@ -2290,6 +2290,13 @@ export function compile(d: CardDef): CompiledCard {
       out.powerUpAgain = true;
       continue;
     }
+    // Fluctuator: "Cycling abilities you activate cost {2} less to activate": typecycling too (CR 702.29f), generic mana
+    // only (CR 601.2f, 602.2b).
+    const cyclingLess = /^Cycling abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (cyclingLess) {
+      out.cyclingLess = (out.cyclingLess ?? 0) + Number(cyclingLess[1]);
+      continue;
+    }
     const youActivateLess = /^Abilities you activate that aren't mana abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
     if (youActivateLess && !out.youActivateLess) {
       out.youActivateLess = { n: Number(youActivateLess[1]), ...(youActivateLess[2] ? { atLeastOne: true as const } : {}) };

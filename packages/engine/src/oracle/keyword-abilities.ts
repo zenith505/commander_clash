@@ -291,6 +291,18 @@ export function parseCostKeyword(
   if ((m = /^Cumulative upkeep(?: |—)(.+?)\.?$/.exec(line))) {
     // "Cumulative upkeep {R} or {G}" (Earthen Goo): {R} or {G} for each age counter, chosen each time, which is a hybrid
     // {R/G} for each (CR 702.24a, 107.4e).
+    // Aboroth: "Cumulative upkeep—Put a -1/-1 counter on ~": a -1/-1 counter for each age counter, which can always be
+    // put (CR 702.24a, 118.3); a creature with no toughness left then dies (CR 704.5f).
+    const counterCost = /^Cumulative upkeep—Put an? (-1\/-1|\+1\/\+1) counter on ~\.?$/.exec(line);
+    if (counterCost) {
+      const kind = counterCost[1]!;
+      return {
+        trigger: {
+          event: "yourUpkeep",
+          body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay: {}, selfCounter: kind }], text: `Cumulative upkeep—put a ${kind} counter on ~: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you put a ${kind} counter on it for each age counter on it.` },
+        },
+      };
+    }
     const raw = m[1]!.replace(/^Pay /, "").replace(/^\{([WUBRG])\} or \{([WUBRG])\}$/, (x, a: string, b: string) => (a !== b ? `{${a}/${b}}` : x));
     const pay = parsePayCost(raw);
     if (!pay || (pay.mana && !plainMana(pay.mana))) return "fail"; // "Sacrifice a creature", ...

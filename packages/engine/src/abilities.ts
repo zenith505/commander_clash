@@ -291,7 +291,7 @@ export type Count =
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
-  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true }
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -1946,7 +1946,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true }
+  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending" | /** "Its controller controls no other creatures" (Predator's Gambit): the controller of the permanent the source is attached to; `other` means other than that permanent. */ "attached"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**
@@ -2505,7 +2505,7 @@ export type Effect =
   | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec; move?: true }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
-  | { type: "sacrifice"; what: ObjRef; byController?: true }
+  | { type: "sacrifice"; what: ObjRef; byController?: true; /** "That player sacrifices that creature" (Lingering Death): only if the trigger's player controls it (CR 701.21a). */ byEventPlayer?: true }
   /**
    * Exploit (CR 702.110a-b): "you may sacrifice a creature". If the source is still on the battlefield as this
    * resolves, it "exploits" the sacrificed creature, which its "when ~ exploits a creature" abilities see.
@@ -3296,7 +3296,7 @@ export type Effect =
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
    */
-  | { type: "cumulativeUpkeep"; pay: PayCost } // "If you don't, ...": fabricate (CR 702.123a)
+  | { type: "cumulativeUpkeep"; pay: PayCost; /** "Cumulative upkeep—Put a -1/-1 counter on ~" (Aboroth): the cost is that many of these counters on it, not a payment. */ selfCounter?: CounterKind } // "If you don't, ...": fabricate (CR 702.123a)
   /**
    * "You may collect evidence N" as it resolves (CR 701.59a), always inside a "may": its controller picks cards in their
    * graveyard with total mana value N or more (they can say yes only if they have them, 701.59b).
@@ -3742,7 +3742,7 @@ export type SpellCondition =
   | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
-  | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true }
+  | { kind: "sacrificedThisWay"; you?: true; /** "If the sacrificed permanent was a commander" (Tevesh Szat). */ commander?: true; /** "If you sacrifice an Island this way" (Serendib Djinn): one with this subtype, as it last existed (CR 608.2h). */ subtype?: string }
   /** "Destroy target creature. If another creature died this turn" (Chain Assassination): a creature died this turn other than target `index` dying to this. */
   | { kind: "anotherDied"; index: number }
   /** "If that spell targets a commander you control" (Bane's Contingency): target `index`, a spell, targets a permanent on the battlefield matching `filter` as this resolves. */
@@ -5336,6 +5336,8 @@ export interface CompiledCard {
    * "If ~ would die, exile it instead" (`self`), "If a creature an opponent controls would die, exile it instead",
    * "If another creature would die, ..." (`filter`, from this permanent's controller's view): replacement effects (CR 614.1a).
    */
+  /** "If ~ would die, put it on top of its owner's library instead" (Gravebane Zombie): a replacement effect (CR 614.1a). */
+  libraryTopInsteadOfDying?: true;
   exileInsteadOfDying?: {
     self?: true;
     filter?: TargetSpec;

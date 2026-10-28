@@ -521,6 +521,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Blue spells and red spells you cast cost {1} less to cast" (Nightscape Familiar): a spell that's both gets {1} less,
   // not {2} (rulings), as "Blue and red spells".
   text = text.replace(/^([A-Z][a-z]+) spells and ([A-Za-z]+) spells(?= )/, "$1 and $2 spells");
+  // Irini Sengir: "Green enchantment spells and white enchantment spells cost {2} more to cast": {2} more once for a
+  // green and white one, as "Green and white enchantment spells".
+  text = text.replace(/^(White|Blue|Black|Red|Green) ([a-z]+) spells and (white|blue|black|red|green) \2 spells(?= )/, "$1 and $3 $2 spells");
   // Semblance Anvil: "Spells you cast that share a card type with the exiled card cost {2} less to cast." Sharing several
   // still takes off {2} (rulings); the exiled card is the one its imprint ability exiled (linked in compile.ts).
   if ((m = /^Spells you cast that share a card type with the exiled card cost \{(\d+)\} less to cast$/.exec(text)))
@@ -1298,6 +1301,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you control no ([A-Z][a-z]+)s other than ~$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
   // Synod Centurion: "When you control no other artifacts", Emperor Crocodile: "no other creatures": likewise.
   if ((m = /^you control no other (artifact|creature|land|enchantment)s$/.exec(text))) return parseStaticCondition(`you don't control another ${m[1]}`, st);
+  // Predator's Gambit: "Enchanted creature has intimidate as long as its controller controls no other creatures": the
+  // enchanted creature's controller, and creatures other than that one.
+  if ((m = /^its controller controls no other (artifact|creature|land|enchantment)s$/.exec(text)) && st.affects.kind === "attached") {
+    const c = parseStaticCondition(`you don't control another ${m[1]}`, st);
+    return c?.kind === "control" && c.who === "you" && c.other ? { ...c, who: "attached" } : null;
+  }
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
@@ -1744,7 +1753,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^(?:is|are) all colors$/.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
   // "Can't attack unless defending player controls an Island" (Sea Serpent), "... a Swamp", "... a blue permanent".
   if ((m = /^can't attack unless defending player controls (an? .+)$/.exec(rest))) {
-    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    const filter = parseTargetPhrase(/^an enchantment or an enchanted permanent$/.test(m[1]!) ? m[1]! : m[1]!.replace(/^an? /, ""));
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   // Vantress Gargoyle: "can't attack unless defending player has seven or more cards in their graveyard".

@@ -850,6 +850,13 @@ export function moveObject(
     to = "library";
     log(s, `${player(s, o.owner).name} reveals ${defOf(s, o).name} and shuffles it into their library instead.`);
   }
+  // Gravebane Zombie: "If ~ would die, put it on top of its owner's library instead" (CR 614.1a), the permanent's own
+  // ability as it would leave (an "exile it instead" applied above comes first, as its owner would choose, CR 616.1).
+  if (to === "graveyard" && fromZone === "battlefield" && objIsType(s, o, "Creature") && abilitiesOf(s, o).libraryTopInsteadOfDying) {
+    to = "library";
+    opts = { ...opts, top: true };
+    log(s, `${defOf(s, o).name} is put on top of its owner's library instead of dying.`);
+  }
   // A merged permanent's components all go where it goes (CR 730.3, 730.3d), but the commander redirect below is the
   // commander card's alone (903.9c).
   const merged = fromZone === "battlefield" ? o.merged : undefined;
@@ -924,6 +931,7 @@ export function moveObject(
     o.convoked = undefined;
     o.manaSpent = undefined;
     o.spent = undefined;
+    o.castNth = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.webSlung = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
@@ -5395,6 +5403,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
+  o.castNth = item.castNth;
   p.nextSpellImprovise = undefined; // it was the next spell cast (Archway of Innovation)
   p.nextSpellConvoke = undefined; // and Wand of the Worldsoul's
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;

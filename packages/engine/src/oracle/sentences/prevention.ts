@@ -183,6 +183,8 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Prevent all damage that creatures would deal to players this turn" (Chameleon Blur), "Prevent all damage that black
   // sources and red sources would deal this turn" (Luminesce).
+  // Radiant Kavu: "Prevent all combat damage blue creatures and black creatures would deal this turn", without "that".
+  s = s.replace(/^(Prevent all (?:combat )?damage) ((?:white|blue|black|red|green) creatures and (?:white|blue|black|red|green) creatures would deal this turn)$/, "$1 that $2");
   if ((m = /^Prevent all (combat )?damage that (.+?) would deal(?: to (.+?))? this turn$/i.exec(s))) {
     if (/^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(m[2]!)) return undefined;
     const by = sourceGroup(m[2]!);

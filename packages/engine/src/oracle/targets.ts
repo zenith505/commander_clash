@@ -1019,6 +1019,11 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [{ kind: "object", status: "enchanted", text: "enchanted creature" }, { kind: "object", types: ["Enchantment"], text: "enchantment creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "enchanted creature or enchantment creature") };
   }
+  // Godhunter Octopus: "an enchantment or an enchanted permanent": a permanent that's either one (TargetSpec.anyOf).
+  if (/^an? enchantment or an enchanted permanent$/.test(phrase.trim())) {
+    const anyOf: TargetSpec[] = [{ kind: "object", types: ["Enchantment"], text: "enchantment" }, { kind: "object", status: "enchanted", text: "enchanted permanent" }];
+    return { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: "enchantment or enchanted permanent" };
+  }
   // Sonar Strike: "target attacking, blocking, or tapped creature": one that's any of them (TargetSpec.anyOf).
   const combatOrTapped = /^(target )?attacking, blocking, or tapped creature$/.exec(phrase.trim());
   if (combatOrTapped) {
@@ -1532,6 +1537,11 @@ export function parseTargetPhrase(
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you or a planeswalker you control$/.test(p)) {
     extra.combat = "attackingYouOrYourPlaneswalker";
     p = "creature";
+  }
+  // Crowd of True Believers: "target creature you control that's attacking alone": the only attacking creature (CR 506.5).
+  if (!inGraveyard && !extra.combat && /^creature( you control)? that's attacking alone$/.test(p)) {
+    extra.combat = "attackingAlone";
+    p = p.replace(/ that's attacking alone$/, "");
   }
   // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
   // Giant Trap Door Spider: "target creature without flying that's attacking you".

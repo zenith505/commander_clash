@@ -2841,6 +2841,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // Serendib Djinn: "Sacrifice a land. If you sacrifice an Island this way, ~ deals 3 damage to you.": the land as it
+    // last existed (CR 608.2h).
+    const sacSub = /^If you sacrifice an? ([A-Z][a-z]+) this way, (.+)$/.exec(s);
+    if (sacSub && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless && !sacPrev.anyNumber) {
+      const inner = parseOne(capital(sacSub[2]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay", subtype: sacSub[1]! }, effects: inner });
+      continue;
+    }
     // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life.": only if it was
     // exiled from the battlefield (rulings: not from the zone it went to if it left first).
     if (sacDo && !/, where X is /.test(s) && sacPrev?.type === "exile" && sacPrev.what.ref === "self" && Object.keys(sacPrev).length === 2) {
@@ -10043,7 +10052,8 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
   s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");
   // Psionic Entity: "~ deals 2 damage to any target and 3 damage to itself": ~ is dealt the second amount.
-  s = s.replace(/^(~ deals \d+ damage to any target and \d+ damage to) itself$/, "$1 ~");
+  // Sunflare Shaman: "~ deals X damage to any target and X damage to itself, where X is ...": the same.
+  s = s.replace(/^(~ deals (?:\d+|X) damage to any target and (?:\d+|X) damage to) itself(?=$|, where X is )/, "$1 ~");
   // "~ deals 1 damage to each opponent and each creature and planeswalker they control" (End the Festivities): theirs.
   s = s.replace(/^(~ deals (?:\d+|X) damage to each opponent and each [a-z ]+?) they control$/, "$1 your opponents control");
   // "Untap ~ and put a +1/+1 counter on it" (Grimgrin, Corpse-Born): "it" is ~.

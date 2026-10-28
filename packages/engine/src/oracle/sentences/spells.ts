@@ -22,6 +22,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).
     return what?.ref === "self" || what?.ref === "subject" ? [{ type: "sacrifice", what }] : null;
   }
+  // Lingering Death: "that player sacrifices enchanted creature" ("that creature", the enchanted creature, in a trigger at
+  // the beginning of a step of its controller's): that player, if they still control it (CR 701.21a).
+  if (ctx.eventPlayer && /^[Tt]hat player sacrifices enchanted creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" }, byEventPlayer: true }];
   // "Sacrifice all creatures you control" (CR 701.21a), "Each player sacrifices all permanents they control that are one or
   // more colors" (All Is Dust): every one of them, each by its controller (rulings: all at the same time).
   if ((m = /^([Ss]acrifice|[Ee]ach player sacrifices) all (.+?) (you|they) control( that .+)?$/.exec(s)) && /^sacrifice$/i.test(m[1]!) === (m[3] === "you")) {

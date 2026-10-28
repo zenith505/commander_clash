@@ -1224,9 +1224,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Riding the Dilu Horse: "Target creature gets +2/+2 and gains horsemanship.": no duration, so for as long as it stays
   // on the battlefield (CR 611.2a, rulings).
-  if ((m = /^([Tt]arget creature) (gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)?)$/.exec(s))) {
+  // Goblin Ski Patrol: "~ gets +2/+0 and gains flying" the same.
+  if ((m = /^([Tt]arget creature|~) (gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)?)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
+    const mods = what?.ref === "target" || (what?.ref === "self" && m[1] === "~") ? parseChanges(m[2]!) : null;
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || x.kind === "modifyPT")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // Chance for Glory: "Creatures you control gain indestructible": the creatures there as it resolves (CR 611.2c), for as

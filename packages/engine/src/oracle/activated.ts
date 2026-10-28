@@ -356,6 +356,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, effectText.length - " X can't be 0.".length);
       found = true;
     }
+    // Goblin Ski Patrol: "Activate only once and only if you control a snow Mountain": once ever, and only then.
+    if (/ Activate only once and only [^.]+\.$/.test(effectText) && !onceEver && !keyword) {
+      onceEver = true;
+      effectText = effectText.replace(/ Activate only once and only ([^.]+)\.$/, " Activate only $1.");
+      found = true;
+    }
     // "Activate only once." (CR 602.5b): for as long as it's the same object (CR 400.7), like exhaust (702.177a).
     if (/ Activate only once\.$/.test(effectText) && !onceEver && !keyword) {
       onceEver = true;

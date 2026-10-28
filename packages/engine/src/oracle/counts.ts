@@ -575,6 +575,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Storm Entity: "for each other spell cast this turn", every player's, not its own cast (rulings: counted as it enters,
+  // spells cast while it was on the stack too; copies weren't cast, CR 707.10).
+  if (each && (ctx === null || ctx.spell) && /^other spells? cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", anyone: true, notSource: true });
   // Thunder Salvo: "the number of other spells you've cast this turn": not its own cast (rulings: resolved or not).
   if (ctx?.spell && /^other spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", other: true });
   // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was

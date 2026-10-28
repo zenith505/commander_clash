@@ -2793,7 +2793,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "sacrifice":
       for (const o of objects(s, e.what, ctx)) {
         const by = controllerOf(s, o);
-        if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
+        if (e.byEventPlayer ? by !== ctx.event?.player : by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
         log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
         const ch = characteristics(s, o);
         const last = { id: o.id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: by, types: [...ch.types] };

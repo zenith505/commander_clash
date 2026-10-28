@@ -2339,10 +2339,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("Choose five permanents you control"), Retraced Image and Mitotic Manipulation ("the same name as a permanent":
   any controller's, chosen as it resolves), Moratorium Stone ("and all permanents with that name" with the graveyard
   cards), Candles of Leng ("if it has the same name as a card in your graveyard ... Otherwise").
-- Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
-  Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
-  Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
-  Fire (a number chosen as a cost), Forethought Amulet; Shrouded Serpent ("defending player may pay").
+- Round B31 (harder skipped cards, least played first): "defending player may pay ... If that player does/doesn't"
+  and "that player may pay ... If they don't" (Mtenda Lion, Shrouded Serpent, Mind Whip; a bot defending pays to stop
+  the Lion, and pays for the Serpent only with a creature that could block it), targets "chosen at random" for
+  triggered abilities, picked among the legal ones as the ability is put on the stack (Scab-Clan Giant, Knight
+  Rampager, Witch Hunt; rulings), "doesn't untap during its controller's next two untap steps" (Telekinesis), damage
+  "for each Aura attached to that creature" to each creature (Baki's Curse), "X damage to each creature with flying and
+  1 additional damage to each blue creature" (Tropical Storm), the Defeat cycle's "If that permanent was a Nissa/is a
+  Chandra planeswalker" (Nissa's Defeat, Chandra's Defeat: the walker is still on the battlefield until state-based
+  actions, CR 704.3), Talara's Bane (life equal to the chosen card's toughness, then the discard), "put a creature you
+  control on top of its owner's library" (Nulltread Gargantuan; browser test), Fold into Aether's "If that spell is
+  countered this way", Painbringer's "Exile any number of cards from your graveyard" cost counted as X (X can be 0; browser
+  test), Threshold's "is black/white and has ..." (Wayward Angel, Repentant Vampire), Infernal Caretaker's "return all
+  Zombie cards from all graveyards", Durkwood Tracker's bite of an attacking creature. +19 (27,265 of 31,936 with main and Lane A round 199).
+- Known limits there: bots don't activate Painbringer (an X cost they skip) and may value Baki's Curse at 0.
+- Out after round B31: Ekundu Cyclops (an attack requirement that depends on the declaration itself, like Viashino
+  Bey), Taste of Paradise (optional additional costs, Lane A's round 197 template; left to it), Liquid Fire (a number
+  chosen as a cost), Goblin Test Pilot (a random target for an activated ability), Emberwilde Djinn ("pay {R}{R} or 2
+  life"), Carrion Wurm ("any player may exile three"), Matopi Golem (a regeneration shield's rider), Taunt (a rule
+  bound to a target player), Goblin Sappers ("destroy it and ~ at end of combat"), Curtain of Light, Dazzling Beauty and
+  Trap Runner ("becomes blocked" by an effect), Kill-Suit Cultist (a destroy-instead damage shield), Rock Jockey,
+  Explosion of Riches, Power Pack, Cinderheart Giant (chosen at random as it resolves, not targeted), Juju Bubble ("play
+  a card"), Curse Artifact, Erithizon (a target chosen by the defending player), Selfless Exorcist, Cut the Tethers.
+- Next for Lane B, least played first, with what blocks each: Heroism (a pay-or-prevent per creature),
+  Sheltering Prayers (shroud by each player's land count), Graxiplon (creatures sharing a type),
+  Exiled Doomsayer (morph cost tax), Forethought Amulet.
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
   cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Storm Entity
@@ -2373,7 +2394,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
-  Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Witch Hunt, Bridge from
+  Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Bridge from
   Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex,
   Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 470 are still unsupported there, its skips

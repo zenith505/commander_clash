@@ -474,14 +474,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // opponent clashed with, whatever creatures they control when that step comes, as for Misstep.
   if (/^Creatures that player controls don't untap during the player's next untap step$/.test(s) && ctx.clashOpp) return [{ type: "noUntapNext", who: { ref: "clashOpponent" }, types: ["Creature"] }];
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
-  if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {
+  // Telekinesis: "It doesn't untap during its controller's next two untap steps": the next two it would untap in.
+  if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next (two )?untap steps?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     // "Tap all creatures your opponents control. Those creatures don't untap ..." (Cone of Cold): the group just tapped.
     const tapped = what && what === ctx.lastGroup && /^(?:those creatures|they)$/i.test(m[1]!);
     // Tangle: "Each attacking creature doesn't untap during its controller's next untap step": those attacking as it
     // resolves (CR 611.2c).
     const attackers = /^each attacking creature$/i.test(m[1]!);
-    return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what }] : null;
+    return what && (!isGroup(what) || tapped || attackers) ? [{ type: "skipUntap", what, ...(m[2] ? { n: 2 } : {}) }] : null;
   }
   // Sleep: "Tap all creatures target player controls. Those creatures don't untap during that player's next untap step":
   // the creatures that player controls, so their controller's untap step.

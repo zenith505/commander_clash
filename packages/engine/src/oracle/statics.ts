@@ -309,6 +309,16 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
+  // Repentant Vampire: "Threshold — As long as ..., ~ is white and has "{T}: ..."": white instead of its other colors
+  // (layer 5, rulings: not white and black) and the ability (layer 6) while the condition holds.
+  const hued = /^~ (is (?:white|blue|black|red|green) and has ".+")$/.exec(statement);
+  if (hued) {
+    const mods = parseStaticMods(hued[1]!);
+    if (!mods) return null;
+    const self: StaticAbility = { affects: { kind: "self" }, mods, text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   // Idol of False Gods: "it's a 0/0 creature in addition to its other types and it has annihilator 2".
   const itsA = /^it's (an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types)(?: and it (has .+))?$/.exec(statement);
   if (itsA) statement = `~ is ${itsA[1]}${itsA[2] ? ` and ${itsA[2]}` : ""}`;
@@ -1603,6 +1613,16 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), is (white|blue|black|red|green),? and ((?:has|have) .+)$`).exec(rest))) {
     const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(m[5]!)];
     return a && b ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }, ...b] : null;
+  }
+  // Wayward Angel: "gets +3/+3, is black, has trample, and has "..."": the same, with a keyword before the granted ability.
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), is (white|blue|black|red|green), ((?:has|have) [a-z ]+), and ((?:has|have) ".+")$`).exec(rest))) {
+    const [a, b] = [parseStaticMods(m[1]!), parseStaticMods(`${m[5]!} and ${m[6]!.replace(/^(?:has|have) /, "")}`)];
+    return a && b ? [...a, { kind: "setColors", colors: [COLOR_WORDS[m[4]!]!] }, ...b] : null;
+  }
+  // Repentant Vampire: "is white and has "..."": white instead of its other colors (layer 5), and the ability (layer 6).
+  if ((m = /^is (white|blue|black|red|green) and ((?:has|have) ".+")$/.exec(rest))) {
+    const b = parseStaticMods(m[2]!);
+    return b ? [{ kind: "setColors", colors: [COLOR_WORDS[m[1]!]!] }, ...b] : null;
   }
   // Grave Servitude: "Enchanted creature gets +3/-1 and is black": black instead of its other colors (layer 5).
   if ((m = new RegExp(`^(gets? ${PT}/${PT}) and is (white|blue|black|red|green)$`).exec(rest))) {

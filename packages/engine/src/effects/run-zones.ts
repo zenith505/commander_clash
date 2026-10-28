@@ -225,6 +225,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id, zc: o.zoneChanges ?? 0, kind: k });
         continue;
       }
+      // Nulltread Gargantuan: on top of its owner's library.
+      if (e.action === "libraryTop") {
+        log(s, `${player(s, pid).name} puts ${defOf(s, o).name} on top of its owner's library.`);
+        moveObject(s, id, "library", { top: true });
+        continue;
+      }
       if (e.action === "exile") {
         log(s, `${player(s, pid).name} exiles ${defOf(s, o).name}.`);
         // As it last existed, for "the power of the creature they exiled" (Olórin's Searing Light, CR 608.2h).

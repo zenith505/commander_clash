@@ -643,6 +643,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(`${m[1]} or ${m[2]} card`);
     return filter ? [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...filter, text: `${m[1]} and ${m[2]} card` }, toHand: true }] : null;
   }
+  // Infernal Caretaker: "return all Zombie cards from all graveyards to their owners' hands": each card with that creature
+  // type (a changeling card too, CR 702.73a), to its owner's hand.
+  if ((m = /^[Rr]eturn all ([A-Z][a-z]+) cards from all graveyards to their owners' hands$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", subtypes: [m[1]!], text: `${m[1]} card` }, toHand: true }];
+  }
   // Demigod of Revenge: "return all cards named ~ from your graveyard to the battlefield" (its cast trigger): the source's
   // name (CR 201.5); the spell itself is on the stack, not there (rulings).
   if (/^[Rr]eturn all cards named ~ from your graveyard to the battlefield$/.test(s)) {
@@ -742,8 +747,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Pendant of Prosperity: "~'s owner may put a land card from their hand onto the battlefield": that player chooses.
   // Braids, Conjurer Adept: "At the beginning of each player's upkeep, that player may put an artifact, creature, or land
   // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
-  if ((m = /^(~'s owner|[Tt]hat player) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
-    const who = parsePlayer(m[1]!.replace(/^T/, "t"), ctx);
+  // Fold into Aether: "its controller may put a creature card from their hand onto the battlefield": the countered spell's.
+  if ((m = /^(~'s owner|[Tt]hat player|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/^T/, "t").replace(/^I/, "i"), ctx);
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (!who || filter === null) return null;
     return [{ type: "putFromHand", who, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true }];
@@ -1296,6 +1302,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Return another (?!target )(.+?) you control to its owner's hand$/i.exec(s))) {
     const filter = pickFilter(m[1]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "bounce" }];
+  }
+  // Nulltread Gargantuan: "Put a creature you control on top of its owner's library": chosen as it resolves, not targeted,
+  // itself too (rulings).
+  if ((m = /^Put an? (?!target )([a-z]+) you control on top of its owner's library$/i.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "libraryTop" }];
   }
   // (Sea Drake's "return two target lands you control" targets: sentences/permanents.ts.)
   if ((m = new RegExp(`^Return ${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {

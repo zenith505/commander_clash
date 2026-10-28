@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { attackingPermanentOf, castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
+import { bindBound, bindChosen, cardPT, objectMatches, pickOptions, printedMatches, sayBound } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
@@ -440,6 +440,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.resolving!.chosen = { ...s.resolving!.chosen, name: defOf(s, obj(s, id)).name };
         log(s, `${player(s, ctx.controller).name} chooses ${defOf(s, obj(s, id)).name} from ${p.name}'s hand.`);
       } else if (e.action === "discard") {
+        // Talara's Bane: its toughness in the hand, a "*" by its characteristic-defining ability (rulings, CR 604.3).
+        if (e.gainToughness && !sc.toughnessGained && ids.length) {
+          sc.toughnessGained = true;
+          gainLife(s, ctx.controller, Math.max(0, cardPT(s, obj(s, ids[0]!), "toughness")));
+        }
         const tops = discardToTop(s, pid, ids, src, ctx);
         if (tops === "paused") return "paused";
         discardCards(s, pid, ids, "", false, false, ctx.controller, undefined, tops);

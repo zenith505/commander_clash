@@ -668,6 +668,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"
             ? !!s.resolving!.unlessPaid
+            : e.cond.kind === "spellCountered"
+            ? !!s.resolving!.spellCountered
             : e.cond.kind === "targetPlayerIsYou"
             ? ((t) => !!ctx.legal[(e.cond as { index: number }).index] && t?.kind === "player" && t.id === ctx.controller)(ctx.targets[e.cond.index])
             : e.cond.kind === "targetWasYours"

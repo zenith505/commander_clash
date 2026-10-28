@@ -1208,6 +1208,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const index = addTarget(ctx, { kind: "player", text: "target player" });
     return [{ type: "draw", who: { ref: "target", index }, n: { count: { kind: "sum", of: [{ kind: "x" }, { kind: "commanderCasts", who: { ref: "target", index } }] } } }];
   }
+  // Baki's Curse: "~ deals 2 damage to each creature for each Aura attached to that creature": each creature its own
+  // amount, counted as it resolves, all dealt at once (CR 120.3).
+  if ((m = /^~ deals (\d+) damage to (each creature) for each (Aura|Equipment) attached to that creature$/i.exec(s))) {
+    const to = parseDamageRecipient(m[2]!, ctx);
+    return to?.ref === "each" ? [{ type: "damage", amount: { count: { kind: "attachedToAffected", subtypes: [m[3]!] }, times: Number(m[1]) }, to }] : null;
+  }
   // "~ deals damage to each player equal to twice the number of nonbasic lands that player controls" (Price of
   // Progress): each player their own amount, all dealt at once (CR 120.3).
   if ((m = /^~ deals damage to (each player|each opponent) equal to (twice )?the number of (.+)$/i.exec(s))) {

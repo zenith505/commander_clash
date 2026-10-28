@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Exile any number of creatures you control, then return them" (Another Round): the ones to flicker next. */ "flicker" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile" | /** Nulltread Gargantuan: "put a creature you control on top of its owner's library". */ "libraryTop";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -525,6 +525,8 @@ export interface TargetSpec {
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
   /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
   anyOf?: TargetSpec[];
+  /** "Target creature an opponent controls chosen at random" (Scab-Clan Giant): a triggered ability's one target, chosen at random among the legal ones as it's put on the stack (rulings). */
+  random?: true;
   keywords?: string[]; // "creature with flying"
   /** "Creatures you control with toxic" (Skrelv's Hive): any toxic ability, whatever its number (CR 702.164). */
   toxic?: true;
@@ -1996,6 +1998,8 @@ export type Effect =
       amount: Amount;
       to: DamageRecipient;
       also?: DamageRecipient[];
+      /** Tropical Storm: "and 1 additional damage to each blue creature": what `also` is dealt instead of `amount`. */
+      alsoAmount?: Amount;
       divided?: true;
       evenly?: true;
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
@@ -2480,7 +2484,7 @@ export type Effect =
   /** "Target creature can't block ~ this turn" (Duct Crawler): a blocking restriction for the rest of the turn (CR 509.1b). */
   | { type: "cantBlockSource"; what: ObjRef }
   /** "That creature doesn't untap during its controller's next untap step." */
-  | { type: "skipUntap"; what: ObjRef }
+  | { type: "skipUntap"; what: ObjRef; /** "Its controller's next two untap steps" (Telekinesis). */ n?: number }
   /** "Lands you control don't untap during your next untap step": every one of these types they control then (Player.noUntapNext). */
   | { type: "noUntapNext"; who: PlayerRef; types: string[] }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
@@ -3027,6 +3031,8 @@ export type Effect =
       ownerMay?: { play?: true; more?: number };
       /** "If you do, it becomes plotted" (Kellan Joins Up, CR 702.170c): its owner may cast it free on a later turn. */
       plot?: true;
+      /** Talara's Bane: "You gain life equal to that creature card's toughness, then that player discards that card." */
+      gainToughness?: true;
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
@@ -3869,6 +3875,8 @@ export type SpellCondition =
   | { kind: "targetCardWas"; index: number; filter: TargetSpec }
   /** "Counter target spell unless its controller pays {4}. If they do, you incubate 2." (Assimilate Essence): it was paid. */
   | { kind: "unlessPaid" }
+  /** Fold into Aether: "If that spell is countered this way, ...": the counter just before this one countered a spell (not one that can't be countered, rulings). */
+  | { kind: "spellCountered" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
   /** "If it has the same mana value as the revealed card" (Counterbalance): the revealed card's (X as 0 off the stack, CR 202.3e) is `mv`. */

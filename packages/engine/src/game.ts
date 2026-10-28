@@ -977,6 +977,7 @@ export function moveObject(
   o.targetedThisTurn = undefined;
   o.modesChosen = undefined; // "choose one that hasn't been chosen": a new object starts over (CR 400.7)
   o.skipNextUntap = undefined;
+  o.skipMoreUntaps = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
   o.adaptFresh = undefined;
@@ -3059,8 +3060,10 @@ function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
       if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
       continue;
     }
-    if (o.skipNextUntap) o.skipNextUntap = undefined;
-    else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) {
+    if (o.skipNextUntap) {
+      o.skipNextUntap = o.skipMoreUntaps ? true : undefined;
+      o.skipMoreUntaps = o.skipMoreUntaps && o.skipMoreUntaps > 1 ? o.skipMoreUntaps - 1 : undefined;
+    } else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) {
       if (o.tapped) untapped++;
       untapPermanent(s, o); // CR 502.3
     }
@@ -6145,7 +6148,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (c.kind === "sacrifice" && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
-    if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;
+    // X can be 0 ("Exile any number of cards from your graveyard", Painbringer): nothing chosen.
+    if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || (chosen.length > 0 && !chosen.some(fits))) return `choose ${full} to ${verb}`;
     if (c.kind === "sacrifice" && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full} to ${verb}`;
   }
   return null;

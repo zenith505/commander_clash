@@ -8,7 +8,8 @@ import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, letha
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
-import { ResolveCtx, apnap, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
+import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, runEffectInner, damageRecipients, ctxSource } from "./resolve";
+import { evalAmount } from "../amounts";
 import { fireEvent } from "./triggers";
 import { bindChosen, objectMatches } from "./targeting";
 import { COLOR_NAMES } from "./describe";
@@ -143,6 +144,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const amount = amountNow(s, e.amount, ctx);
       // Price of Progress: each player's own amount ("that player controls", PlayerRef eachOne).
       const perPlayer = typeof e.amount === "object" && JSON.stringify(e.amount).includes('"eachOne"');
+      // Baki's Curse: "2 damage to each creature for each Aura attached to that creature": each its own, all at once.
+      const perObject = typeof e.amount === "object" && JSON.stringify(e.amount).includes('"attachedToAffected"');
       // "Divided as you choose": each target is dealt its part; a part for an illegal target isn't dealt (CR 608.2b,
       // rulings on Arc Lightning).
       // "Divided evenly, rounded down": among the targets still legal (rulings on Fireball).
@@ -158,8 +161,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             })
           : perPlayer
             ? ((r) => r.pids.map((pid) => ({ objs: [], pids: [pid], n: amountNow(s, e.amount, { ...ctx, eachOne: pid }) })))(damageRecipients(s, to, ctx))
+            : perObject
+            ? ((r) => r.objs.map((o) => ({ objs: [o], pids: [], n: Math.max(0, evalAmount(s, e.amount, { ...amountCtx(s, ctx), affected: o.id })) })))(damageRecipients(s, to, ctx))
             : [{ ...damageRecipients(s, to, ctx), n: amount }];
-      const all = [e.to, ...(e.also ?? [])].flatMap(parts);
+      const alsoN = e.alsoAmount !== undefined ? amountNow(s, e.alsoAmount, ctx) : undefined;
+      const all = [...parts(e.to), ...(e.also ?? []).flatMap((to) => parts(to).map((x) => (alsoN === undefined ? x : { ...x, n: alsoN })))];
       const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
       const made = e.by === "created" ? objects(s, { ref: "created" }, ctx) : [];
       const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "castSpell" ? castSpellSource(s, ctx) : e.by === "created" ? (made.length === 1 && made[0]!.zone === "battlefield" ? objectSource(s, made[0]!) : undefined) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);

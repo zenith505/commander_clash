@@ -116,6 +116,11 @@ function refPlayers(s: GameState, ref: PlayerRef, ctx: AmountCtx): PlayerId[] {
   if (ref.ref === "eventPlayer") return ctx.event?.player !== undefined ? [ctx.event.player] : [];
   // "The chosen player" in a static ability (Sewer Nemesis): the one chosen as the permanent entered; none once that
   // player has left the game (rulings).
+  // Elturel Survivors: the player the source is attacking (CR 506.2).
+  if (ref.ref === "selfDefending") {
+    const p = selfObject(s, ctx)?.attacking;
+    return p !== undefined && !s.players[p]!.lost ? [p] : [];
+  }
   if (ref.ref === "selfChosenPlayer") {
     const p = selfObject(s, ctx)?.chosen?.player;
     return p !== undefined && !s.players[p]!.lost ? [p] : [];
@@ -185,6 +190,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const filter = c.filter.named === "~" ? { ...c.filter, named: me?.zone === "battlefield" ? (view(me)?.name ?? defOf(s, me).name) : (ctx.sourceName ?? (me ? defOf(s, me).name : "")) } : bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       const onPlayers = c.attachedToPlayer && refPlayers(s, c.attachedToPlayer, ctx);
+      const attacked = c.attackingWho && refPlayers(s, c.attackingWho, ctx);
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;
       // The source's creature types now, or as it last existed (CR 608.2h).
@@ -207,6 +213,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[id]!;
         if ((c.other && id === ctx.sourceId) || id === notThis || (c.otherThanAffected && id === ctx.affected)) continue;
         if (onPlayers && (o.attachedToPlayer === undefined || !onPlayers.includes(o.attachedToPlayer))) continue;
+        if (attacked && (o.attacking === undefined || o.attackingPermanent || !attacked.includes(o.attacking))) continue;
         if (subject && ((id === subject.id && !c.includeSubject) || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
         if (srcTypes && (id === ctx.sourceId || !shareCreatureType(srcTypes, creatureTypesOf(s, o)))) continue;
         if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
@@ -284,6 +291,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
       return ctx.event?.groupPower ?? 0;
+    case "totalPowerOf":
+      return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
       return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
     case "exchangedLifeDifference": {
@@ -326,6 +335,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "sacrificedThisWayGreatestPower":
+      return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
     case "putThisWay":
       return (s.resolving?.created ?? []).filter((id) => s.objects[id]?.zone === "battlefield").length;
     case "blockingIt":
@@ -892,6 +903,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "sacrificedThisWayGreatestPower":
+      return "the greatest power sacrificed";
     case "putThisWay":
       return "#put onto the battlefield";
     case "blockingIt":
@@ -937,6 +950,8 @@ function describeCount(c: Count): string {
     case "stillExiled":
       return "#those cards still exiled";
     case "eventGroupPower":
+      return "the total power of those creatures";
+    case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":
       return "the life you lost";
@@ -1126,6 +1141,8 @@ function describeCount(c: Count): string {
 /** Replace X in an amount with what the text defines it as ("where X is ..."). */
 export function substituteX(a: Amount, x: AmountExpr): Amount {
   if (typeof a === "number" || a.count.kind !== "x") return a;
+  // "Half X life, rounded down" with X defined as a plain count (Brass Infiniscope's spell's X): halved all the same.
+  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
   // "Half X damage, rounded up, ..., where X is the number of Mountains you control" (Eternal Flame): half the definition.

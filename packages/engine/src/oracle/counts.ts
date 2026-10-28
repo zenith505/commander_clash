@@ -100,6 +100,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "Each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way."
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
+  // Shadowgrange Archfiend: "the greatest power among creatures sacrificed this way".
+  if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
   if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
@@ -108,6 +110,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Iridescent Hornbeetle: "for each +1/+1 counter you've put on creatures under your control this turn", as they were
   // put, even on creatures that have left since (rulings).
   if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
+  // Vault 12: The Necropolis: "the total number of rad counters among players" (CR 728, 122.1), every player's together.
+  if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
@@ -487,7 +491,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return who && filter ? count({ kind: "cardsInHand", who, filter }) : null;
   }
   // Dark Suspicions: "the number of cards in that player's hand minus the number of cards in your hand", 0 if fewer.
-  if ((m = /^(?:the number of )?cards in (that player's|target opponent's|target player's) hand minus the number of cards in your hand$/i.exec(p))) {
+  // Mr. Foxglove: "the number of cards in defending player's hand minus the number of cards in your hand" (rulings: none
+  // if that's 0 or less).
+  if ((m = /^(?:the number of )?cards in (that player's|target opponent's|target player's|defending player's) hand minus the number of cards in your hand$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "handMoreThanYou", who });
   }
@@ -559,7 +565,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.spell && /^other spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", other: true });
   // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was
   // (rulings).
-  if (/^spells? you've cast this turn from anywhere other than your hand$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });
+  // Impending Flux: "the number of spells you've cast from anywhere other than your hand this turn" likewise.
+  if (/^spells? you've cast (?:this turn from anywhere other than your hand|from anywhere other than your hand this turn)$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });
   // Rug of Smothering: "for each spell they've cast this turn", the player the trigger is about.
   if (ctx?.eventPlayer && /^spells? (?:they've|that player has) cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", eventPlayer: true });
   // Magebane Lizard: "the number of noncreature spells they've cast this turn", that one included (it's cast by now).
@@ -607,8 +614,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the discarded card's mana value|the mana value of the discarded card)$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
   // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
   if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
+  // Havoc Eater: "for each opponent, goad up to one target creature that player controls. Put X +1/+1 counters on ~, where
+  // X is the total power of creatures goaded this way": the targets still there as it resolves.
+  if (/^the total power of creatures goaded this way$/.test(p) && ctx?.lastTargets && ctx.targets[ctx.lastTargets.index]?.perOpponent && ctx.targets[ctx.lastTargets.index]?.types?.includes("Creature")) return count({ kind: "totalPowerOf", of: { ref: "target", ...ctx.lastTargets } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the exiled card's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
@@ -717,6 +727,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The number of creatures attacking you" (Arachnogenesis): attacking you, not your planeswalkers (CR 506.3).
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
+  // "Each opponent loses life equal to the number of creatures attacking them" (Within Range): each that player's own,
+  // attacking them and not their planeswalkers (CR 506.3).
+  if (ctx?.eachOne && /^creatures? attacking (?:them|that player)$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", text: p }, attackingWho: { ref: "eachOne" } });
   // "attacking creature", "tapped creature": any controller. "Other attacking creatures" (Ghalta and Mavren): not the
   // object with the ability.
   // Cybermat: "the number of attacking artifact creatures", any controller's. Siani, Eye of the Storm: "the number of
@@ -792,6 +805,7 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
   if ((x === "that player's" || x === "their") && (ctx.eventPlayer || ctx.defending)) return { ref: "eventPlayer" };
   if (x === "enchanted player's" || x === "enchanted opponent's") return { ref: "enchantedPlayer" };
+  if (x === "defending player's" && ctx.defending) return { ref: "eventPlayer" };
   return null;
 }
 
@@ -819,12 +833,15 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
-  // Corpse Lunge: "the exiled card's power" after an "exile a creature card from your graveyard" cost; compile() checks it has one.
-  if (x === "the exiled card's") return { ref: "sacrificed", exiledCost: true };
+  // Corpse Lunge: "the exiled card's power" after an "exile a creature card from your graveyard" cost, with no card
+  // targeted (Lobelia's, below); compile() checks it has that cost.
+  if (x === "the exiled card's" && !ctx.targets.some((t) => t.kind === "card")) return { ref: "sacrificed", exiledCost: true };
   if (x === "that card's" && ctx.revealedTop) return { ref: "revealed" };
   if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
   // Pyretic Rebirth: "... ~ deals damage equal to that card's mana value to up to one target creature": the one card targeted.
-  if (x === "that card's") {
+  // Lobelia Sackville-Baggins: "exile target creature card from an opponent's graveyard ..., then create X Treasure
+  // tokens, where X is the exiled card's power": that card, as it last existed in the graveyard (rulings).
+  if (x === "that card's" || x === "the exiled card's") {
     const cards = ctx.targets.flatMap((t, i) => (t.kind === "card" ? [i] : []));
     return cards.length === 1 && ctx.targets.every((t) => t.kind === "card" || t.kind === "object" || t.kind === "any") ? { ref: "target", index: cards[0]! } : null;
   }

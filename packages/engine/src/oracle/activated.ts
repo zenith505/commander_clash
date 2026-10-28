@@ -7,6 +7,7 @@ import { parseAdditionalCost } from "./keyword-abilities";
 import { pickFilter } from "./targets";
 import { parseOnlyClauses } from "./statics";
 import { parseCount } from "./counts";
+import type { ManaType } from "../types";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
 const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
@@ -54,7 +55,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // permanent itself and one of each of the others.
     .replace(/(^|, )Sacrifice (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*), and (an? [a-z]+ creature|a creature named [A-Z][A-Za-z' -]*|~)(?=:)/, (_, pre: string, a: string, b: string, c: string) => (c === "~" ? `${pre}Sacrifice ~, Sacrifice ${a}; and ${b}` : `${pre}Sacrifice ${a}; ${b}; and ${c}`));
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Tap enchanted (?:creature|land)|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove a counter from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard another card named ~|Discard X cards|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) untapped [^,:]+? you control|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and (?:an?|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen) [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Tap enchanted (?:creature|land)|Return ~ to its owner's hand|Put ~ on the bottom of its owner's library|Discard ~|Discard your hand|Reveal ~ from your hand|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifty|\d+|X) (?:[+-]\d+/[+-]\d+|[a-z]+) counters? from ~|Remove all (?:[+-]1/[+-]1|[a-z]+) counters from ~|Remove a counter from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from (?:an?|another) (?:permanent|nonland permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Put an? [+-]1/[+-]1 counter on an? creature you control|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard another card named ~|Discard X cards|Reveal X (?:white|blue|black|red|green) cards from your hand|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|X) (?:other )?untapped [^,:]+? you control|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile the top (?:card|[a-z]+ cards) of your library|Exile (?:a|an|another|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Exile ~ and (?:one|two|three|four|five) other [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
   // "Waterbend {N}" (CR 701.67a) is paying {N}, part of which tapped artifacts and creatures can pay.
   const water = /^Waterbend \{(\d+|X)\}(?=[,:])/.exec(line);
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(water ? line.slice("Waterbend ".length) : line);
@@ -160,12 +161,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       if (!filter || (c[3] && c[1] === "another")) return "fail";
       // "Sacrifice X Squirrels" (Chatterfang): X is announced as it's activated, and is how many (CR 107.3a, 602.2b).
       extra.push({ kind: "sacrifice", filter: c[3] ? { ...filter, text: `other ${andOr ?? c[4]!}` } : filter, n: c[1] === "another" || c[1] === "X" ? (c[1] === "X" ? 0 : 1) : num(c[1]!), ...(c[1] === "another" || c[3] ? { other: true } : {}), ...(c[1] === "X" ? { x: true as const } : {}) });
-    } else if ((c = new RegExp(`^Tap (another|X|${NUM}) untapped (.+) you control$`).exec(part))) {
+    } else if ((c = new RegExp(`^Tap (another|X|${NUM}) (other )?untapped (.+) you control$`).exec(part))) {
       // "Tap another untapped creature you control" (Tyvar, the Pummeler): not the source. "Tap X untapped Knights you
       // control" (Aryel): X is announced as it's activated, and is how many (CR 107.3a, 602.2b).
+      // Saradoc, Master of Buckland: "Tap two other untapped Halflings you control": not the source either.
+      const other = c[1] === "another" || !!c[c.length - 2];
+      if (c[c.length - 2] && (c[1] === "another" || c[1] === "X")) return "fail";
       const filter = pickFilter(c[c.length - 1]!.replace(/^([a-z]+)s and\/or ([a-z]+)s$/, "$1 or $2")); // "artifacts and/or creatures" (Warden of the Inner Sky): either
       if (!filter) return "fail";
-      extra.push({ kind: "tap", filter: { ...filter, text: `untapped ${c[1] === "another" ? "other " : ""}${filter.text} you control` }, n: c[1] === "another" ? 1 : c[1] === "X" ? 0 : num(c[1]!), ...(/\{T\}/.test(costs) || c[1] === "another" ? { other: true } : {}), ...(c[1] === "X" ? { x: true as const } : {}) });
+      extra.push({ kind: "tap", filter: { ...filter, text: `untapped ${other ? "other " : ""}${filter.text} you control` }, n: c[1] === "another" ? 1 : c[1] === "X" ? 0 : num(c[1]!), ...(/\{T\}/.test(costs) || other ? { other: true } : {}), ...(c[1] === "X" ? { x: true as const } : {}) });
     } else if ((c = new RegExp(`^Untap ${NUM} tapped (.+) you control$`).exec(part))) {
       // "Untap a tapped creature you control" (Halo Fountain): permanents that are tapped, any of them (CR 602.2b).
       const filter = pickFilter(c[2]!);
@@ -265,6 +269,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // being that player; "but only during their turn" is the activator's turn.
   let anyPlayer = false;
   let spendOnlyChosenColor = false;
+  let spendOnly: ManaType[] | undefined;
   const anyone = / Any player may activate this ability(?: but only ([^.]+))?\.$/.exec(effectText);
   if (anyone) {
     anyPlayer = true;
@@ -286,7 +291,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     }
     const less = / This ability costs \{(\d+)\} less to activate for each ([^.]+)\.$/.exec(effectText);
     if (less && !costLess) {
-      const c = parseCount(less[2]!, null, true);
+      // Mobilized District: "for each legendary creature and planeswalker you control": each legendary permanent that's a
+      // creature and/or a planeswalker, once (rulings).
+      const c = parseCount(less[2]!.replace(/^legendary creature and planeswalker you control$/, "legendary creature or planeswalker you control"), null, true);
       if (!c) return "fail";
       costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
       effectText = effectText.slice(0, less.index);
@@ -313,6 +320,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (/ Spend only mana of the chosen color to activate this ability\.$/.test(effectText) && !spendOnlyChosenColor) {
       spendOnlyChosenColor = true;
       effectText = effectText.slice(0, effectText.length - " Spend only mana of the chosen color to activate this ability.".length);
+      found = true;
+    }
+    // "Spend only black mana on X." (Crypt Rats, Crimson Hellkite): with {X} the whole mana cost, all of it (CR 107.3).
+    const onlyOnX = / Spend only (white|blue|black|red|green) mana on X\.$/.exec(effectText);
+    if (onlyOnX && !spendOnly) {
+      spendOnly = [({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[onlyOnX[1] as "white"]];
+      effectText = effectText.slice(0, onlyOnX.index);
       found = true;
     }
     // "This ability can't be copied and X can't be 0." (Gogo, Master of Mimicry): a copy effect makes no copy of it
@@ -449,11 +463,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
   // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.
   if (spendOnlyChosenColor && (mana !== "stack" || !manaCost || fromYard || fromHand)) return "fail";
+  if (spendOnly && (mana !== "stack" || manaCost !== "{X}" || spendOnlyChosenColor)) return "fail";
   if (anyPlayer && (tap || untapSelf || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
   return {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(ownerOnly ? { ownerOnly: true as const } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
+    ...(spendOnly ? { spendOnly } : {}),
     manaCost,
     ...(water ? { waterbend: water[1] === "X" ? ("X" as const) : Number(water[1]) } : {}),
     tap,

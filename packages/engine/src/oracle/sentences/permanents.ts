@@ -44,6 +44,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = each ? ({ ref: "created" } as ObjRef) : parseObject(fu[1]!, ctx);
     return what && (what.ref !== "target" || !what.n) && what.ref !== "each" ? [{ type: "attachEquipmentTo", what }] : null;
   }
+  // Beatrix, Loyal General: "you may attach any number of Equipment you control to target creature you control"; Battlefield
+  // Improvisation: "... to it". Only those that can be attached to it (rulings; CR 301.5c).
+  if ((fu = /^[Yy]ou may attach any number of Equipment you control to (target creature you control|it|that creature)$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "attachAny", host: what.index, equipment: true }] : null;
+  }
   // Energybending: "Lands you control gain all basic land types until end of turn": added to their other types, each with
   // its mana ability (CR 305.6; rulings).
   if ((fu = /^(.+?) gains? all basic land types until end of turn$/.exec(s))) {
@@ -482,6 +488,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const theirs = what && what === ctx.lastGroup && what.ref === "each" && what.of?.ref === "target" && ctx.targets[what.of.index]?.kind === "player";
     return what && theirs ? [{ type: "skipUntap", what }] : null;
   }
+  // Change of Plans: "Each of X target creatures you control connive. You may have any number of them phase out.": the
+  // targets still on the battlefield, chosen after they've all connived (rulings), none too.
+  if (/^You may have any number of them phase out$/.test(s) && ctx.lastTargets) {
+    const what = parseObject("them", ctx);
+    return what?.ref === "target" ? [{ type: "phaseOut", what, anyNumber: true }] : null;
+  }
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
   // Shape Stealer: "~'s base power and toughness become equal to that creature's power and toughness until end of turn": the
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
@@ -675,6 +687,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter("creature")!;
     return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
   }
+  // Lily Bowen: "remove all but one +1/+1 counter from it, then you gain 1 life for each +1/+1 counter removed this way":
+  // the life is for the counters actually removed (ResolvingState.countersRemoved).
+  if ((m = /^Remove all but one (\+1\/\+1) counter from (~|it)(?:, then you gain 1 life for each \+1\/\+1 counter removed this way)?$/i.exec(s))) {
+    const what = parseObject(m[2]!, ctx);
+    if (!what || isGroup(what)) return null;
+    return [{ type: "removeCounters", what, counter: m[1]!, n: "allButOne" }, ...(/gain 1 life/.test(s) ? [{ type: "gainLife" as const, who: { ref: "you" as const }, n: { count: { kind: "countersRemovedThisWay" as const } } }] : [])];
+  }
   // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
   if ((m = /^Remove all counters from (~|it|that creature|target .+|up to one target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -705,6 +724,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const from = parseObject(g.from ?? g.self!, ctx);
     const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, "another "), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
+  }
+  // Gatewatch Beacon: "you may move a loyalty counter from ~ onto that planeswalker": the one that entered (CR 122.5: none
+  // moves if ~ has none).
+  if ((m = new RegExp(`^Move (?:a|one) ${COUNTER} counter from ~ onto (it|that (?:planeswalker|creature|permanent))$`, "i").exec(s))) {
+    const to = parseObject(m[2]!, ctx);
+    return to?.ref === "subject" ? [{ type: "moveCounter", counter: counterKind(m[1]!), from: { ref: "self" }, to }] : null;
   }
   // Scrounging Bandar: "you may move any number of +1/+1 counters from ~ onto another target creature": that kind only,
   // as many as you choose (none is choosing not to) as it resolves.
@@ -807,12 +832,31 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Distribute up to X +1/+1 counters among any number of other target creatures, where X is ..." (Lathiel, rewritten in
   // triggers.ts): X worked out as the targets are chosen, then any number of them each getting at least 1, X in all at
   // most (rulings; CR 601.2d).
-  if ((m = /^[Dd]istribute up to X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures)$/.exec(s)) && ctx.whereX) {
-    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures$/, "creature"));
+  // Quirion Beastcaller: "When ~ dies, distribute X +1/+1 counters among any number of target creatures you control, where X
+  // is the number of +1/+1 counters on ~": all X, each target getting at least one, divided as it's put on the stack
+  // (rulings), X counted then (as ~ last existed).
+  if ((m = /^[Dd]istribute (up to )?X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures(?: you control)?)$/.exec(s)) && ctx.whereX) {
+    const upTo = !!m[1];
+    m.splice(1, 1);
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
     if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
     const first = ctx.targets.length;
     const x: AmountExpr = { count: { kind: "x" } };
-    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures$/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), atMost: true }, many: "any" });
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), ...(upTo ? { atMost: true as const } : {}) }, many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
+  }
+  // Grove's Bounty: "Distribute X +1/+1 counters among any number of target creatures you control": the spell's X, all of
+  // it, chosen with the targets, each getting at least one (rulings, CR 601.2d).
+  // Broodlord: "When ~ enters, distribute X +1/+1 counters among any number of other target creatures you control": the X it
+  // was cast with, divided as the ability is put on the stack (rulings).
+  if ((m = /^[Dd]istribute X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures you control)$/.exec(s)) && !ctx.whereX && (ctx.spell || ctx.ownX)) {
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
+    if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
+    const first = ctx.targets.length;
+    const x: AmountExpr = { count: { kind: "x" } };
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!) }, many: "any" });
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
     return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
@@ -1214,7 +1258,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Depthshaker Titan: "Any number of target noncreature artifacts you control become 3/3 artifact creatures": each of
   // them, as with one target (no duration: for as long as each stays on the battlefield, CR 611.2a).
-  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five)) target .+?) become (\d+\/\d+) ((?:[a-z]+ )*)creatures$/.exec(s))) {
+  // Nissa, Sage Animist: "Untap up to six target lands. They become 6/6 Elemental creatures. They're still lands." The same.
+  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five|six)) target .+?|They) become (\d+\/\d+) ((?:[a-z]+ |[A-Z][a-z]+ )*)creatures$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes a ${m[2]} ${m[3]}creature`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
@@ -1304,6 +1349,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^[Uu]ntil your next turn, (creatures your opponents control|each creature) attacks? each combat if able and attacks? a player other than you if able$/.exec(s))) {
     const affects = parseAffected(m[1] === "each creature" ? "Each creature" : "Creatures your opponents control");
     return affects ? [{ type: "groupRules", affects, text: m[1]!, mods: [{ kind: "goad", notGoaded: true }], duration: "yourNextTurn" }] : null;
+  }
+  // The Akroan War: "Until your next turn, creatures your opponents control attack each combat if able": the same way,
+  // every creature in the group at any time (CR 611.2c is only for characteristics), unless it can't (rulings).
+  if (/^[Uu]ntil your next turn, creatures your opponents control attack each combat if able$/.test(s)) {
+    const affects = parseAffected("Creatures your opponents control");
+    return affects ? [{ type: "groupRules", affects, text: "creatures your opponents control", mods: [{ kind: "attacksIfAble" }], duration: "yourNextTurn" }] : null;
   }
   // Akroma, Vision of Ixidor: "until end of turn, each other creature you control gets +1/+1 if it has flying, +1/+1 if
   // it has first strike, and so on for double strike, ...": +1/+1 for each of those keywords it has as this resolves

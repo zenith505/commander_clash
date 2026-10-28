@@ -1,12 +1,12 @@
 // Rolling dice (CR 706).
 
 import type { Effect } from "../abilities";
-import { abilitiesOf } from "../cards";
+import { abilitiesOf, defOf } from "../cards";
 import { controllerOf } from "../layers";
-import { livingPlayers, log, obj, player } from "../game";
+import { destroyPermanent, livingPlayers, log, obj, player } from "../game";
 import { nextRandom } from "../rng";
 import type { GameState, PlayerId } from "../types";
-import { ResolveCtx, amountNow } from "./resolve";
+import { ResolveCtx, amountNow, objects } from "./resolve";
 import { fireEvent } from "./triggers";
 
 /** Where `pid` comes in turn order, counted from the active player. */
@@ -128,4 +128,23 @@ export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin
   }
   s.resolving!.flipped = { won, wins };
   log(s, e.n ? `${player(s, who).name} flips ${e.n} coins for ${src}: ${wins} won.` : e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won.` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip.`);
+}
+
+/**
+ * Rakdos, the Showstopper: "Flip a coin for each creature that isn't a Demon, Devil, or Imp. Destroy each creature whose
+ * coin comes up tails." Coins that only come up heads or tails, which no one wins or loses (CR 705.2); every creature
+ * whose coin came up tails is destroyed at the same time, with no chance to act in between (rulings). With Krark's Thumb
+ * each is two coins and its controller ignores one: the heads one is kept for their own creatures, the tails one for
+ * everyone else's (not asked: ROADMAP).
+ */
+export function runCoinEachEffect(s: GameState, e: Extract<Effect, { type: "flipCoinEach" }>, ctx: ResolveCtx, src: string): void {
+  const who = ctx.controller;
+  const thumb = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === who && !!abilitiesOf(s, obj(s, id)).flipTwo);
+  const each = objects(s, { ref: "each", filter: e.filter }, ctx);
+  const tails = each.filter((o) => {
+    const coins = thumb ? [nextRandom(s) < 0.5, nextRandom(s) < 0.5] : [nextRandom(s) < 0.5];
+    return controllerOf(s, o) === who ? coins.every((h) => !h) : coins.some((h) => !h);
+  });
+  log(s, `${player(s, who).name} flips ${each.length} coin${each.length === 1 ? "" : "s"} for ${src}: ${tails.length ? `tails for ${tails.map((o) => defOf(s, o).name).join(", ")}` : "no tails"}.`);
+  for (const o of tails) if (o.zone === "battlefield") destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, false, who);
 }

@@ -15,7 +15,7 @@ import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runCoinEffect, runDiceEffect } from "./run-dice";
+import { runCoinEachEffect, runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -596,6 +596,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const lk = me && s.lastKnown?.[me.id];
       const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? controllerOf(s, me) : lk && lk.zc === ctx.sourceZc ? lk.controller : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
+    case "selfDefending": {
+      // The player the source is attacking (CR 506.2).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const p = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.attacking : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
     case "neighbor": {
@@ -1190,6 +1196,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "dig":
     case "vault":
     case "nextDrawExile":
+    case "surge":
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":
     case "revealUntil":
@@ -1202,6 +1209,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDiceEffect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
+    case "flipCoinEach":
+      return runCoinEachEffect(s, e, ctx, src);
     case "vote":
     case "eachChooses":
     case "controlFromEach":

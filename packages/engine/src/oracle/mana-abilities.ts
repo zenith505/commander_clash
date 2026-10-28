@@ -103,7 +103,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     }
     else if (extra === "If that mana is spent on an instant or sorcery spell, that spell can't be countered.") out.spentUncounterable = true;
     else if (extra === "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it.") out.spentCreatureCounter = true;
-    else if (/^When you next cast an? [a-z ]+ spell this turn, /.test(extra) && !out.nextCast) {
+    else if (/^When you next cast an? (?:[a-z ]+ )?spell(?: with \{X\} in its mana cost)? this turn, /.test(extra) && !out.nextCast) {
       const body = parseBody(extra);
       const e = body?.effects.length === 1 && !body.targets.length ? body.effects[0]! : undefined;
       if (e?.type !== "nextCast" || e.cascade || e.who) return null;
@@ -343,6 +343,13 @@ function parseManaProduced(text: string): ManaProduce | null {
   if (xAny) {
     const n = parseCount(xAny[1]!, null);
     return n && { kind: "oneOf", options: ALL_COLORS, amount: 1, n };
+  }
+  // "Add X {G} or X {W}, where X is the number of other creatures you control" (Brigid, Doun's Mind): X mana, all of the
+  // one color chosen (CR 605.3b, like "X mana of any one color").
+  const xEither = /^X \{([WUBRGC])\} or X \{([WUBRGC])\}, where X is (.+)$/.exec(text);
+  if (xEither && xEither[1] !== xEither[2]) {
+    const n = parseCount(xEither[3]!, null);
+    return n && { kind: "oneOf", options: [xEither[1] as ManaType, xEither[2] as ManaType], amount: 1, n };
   }
   // "One mana of any color among legendary creatures and planeswalkers you control" (Mox Amber), "... among legendary
   // permanents you control" (Plaza of Heroes); "one mana of any of the exiled card's colors" (Chrome Mox: the card its

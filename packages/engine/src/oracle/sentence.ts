@@ -43,14 +43,15 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     return "more";
   }
   if (dig.into === undefined) {
-    // Stargaze: "Put X cards from among them into your hand", the X it was cast with.
     // Browse, Eye of Yawgmoth: "Put one (of them) into your hand and exile the rest".
     if ((m = /^Put (one|two|three) (?:of (?:them|those cards) )?into your hand and exile the rest$/.exec(s))) {
       Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand", rest: "exile" });
-    } else if ((m = new RegExp(`^Put (one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
-      if (m[1] === "X" && !ctx?.spell) return null;
-      Object.assign(dig, m[1] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[1]!), upTo: false, into: "hand" });
-      if (m[2]) Object.assign(dig, restOf(m[2]));
+      // Stargaze: "Put X cards from among them into your hand", the X it was cast with.
+      // Thassa's Intervention: "Put up to two of them into your hand and the rest on the bottom ...": none to two.
+    } else if ((m = new RegExp(`^Put (up to )?(one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
+      if (m[2] === "X" && (!ctx?.spell || m[1])) return null;
+      Object.assign(dig, m[2] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[2]!), upTo: !!m[1], into: "hand" });
+      if (m[3]) Object.assign(dig, restOf(m[3]));
     } else if ((m = /^You may (?:reveal (an? [^,]+? card) and\/or (an? [^,]+? card) from among them and put (?:them|the revealed cards)|put (an? [^,]+? card) and\/or (an? [^,]+? card) from among them) into your hand$/.exec(s))) {
       // "You may put a creature card and/or a land card from among them into your hand" (Kiora, Master of the Depths): up
       // to one card for each, a card that's both being either one (as Krosan Verge's search, oneOfEach).
@@ -85,11 +86,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 1, upTo: false, required: true, filter, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
-    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
+    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards|cards of the chosen type) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
       // Reality Heist: "You may reveal up to two artifact cards from among them and put them into your hand".
-      const filter = parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
-      if (!filter || / of the chosen /.test(m[2]!)) return null;
+      // For the Ancestors: "... any number of cards of the chosen type ..." after "Choose a creature type": any card with
+      // that creature type (CR 205.3m), a changeling's too (CR 702.73a).
+      const filter = ctx?.choseCreatureType && m[2] === "cards of the chosen type" ? ({ kind: "card", chosen: "type", text: "card of the chosen type" } as const) : parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
+      if (!filter || (/ of the chosen /.test(m[2]!) && !filter.chosen)) return null;
       Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand", reveal: true });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) into your hand$/.exec(s))) {
       // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
@@ -321,6 +324,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // "When that creature dies this turn, you draw a card" (A Good Day to Die): a delayed trigger (sentences/permanents.ts),
   // not a draw with a long subject.
   if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
+  // "When you next cast a spell with {X} in its mana cost this turn, you draw a card ..." (Brass Infiniscope): a delayed
+  // trigger (sentences/spells.ts), not a draw with a long subject.
+  if (/^When you next cast /.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   // "Target creature gets +3/+0 until end of turn. When it dies this turn, manifest dread." (Turn Inside Out): "it" is
   // that target creature.
   if (/^When it dies (?:under your control )?this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)
@@ -513,7 +519,9 @@ export function parseBecomes(text: string): Modification[] | null {
   }
   // "... that's still a land" keeps its card types, like "It's still a land." after it (CR 205.1b).
   let still = false;
-  if ((m = /^(.+?) that(?:'s| is) still an? land$|^(.+?) that are still lands$/i.exec(rest))) {
+  // Gideon, Ally of Zendikar: "a 5/5 Human Soldier Ally creature with indestructible that's still a planeswalker" (CR
+  // 205.1b): a planeswalker creature, dealt damage as both (CR 120.3c-d).
+  if ((m = /^(.+?) that(?:'s| is) still an? (?:land|planeswalker)$|^(.+?) that are still lands$/i.exec(rest))) {
     rest = (m[1] ?? m[2])!;
     still = true;
   }

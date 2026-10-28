@@ -995,6 +995,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject("that card", ctx);
     return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
   }
+  // The Cauldron of Eternity: "Whenever a creature you control dies, put it on the bottom of its owner's library": the card,
+  // if it's still in the graveyard (CR 400.7).
+  if ((m = /^[Pp]ut (it|that card) on (top|the bottom) of its owner's library$/.exec(s)) && ctx.subjectLeft) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: m[2] === "top" ? "top" : "bottom" }] : null;
+  }
   // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
   if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).

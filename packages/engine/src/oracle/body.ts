@@ -1050,6 +1050,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
   // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
+  // Silvan Rally: "Mill four cards, then put up to two land cards from among them into your hand": up to two, none too.
+  text = text.replace(/^Mill (two|three|four|five) cards, then put up to (two|three) ([a-z]+) cards from among them into your hand\./, "Mill $1 cards. You may put up to $2 $3 cards from among them into your hand.");
   // Ana Battlemage: "tap target untapped creature and that creature deals damage equal to its power to its controller":
   // two instructions about the target, in order.
   text = text.replace(/^([Tt]ap target untapped creature) and (that creature deals damage equal to its power to its controller)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
@@ -2916,12 +2918,33 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Sacrifice a creature. If you can't, sacrifice ~." (Eldrazi Monument): you must if you can, so only when none was.
     // "That player sacrifices a creature of their choice. If the player can't, you create a ... token" (Wasitora): the
     // same, for that one player.
-    const sacCant = /^If (you|the player|that player) can't, (.+)$/.exec(s);
+    // Invoke Despair: "Target opponent sacrifices a creature of their choice. If they can't, they lose 2 life and you draw a
+    // card." ("they" is that player).
+    const sacCant = /^If (you|the player|that player|they) can't, (.+)$/.exec(s);
     const sacWho = sacPrev?.type === "pick" ? sacPrev.who : undefined;
-    if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && (sacCant[1] === "you" ? sacWho?.ref === "you" : sacWho?.ref === "eventPlayer" || (sacWho?.ref === "target" && !sacWho.n)) && sacPrev.n === 1 && !sacPrev.unless) {
+    if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && (sacCant[1] === "you" ? sacWho?.ref === "you" : sacWho?.ref === "eventPlayer" || (sacWho?.ref === "target" && !sacWho.n)) && sacPrev.n === 1 && !sacPrev.unless && !sacPrev.anyNumber && !sacPrev.upTo) {
       const before = ctx.targets.length;
-      const inner = parseOne(capital(sacCant[2]!), ctx);
+      const text = sacCant[1] === "they" ? sacCant[2]!.replace(/^they (lose|gain|draw|discard|mill)\b/, "that player $1s") : sacCant[2]!;
+      if (sacCant[1] === "they" && /\b(?:they|them|their)\b/.test(text)) return null;
+      const inner = parseOne(capital(text), ctx);
       if (!inner || ctx.targets.length !== before) return null;
+      // "Then repeat this process for an enchantment and a planeswalker": the same player sacrifices one of each in turn,
+      // each "if they can't" about that one alone (rulings), whether or not the ones before were sacrificed. Worked out
+      // here by how many have been sacrificed so far: after k of them, this one was if there are k + 1.
+      const again = /^Then repeat this process for (an? [a-z]+(?:, an? [a-z]+)*,? and an? [a-z]+)\.?$/.exec(sentences[si + 1] ?? "");
+      if (again) {
+        const kinds = again[1]!.split(/,? and |, /).map((w) => w.replace(/^an? /, ""));
+        const filters = kinds.map((w) => pickFilter(w));
+        if (filters.some((f) => !f)) return null;
+        const pickOf = (f: TargetSpec): Effect => ({ ...sacPrev, filter: f });
+        const steps = (rest: TargetSpec[], k: number): Effect[] => {
+          if (!rest.length) return [];
+          return [pickOf(rest[0]!), { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "sacrificedThisWayCount" } }, min: k + 1 }, effects: steps(rest.slice(1), k + 1), otherwise: [...inner, ...steps(rest.slice(1), k)] }];
+        };
+        effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: steps(filters as TargetSpec[], 1), otherwise: [...inner, ...steps(filters as TargetSpec[], 0)] });
+        si++;
+        continue;
+      }
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [], otherwise: inner });
       continue;
     }
@@ -4102,11 +4125,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cosmic Cube: "You may cast a spell from among them with mana value less than or equal to the greatest power among
     // attacking creatures you control without paying its mana cost": that bound worked out as it resolves.
-    const lookCastMv = lookCast && /^You may cast a spell from among them with mana value less than or equal to (.+) without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Velomachus Lorehold: "You may cast an instant or sorcery spell with mana value less than or equal to ~'s power from
+    // among them without paying its mana cost": only those, the power as it resolves.
+    const lookCastMv = lookCast && (/^You may cast a spell from among them with mana value less than or equal to (.+) without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") ?? /^You may cast an instant or sorcery spell with mana value less than or equal to (.+) from among them without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? ""));
     if (lookCast && lookCastMv && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       const x = parseCount(lookCastMv[1]!, ctx);
       if (!x) return null;
-      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" } });
+      const spells = / an instant or sorcery spell /.test(lookCastMv[0]) ? { filter: { kind: "card" as const, types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } : {};
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" }, ...spells });
       si += 2;
       continue;
     }
@@ -7639,7 +7665,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const fromMilled =
       /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
       // Lluwen, Imperfect Naturalist: "you may put a creature or land card from among the milled cards on top of your library".
-      /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s);
+      /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s) ??
+      // Free the Fae: "Then put an instant, sorcery, or Faerie card from among the milled cards into your hand": one if any
+      // matches, not optional.
+      /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards) into your hand$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).

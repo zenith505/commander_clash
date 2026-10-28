@@ -461,6 +461,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // TARDIS's "and you may planeswalk": only in a Planechase game; in any other, nothing happens (CR 701.31a, rulings).
   // "Target player adds two mana of any one color. The next spell they cast this turn has cascade" (Bigger on the Inside):
   // the targeted player's next spell (rulings: the effect applies to it as they start casting it).
+  // Crackling Spellslinger: "the next instant or sorcery spell you cast this turn has storm": its own storm ability, the
+  // same way (CR 702.40a).
+  if ((m = /^[Tt]he next (instant or sorcery spell|(?:[a-z]+ )?spell) you cast this turn has storm$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn has storm`, storm: true }] : null;
+  }
   if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? (you|they) cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
     const who: PlayerRef | null = m[3] === "you" ? null : ctx.lastPlayerTarget !== undefined && !ctx.targets[ctx.lastPlayerTarget]?.many ? { ref: "target", index: ctx.lastPlayerTarget } : null;
     if (m[3] === "they" && !who) return null;
@@ -515,6 +521,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Sevinne's Reclamation: "you may copy ~ and may choose a new target for the copy", made as it resolves (rulings).
   if (ctx.spell && /^[Yy]ou may copy ~ and may choose a new target for the copy$/.test(s))
     return [{ type: "may", effects: [{ type: "copySpell", spell: "self", n: 1, newTargets: true }], text: "copy ~ (you may choose a new target for the copy)" }];
+  // Malicious Affliction: "When you cast ~, if a creature died this turn, you may copy ~ and may choose a new target for the
+  // copy": the spell that triggered it (CR 707.10, 707.10c); the "you may" is its own.
+  if (ctx.selfCastSpell && /^[Cc]opy ~ and may choose a new target for the copy$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }];
   // Wild Ricochet: "You may choose new targets for target instant or sorcery spell. Then copy that spell."
   if (!ctx.castSpell && !ctx.selfCastSpell && /^(?:Then )?copy that spell$/i.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" && !ctx.targets[ctx.lastObjectTarget]!.stackAbilities)
     return [{ type: "copySpell", spell: { target: ctx.lastObjectTarget }, n: 1, newTargets: false }];
@@ -524,7 +533,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // nonlegendary token, CR 608.3f).
   // Storm King's Thunder: "copy that spell X times", the X of the spell that made the delayed trigger; Photon Blast
   // Barrage: "When you cast ~, copy it X times", its own X (rulings: X copies, none if X is 0).
-  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice| X times)?(, except the copy isn't legendary)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] === " X times" ? X : m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
+  // Bygone Marvels: "When you cast this spell, ... copy this spell twice" ("this spell" is ~ by now).
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice| X times)?(, except the copy isn't legendary)?$/.exec(s) ?? (ctx.selfCastSpell ? /^[Cc]opy ~( twice)?()$/.exec(s) : null))) return [{ type: "copySpell", spell: "cause", n: m[1] === " X times" ? X : m[1] ? 2 : 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true as const } } : {}) }];
   // Bonus Round: "that player copies it and may choose new targets for the copy": the caster copies it and controls the
   // copy (rulings, CR 707.10).
   if (ctx.castSpell && /^[Tt]hat player copies (?:it|that spell) and may choose new targets for the copy$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: true, byController: true }];

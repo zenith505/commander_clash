@@ -91,11 +91,16 @@ const henrikaDomnathi = scry("transform", [
   { name: "Henrika Domnathi", mana_cost: "{2}{B}{B}", type_line: "Legendary Creature — Vampire", power: "1", toughness: "3", oracle_text: "Flying\nAt the beginning of combat on your turn, choose one that hasn't been chosen —\n• Each player sacrifices a creature of their choice.\n• You draw a card and you lose 1 life.\n• Transform Henrika." },
   { name: "Henrika, Infernal Seer", type_line: "Legendary Creature — Vampire", color_indicator: ["B"], power: "3", toughness: "4", oracle_text: "Flying, deathtouch, lifelink\n{1}{B}{B}: Each creature you control with flying, deathtouch, and/or lifelink gets +1/+0 until end of turn." },
 ], { keywords: ["Deathtouch", "Flying", "Lifelink", "Transform"] });
+// Targeted "up to two target creatures you control" stays its own template.
+const felidarSavior = card("Felidar Savior", "Creature \u2014 Cat Beast", "{3}{W}", {"cmc": 4, "power": "2", "toughness": "3", "keywords": ["Lifelink"], "oracleText": "Lifelink (Damage dealt by this creature also causes you to gain that much life.)\nWhen this creature enters, put a +1/+1 counter on each of up to two other target creatures you control.", "colors": ["W"], "layout": "normal"});
+const zimoneParadoxSculptor = card("Zimone, Paradox Sculptor", "Legendary Creature \u2014 Human Wizard", "{2}{G}{U}", {"cmc": 4, "power": "1", "toughness": "4", "keywords": ["Double"], "oracleText": "At the beginning of combat on your turn, put a +1/+1 counter on each of up to two target creatures you control.\n{G}{U}, {T}: Double the number of each kind of counter on up to two target creatures and/or artifacts you control.", "colors": ["G", "U"], "layout": "normal"});
 
 const ALL = [stormKingsThunder, photonBlastBarrage, soldierMilitaryProgram, discipleOfPerdition, propheticTitan, ayarasOathsworn, bartzAndBoko, moonlightHunt, magmaticHellkite, saffiEriksdotter, vraskaTheUnseen, cultConscript, gameOver, taintedSigil, henrikaDomnathi, celebornTheWise, byInvitationOnly];
 
 describe("round 189", () => {
   it("all compile", () => supported(...ALL));
+
+  it("\"each of up to two target creatures you control\" is still targeted (Felidar Savior, Zimone)", () => supported(felidarSavior, zimoneParadoxSculptor));
 
   it("Storm King's Thunder copies the next instant or sorcery X times, with X locked in as the Thunder resolved", () => {
     let { s, ap, ids, opp } = setup([stormKingsThunder, shock, shock]);
@@ -285,7 +290,7 @@ describe("round 189", () => {
     const saffi2 = putOnBattlefield(s, ap, saffiEriksdotter);
     s = resolveAll(run(s, planActivate(s, ap, saffi2, 0, [tgt(saffi2)])));
     expect(named(s, ap, "Saffi Eriksdotter")).toHaveLength(0);
-    expect(s.delayedTriggers?.length ?? 0).toBe(0);
+    expect(s.delayed ?? []).toEqual([]);
   });
 
   it("Vraska the Unseen +1: until your next turn, a creature that deals combat damage to her is destroyed", () => {

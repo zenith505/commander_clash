@@ -613,10 +613,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // SOLDIER Military Program: "Put a +1/+1 counter on each of up to two Soldiers you control": chosen as it resolves, not
   // targeted, none to two of them.
-  if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on each of up to (two|three) (.+?)s you control$`, "i").exec(s)) && (m[1] === "a") === !/counters/.test(s)) {
-    const filter = pickFilter(m[4]!);
+  if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on each of up to (two|three) (?!target )(.+?)s you control$`, "i").exec(s)) && (m[1] === "a") === !/counters/.test(s) && pickFilter(m[4]!)) {
+    const filter = pickFilter(m[4]!)!;
     const counter = { kind: counterKind(m[2]!), n: amt(m[1]!) };
-    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: num(m[3]!), action: "counters", counter, upTo: true, prompt: `~: click up to ${m[3]} ${m[4]}s of yours to put ${m[1] === "a" ? `a ${counter.kind} counter` : `${m[1]} ${counter.kind} counters`} on each.` }];
+    return [{ type: "pick", who: { ref: "you" }, filter, n: num(m[3]!), action: "counters", counter, upTo: true, prompt: `~: click up to ${m[3]} ${m[4]}s of yours to put ${m[1] === "a" ? `a ${counter.kind} counter` : `${m[1]} ${counter.kind} counters`} on each.` }];
   }
   // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {

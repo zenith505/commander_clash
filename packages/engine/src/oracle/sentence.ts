@@ -59,18 +59,22 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
-    } else if ((m = /^You may reveal (an? [A-Z][a-z]+ card), (an? [A-Z][a-z]+ card), and\/or (an? [A-Z][a-z]+ card) from among them and put them into your hand$/.exec(s))) {
+    } else if ((m = /^You may reveal ((?:an? [A-Z][a-z]+ card, )+)and\/or (an? [A-Z][a-z]+ card) from among them and put (?:them|those cards) into your hand$/.exec(s))) {
       // "You may reveal an Angel card, a Demon card, and/or a Dragon card from among them and put them into your hand"
-      // (Kaalia, Zenith Seeker): up to one of each, as Kiora's two above.
-      const specs = [m[1]!, m[2]!, m[3]!].map((w) => parseSearchFilter(w.replace(/^an? /, "")));
+      // (Kaalia, Zenith Seeker): up to one of each, as Kiora's two above. Harper Recruiter: four of them, "put those cards".
+      const words = [...m[1]!.split(", ").filter(Boolean), m[2]!];
+      const specs = words.map((w) => parseSearchFilter(w.replace(/^an? /, "")));
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
-      Object.assign(dig, { count: 3, upTo: true, filter: { kind: "card", anyOf, text: `${m[1]}, ${m[2]}, and/or ${m[3]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+      Object.assign(dig, { count: anyOf.length, upTo: true, filter: { kind: "card", anyOf, text: `${m[1]}and/or ${m[2]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
     } else if (/^For each card type, you may put a card of that type from among (?:them|the revealed cards) into your hand$/.test(s)) {
       // Atraxa, Grand Unifier: up to one card for each card type (CR 205.2a), a card with more than one type taken as any
       // one of them (rulings), as Kiora's "and/or" (oneOfEach).
       const anyOf: TargetSpec[] = CARD_TYPES_IN_DECKS.map((t) => ({ kind: "card", types: [t], text: `${t.toLowerCase()} card` }));
       Object.assign(dig, { count: anyOf.length, upTo: true, filter: { kind: "card", anyOf, text: "card of each card type" }, oneOfEach: anyOf, into: "hand" });
+    } else if ((m = new RegExp(`^(?:Put|You may put) any number of (?:them|those cards) into your hand(?: and the rest ${REST})?$`).exec(s))) {
+      // Search for Blex: "You may put any number of them into your hand and the rest into your graveyard": none to all.
+      Object.assign(dig, { count: 99, upTo: true, into: "hand" }, m[1] ? restOf(m[1]) : {});
     } else if ((m = new RegExp(`^(?:Put|You may put) (any number of|up to two|up to three) ([^,]+? cards) from among them into your hand(?: and the rest(?: of the revealed cards)? ${REST})?$`).exec(s))) {
       // "Put any number of legendary cards from among them into your hand and the rest into your graveyard" (Dihada).
       // Kruphix's Insight: "Put up to three enchantment cards from among them into your hand and the rest of the revealed
@@ -521,7 +525,9 @@ export function parseBecomes(text: string): Modification[] | null {
   }
   // "... that's still a land" keeps its card types, like "It's still a land." after it (CR 205.1b).
   let still = false;
-  if ((m = /^(.+?) that(?:'s| is) still an? land$|^(.+?) that are still lands$/i.exec(rest))) {
+  // Gideon, Ally of Zendikar: "a 5/5 Human Soldier Ally creature with indestructible that's still a planeswalker" (CR
+  // 205.1b): a planeswalker creature, dealt damage as both (CR 120.3c-d).
+  if ((m = /^(.+?) that(?:'s| is) still an? (?:land|planeswalker)$|^(.+?) that are still lands$/i.exec(rest))) {
     rest = (m[1] ?? m[2])!;
     still = true;
   }

@@ -18,6 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { countersBanned, countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
@@ -1121,7 +1122,8 @@ export function moveObject(
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
-    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
+    // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
+    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
       s.battlefield = s.battlefield.filter((x) => x !== id);
@@ -1403,7 +1405,9 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
     return;
   }
   const ewc = printed.entersWithCounters?.afterChoice ? undefined : printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  const n0 = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
+  const n = ewc?.rollD && n0 > 0 ? rollDice(s, o.controller, ewc.rollD, n0, realDefOf(s, o).name).result : n0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
@@ -4076,6 +4080,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
+  if (ab.returnSelf) {
+    log(s, `${p.name} returns ${name} to its owner's hand for mana.`);
+    moveObject(s, id, "hand");
+  }
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
@@ -4163,6 +4171,14 @@ function spellCostFloor(s: GameState): number {
 
 /** Trinisphere is on the battlefield, untapped: a spell cast without paying its mana cost can still cost mana (costAtLeast). */
 export const costFloorInPlay = (s: GameState) => spellCostFloor(s) > 0;
+
+/** CR 205.4e: a legendary instant or sorcery can be cast only by a player who controls one of these. */
+const controlsLegendaryCreatureOrPlaneswalker = (s: GameState, pid: PlayerId) =>
+  s.battlefield.some((b) => {
+    const ob = obj(s, b);
+    const c = characteristics(s, ob);
+    return controllerOf(s, ob) === pid && c.supertypes.includes("Legendary") && (c.types.includes("Creature") || c.types.includes("Planeswalker"));
+  });
 
 export function castProblem(
   s: GameState,
@@ -4367,6 +4383,9 @@ export function castProblem(
   // "Cast this spell only during combat" (CR 506.8, 601.3): also when it's cast during another's resolution (rulings).
   const only = compileCard(d).castOnly;
   if (only && !choices?.faceDown && !staticConditionNow(s, only, id, pid)) return `${d.name} can be cast only ${/Cast (?:this spell|~) only ([^.\n]+)\./.exec(d.oracleText ?? "")?.[1] ?? "at certain times"}`;
+  // A legendary instant or sorcery spell: only while you control a legendary creature or a legendary planeswalker (CR
+  // 205.4e), whatever lets you cast it; face down it's a creature spell with no supertypes (CR 708.2).
+  if (!choices?.faceDown && d.supertypes.includes("Legendary") && (isType(d, "Instant") || isType(d, "Sorcery")) && !controlsLegendaryCreatureOrPlaneswalker(s, pid)) return `you can cast ${d.name} only if you control a legendary creature or planeswalker`;
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
@@ -4375,7 +4394,10 @@ export function castProblem(
   // Timely Ward: with a commander among its targets; before they're chosen, a commander on the battlefield to target.
   const commanderTarget = !!compileCard(d).flashIfTargetsCommander && (targets ? targets.some((t) => t.kind === "object" && !!s.objects[t.id]?.isCommander && s.objects[t.id]!.zone === "battlefield") : s.battlefield.some((b) => obj(s, b).isCommander));
   const yoursTarget = !!compileCard(d).flashIfTargetsYours && (targets ? targets.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, s.objects[t.id]!) === pid) : s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid));
-  const instantSpeed = choices?.alt === "sneak" || yoursTarget || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
+  // Silver Scrutiny: begun as though it had flash when an X it could be cast with is small enough (CR 601.3b), then only
+  // with that X announced (601.2b); before X is announced it counts as 0.
+  const smallX = compileCard(d).flashIfXAtMost !== undefined && (x ?? 0) <= compileCard(d).flashIfXAtMost!;
+  const instantSpeed = choices?.alt === "sneak" || yoursTarget || smallX || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   // Offering (CR 702.48a): with a permanent sacrificed for it; before its costs are chosen, when there's one to sacrifice.
   const offered = !!compileCard(d).offering && (choices ? choices.offering !== undefined : offeringCandidates(s, pid, id).length > 0);
   if (!free && !instantSpeed && !offered && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -4552,7 +4574,17 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
+    // Accursed Witch: "Spells your opponents cast that target ~ cost {1} less to cast".
+    if (t?.zone === "battlefield" && !how.faceDown && opponents(s, controllerOf(s, t)).includes(pid)) mods.less += abilitiesOf(s, t).targetDiscount ?? 0;
   }
+  // Infectious Curse: "Spells you cast that target enchanted player cost {1} less to cast": each such Curse once.
+  const playersTargeted = new Set((how.targets ?? []).flatMap((t) => (t.kind === "player" ? [t.id] : [])));
+  if (playersTargeted.size && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const n = src.attachedToPlayer !== undefined && playersTargeted.has(src.attachedToPlayer) && controllerOf(s, src) === pid ? abilitiesOf(s, src).castTargetEnchantedPlayerLess : undefined;
+      if (n) mods.less += n;
+    }
   // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less"; Esior, Wardwing Familiar: "Spells your
   // opponents cast that target one or more commanders you control cost {3} more". Each such permanent once, with the
   // targets chosen before the cost is worked out (CR 601.2c, 601.2f).
@@ -4567,6 +4599,21 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
       if (by !== pid && opponents(s, by).includes(pid)) for (const c of ab.opponentsTargetTax ?? []) if (!c.abilities && targeted.some((t) => controllerOf(s, t) === by && objectMatches(s, c.filter, t, by, false))) mods.more += c.n;
       if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
       if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
+    }
+  // Hinata, Dawn-Crowned: {1} less (or more) for each target, counting each different player or object it targets once,
+  // however many times the spell says "target" (rulings; CR 601.2c before 601.2f).
+  const targetCount = new Set((how.targets ?? []).flatMap((t) => (t.kind === "none" ? [] : [`${t.kind}:${t.id}`]))).size;
+  if (targetCount && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const per = abilitiesOf(s, src).perTargetCost;
+      if (!per) continue;
+      const by = controllerOf(s, src);
+      for (const c of per) {
+        if (c.opponents ? !opponents(s, by).includes(pid) : by !== pid) continue;
+        if (c.n < 0) mods.less += -c.n * targetCount;
+        else mods.more += c.n * targetCount;
+      }
     }
   // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
   // will enchant (CR 303.4a), chosen before the cost is worked out (CR 601.2c, 601.2f).
@@ -5675,6 +5722,7 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   const k = compileCard(d).kicker!;
   const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
   const name = kickerName(k);
+  if (k.optional) return `, paying its additional cost (${k.text})`;
   if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
   if (k.extraCosts) return `, kicked (${k.text})`;
   if (k.multi || k.costs.length === 1) return kicks.length === 1 ? ", kicked" : `, kicked${times}`;
@@ -6024,13 +6072,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "putCounter") {
       // Hatchet Bully: one permanent you control that matches, not one counters can't be put on (rulings on Solemnity).
       const pool = counterOnCandidates(s, pid, c);
+      // Blight N: all N counters on one creature you control (CR 701.68a, rulings), which can't be done with none (701.68b).
       const what = `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+      const counters = c.n === 1 ? `a ${c.counter} counter` : `${c.n} ${c.counter} counters`;
       const chosen = choices?.counterOn;
       if (!chosen) {
-        if (!pool.length) return `you need to put a ${c.counter} counter on ${what} to ${doing}`;
+        if (!pool.length) return c.blight ? `you need a creature to blight ${c.n} to ${doing}` : `you need to put ${counters} on ${what} to ${doing}`;
         continue;
       }
-      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put a ${c.counter} counter on`;
+      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put ${counters} on`;
       continue;
     }
     if (c.kind === "mill") {
@@ -6230,7 +6280,7 @@ export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: 
 
 /** "An Elf" for "behold an Elf". */
 export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
-  const kind = c.filter.subtypes?.[0] ?? c.filter.text;
+  const kind = c.filter.subtypes?.[0] ? `${c.filter.subtypes[0]}${c.filter.types?.includes("Creature") ? " creature" : ""}` : c.filter.text;
   return `${c.n === 1 ? (/^[AEIOU]/.test(kind) ? "an" : "a") : c.n} ${kind}`;
 };
 
@@ -6303,8 +6353,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     } else if (c.kind === "putCounter") {
       // Through the replacement effects on counters, as any counter put on a permanent (CR 122.6).
       for (const id of choices.counterOn ?? []) {
-        const put = putCounters(s, obj(s, id), c.counter, 1);
-        log(s, `${p.name} puts ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
+        const put = putCounters(s, obj(s, id), c.counter, c.n);
+        log(s, `${p.name} ${c.blight ? `blights ${c.n}, putting` : "puts"} ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
       }
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
@@ -6616,6 +6666,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
   if (!ab.mana)
     for (const id of s.battlefield) {
       const src = obj(s, id);
+      if (ab.cycling && controllerOf(s, src) === pid) less += abilitiesOf(s, src).cyclingLess ?? 0;
       const z = controllerOf(s, src) === pid ? abilitiesOf(s, src).youActivateLess : undefined;
       if (!z) continue;
       less += z.n;
@@ -9808,6 +9859,14 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
     });
   for (const other of s.battlefield) if (s.objects[other]!.attachedTo && !s.objects[s.objects[other]!.attachedTo!]) s.objects[other]!.attachedTo = undefined;
   invalidateCharacteristics(s);
+  // "Then, if there are any objects still controlled by that player, those objects are exiled" (CR 800.4a): a permanent
+  // someone else owns that was put onto the battlefield under their control (Yavimaya Dryad's Forest, rulings).
+  const still = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+  for (const id of still) {
+    log(s, `${defOf(s, obj(s, id)).name} is exiled (its controller left the game).`);
+    moveObject(s, id, "exile");
+  }
+  if (still.length) invalidateCharacteristics(s);
   for (const o of attackers(s)) if (o.attacking === pid) clearCombat(o);
   s.passedInSuccession = s.passedInSuccession.filter((id) => id !== pid);
   // Odric's controller leaving while declaring for someone: that player declares their own blockers.

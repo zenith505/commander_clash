@@ -410,6 +410,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Foresight: the cards it wants least (as many as it must); "any number of" (Selective Memory): none.
     if (pend.kind === "searchLibrary" && pend.away) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, pend.min) }];
+    // Search for Blex: each card taken costs life; at most two, keeping 10 life.
+    if (pend.kind === "searchLibrary" && pend.dig?.lifeEach) return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, Math.max(0, Math.min(pend.max, 2, Math.floor((player(s, pid).life - 10) / pend.dig.lifeEach)))) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
@@ -492,6 +494,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pw = (id: ObjectId) => power(s, obj(s, id));
       for (const id of [...pend.options].sort((a, b) => Number(pw(a) > 0) - Number(pw(b) > 0) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))))
         if (total + pw(id) <= pend.maxTotalPower) (ids.push(id), (total += pw(id)));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
+    // Killing Wave: our best creatures, each while it's worth the life it costs (the more, the closer to 0), never all of it.
+    if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.payLife !== undefined) {
+      const ids: ObjectId[] = [];
+      let life = player(s, pid).life;
+      for (const id of [...pend.options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))) {
+        const n = pend.payLife;
+        if (ids.length >= pend.count || (n > 0 && (n >= life || worth(s, pid, obj(s, id)) < n * (1 + 15 / Math.max(1, life - n))))) continue;
+        ids.push(id);
+        life -= n;
+      }
       return [{ type: "pickPermanents", player: pid, ids }];
     }
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
@@ -1985,7 +1999,7 @@ function targetIndexOf(e: Effect): number | undefined {
   const refs = [("what" in e ? e.what : undefined), ("who" in e ? e.who : undefined), ("to" in e ? e.to : undefined), ("a" in e ? e.a : undefined), ("b" in e ? e.b : undefined)];
   for (const r of refs) if (r && "index" in r && (r.ref === "target" || r.ref === "anyTarget")) return r.index;
   if (e.type === "counterSpell") return e.index;
-  if (e.type === "attachAny") return e.host;
+  if (e.type === "attachAny") return e.self ? undefined : e.host;
   return undefined;
 }
 
@@ -2360,9 +2374,10 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
     return cards.reduce((t, id) => t + (isType(defOf(s, obj(s, id)), "Land") ? (lands(s, pid) >= 6 ? 1.5 : 5) : 4 + Math.min(3, mv(s, id) / 2)), 0);
   };
   // "Discards two cards unless ...": the two cards it would cost (as many as there are).
+  const doomed = pu.destroys ? s.objects[pu.destroys] : undefined;
   // Icy Prison: its controller keeps it if no one else does; the others let it go.
   const sourceWorth = pu.losesSource && controller === pid && !settled && s.resolving?.item.sourceId && s.objects[s.resolving.item.sourceId]?.zone === "battlefield" ? Math.max(3, worth(s, pid, obj(s, s.resolving.item.sourceId))) : 0;
-  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];
@@ -2377,7 +2392,7 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       const n = w.n ?? 1;
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
-    if ("damage" in w) return lifeCost(w.damage);
+    if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
     const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
     return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
   };
@@ -2518,7 +2533,8 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   const both = printed?.modal?.both;
   // Flame of Anor with a Wizard: the two best modes.
   if (both === "control" && bothModes(s, pid, printed!)) {
-    const two = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: 2 } }, false, id);
+    // Let's Play a Game with delirium: as many as are useful.
+    const two = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: printed!.modal!.bothAny ? printed!.modal!.modes.length : 2 } }, false, id);
     if (two && two.modes.length > 1) {
       const plan = castPlanWithModes(s, pid, id, free, x, via, alt, two.modes);
       if (plan) return plan;
@@ -3140,6 +3156,9 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // Eternity Vessel: "you may have your life total become the number of charge counters on ~": when that's more life.
+  const set = e?.type === "may" && e.effects.length === 1 && e.effects[0]!.type === "setLife" && e.effects[0]!.who.ref === "you" ? e.effects[0]! : undefined;
+  if (r && set?.type === "setLife" && set.amount) return evalAmount(s, set.amount, { controller: pid, sourceId: r.item.sourceId }) > player(s, pid).life;
   // "You may get two rad counters" (Tato Farmer): milling ourselves, while the library and life can take it.
   if (e?.type === "may" && e.effects.length && e.effects.every((x) => x.type === "getRad" && x.who.ref === "you")) return player(s, pid).library.length >= 20 && player(s, pid).life >= 12;
   // Descendants' Fury: "you may sacrifice one of them. If you do, reveal cards ... until you reveal a creature card that
@@ -3257,6 +3276,20 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // Assault Suit: "... gain control of equipped creature until end of turn": the same, the creature it equips can't attack us.
   if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && (e.effects[0]!.what.ref === "self" || e.effects[0]!.what.ref === "attached") && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
     return opponents(s, pid).filter((p) => p !== r.item.event?.player).length > 0;
+  // Tanazir Quandrix: "you may have the base power and toughness of other creatures you control become equal to ~'s
+  // power and toughness": only when that makes our other creatures bigger overall.
+  const setAll = e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "each" && e.effects[0]!.mods.length === 1 && e.effects[0]!.mods[0]!.kind === "setPT" ? e.effects[0]! : undefined;
+  if (setAll?.type === "continuous" && setAll.mods[0]!.kind === "setPT" && typeof setAll.mods[0]!.power === "object" && typeof setAll.mods[0]!.toughness === "object") {
+    const ctx = { controller: pid, sourceId: r.item.sourceId };
+    const [p, t] = [evalAmount(s, setAll.mods[0]!.power, ctx), evalAmount(s, setAll.mods[0]!.toughness, ctx)];
+    const mine = s.battlefield.filter((id) => id !== r.item.sourceId && controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    const base = (id: ObjectId) => {
+      const c = characteristics(s, obj(s, id));
+      const set = [...c.pt].reverse().find((x) => x.kind === "set");
+      return set ? set.power + set.toughness : c.printedPower + c.printedToughness;
+    };
+    return mine.reduce((n, id) => n + p + t - base(id), 0) > 0;
+  }
   // Scavenger's Talent: "you may sacrifice three other nonland permanents. If you do, return a creature card from your
   // graveyard to the battlefield": only when the best creature card there is worth more than the cheapest ones we'd give.
   const sacN = e.effects.length === 1 && e.effects[0]!.type === "pick" && e.effects[0]!.action === "sacrifice" && typeof e.effects[0]!.n === "number" && e.effects[0]!.n > 1 ? e.effects[0]! : undefined;
@@ -4394,7 +4427,7 @@ function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Ef
 function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
   const item = s.resolving?.item;
   const e = item?.body?.effects.find((x) => x.type === "attachAny");
-  const t = e?.type === "attachAny" ? item!.targets?.[e.host] : undefined;
+  const t = e?.type === "attachAny" ? (e.self && item?.sourceId ? ({ kind: "object", id: item.sourceId } as const) : item!.targets?.[e.host]) : undefined;
   if (!t || (t.kind !== "object" && t.kind !== "player")) return [];
   const host = t.kind === "object" ? s.objects[t.id] : undefined;
   const ourHost = host ? controllerOf(s, host) === pid : t.id === pid;
@@ -4679,14 +4712,14 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
 }
 
 /**
- * Where we'd put a -1/-1 counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): a creature of ours
- * that survives it (toughness 2 or more), the least valuable, never our commander or a target; null if there's none.
+ * Where we'd put the -1/-1 counters for "Put a -1/-1 counter on a creature you control" (Hatchet Bully) or "blight N": a creature of ours
+ * that survives them (toughness above N), the least valuable, never our commander or a target; null if there's none.
  */
 function spareCounterHost(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>, targeted: Set<string | number>): ObjectId | null {
   if (c.counter !== "-1/-1") return null;
   const pool = counterOnCandidates(s, pid, c)
     .map((x) => obj(s, x))
-    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) >= 2)
+    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) > c.n)
     .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
   return pool[0]?.id ?? null;
 }

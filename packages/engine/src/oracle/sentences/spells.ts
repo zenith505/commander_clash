@@ -20,7 +20,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Sacrifice (~|it)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).
-    return what?.ref === "self" || what?.ref === "subject" ? [{ type: "sacrifice", what }] : null;
+    if (what?.ref === "self" || what?.ref === "subject") return [{ type: "sacrifice", what }];
+    // Special Move: "Target creature you control deals damage equal to its power to any other target. Then sacrifice it.":
+    // that creature, still only if you control it as this resolves (CR 701.21a); none if it's an illegal target (CR 608.2b).
+    const spec = what?.ref === "target" && !what.n ? ctx.targets[what.index] : undefined;
+    return spec?.kind === "object" && spec.controller === "you" && !spec.optional ? [{ type: "sacrifice", what: what! }] : null;
   }
   // "Sacrifice all creatures you control" (CR 701.21a), "Each player sacrifices all permanents they control that are one or
   // more colors" (All Is Dust): every one of them, each by its controller (rulings: all at the same time).
@@ -424,7 +428,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // Consuming Ferocity: "it deals damage equal to its power to its controller", the enchanted creature, to whoever controls it.
     if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^its controller$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "hostController" }, by: "attached" }];
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
-    if (a?.ref === "target" && !a.n && /^any target$/i.test(m[2]!)) {
+    // "... to any other target" (Special Move): not that creature (CR 115.3).
+    if (a?.ref === "target" && !a.n && /^any (?:other )?target$/i.test(m[2]!)) {
       const to = parseDamageRecipient(m[2]!, ctx);
       return to ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
     }

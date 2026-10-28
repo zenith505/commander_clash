@@ -269,9 +269,15 @@ export function dealDamage(
         return a.lifeFloor && (!a.lifeFloorIf || staticConditionNow(s, a.lifeFloorIf, o.id, p.id)) ? a.lifeFloor : 0;
       };
       const floor = Math.max(p.lifeFloorTurn === s.turn ? 1 : 0, ...s.battlefield.map((id) => (controllerOf(s, obj(s, id)) === p.id ? floorOf(obj(s, id)) : 0)), ...liveEmblems(s).map((o) => (o.owner === p.id ? floorOf(o) : 0)));
-      const lost = floor && p.life >= floor && p.life - n < floor ? p.life - floor : n;
-      loseLife(s, p.id, lost);
-      log(s, `${src.name} deals ${n} damage to ${p.name}${lost < n ? ` (their life total can't go below ${floor})` : ""}.`);
+      // Archon of Coronation: the damage is dealt, without the life loss (CR 120.3a; rulings).
+      const noLoss = s.battlefield.some((id) => {
+        const o = obj(s, id);
+        const cond = controllerOf(s, o) === p.id && abilitiesOf(s, o).damageNoLifeLossIf;
+        return !!cond && staticConditionNow(s, cond, o.id, p.id);
+      });
+      const lost = noLoss ? 0 : floor && p.life >= floor && p.life - n < floor ? p.life - floor : n;
+      if (!noLoss) loseLife(s, p.id, lost);
+      log(s, `${src.name} deals ${n} damage to ${p.name}${noLoss ? " (it doesn't cause them to lose life)" : lost < n ? ` (their life total can't go below ${floor})` : ""}.`);
     }
     if (!(s.damagedThisTurn ??= []).includes(p.id)) s.damagedThisTurn.push(p.id);
     // Inferno Trap: each creature once, as the object it was then (CR 400.7); one that has left counts as it last existed.

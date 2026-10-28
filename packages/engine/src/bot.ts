@@ -3659,7 +3659,7 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       }
       case "eachDealsDamage": {
         // "Each creature deals 1 damage to its controller": life off each player, by how many of them they control.
-        if (e.what.ref !== "each") break;
+        if (e.what.ref !== "each" || e.to) break;
         const f = e.what.filter;
         for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (controllerOf(s, obj(s, id)) === pid ? -1 : 1) * estimate(e.amount);
         break;

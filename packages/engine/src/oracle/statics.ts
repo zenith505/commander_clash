@@ -2393,7 +2393,14 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (p === null || t === null) return null;
     mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
-  if (where) {
+  // Elturel Survivors: "where X is the number of lands defending player controls": the player ~ is attacking (or whose
+  // planeswalker or battle it attacks, CR 506.2), as it is now; none while it isn't attacking.
+  const defending = where && affects.kind === "self" ? /^the number of (.+) defending player controls$/.exec(where[2]!) : null;
+  if (defending) {
+    const c = parseCount(`the number of ${defending[1]} on the battlefield`, null);
+    if (!c || typeof c !== "object" || !("count" in c) || c.count.kind !== "permanents" || c.count.whose || Object.keys(c).length !== 1) return null;
+    mods = replaceX(mods, { count: { ...c.count, whose: { ref: "selfDefending" } } });
+  } else if (where) {
     const def = counts(parseCount(where[2]!, null), where[2]!);
     if (!def) return null;
     mods = replaceX(mods, def);

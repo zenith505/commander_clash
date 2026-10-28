@@ -705,7 +705,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const i = s.turnOrder.indexOf(ctx.controller);
   // "For each player": its controller too, first (TargetSpec.perPlayer).
   const every = body0.targets.some((t) => t.perPlayer);
-  const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...(every ? [ctx.controller] : []), ...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
+  // Not "up to one": each opponent's target only if they have one to target (rulings on Sylvan Primordial).
+  const able = (spec: TargetSpec) => legalTargets(s, spec, ctx.controller, undefined, undefined, ctx.sourceId).length > 0;
+  const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...(every ? [ctx.controller] : []), ...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost), able) : body0;
   const castBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "castSpell";
   // "When you do, shuffle target nonland permanent ... with mana value X or less, where X is the number of creatures
   // tapped this way" (Teferi Akosa of Zhalfir): the number tapped, fixed before the reflexive trigger's targets are chosen.

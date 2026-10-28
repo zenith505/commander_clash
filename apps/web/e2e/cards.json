@@ -1826,6 +1826,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8bb51dd2-cc62-48ea-ae8e-52351073a8c9",
+  "name": "Blatant Thievery",
+  "manaCost": "{4}{U}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each opponent, gain control of target permanent that player controls.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "e02",
+  "releasedAt": "2017-11-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ccba143d-ed9b-4044-bdad-f010a0e38e47",
   "name": "Blazing Shoal",
   "manaCost": "{X}{R}{R}",
@@ -14992,6 +15018,38 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2023-10-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8f3705ff-e8e5-48e7-ab68-df6849d78867",
+  "name": "Shadowgrange Archfiend",
+  "manaCost": "{6}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "When this creature enters, each opponent sacrifices a creature with the greatest power among creatures they control. You gain life equal to the greatest power among creatures sacrificed this way.\nMadness—{2}{B}, Pay 8 life. (If you discard this card, discard it into exile. When you do, cast it for its madness cost or put it into your graveyard.)",
+  "power": "8",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Madness"
+  ],
+  "commanderLegal": "legal",
+  "set": "voc",
+  "releasedAt": "2021-11-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

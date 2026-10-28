@@ -98,6 +98,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "Each opponent sacrifices a creature of their choice. Create a Food token for each creature sacrificed this way."
   // (Voracious Fell Beast): the permanents this ability's sacrifice took.
+  // Shadowgrange Archfiend: "the greatest power among creatures sacrificed this way".
+  if (ctx && /^the greatest power among creatures sacrificed this way$/.test(p)) return { count: { kind: "sacrificedThisWayGreatestPower" } };
   if (ctx && ((each && /^(?:creature|artifact) sacrificed this way$/.test(p)) || /^the number of (?:creature|artifact)s sacrificed this way$/.test(p))) return { count: { kind: "sacrificedThisWayCount" } };
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
@@ -700,6 +702,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The number of creatures attacking you" (Arachnogenesis): attacking you, not your planeswalkers (CR 506.3).
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
+  // "Each opponent loses life equal to the number of creatures attacking them" (Within Range): each that player's own,
+  // attacking them and not their planeswalkers (CR 506.3).
+  if (ctx?.eachOne && /^creatures? attacking (?:them|that player)$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], combat: "attacking", text: p }, attackingWho: { ref: "eachOne" } });
   // "attacking creature", "tapped creature": any controller. "Other attacking creatures" (Ghalta and Mavren): not the
   // object with the ability.
   // Cybermat: "the number of attacking artifact creatures", any controller's. Siani, Eye of the Storm: "the number of

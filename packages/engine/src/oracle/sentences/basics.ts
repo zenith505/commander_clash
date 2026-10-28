@@ -345,6 +345,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!what || what.ref !== (target ? "target" : "subject")) return null;
     return [{ type: "punisher", who: target ? { ref: "targetController", index: before } : { ref: "subjectController" }, options, effects: fx }];
   }
+  // Combustion Man: "destroy target permanent unless its controller has ~ deal damage to them equal to ~'s power": that
+  // permanent's controller decides as it resolves (CR 608.2d), and ~ deals the damage.
+  if ((m = /^([Dd]estroy target (?:nonland )?permanent) unless its controller (has ~ deal damage to them equal to ~'s power)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(capital(m[1]!), ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "destroy" || !options || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx, penalty: "Let ~ destroy it" }];
+  }
   // Rhystic Shield, Wild Might: "... get an additional +0/+2 until end of turn unless any player pays {2}": each player in
   // turn order may pay (the caster too); the bonus only if no one does (CR 101.4).
   if ((m = /^(.+?) unless any player (pays (?:\{[^}]+\})+)$/.exec(s)) && /\bgets? an additional [+-]\d+\/[+-]\d+ until end of turn$/.test(m[1]!)) {
@@ -1409,6 +1418,9 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     }
     // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
     else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
+    // Combustion Man: "has ~ deal damage to them equal to ~'s power": its power as that player chooses, or as it last
+    // existed (CR 608.2h).
+    else if (/^has ~ deal damage to them equal to ~'s power$/.test(part)) out.push({ damage: { count: { kind: "power", of: { ref: "self" } } } });
     else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
       // "An artifact, a creature, or a land": one permanent that's any of them.
       const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));

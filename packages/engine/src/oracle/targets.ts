@@ -580,7 +580,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "target", index: addTarget(ctx, { ...spec, controlledByTarget: ctx.lastPlayerTarget, text: `target ${m[1]!}` }) };
   }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
-  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true });
+  // "Target creature card of the chosen type" (From the Rubble, Dawn-Blessed Pennant): the creature type chosen as its
+  // source entered, filled in on its abilities (cards.ts abilitiesOf); compile checks the source makes that choice.
+  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true, chosen: true });
+  if (spec?.chosen && (spec.chosen !== "type" || ctx.spell)) return null;
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
@@ -995,6 +998,12 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // "Permanent you control but don't own" (Staff of Eden): another player's that you control (CR 108.3).
+  const notOwned = /^(.+ you control) but don't own$/.exec(phrase.trim());
+  if (notOwned) {
+    const head = parseTargetPhrase(notOwned[1]!, opts);
+    return head?.kind === "object" && head.controller === "you" && !head.owner ? { ...head, owner: "opponent", text: `${head.text} but don't own` } : null;
+  }
   // "Enchanted creature or enchantment creature" (Karametra's Blessing, Nyx Herald, Feast of Dreams): a creature that's
   // enchanted or is an enchantment, either one (TargetSpec.anyOf).
   const enchOr = /^(target )?enchanted creature or enchantment creature((?: you control)?)$/.exec(phrase.trim());
@@ -1163,6 +1172,12 @@ export function parseTargetPhrase(
   // only cards with the basic supertype (CR 205.4c). Only for a card in a graveyard.
   const otherThanBasic = / other than a basic land card\b/.test(p);
   if (otherThanBasic) p = p.replace(/ other than a basic land card\b/, "");
+  // "Target legendary permanent card not named ~ from a graveyard" (Staff of Eden): any other name; compile fills in
+  // this card's name. Only for a card target.
+  if (opts.target && /^[a-z ]+ card not named ~ from /.test(p)) {
+    extra.notNamed = "~";
+    p = p.replace(/ not named ~(?= from )/, "");
+  }
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:(?:the chosen|that) (creature type|type|color)|(a type chosen this way))/.exec(p);
   if (chosen) {

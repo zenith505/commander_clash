@@ -2323,7 +2323,8 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
     return cards.reduce((t, id) => t + (isType(defOf(s, obj(s, id)), "Land") ? (lands(s, pid) >= 6 ? 1.5 : 5) : 4 + Math.min(3, mv(s, id) / 2)), 0);
   };
   // "Discards two cards unless ...": the two cards it would cost (as many as there are).
-  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  const doomed = pu.destroys ? s.objects[pu.destroys] : undefined;
+  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];
@@ -2338,7 +2339,7 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
       const n = w.n ?? 1;
       return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
-    if ("damage" in w) return lifeCost(w.damage);
+    if ("damage" in w) return lifeCost(typeof w.damage === "number" ? w.damage : 3);
     const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
     return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
   };

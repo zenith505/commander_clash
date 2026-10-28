@@ -52,7 +52,7 @@ export interface PayCost {
  * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
  * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
  */
-export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { damage: number };
+export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount };
 
 export interface UnlessPays {
   cost: string;

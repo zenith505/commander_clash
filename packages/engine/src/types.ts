@@ -2211,6 +2211,8 @@ export interface Resolving {
       tokens?: number;
       /** Or that they discard this many cards (Bandit's Talent's "discards two cards unless ..."). */
       discards?: number;
+      /** Or that this permanent is destroyed (Combustion Man's "destroy target permanent unless ..."). */
+      destroys?: ObjectId;
       /** "If a player does" / "If no one does" (see the punisher effect). */
       mode?: "ifAny" | "ifNone";
     };

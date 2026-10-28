@@ -3971,6 +3971,18 @@ export function compile(d: CardDef): CompiledCard {
     if (!out.spell || v.unsupported.length || !v.spell) out.unsupported.push(`Cleave ${cleave.mana}`);
   }
   linkExile(out);
+  // "Target ... card not named ~" (Staff of Eden): this card's name (CR 201.5).
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    b.targets = b.targets.map((t) => (t.notNamed === "~" ? { ...t, notNamed: d.name } : t));
+  // "Target ... of the chosen type": the creature type chosen as this permanent entered (CR 614.12), bound on its
+  // abilities (cards.ts abilitiesOf). Not on a spell, nor with a choice made while it resolves (after its targets).
+  // Mirror of the Forebears: a copy of a creature whose own abilities read "the chosen type" has no type chosen for them
+  // (rulings), but the type chosen for the Mirror stays on the permanent, so it isn't done.
+  const chosenTarget = (b: AbilityBody) => [...b.targets, ...(b.modal?.modes.flatMap((m) => m.targets) ?? [])].some((t) => t.chosen === "type");
+  const choosesType = out.entersChoose?.some((c) => c.what === "creatureType");
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    if (chosenTarget(b) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
+    else if (chosenTarget(b) && allEffects(b.effects).some((e) => e.type === "becomeCopy")) out.unsupported.push(`${b.text} (a copy keeping the type chosen for its source)`);
   // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))

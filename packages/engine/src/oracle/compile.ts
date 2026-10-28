@@ -1912,6 +1912,15 @@ export function compile(d: CardDef): CompiledCard {
       out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);
       continue;
     }
+    // Thranduil's Company: "As long as you control another Elf, you may play an additional land on each of your turns."
+    // (CR 305.2a): one more while the condition holds.
+    const landIf = /^As long as (.+), you may play an additional land on each of your turns\.$/.exec(line);
+    if (landIf) {
+      const cond = parseStaticCondition(landIf[1]!, { affects: { kind: "self" }, mods: [], text: line });
+      if (!cond) out.unsupported.push(raw);
+      else out.extraLandsIf = [...(out.extraLandsIf ?? []), cond];
+      continue;
+    }
     if (line === "Each player may play an additional land on each of their turns.") {
       out.extraLandsEach = (out.extraLandsEach ?? 0) + 1;
       continue;
@@ -2031,6 +2040,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Enhanced Surveillance: the extra cards looked at are surveilled too (rulings). Looking at them is optional, but a
     // player who looks can put each of them back on top in the same order, so they're always looked at here.
+    if (line === "If you would scry a number of cards, scry that many cards plus one instead.") {
+      out.scryMore = (out.scryMore ?? 0) + 1;
+      continue;
+    }
     const surveilMore = new RegExp(`^You may look at an additional ${NUM} cards each time you surveil\\.$`).exec(line);
     if (surveilMore) {
       out.surveilMore = (out.surveilMore ?? 0) + num(surveilMore[1]!);
@@ -3160,6 +3173,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Flash Photography: "... if it targets a permanent you control": one of its targets as it's cast (rulings: chosen
     // as it's cast, CR 601.2c); starting to cast it then needs a permanent of yours to target.
+    // Silver Scrutiny: "You may cast ~ as though it had flash if X is 3 or less": the X announced as it's cast (CR 601.3b).
+    const flashX = /^You may cast ~ as though it had flash if X is (\d+) or less\.$/.exec(line);
+    if (flashX && /\{X\}/.test(d.manaCost ?? "")) {
+      out.flashIfXAtMost = Number(flashX[1]);
+      continue;
+    }
     if (line === "You may cast ~ as though it had flash if it targets a permanent you control.") {
       out.flashIfTargetsYours = true;
       continue;
@@ -3453,6 +3472,8 @@ export function compile(d: CardDef): CompiledCard {
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
+      else if ("targetDiscount" in cost) out.targetDiscount = (out.targetDiscount ?? 0) + cost.targetDiscount;
+      else if ("castTargetEnchantedPlayerLess" in cost) out.castTargetEnchantedPlayerLess = (out.castTargetEnchantedPlayerLess ?? 0) + cost.castTargetEnchantedPlayerLess;
       else if ("castTargetLess" in cost) out.castTargetLess = [...(out.castTargetLess ?? []), cost.castTargetLess];
       else if ("commanderTargetTax" in cost) out.commanderTargetTax = (out.commanderTargetTax ?? 0) + cost.commanderTargetTax;
       else if ("targetLifeTax" in cost) out.targetLifeTax = (out.targetLifeTax ?? 0) + cost.targetLifeTax;
@@ -3582,7 +3603,8 @@ export function compile(d: CardDef): CompiledCard {
     const also = /^(Creatures you control) also (get .+ as long as .+)$/.exec(line);
     // Ivory Guardians: "Creatures named ~ get +1/+1 as long as ...": every creature with its name, anyone's, itself too
     // (rulings); each such ability applies once.
-    const named = /^Creatures named ~ /.test(line) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
+    // Shield of Kaldra: "Equipment named Sword of Kaldra, ~, and Helm of Kaldra have indestructible": by its name too.
+    const named = (/^Creatures named ~ /.test(line) || /^Equipment named [^.]*~/.test(line)) && /^[A-Z][A-Za-z' -]+$/.test(d.name) ? line.replace("~", d.name) : line;
     const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(named) ?? parseConditionalStatic(named);
     if (st) {
       out.statics.push(st);

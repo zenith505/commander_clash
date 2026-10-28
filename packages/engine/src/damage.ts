@@ -252,7 +252,7 @@ export function dealDamage(
       if (creatureBatch) creatureBatch.push(ev);
       else fireEvent(s, ev);
     }
-    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n });
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
     noteDealt(s, src);
   } else {
     const p = player(s, to.player);
@@ -294,7 +294,7 @@ export function dealDamage(
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n, combat: !!opts.combat });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
-    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n });
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n, ...(opts.combat ? { combat: true } : {}) });
     noteDealt(s, src);
     spellDealt(s, src, { player: p.id });
     if (opts.combat) {
@@ -508,6 +508,8 @@ function ruleTakes(s: GameState, r: DamageRule, e: DamageEvent): boolean {
     // A permanent spell chosen as the source: the permanent it becomes is that source too (CR 609.7a).
     if (!ref || ref.object !== c.id || (ref.zc !== c.zc && !(c.spell && ref.zc === c.zc + 1))) return false;
   }
+  const not = r.by?.not;
+  if (not && e.src.ref?.object === not.id && e.src.ref.zc === not.zc) return false;
   return !r.by?.filter || sourceMatches(s, r.by.filter, e.src, r.controller);
 }
 

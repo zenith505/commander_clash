@@ -446,7 +446,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Invincible Hymn: "Your life total becomes the number of cards in your library" (CR 119.5).
   // Touch of the Eternal: "the number of permanents you control".
-  if ((m = /^Your life total becomes (the number of (?:cards in your library|permanents you control))$/.exec(s))) {
+  // Eternity Vessel: "you may have your life total become the number of charge counters on ~": you gain or lose the
+  // difference (rulings).
+  if ((m = /^Your life total becomes (the number of (?:cards in your library|permanents you control|[a-z]+ counters on ~))$/.exec(s))) {
     const amount = parseCount(m[1]!, ctx);
     return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "you" }, n: 0, amount }] : null;
   }

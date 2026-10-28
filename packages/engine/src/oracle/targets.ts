@@ -331,6 +331,10 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 }
 
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  // Sanguine Praetor: "each creature with the same mana value as the sacrificed creature"; Endemic Plague: "all creatures
+  // that share a creature type with the sacrificed creature": compared with the creature as it last existed (CR 608.2h).
+  const kin = /^(?:each creature|all creatures) (with the same mana value as|that shares? a creature type with) the sacrificed creature$/i.exec(p.trim());
+  if (kin) return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: p.trim().replace(/^(?:each|all) /i, "") }, sacrificedKin: /mana value/.test(kin[1]!) ? "manaValue" : "creatureType" };
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
@@ -1017,6 +1021,14 @@ export function parseTargetPhrase(
     if (rest?.kind !== "object" || rest.anyOf) return null;
     const anyOf: TargetSpec[] = [{ kind: "object", combat: "attackingOrBlocking", text: "attacking or blocking creature" }, { kind: "object", tapped: true, text: "tapped creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "attacking, blocking, or tapped creature") };
+  }
+  // Tetsuo Umezawa: "target tapped or blocking creature": either one.
+  const tappedOrBlocking = /^(target )?tapped or blocking creature$/.exec(phrase.trim());
+  if (tappedOrBlocking) {
+    const rest = parseTargetPhrase(`${tappedOrBlocking[1] ?? ""}creature`, opts);
+    if (rest?.kind !== "object" || rest.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", tapped: true, text: "tapped creature" }, { kind: "object", combat: "blocking", text: "blocking creature" }];
+    return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "tapped or blocking creature") };
   }
   // Silumgar Assassin: "target creature with power 3 or less an opponent controls": the same as "target creature an
   // opponent controls with power 3 or less".

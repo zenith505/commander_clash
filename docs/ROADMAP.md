@@ -2240,13 +2240,35 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   state trigger), Detention Sphere (left to Lane A, near the top). Known limit: a "*" creature card's power outside the
   battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
   the stack); characteristics() still shows it as 0 there.
+- Round B28 (harder skipped cards, least played first): "Remove X [kind] counters from ~" as a cost, X announced up
+  to how many it has (CR 107.3a, 602.2b; the Bakus with Blademane's "for each counter removed", Infused Arrows,
+  Mercadian Lift's "a creature card with mana value X from your hand", Talon of Pain and Night Dealings with "a source
+  you control (other than ~) deals damage to an opponent / another player", Arcbound Javelineer, Auntie Blyte, Chamber
+  Sentry, Cruel Sadist; the X picker names the counters, browser test; bots use it in main 2; a mana ability with this
+  cost stays unsupported). Sacrificing "a white creature, a blue creature, and a black creature" (the Heralds, three
+  different creatures, one for each) and Urborg Panther's named creatures and itself. Essence Filter's "all
+  enchantments or all nonwhite enchantments"; Hooded Horror's "defending player controls the most creatures or is tied";
+  Cosmic Horror's "If ~ is destroyed this way" (not when indestructible, rulings); Toil to Renown's "each tapped
+  artifact, creature, and land"; Obelisk of Undoing's "you both own and control"; Tetsuo's "tapped or blocking" and
+  "can't be the target of Aura spells"; Doorman's "power 2 or less and/or Walls"; Valakut Fireboar's switch; Riptide
+  Mangler's base power, locked in as it resolves (CR 608.2h); Impetuous Protege's "tapped creatures your opponents
+  control"; Tenacious Hunter's "a creature has a -1/-1 counter on it"; Spellbane Centaur and Dense Foliage; Sanguine
+  Praetor's "the same mana value as the sacrificed creature" and Endemic Plague's "share a creature type with the
+  sacrificed creature"; Icy Prison's "unless any player pays {3}" (its controller's bot pays, the others don't). +34
+  (27,140 of 31,936 with rounds 194-196).
+- Known limits there: bots never use Urborg Panther's search (it sacrifices itself), Sanguine Praetor or Endemic Plague
+  (no value for "the sacrificed creature's" group), and may use Riptide Mangler or Obelisk of Undoing without a good
+  reason. Skipped there: Crucible of the Spirit Dragon, Haruspex and Petalmane Baku (mana abilities with an X counter
+  cost); Insubordination, Erosion, Curse Artifact, Wicked Guardian, Mausoleum Turnkey, Desecrator Hag, Cinder Cloud,
+  Cragganwick Cremator, Lumengrid Augur, Mind Maggots, Gravebane Zombie, Lichenthrope, Territorial Dispute (each needs
+  a template of its own).
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
   Fire (a number chosen as a cost), Forethought Amulet; Shrouded Serpent ("defending player may pay").
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
-  cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
+  cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Storm Entity
   ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Sabotage Strategist, Lavabrink Venturer (odd or even).
   Then up from about 21,900 (round B8 took the easier ones; these are left): Wall of Shadows, Festering Newt,
   Flameskull, Defiant Greatmaw, Aegis Sculptor, Fickle Efreet, Burn Away ("when that creature dies this turn"), Bill
@@ -2257,7 +2279,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Haunted Plate
   Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Gnarlbark Elm, Time to Feed,
   Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,
-  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dense Foliage, Dralnu's Crusade.
+  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dralnu's Crusade.
   Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):
   Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
   before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch

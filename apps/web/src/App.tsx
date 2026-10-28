@@ -728,7 +728,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
-      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : ""}`.trim()] : []))].join(" and ");
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.removeCounters?.x ? [`remove X ${ab.removeCounters.counter} counters`] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : c.kind === "reveal" ? `${plural(c.filter.text)} from your hand` : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).

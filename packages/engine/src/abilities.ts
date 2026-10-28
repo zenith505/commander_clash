@@ -1040,7 +1040,7 @@ export type ObjRef =
    * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
    * it's still a legal target, CR 608.2b).
    */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** "Whenever enchanted creature attacks, each other creature ..." (Martial Impetus): other than the trigger's subject, not the source. */ otherThanSubject?: true; /** "Create X 1/1 Soldier tokens. ... destroy all other creatures" (Martial Coup): all but the tokens this resolution created. */ notCreated?: true; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** With `of`: "all artifacts target player owns" (Hurkyl's Recall): the permanents that player owns, whoever controls them (CR 108.3). */ ofOwner?: true; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true; /** "Exile all creatures except those that share a creature type with a creature that convoked ~, all artifacts, and all enchantments" (Everything Comes to Dust): not a creature that is neither an artifact nor an enchantment and shares a creature type with one of the creatures tapped to convoke the resolving spell (CR 702.51a), each as it is or last was on the battlefield (CR 608.2h). */ spareConvokerTypes?: true }
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** "Whenever enchanted creature attacks, each other creature ..." (Martial Impetus): other than the trigger's subject, not the source. */ otherThanSubject?: true; /** "Create X 1/1 Soldier tokens. ... destroy all other creatures" (Martial Coup): all but the tokens this resolution created. */ notCreated?: true; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** With `of`: "all artifacts target player owns" (Hurkyl's Recall): the permanents that player owns, whoever controls them (CR 108.3). */ ofOwner?: true; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "Each creature with the same mana value as the sacrificed creature" (Sanguine Praetor), "all creatures that share a creature type with the sacrificed creature" (Endemic Plague): the creature a cost sacrificed, as it last existed (CR 608.2h). */ sacrificedKin?: "manaValue" | "creatureType"; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true; /** "Exile all creatures except those that share a creature type with a creature that convoked ~, all artifacts, and all enchantments" (Everything Comes to Dust): not a creature that is neither an artifact nor an enchantment and shares a creature type with one of the creatures tapped to convoke the resolving spell (CR 702.51a), each as it is or last was on the battlefield (CR 608.2h). */ spareConvokerTypes?: true }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -1718,6 +1718,8 @@ export type StaticCondition =
    * opponents has more life than the attacked player (rulings; the attacker's own life isn't compared).
    */
   | { kind: "defenderMostLife" }
+  /** "As long as defending player controls the most creatures or is tied for the most" (Hooded Horror): the player it's attacking, among all players. */
+  | { kind: "defenderMostCreatures" }
   /** "Unless it's paired with a creature with soulbond" (CR 702.95b): `not` for "unless". */
   | { kind: "paired"; withKeyword?: string; not?: true }
   /** Morbid: "if a creature died this turn" (CR 700.4); `n`: "if two or more creatures died this turn"; `yours`: "under your control". */
@@ -4418,6 +4420,8 @@ export interface TriggeredAbility {
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;
+  /** For "sourceYouControlDamagesOpponent": "a source you control other than ~" (Talon of Pain). */
+  otherSource?: true;
   /** For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. */
   sourceDamage?: { exactly: number; other?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
@@ -4743,8 +4747,13 @@ export interface ActivatedAbility {
   toLibraryBottom?: true;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];
-  /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). `all`: "Remove all +1/+1 counters from ~" (Sage of Hours), however many (none too); the number removed is "the number of counters removed this way". */
-  removeCounters?: { counter: CounterKind; n: number; all?: true };
+  /**
+   * "Remove three spore counters from ~" as part of the cost (CR 602.2b). `all`: "Remove all +1/+1 counters from ~" (Sage of
+   * Hours), however many (none too); the number removed is "the number of counters removed this way". `x`: "Remove X ki
+   * counters from ~" (the Bakus): X is announced as it's activated, up to how many it has, and is how many (CR 107.3a,
+   * 601.2b); also "the counters removed".
+   */
+  removeCounters?: { counter: CounterKind; n: number; all?: true; x?: true };
   /** "{T}, Exert ~: ..." (CR 701.43a): it won't untap during your next untap step; possible even if already exerted (701.43b). */
   exertCost?: true;
   /** The untap symbol {Q} (CR 107.6): untapping this permanent is part of the cost; it must be tapped, and a creature not summoning sick (CR 302.6). */

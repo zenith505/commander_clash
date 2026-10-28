@@ -25,6 +25,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
   // modified creatures you control".
   p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
+  // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
+  if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
   // Superior Numbers: "the number of creatures you control in excess of the number of creatures target opponent controls":
   // the first less the second, 0 if it's not more (CR 107.1b).
@@ -187,10 +189,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
   // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.
-  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
+  // Impetuous Protege: "the greatest power among tapped creatures your opponents control" (0 with none, rulings).
+  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking |tapped )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls|your opponents control)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
     const words = m[3]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[4]!;
-    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : ""}`, { chosen: true });
+    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : who === "your opponents control" ? " an opponent controls" : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
     const theirs = /^(?:they|that player|target player|target opponent) control/.test(who);
     const whose = theirs ? whosePlayer(who === "they control" ? "their" : who.replace(/ controls$/, "'s"), ctx) : undefined;

@@ -894,6 +894,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
     case "defendingHasRad":
       return src.attacking !== undefined && (s.players[src.attacking]?.rad ?? 0) > 0;
+    case "defenderMostCreatures": {
+      if (src.attacking === undefined) return false;
+      const count = (p: PlayerId) => s.battlefield.filter((id) => { const c = chars.get(id); return !!c && c.controller === p && c.types.includes("Creature"); }).length;
+      const theirs = count(src.attacking);
+      return s.turnOrder.every((p) => s.players[p]!.lost || count(p) <= theirs);
+    }
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];
       return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);

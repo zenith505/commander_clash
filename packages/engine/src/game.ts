@@ -5921,7 +5921,7 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
 const mvXCost = (c: AdditionalCost) => c.kind === "discard" && !!c.mvX && !!c.filter;
 
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
-export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
+export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.removeCounters?.x || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
@@ -6505,7 +6505,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
   if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
-  if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
+  // "Remove X ki counters from ~": X counters, up to how many it has (CR 107.3a).
+  const toRemove = ab.removeCounters?.x ? (x ?? 0) : (ab.removeCounters?.n ?? 0);
+  if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < toRemove) return `${d.name} doesn't have ${toRemove} ${ab.removeCounters.counter} counter${toRemove === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
     const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
@@ -6868,7 +6870,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     p.energy = (p.energy ?? 0) - x;
     log(s, `${p.name} pays ${x} energy.`);
   }
-  const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : undefined;
+  const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : undefined;
   if (ab.removeCounters) removeCountersCost(s, o, countersRemoved !== undefined ? { counter: ab.removeCounters.counter, n: countersRemoved } : ab.removeCounters);
   if (countersRemoved !== undefined) log(s, `${p.name} removes ${countersRemoved} ${ab.removeCounters!.counter} counter${countersRemoved === 1 ? "" : "s"} from ${d.name}.`);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).

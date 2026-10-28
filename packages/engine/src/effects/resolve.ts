@@ -495,7 +495,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const filter0 = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
     // "Named ~" (Gruff Triplets): its name now, or as it last existed (CR 201.5, 608.2h).
     const me0 = filter0.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    const filter = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
+    const filter1 = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
+    // Sanguine Praetor, Endemic Plague: the sacrificed creature as it last existed; none matches without one.
+    const sacked = ref.sacrificedKin ? (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1)) : undefined;
+    if (ref.sacrificedKin && !sacked) return [];
+    const filter = ref.sacrificedKin === "manaValue" ? { ...filter1, manaValue: { min: sacked!.manaValue ?? 0, max: sacked!.manaValue ?? 0 } } : filter1;
+    const sackedTypes = ref.sacrificedKin === "creatureType" ? (sacked!.allCreatureTypes ? ("all" as const) : new Set((sacked!.subtypes ?? []).filter((x) => CREATURE_TYPES.has(x)))) : undefined;
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
@@ -503,7 +508,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
     const spared = ref.spareConvokerTypes ? convokerTypes(s, ctx) : [];
     const spare = (o: GameObject) => spared.length > 0 && objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !objIsType(s, o, "Enchantment") && spared.some((t) => shareCreatureType(t, creatureTypesOf(s, o)));
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && !spare(o));
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && (!sackedTypes || shareCreatureType(sackedTypes, creatureTypesOf(s, o))) && !spare(o));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);

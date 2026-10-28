@@ -1666,6 +1666,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Vantress Gargoyle: "can't attack unless defending player has seven or more cards in their graveyard".
   if ((m = new RegExp(`^can't attack unless defending player has ${NUM} or more cards in their graveyard$`).exec(rest))) return [{ kind: "cantAttackUnlessDefenderYard", n: num(m[1]!) }];
+  // Orcish Conscripts: "can't attack unless at least two other creatures attack", "can't block unless at least two other
+  // creatures block": declared in the same combat (CR 508.1c, 509.1b).
+  if ((m = new RegExp(`^can't (attack|block) unless at least ${NUM} other creatures (attack|block)$`).exec(rest)) && m[1] === m[3]) return [{ kind: m[1] === "attack" ? "cantAttackUnlessOthers" : "cantBlockUnlessOthers", n: num(m[2]!) }];
   // Scarred Puma: "can't attack unless a black or green creature also attacks": another one, declared with it (rulings,
   // CR 508.1c).
   if ((m = /^can't attack unless (an? .+) also attacks$/.exec(rest))) {
@@ -2131,8 +2134,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const noAbilities = /^Enchanted (creature|permanent|artifact|land)'s activated abilities can't be activated( unless they're mana abilities)?$/.exec(text);
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
-  // "You control enchanted creature." (Mind Control)
-  if (/^You control enchanted (creature|permanent|artifact|land|enchantment)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  // "You control enchanted creature." (Mind Control), "... enchanted artifact creature." (Domineer)
+  if (/^You control enchanted (creature|permanent|artifact|land|enchantment|artifact creature)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   // Ghostly Prison, Propaganda (CR 508.1g-h).
   // Sphere of Safety: "you or planeswalkers you control ... {X} for each of those creatures, where X is ...", counted now.
   const tax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+|X)\} for each (?:creature they control that's attacking you|of those creatures)(?:, where X is (.+))?$/.exec(text);

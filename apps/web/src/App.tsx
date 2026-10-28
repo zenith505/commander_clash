@@ -174,6 +174,7 @@ import {
   activatedCosts,
   abilityCostsHaveX,
   spellManaValue,
+  blockWithoutCompany,
 } from "@cc/engine";
 import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -4763,6 +4764,8 @@ function Controls({
     const list = Object.entries(blocks).flatMap(([b, atts]) => atts.map((attacker) => ({ blocker: b, attacker })));
     const earlier = s.battlefield.some((id) => s.objects[id]!.blocking !== undefined);
     const alone = Object.keys(blocks).length === 1 && !earlier && characteristics(s, s.objects[list[0]!.blocker]!).cantBlockAlone ? `${cardOf(s, list[0]!.blocker).name} can't block alone.` : null;
+    // Orcish Conscripts: "can't block unless at least two other creatures block" (CR 509.1b).
+    const lonely = blockWithoutCompany(s, list, s.battlefield.filter((id) => s.objects[id]!.blocking !== undefined).length);
     // Archangel of Tithes: what blocking costs, paid from your lands as you declare (CR 509.1d-f); with a cost, no
     // requirement makes a creature block (CR 509.1c).
     const blockTax = blockCost(s, Object.keys(blocks).length);
@@ -4770,7 +4773,7 @@ function Controls({
     const defender = pending.defender ?? HUMAN;
     const theirs = defender !== HUMAN ? s.players[defender]!.name : null;
     const blockTaps = blockTax ? (theirs ? [] : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
-    const needed = alone ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, defender, list));
+    const needed = alone ?? lonely ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, defender, list));
     return (
       <div className="controls">
         <span>

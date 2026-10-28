@@ -641,6 +641,12 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
   }
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
+    // Harsh Deceiver: "untap ~ and it gets +1/+1 until end of turn": "it" is ~, not the card.
+    const untapSelf = /^untap ~ and it (gets .+)$/.exec(text);
+    if (untapSelf) {
+      const rest = revealedAction(`~ ${untapSelf[1]}`, ctx, targets);
+      return rest && [{ type: "untap", what: { ref: "self" } }, ...rest];
+    }
     // Not about the card: "draw a card" (Track Down, Thrasios), "sacrifice ~ and draw three cards" (Diviner's Lockbox).
     if (/\b(?:it|its|that card|that card's)\b/.test(text)) return null;
     const sac = /^sacrifice ~ and (.+)$/.exec(text);
@@ -745,6 +751,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
 function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
+    // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
+    // instructions about ~, then tapping ~.
+    .replace(/^~ gains (\w+) until end of turn and doesn't untap during your next untap step\. Tap it\.$/, "~ gains $1 until end of turn. ~ doesn't untap during your next untap step. Tap ~.")
     // Yawgmoth Demon: "tap ~ and it deals 2 damage to you": the same.
     .replace(/\b([Tt]ap ~ and) it (deals \d+ damage to you)\b/g, "$1 ~ $2")
     // Touch of the Eternal: "count the number of permanents you control. Your life total becomes that number.": the number
@@ -754,6 +763,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
   text = text.replace(/^[Cc]hoose (target creature you control)\. If damage would be dealt to that creature this turn, /, "If damage would be dealt to $1 this turn, ");
+  // Fulgent Distraction: "Choose two target creatures. Tap those creatures, then ...": the same as "Tap two target creatures".
+  text = text.replace(/^Choose two target creatures\. Tap those creatures, then /, "Tap two target creatures, then ");
   // Willowdusk, Essence Seer: "Choose another target creature. Put a number of +1/+1 counters on it equal to ...": the same.
   text = text.replace(/(^|: )Choose (another target creature)\. (Put a number of [+-]1\/[+-]1 counters) on it (equal to [^.]+)\./, "$1$3 on $2 $4.");
   // Akroan Horse: "When ~ enters, an opponent gains control of it": an opponent chosen as it resolves, not targeted
@@ -2107,8 +2118,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Reign of Terror: "Destroy all green creatures or all white creatures"; Lava Storm: "~ deals 2 damage to each attacking
+    // creature or ~ deals 2 damage to each blocking creature": one or the other, chosen as it resolves (CR 608.2d).
+    const orAll = /^(Destroy all (?:[a-z]+ )?creatures) or all ((?:[a-z]+ )?creatures)$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
+    if (orAll) {
+      const halves = [orAll[1]!, /^Destroy/.test(orAll[1]!) ? `Destroy all ${orAll[2]}` : orAll[2]!];
+      const options = halves.map((h) => parseOne(h, ctx));
+      if (options.some((o) => o?.length !== 1 || (o[0]!.type !== "destroy" && o[0]!.type !== "damage") || o[0]!.type !== options[0]![0]!.type)) return null;
+      effects.push({ type: "either", options: options as Effect[][], labels: halves });
+      continue;
+    }
     // Haunting Voyage: "Choose a creature type. Return up to two creature cards of that type ...": the type chosen.
     if (/ cards? of that type\b/.test(s) && effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/( cards?) of that type\b/g, "$1 of the chosen type");
+    // Mistform Mutant, Standardize: "Choose a creature type (other than Wall). Target creature (Each creature) becomes that
+    // type until end of turn.": the type chosen as it resolves (CR 608.2d), replacing its creature types (CR 205.1b).
+    // Tsabo's Decree, Peer Pressure: "creatures of that type": of the chosen type.
+    if (effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/\b(becomes?) that type\b/g, "$1 the chosen creature type").replace(/\b(creatures?) of that type\b/g, "$1 of the chosen type");
+    // Terraformer: "Choose a basic land type. Each land you control becomes that type until end of turn."
+    else if (effects.some((e) => e.type === "choose" && e.choice === "basicLandType")) s = s.replace(/\b(becomes?) that type\b/g, "$1 the chosen basic land type");
     // Lae'zel's Acrobatics: "Exile all nontoken creatures you control, then roll a d20. 1—9 | Return those cards to the
     // battlefield ... at the beginning of the next end step. 10—20 | Return those cards ..., then exile them again. Return
     // those cards ... at the beginning of the next end step." The cards the first exile exiled are held for the returns.
@@ -3375,6 +3402,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
+    // Chaos Harlequin: "Exile the top card of your library. If that card is a land card, ~ gets -4/-0 until end of turn.
+    // Otherwise, ~ gets +2/+0 until end of turn.": the card as it is in exile, face up (CR 406.3); nothing more about it.
+    const exiledIs = exTop && !exTop[1] && !exEqual && !impulseIf ? /^If (?:that card|it) is an? ([a-z]+) card, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    const exiledElse = exiledIs ? /^Otherwise, (.+)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;
+    if (exiledIs && !/\b(?:it|its|that card)\b/.test(`${exiledIs[2]} ${exiledElse?.[1] ?? ""}`)) {
+      const filter = parseSearchFilter(`${exiledIs[1]} card`);
+      const before = ctx.targets.length;
+      const then = parseOne(capital(exiledIs[2]!), ctx);
+      const otherwise = exiledElse ? parseOne(capital(exiledElse[1]!), ctx) : undefined;
+      if (!filter || !then || otherwise === null || ctx.targets.length !== before || [...then, ...(otherwise ?? [])].some((e) => pauses(e))) return null;
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: 1 }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledTopMatching", filter } }, min: 1 }, effects: then, ...(otherwise ? { otherwise } : {}) });
+      si += exiledElse ? 2 : 1;
+      continue;
+    }
     // Rundvelt Hordemaster: "Exile the top card of your library. If it's a Goblin creature card, you may cast that card
     // until the end of your next turn." Vance's Blasting Cannons: "If it's a nonland card, you may cast that card this
     // turn." The card as it is in exile, face up (CR 406.3); only a card like that gets the permission.
@@ -8603,6 +8644,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const insteadDestroy = /^Creatures destroyed this way/.test(s) && prev?.type === "if" && prev.otherwise && prev.effects[0]?.type === "destroy" && prev.effects.slice(1).every((e) => e.type !== "destroy") ? prev.effects[0] : undefined;
       if (insteadDestroy?.type === "destroy") {
         insteadDestroy.noRegen = true;
+        continue;
+      }
+      // Reign of Terror: "Destroy all green creatures or all white creatures. They can't be regenerated.": either one.
+      if (prev?.type === "either" && /^They\b/.test(s) && prev.options.every((o) => o.length === 1 && o[0]!.type === "destroy")) {
+        for (const o of prev.options) if (o[0]!.type === "destroy") o[0]!.noRegen = true;
         continue;
       }
       const last = prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : prev;

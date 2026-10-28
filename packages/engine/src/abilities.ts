@@ -173,7 +173,7 @@ export type Count =
   /** "The power of the creature they exiled" (Olórin's Searing Light): the power, as it last existed on the battlefield, of the creatures this player controlled that this spell or ability exiled (CR 608.2h). */
   | { kind: "exiledPowerOf"; who: PlayerRef }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
-  | { kind: "destroyedThisWay"; filter: TargetSpec }
+  | { kind: "destroyedThisWay"; filter: TargetSpec; /** "For each creature that died this way" (Reign of Terror): only those put into a graveyard (CR 700.4). */ died?: true }
   /** "For each nontoken creature exiled this way" (Declaration in Stone): permanents, as they last existed. */
   | { kind: "exiledThisWay"; filter: TargetSpec }
   /**
@@ -1411,6 +1411,9 @@ export type Modification =
   | { kind: "cantAttackUnlessMore"; what: "lands" | "creatures" }
   /** "Can't attack unless a black or green creature also attacks" (Scarred Puma): another attacker that fits, in the same declaration (CR 508.1c). */
   | { kind: "cantAttackUnlessAlso"; filter: TargetSpec }
+  /** Orcish Conscripts: "can't attack (block) unless at least two other creatures attack (block)": in the same combat (CR 508.1c, 509.1b). */
+  | { kind: "cantAttackUnlessOthers"; n: number }
+  | { kind: "cantBlockUnlessOthers"; n: number }
   /**
    * "Creatures with power less than ~'s power can't block it" (CR 509.1b). `than: "source"`: less than the power of the
    * permanent with this ability, not the attacker's ("... can't block creatures you control", Champion of Lambholt).
@@ -4610,7 +4613,7 @@ export interface ActivatedAbility {
    * The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). A power-up
    * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
    */
-  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft";
+  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft" | "Forecast";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */

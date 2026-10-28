@@ -1952,6 +1952,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Writ of Passage: "Whenever enchanted creature attacks, if its power is 2 or less, ...": "its" is the enchanted creature's.
+    .replace(/^(Whenever enchanted creature attacks), if its (power|toughness) is /, "$1, if enchanted creature's $2 is ")
     // Electryte: "Whenever ~ deals combat damage to defending player": the only player an attacking creature can deal
     // combat damage to is the one it attacks (CR 506.2, 510.1), and a blocking one deals it to no player.
     .replace(/^Whenever ~ deals combat damage to defending player, /, "Whenever ~ deals combat damage to a player, ")

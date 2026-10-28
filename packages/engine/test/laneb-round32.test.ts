@@ -107,7 +107,6 @@ const lavaAxe = () => card("Lava Axe", "Sorcery", "{4}{R}", { cmc: 5, colors: ["
 const shock = () => card("Shock", "Instant", "{R}", { cmc: 1, colors: ["R"], oracleText: "Shock deals 2 damage to any target." });
 const divination = () => card("Divination", "Sorcery", "{2}{U}", { cmc: 3, colors: ["U"], oracleText: "Draw two cards." });
 const kws = (s: GameState, id: string, kw: string) => objHasKeyword(s, s.objects[id]!, kw);
-const kwCount = (s: GameState, id: string, kw: string) => characteristics(s, s.objects[id]!).abilities?.filter((a) => a.startsWith(kw)).length;
 
 describe("Lane B round 32", () => {
   it("compiles every card fully", () => {

@@ -488,6 +488,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
     }
+    // "Enters with your choice of a flying counter or a first strike counter": evasion first, then what wins fights.
+    if (pend.kind === "chooseOption" && pend.what === "counterChoice") {
+      const rank = ["flying", "deathtouch", "menace", "trample", "+1/+1", "first strike", "hexproof", "lifelink", "reach", "vigilance"];
+      const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
+    }
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
       const best = [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
@@ -2432,8 +2438,8 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
-              : c.kind === "tap"
-                ? 0 // "Tap X untapped ... you control" is an activated ability's cost only
+              : c.kind === "tap" || c.kind === "reveal"
+                ? 0 // "Tap X untapped ... you control", "Reveal X red cards from your hand" are activated abilities' costs only
                 : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }
@@ -3810,6 +3816,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      // Dragon Whelp: not a fourth time, which would sacrifice it at the end step.
+      if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "activatedTimes" && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= e.cond.n - 1)) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;

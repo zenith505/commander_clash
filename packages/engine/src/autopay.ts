@@ -1,7 +1,7 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
@@ -69,7 +69,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Battery gives its one mana without removing any.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
         // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && abs[x.ability]!.produces.kind !== "doublePool" && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === (abs[x.ability]!.produces.kind === "removeX" && (abs[x.ability]!.produces as { base?: number }).base ? 0 : 1) && !abs[x.ability]!.discardHand && abs[x.ability]!.produces.kind !== "doublePool" && !(abs[x.ability]!.sacrificeIfActivated && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + x.ability).length >= abs[x.ability]!.sacrificeIfActivated! - 1) && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };

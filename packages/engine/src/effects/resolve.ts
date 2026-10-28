@@ -1153,6 +1153,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealTopToHand":
     case "duelReveal":
     case "revealTop":
+    case "revealedUntilToBottom":
     case "parleyReveal":
     case "revealRevealed":
     case "discard":

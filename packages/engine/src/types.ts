@@ -853,6 +853,8 @@ export interface StackItem {
   subject?: { id: ObjectId; zc: number };
   /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
   stateIndex?: number;
+  /** An activated ability whose text asks how many times "this ability has been activated this turn" (Dragon Whelp): its index. */
+  activatedIndex?: number;
   /** A Saga's chapter ability: while it's on the stack, the Saga isn't sacrificed (CR 714.4). */
   chapter?: true;
   /** A Saga's final chapter ability (its greatest chapter number): the Saga's mana value, for "whenever the final chapter ability of a Saga you control resolves" (Narci). */
@@ -2007,6 +2009,8 @@ export interface Resolving {
   counteredSource?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
+  /** The cards "reveal cards from the top of your library until you reveal a nonland card" revealed, in order (Erratic Explosion). */
+  revealedUntil?: ObjectId[];
   /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */
   exiledTop?: { id: ObjectId; zc: number };
   /** The card a chooseFromGraveyard with a `chooser` moved, for "that card's mana value" (O-Kagachi Made Manifest). */

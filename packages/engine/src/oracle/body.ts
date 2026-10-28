@@ -39,6 +39,8 @@ export interface Ctx {
   exiledTop?: boolean;
   /** After "you may reveal the top card of your library. If you do": "that card" is the revealed card. */
   revealedTop?: boolean;
+  /** "Reveal cards ... until you reveal a nonland card" kept them in the library: "Put the revealed cards on the bottom of your library in any order" can follow (Erratic Explosion). */
+  revealedUntil?: boolean;
   /** The instruction before exiled cards from the top of a library (face up): "for each blue card exiled this way" (Oona, Queen of the Fae). */
   afterExileTop?: boolean;
   /** Another player chose a card in your graveyard to return (O-Kagachi Made Manifest): "that card" is that card. */
@@ -600,6 +602,14 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     return { effect: { type: "if", cond: { kind: "destroyedThisWay" }, effects: [inner] }, next: at + 1 };
   }
   if (reveal && !shuffleFirst && sentences[at + 1] === "Put all cards revealed this way into your hand") return { effect: { type: "exileUntilNonland", reveal: true, then: "hand" }, next: at + 2 };
+  // Erratic Explosion, Goblin Machinist: "... until you reveal a nonland card. ~ deals damage equal to that card's mana
+  // value to any target. Put the revealed cards on the bottom of your library in any order." The cards stay in the library
+  // while the next instruction reads "that card", then go to the bottom (see revealedUntilToBottom).
+  if (reveal && !shuffleFirst && /\bthat card's mana value\b/.test(sentences[at + 1] ?? "") && /^Put (?:the revealed cards|all cards revealed this way|the nonland card into your hand and the rest) on the bottom of your library in any order\.?$/.test(sentences[at + 2] ?? "")) {
+    ctx.revealedTop = true;
+    ctx.revealedUntil = true;
+    return { effect: { type: "exileUntilNonland", reveal: true, then: "keep" }, next: at + 1 };
+  }
   // Breaching Dragonstorm: "You may cast it without paying its mana cost if that spell's mana value is 8 or less. If you
   // don't, put that card into your hand." Any nonland card stops it; one with a greater mana value goes to the hand.
   const upTo = exile && !they ? new RegExp(`^You may cast it without paying its mana cost if that spell's mana value is (${NUM}) or less$`).exec(sentences[at + 1] ?? "") : null;
@@ -1573,6 +1583,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // to that creature." The target is chosen as the spell is cast (CR 601.2c); if it's illegal as the spell resolves,
   // nothing happens, no scry or reveal either (rulings).
   text = text.replace(/^Choose (any target|target [a-z ]+creature)\. (Scry \d+, then reveal the top card of your library\. ~ deals damage equal to that card's mana value to) (?:that permanent or player|that creature)\.$/, "$2 $1.");
+  // Blast of Genius: "Choose any target. Draw three cards, then discard a card. ~ deals damage equal to the discarded card's
+  // mana value to that permanent or player." The same: the target is chosen as it's cast, and with it illegal as the spell
+  // resolves, nothing is drawn or discarded (rulings, CR 608.2b).
+  text = text.replace(/^Choose any target\. (Draw (?:a card|two cards|three cards), then discard a card\. ~ deals damage equal to the discarded card's mana value to) that permanent or player\.$/, "$1 any target.");
+  // Erratic Explosion: "Choose any target. Reveal cards ... until you reveal a nonland card. ~ deals damage equal to that
+  // card's mana value to that permanent or player." Erratic Mutation: "Choose target creature. ... That creature gets
+  // +X/-X ...". The target is chosen as it's cast (CR 601.2c); illegal as it resolves, nothing is revealed (rulings).
+  text = text.replace(/^Choose any target\. (Reveal cards from the top of your library until you reveal a nonland card\. ~ deals damage equal to that card's mana value to) that permanent or player\./, "$1 any target.");
+  text = text.replace(/^Choose target creature\. (Reveal cards from the top of your library until you reveal a nonland card\.) That creature (gets [^.]+, where X is that card's mana value\.)/, "$1 Target creature $2");
   // Incite: "Target creature becomes red until end of turn and attacks this turn if able": two changes to that target.
   text = text.replace(/^(Target creature) becomes (white|blue|black|red|green) until end of turn and attacks this turn if able\.$/, "$1 becomes $2 until end of turn. It attacks this turn if able.");
   // V.A.T.S.: "Choose any number of target creatures with equal toughness. Destroy the chosen creatures." The targets.
@@ -2864,6 +2883,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (untilNonland) {
       effects.push(untilNonland.effect);
       si = untilNonland.next - 1;
+      continue;
+    }
+    const untilBottom = ctx.revealedUntil ? /^Put (the revealed cards|all cards revealed this way|the nonland card into your hand and the rest) on the bottom of your library in any order$/.exec(s) : null;
+    if (untilBottom) {
+      effects.push({ type: "revealedUntilToBottom", ...(/^the nonland card/.test(untilBottom[1]!) ? { hand: true as const } : {}) });
+      ctx.revealedUntil = false;
       continue;
     }
     // "Exile target nonland permanent. For as long as that card remains exiled, its owner may cast it" (Aerial
@@ -6143,8 +6168,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         fx.effects = replaceX(fx.effects, def);
       }
       // "If ~ wasn't cast from your hand, draw two cards instead" (Twinned Vision): the other way round, with no new targets.
-      if (!fx || (howCast.not && fx.instead && ctx.targets.length !== curTargets) || (howCast.noTargets && ctx.targets.length !== curTargets)) return null;
-      if (howCast.ofTarget) {
+      // An activated ability's targets are all chosen as it's activated, before its costs are paid (CR 602.2b, 601.2c,
+      // 601.2h): "If the discarded card was a land card, ~ deals 2 damage to target player" (Land's Edge) targets whatever
+      // is discarded, and only the damage depends on it.
+      const activatedGate = !!ctx.activated && !ctx.spell && !howCast.not && !!fx && !fx.instead && !howCast.ofTarget && ctx.targets.length !== curTargets;
+      if (!fx || (howCast.not && fx.instead && ctx.targets.length !== curTargets) || (howCast.noTargets && ctx.targets.length !== curTargets && !activatedGate)) return null;
+      if (activatedGate) {
+        // (the targets aren't gated)
+      } else if (howCast.ofTarget) {
         // "Counter target spell if no mana was spent to cast it": the one target spell this sentence chose.
         const spell = ctx.targets.length === curTargets + 1 && ctx.targets[curTargets]!.kind === "spell";
         if (!spell || fx.instead || howCast.cond.kind !== "spent") return null;
@@ -8837,6 +8868,9 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
   { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },
+  // Dragon Whelp: "If this ability has been activated four or more times this turn, sacrifice ~ at the beginning of the
+  // next end step": counted as it resolves, activations after it included (rulings).
+  { re: "this ability has been activated four or more times this turn", cond: { kind: "activatedTimes", n: 4 }, activatedOnly: true, noTargets: true },
 ];
 
 /**
@@ -8863,9 +8897,10 @@ function splitSpentPair(x: string): string[] {
 
 function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; noTargets?: true; ungated?: true; ofTarget?: true } | null {
   // "If the discarded card wasn't a land card, ..." after a discard cost (compile checks there is one).
-  const disc = /^If the discarded card (was|wasn't) (an? .+? card), (.+)$/.exec(s);
+  // Stormscale Anarch: "If the discarded card was multicolored, ..." (its colors, from its mana cost and color indicator).
+  const disc = /^If the discarded card (was|wasn't) (an? .+? card|multicolored|monocolored|colorless), (.+)$/.exec(s);
   if (disc) {
-    const filter = parseSearchFilter(disc[2]!.replace(/^an? /, ""));
+    const filter = /^an? /.test(disc[2]!) ? parseSearchFilter(disc[2]!.replace(/^an? /, "")) : ({ kind: "card", colorCount: disc[2] as "multicolored", text: `${disc[2]} card` } as TargetSpec);
     return filter ? { cond: { kind: "discardedIs", filter }, not: disc[1] === "wasn't", text: disc[3]!, noTargets: true } : null;
   }
   // "If the sacrificed creature's toughness was 4 or greater, create two Food tokens instead" (Witch's Oven): as it last

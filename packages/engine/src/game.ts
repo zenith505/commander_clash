@@ -1289,7 +1289,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
   // it as it would exist on the battlefield (CR 614.12, rulings).
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
-  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(printed.entersSacrificeInstead ? (["sacrificeInstead"] as const) : []), ...(saga && readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot, ...(printed.entersCounterChoice && (!printed.entersCounterChoice.escaped || opts.escaped) ? (["counterChoice"] as const) : [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -4040,7 +4040,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     const shown = revealable(s, o, ab.produces).slice(0, combo!);
     log(s, shown.length ? `${p.name} reveals ${shown.map((c) => nameOf(s, c)).join(", ")} for ${name}.` : `${p.name} reveals no cards for ${name}.`);
   }
-  if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  if (ab.oncePerTurn || ab.sacrificeIfActivated) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  // Farrelite Priest: the fourth activation this turn and each one after it make a delayed trigger that sacrifices it
+  // (rulings on Dragon Whelp); one made during an end step waits for the next turn's (CR 603.7).
+  if (ab.sacrificeIfActivated && o.zone === "battlefield" && (o.activatedThisTurn ?? []).filter((n) => n === MANA_ABILITY_OFFSET + i).length >= ab.sacrificeIfActivated)
+    addDelayed(s, "nextEndStep", p.id, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~" });
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
   if (ab.sacrificeSelf) {
@@ -6896,6 +6900,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
+    ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
     ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
@@ -7448,7 +7453,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
-    if (pend.what === "riot" || pend.what === "unleash") {
+    if (pend.what === "counterChoice") {
+      // "Enters with your choice of a reach counter or a vigilance counter on it" (CR 614.1c, 614.12).
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
+      const put = putCounters(s, o, choice, 1, true);
+      log(s, `${pend.source} enters with ${put ? `a ${choice} counter` : `no ${choice} counter`}.`);
+    } else if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
       else if (pend.what === "riot")
@@ -7470,7 +7480,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "counterChoice" || pend.what === "discardInstead" || pend.what === "sacrificeInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -7993,6 +8003,11 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
+      return true;
+    }
+    if (c.what === "counterChoice") {
+      const counters = compileCard(defOf(s, o)).entersCounterChoice?.counters ?? [];
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "counterChoice", options: [...counters], labels: counters.map((k) => `A ${k} counter`), objectId: o.id, prompt: `enter with your choice of ${counters.map((k) => `a ${k} counter`).join(" or ")}` };
       return true;
     }
     if (c.what === "number") {

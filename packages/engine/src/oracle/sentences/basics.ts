@@ -1244,12 +1244,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseLife", who, n: { count: { kind: "lifeLostThisTurn", who: who.ref === "eachOpponent" || who.ref === "eachPlayer" ? { ref: "eachOne" } : who } } }] : null;
   }
-  // "Target player gains twice X life" (Heliod's Intervention): X times 2.
-  if ((m = /^(.+?) (gains?|loses?) twice X life$/i.exec(s))) {
+  // "Target player gains twice X life" (Heliod's Intervention): X times 2. "You gain three times X life" (Martyr of Sands).
+  if ((m = /^(.+?) (gains?|loses?) (twice|three times) X life$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;
     const x = amt("X") as AmountExpr;
-    return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: { ...x, times: 2 } }];
+    return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: { ...x, times: m[3] === "twice" ? 2 : 3 } }];
   }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

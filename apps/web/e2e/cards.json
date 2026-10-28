@@ -7633,6 +7633,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8bcdb107-3827-4280-9e5e-7f1e771ef0c5",
+  "name": "Helica Glider",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Nightmare Squirrel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Nightmare",
+   "Squirrel"
+  ],
+  "oracleText": "This creature enters with your choice of a flying counter or a first strike counter on it.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "454a8902-8120-4373-96ee-bbf352b04e8d",
   "name": "Hero of Bladehold",
   "manaCost": "{2}{W}{W}",
@@ -10318,6 +10349,37 @@
   "set": "ncc",
   "releasedAt": "2022-04-29",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7f00bc45-7c65-4455-9db0-58bd79bcdb4b",
+  "name": "Martyr of Ashes",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Shaman"
+  ],
+  "oracleText": "{2}, Reveal X red cards from your hand, Sacrifice this creature: This creature deals X damage to each creature without flying.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

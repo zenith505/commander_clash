@@ -592,6 +592,8 @@ export function compile(d: CardDef): CompiledCard {
   // Pawprints (CR 700.2i): "Choose up to five {P} worth of modes. You may choose the same mode more than once." and a
   // "{P}{P} — [effect]" line for each mode.
   let paws: { budget: number; costs: number[]; texts: string[]; lines: string[] } | undefined;
+  // Devouring Rage: what its additional cost sacrifices any number of, the number sacrificed its X.
+  let costSacrificedX: string | undefined;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
@@ -1548,6 +1550,19 @@ export function compile(d: CardDef): CompiledCard {
       else {
         (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacLess[1]!) }, n: 0, x: true, optional: true });
         out.sacrificedReduction = Number(sacLess[2]);
+      }
+      continue;
+    }
+    // Devouring Rage: "As an additional cost to cast this spell, you may sacrifice any number of Spirits." then "For each
+    // Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.": an additional cost with an X
+    // of 0 or more (CR 601.2b, 107.3a), the number sacrificed; the spell's text counts it as X.
+    const sacFor = /^As an additional cost to cast ~, you may sacrifice any number of ([A-Z][a-z]+)\.$/.exec(line);
+    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `))) {
+      const spec = parseTargetPhrase(singularWord(sacFor[1]!));
+      if (spec?.kind !== "object" || !spec.subtypes?.length) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacFor[1]!) }, n: 0, x: true, optional: true });
+        costSacrificedX = singularWord(sacFor[1]!);
       }
       continue;
     }
@@ -3851,7 +3866,7 @@ export function compile(d: CardDef): CompiledCard {
     // graveyard to the battlefield ..." (Blood on the Snow): the paragraph after the modes is done whichever mode was
     // chosen, after it (CR 700.2, 608.2c). With one mode chosen, that's the same as the end of each mode.
     const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
-    const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
+    const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
@@ -4334,6 +4349,9 @@ function checkCastingLinks(out: CompiledCard) {
   // "The chosen player's upkeep", "whenever the chosen player casts" (Black Vise, Sewer Nemesis): the player its
   // "As ~ enters, choose a player" chose.
   if (out.triggers.some((tr) => tr.chosenPlayersTurn || tr.cast?.by === "chosen") && !out.entersChoosePlayer) bad = true;
+  // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
+  const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
+  if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
@@ -4616,4 +4634,10 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     return of && of.every((x) => x.filter.controller === "you") ? { of } : null;
   }
   return null;
+}
+
+/** Devouring Rage: "For each Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn" is "That creature gets +3/+0 until end of turn for each Spirit sacrificed this way". */
+function spellBodyText(text: string, costSacrificedX: string | undefined): string {
+  if (!costSacrificedX) return text;
+  return text.replace(new RegExp(`For each ${costSacrificedX} sacrificed this way, that creature gets an additional ([+-]\\d+/[+-]\\d+) until end of turn\\.`), `That creature gets $1 until end of turn for each ${costSacrificedX} sacrificed this way.`);
 }

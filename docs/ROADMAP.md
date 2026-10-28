@@ -2271,6 +2271,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   cost); Insubordination, Erosion, Curse Artifact, Wicked Guardian, Mausoleum Turnkey, Desecrator Hag, Cinder Cloud,
   Cragganwick Cremator, Lumengrid Augur, Mind Maggots, Gravebane Zombie, Lichenthrope, Territorial Dispute (each needs
   a template of its own).
+- Round B29 (harder skipped cards, least played first): the Crowns' "Enchanted creature and other creatures that share
+  a creature type with it" after sacrificing the Aura (Crown of Suspicion, Vigor, Ascension, Fury, Awe: the creature's
+  types as it last existed if it's gone, CR 608.2h; changelings share every type). "The power of the creature tapped
+  this way" / "the tapped creature's power" for a "Tap an untapped creature you control" cost, as the ability resolves
+  or as that creature last existed (rulings; Keldon Battlewagon, Impelled Giant with "other than ~", Unerring Sling).
+  The Clockworks' "Put up to X +1/+0 counters ... can't cause the total number ... to be greater than four" and their
+  end of combat removal (Clockwork Swarm, Avian, Beast, Steed). Prevention with "for each 1 damage prevented this way"
+  as part of the shield (CR 615.5): +1/+1 counters at once, before state-based actions (Temper, Test of Faith, Brace for
+  Impact), +0/+1 counters at the next end step by a delayed trigger (Sacred Boon, Scars of the Veteran), life (Candles'
+  Glow, splice too), and Vengeful Archon's "deals that much damage to target player or planeswalker". "Any number ...
+  this way": Landslide's Mountains sacrificed as it resolves, the Sweep spells' "return any number of Plains you
+  control" (Plow Through Reito, Charge Across the Araba, Sink into Takenuma, Barrel Down Sokenzan; browser test),
+  "Discard any number of cards. ... for each card discarded this way" (Sacred Rites, Rites of Refusal, Tamiyo Meets the
+  Story Circle), and Devouring Rage's optional "sacrifice any number of Spirits" cost counted as X (browser test).
+  +28 (27,186 of 31,936 with main and Lane A round 197).
+- Known limits there: a replacement effect that adds counters (Hardened Scales) can take a Clockwork past its cap;
+  Scars of the Veteran's "If it's a creature" is checked at the end step; bots return or sacrifice only lands already
+  tapped for the Sweep spells and Landslide. Skipped there: Thelon's Chant, Tourach's Chant, Nature's Wrath and
+  Overburden ("the player who put it onto the battlefield", which the engine doesn't track and the rulings say isn't
+  always its controller).
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid

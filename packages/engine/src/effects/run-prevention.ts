@@ -5,6 +5,7 @@ import { characteristics, controllerOf } from "../layers";
 import type { DamageRule, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, amountNow, damageRecipients, objects } from "./resolve";
 import { bindChosen, objectMatches, printedMatches } from "./targeting";
+import { addDelayed } from "./run-spells";
 
 /** A source of damage a player can choose (CR 609.7a), as an option: `id@zc`. */
 export interface SourceOption {
@@ -161,6 +162,27 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   if (spec.gainLife) rule.gainLife = spec.gainLife;
   if (spec.dealBack) rule.dealBack = spec.dealBack;
   if (spec.tokens) rule.tokens = spec.tokens;
+  if (spec.dealTo) {
+    // Vengeful Archon: the target as it resolves; if it's gone, damage is still prevented, with none dealt (rulings).
+    const r = fixedRecipient(s, spec.dealTo, ctx);
+    if (!r) return;
+    rule.dealTo = r;
+  }
+  if (spec.countersOn && rule.to?.object) {
+    const on = rule.to.object;
+    if (!spec.countersOn.endStep) rule.countersOn = { counter: spec.countersOn.counter };
+    else {
+      // Sacred Boon: "At the beginning of the next end step, put a +0/+1 counter on that creature for each 1 damage
+      // prevented this way": a delayed trigger (CR 603.7) counting all this rule prevented; on that creature if it's
+      // still the same object then (CR 400.7), and a creature (Scars of the Veteran's "If it's a creature").
+      rule.countersOn = { counter: spec.countersOn.counter, tally: true };
+      (s.preventedTally ??= {})[rule.id] = 0;
+      const n = { count: { kind: "preventedByRule" as const, rule: rule.id } };
+      const put: Effect = { type: "counters", what: { ref: "subject" }, counter: spec.countersOn.counter, n };
+      const effects: Effect[] = spec.countersOn.ifCreature ? [{ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, effects: [put] }] : [put];
+      addDelayed(s, "nextEndStep", ctx.controller, obj(s, on.id), { targets: [], effects, text: `Put a ${spec.countersOn.counter} counter on that creature for each 1 damage prevented this way.` }, rule.cardId);
+    }
+  }
   (s.damageRules ??= []).push(rule);
   log(s, `${src}: ${describeRule(s, rule)}.`);
 }

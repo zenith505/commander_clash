@@ -456,6 +456,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && theirs ? [{ type: "skipUntap", what }] : null;
   }
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
+  // Shape Stealer: "~'s base power and toughness become equal to that creature's power and toughness until end of turn": the
+  // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
+  if (/^~'s base power and toughness become equal to that creature's power and toughness until end of turn$/.test(s) && ctx.subject && !ctx.subjectIt)
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: { count: { kind: "toughness", of: { ref: "subject" } } } }], duration: "endOfTurn" }];
+  // Dream Fighter: "Whenever ~ blocks or becomes blocked by a creature, ~ and that creature phase out": both, as it resolves.
+  if (/^~ and that creature phase out$/.test(s) && ctx.subject && !ctx.subjectIt) return [{ type: "phaseOut", what: { ref: "self" } }, { type: "phaseOut", what: { ref: "subject" } }];
   if ((m = /^(.+?) phases? out$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
     return what ? [{ type: "phaseOut", what }] : null;
@@ -1106,7 +1112,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what && parseChanges(m[3]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
   }
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
+  // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
@@ -1148,6 +1155,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^((?:up to one )?target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
+    return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // Arcum's Weathervane: "Target snow land is no longer snow", "Target nonsnow basic land becomes snow": with no duration,
+  // for as long as it stays on the battlefield (CR 611.2a, 400.7); only the supertype changes (CR 205.4a, rulings).
+  if ((m = /^([Tt]arget [a-z ]+?) (is no longer snow|becomes snow)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" && !what.n ? parseChanges(m[2]!) : null;
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
   // Cyclopean Giant: "target land becomes a Swamp"; Alchor's Tomb: "Target permanent you control becomes the color of your

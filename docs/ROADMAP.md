@@ -1,6 +1,6 @@
 # Roadmap
 
-26,750 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+26,816 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,862 of
 9,979 (88%).
 
@@ -1934,11 +1934,26 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Presence and Talara's Bane (a landwalk / a creature card's toughness chosen from a revealed hand); Flay and Venarian
   Gold (old "discard a card at random. If you can't" / "X sleep counters" wordings); the Clockwork creatures (as in
   B19).
-- Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
-  supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Exiled Doomsayer (morph cost tax), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
-  the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Tribal Golem, Forethought
-  Amulet; Exalted Dragon, Qal Sisma Behemoth, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
-  and Aven Soulgazer (look at a face-down creature).
+- Round B21 (harder skipped cards, least played first): "As ~ enters, choose a player/an opponent" read later as "the
+  chosen player" (CR 614.12): counts of the chosen player's hand, graveyard and permanents (Sewer Nemesis, Nyxathid,
+  Entropic Specter, Skyshroud War Beast, Lost Order of Jarkeld, Pallimud, Haunting Apparition; nothing once that player
+  has left the game, per Sewer Nemesis's ruling), "At the beginning of the chosen player's upkeep" (Black Vise, The
+  Rack, Energy Vortex) and "Whenever the chosen player casts a spell"; the bot picks the opponent that makes the
+  permanent biggest or hurts most. Block triggers per creature (CR 509.3c-d) on ~, enchanted or equipped creature,
+  with "that creature" / "the other creature" / "both creatures" and filters ("a Vampire", "a non-Wall creature", "a
+  creature that has been dealt damage this turn"): Sawtooth Ogre (delayed damage at end of combat, even if it's gone),
+  Mammoth Harness, Treefolk Mystic ("all Auras attached to that creature"), Dream Fighter, Dead-Iron Sledge,
+  Barrow-Blade, Shape Stealer (base P/T locked as it resolves, CR 608.2h), Giant Shark, Wooden Stake, Venom. "Tap
+  enchanted creature/land" as a cost, which a summoning-sick creature can pay (CR 302.6; Nature's Chosen, Veteran's
+  Voice, Earthlore, Krovikan Plague, Tourach's Gate). Snow as a supertype changed in layer 4 (Melting, Arcum's
+  Weathervane, Thermal Flux). Tek and Tribal Golem's "has X as long as you control a Y, ..." lists. "Look at target
+  face-down creature" (Smoke Teller, Aven Soulgazer; only the looking player's log names it, CR 708.5). +32 (26,816 with rounds 188 and 189).
+- Skipped there, with reasons: Goblin Flotilla (a block trigger set up only for this combat by a pay-or-not); Infinite
+  Authority (a delayed end step check on "if that creature was destroyed this way").
+- Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
+  Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
+  Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
+  Fire (a number chosen as a cost), Forethought Amulet; Exalted Dragon and Qal Sisma Behemoth (attack and block costs).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
   cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity

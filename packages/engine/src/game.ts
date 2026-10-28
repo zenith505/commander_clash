@@ -6425,6 +6425,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
   // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
   if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
+  if (ab.tapAttached) {
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    if (!host || host.zone !== "battlefield") return `${d.name} isn't attached to anything`;
+    if (host.tapped) return `${nameOf(s, host.id)} is tapped`;
+  }
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -6836,6 +6841,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     log(s, `${p.name} exerts ${d.name}.`);
     fireEvent(s, { type: "exerted", id: o.id });
   }
+  if (ab.tapAttached && o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield") tapPermanent(s, obj(s, o.attachedTo));
   if (ab.unattachCost && o.attachedTo) {
     log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
     fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });

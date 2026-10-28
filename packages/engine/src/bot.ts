@@ -510,6 +510,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         const most = [...opps].sort((a, b) => player(s, Number(b)).hand.length - player(s, Number(a)).hand.length)[0]!;
         return [{ type: "chooseOption", player: pid, choice: most }];
       }
+      // A permanent that counts the chosen player's cards (Nyxathid, Sewer Nemesis) or hurts them on their upkeep (Black
+      // Vise, The Rack): the opponent that makes it biggest or hurts most.
+      const entering = pend.objectId !== undefined ? s.objects[pend.objectId] : undefined;
+      const chosenScore = entering && opps.length ? chosenPlayerScore(s, entering, pid) : undefined;
+      if (chosenScore) {
+        const top = [...opps].sort((a, b) => chosenScore(Number(b)) - chosenScore(Number(a)))[0]!;
+        return [{ type: "chooseOption", player: pid, choice: top }];
+      }
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
@@ -5534,4 +5542,25 @@ function orderOwnGraveyard(s: GameState, cards: ObjectId[]): ObjectId[] {
     order.splice(over < 0 ? order.length : over + 1, 0, id);
   }
   return order;
+}
+
+/**
+ * "As ~ enters, choose a player/an opponent" for a permanent whose own power and toughness count the chosen player's
+ * cards (Nyxathid's -1/-1 per card in their hand, Sewer Nemesis's graveyard), or whose "at the beginning of the chosen
+ * player's upkeep" trigger deals damage (Black Vise, The Rack): a score for each player, higher is better for us.
+ * Undefined when the permanent's abilities don't depend on the chosen player that way.
+ */
+function chosenPlayerScore(s: GameState, o: GameObject, pid: PlayerId): ((x: PlayerId) => number) | undefined {
+  const c = compileCard(defOf(s, o));
+  const asEvent = <T>(v: T): T => JSON.parse(JSON.stringify(v).replaceAll('{"ref":"selfChosenPlayer"}', '{"ref":"eventPlayer"}'));
+  const pts = (c.statics ?? []).filter((st) => st.affects.kind === "self").flatMap((st) => st.mods).filter((m) => (m.kind === "modifyPT" || m.kind === "definePT") && JSON.stringify(m).includes('"selfChosenPlayer"'));
+  const hurts = (c.triggers ?? []).filter((t) => t.chosenPlayersTurn).flatMap((t) => t.body.effects).filter((e) => e.type === "damage" && JSON.stringify(e.to) === '{"ref":"eventPlayer"}');
+  if (!pts.length && !hurts.length) return undefined;
+  return (x) => {
+    const ctx = { controller: pid, sourceId: o.id, event: { player: x } };
+    let n = 0;
+    for (const m of pts) if (m.kind === "modifyPT" || m.kind === "definePT") n += (m.power ? evalAmount(s, asEvent(m.power), ctx) : 0) + (m.toughness ? evalAmount(s, asEvent(m.toughness), ctx) : 0);
+    for (const e of hurts) if (e.type === "damage") n += Math.max(0, evalAmount(s, e.amount, ctx));
+    return n;
+  };
 }

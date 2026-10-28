@@ -473,6 +473,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
     return host?.zone === "battlefield" ? [host] : [];
   }
+  if (ref.ref === "attachedToSubject") {
+    const host = objects(s, { ref: "subject" }, ctx)[0];
+    return host ? s.battlefield.map((id) => obj(s, id)).filter((o) => o.attachedTo === host.id && objectMatches(s, ref.filter, o, ctx.controller, false)) : [];
+  }
   if (ref.ref === "subject") {
     // Only while it's still the same object on the battlefield (CR 400.7).
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -990,6 +994,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noRegen":
     case "noCombatDamage":
     case "lookAtHand":
+    case "lookAtFaceDown":
     case "sacrifice":
     case "animateDead":
     case "sacrificeAnimated":

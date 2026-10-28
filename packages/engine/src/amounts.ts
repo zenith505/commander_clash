@@ -103,6 +103,12 @@ function refPlayers(s: GameState, ref: PlayerRef, ctx: AmountCtx): PlayerId[] {
   if (ref.ref === "eachOpponent") return s.turnOrder.filter((id) => id !== ctx.controller && !s.players[id]!.lost);
   // "Among lands that player controls" in an intervening if (Mask of Intolerance): the trigger's player.
   if (ref.ref === "eventPlayer") return ctx.event?.player !== undefined ? [ctx.event.player] : [];
+  // "The chosen player" in a static ability (Sewer Nemesis): the one chosen as the permanent entered; none once that
+  // player has left the game (rulings).
+  if (ref.ref === "selfChosenPlayer") {
+    const p = selfObject(s, ctx)?.chosen?.player;
+    return p !== undefined && !s.players[p]!.lost ? [p] : [];
+  }
   return [];
 }
 

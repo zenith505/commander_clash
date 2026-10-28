@@ -467,6 +467,12 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
       : { kind: "object", subtypes: ["Aura", "Equipment"], text: "Aura or Equipment" };
     return { ...t, attachedToo: { filter, only: true } };
   }
+  // Treefolk Mystic: "Whenever ~ blocks or becomes blocked by a creature, destroy all Auras attached to that creature": the
+  // Auras on the trigger's creature as it resolves.
+  if (attachedThat && !cards && ctx.subject && !ctx.targets.length) {
+    const kind = attachedThat[1]!;
+    return { ref: "attachedToSubject", filter: kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" } };
+  }
   if ((andAttached || attachedThat) && !cards) {
     const kind = (andAttached ?? attachedThat)![andAttached ? 2 : 1]!;
     const filter: TargetSpec = kind === "Auras" ? { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" } : { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" };
@@ -1263,8 +1269,9 @@ export function parseTargetPhrase(
     extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : attached[1] === "land" ? { types: ["Land"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
     p = p.slice(0, attached.index);
   }
-  // "creature an opponent controls that was dealt damage this turn"
-  const hurt = / that was dealt damage this turn$/.exec(p);
+  // "creature an opponent controls that was dealt damage this turn"; Giant Shark: "a creature that has been dealt damage this
+  // turn", the same.
+  const hurt = / that (?:was|has been) dealt damage this turn$/.exec(p);
   if (hurt) {
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);

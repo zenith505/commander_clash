@@ -529,14 +529,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
    * The same event for the Auras and Equipment attached to `host` (TriggeredAbility.host): `subject` is the creature
    * by default ("put a +1/+1 counter on it"). `player`: the player it dealt damage to, for "an opponent".
    */
-  const addHosted = (host: GameObject, pred: (event: string, t: TriggeredAbility) => boolean, cause?: string, subject: GameObject = host, event?: TriggerEventInfo) => {
+  const addHosted = (host: GameObject, pred: (event: string, t: TriggeredAbility, you: PlayerId) => boolean, cause?: string, subject: GameObject = host, event?: TriggerEventInfo) => {
     for (const id of s.battlefield) {
       const a = s.objects[id]!;
       if (a.attachedTo !== host.id || id === host.id) continue;
       const you = controllerOf(s, a);
       hosting = host;
       try {
-        add(a, you, (e, t) => pred(e, t) && !(t.toOpponent && event?.player === you), undefined, cause, subject, undefined, undefined, undefined, event);
+        add(a, you, (e, t) => pred(e, t, you) && !(t.toOpponent && event?.player === you), undefined, cause, subject, undefined, undefined, undefined, event);
       } finally {
         hosting = null;
       }
@@ -874,6 +874,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const a of o.blocking) {
           const at = s.objects[a];
           if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
+          // "Whenever enchanted creature blocks or becomes blocked by a creature" (Mammoth Harness): once for each, that
+          // creature the subject; the two of them the event's group ("destroy both creatures", Dead-Iron Sledge).
+          if (at) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, at, w), undefined, at, { group: [o, at].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
         }
       }
       // "Whenever ~ attacks and isn't blocked": no creature was declared to block it (rulings).
@@ -899,6 +902,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
+          if (bl) addHosted(o, (e, t, w) => e === "selfBlocksOrBlockedByCreature" && fits(t, bl, w), undefined, bl, { player: o.attacking, group: [o, bl].map((x) => ({ id: x.id, zc: x.zoneChanges ?? 0 })) });
           // "Whenever equipped creature becomes blocked by a creature" (Infiltration Lens): once for each blocker (rulings).
           if (bl) addHosted(o, (e) => e === "selfBlockedByCreature", undefined, bl, { player: o.attacking });
           // "Whenever your Ring-bearer becomes blocked by a creature, the blocking creature's controller sacrifices
@@ -1690,7 +1694,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
-        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
+        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller) || (by === "chosen" && o.chosen?.player !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
         if (t.cast.yourTurn && you !== s.activePlayer) return false;
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;
@@ -2036,7 +2040,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
     fromEmblems(stepWatch);

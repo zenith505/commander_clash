@@ -557,6 +557,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         refs.add((y.what as ObjRef).ref);
         whats.add(JSON.stringify(y.what));
       }
+      // Sawtooth Ogre: "~ deals 1 damage to that creature at end of combat": about the trigger's creature (and ~ as the
+      // source, which deals it even if it has left the battlefield, rulings).
+      if (y.type === "damage" && "ref" in y.to && y.to.ref === "subject") {
+        refs.add("subject");
+        whats.add(JSON.stringify(y.to));
+      }
       if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
       if (y.type === "delayed") players = false;
     }

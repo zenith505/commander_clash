@@ -504,6 +504,21 @@ export function compile(d: CardDef): CompiledCard {
       // Questing Druid: "Whenever you cast a spell that's white, blue, black, or red": a spell that's any of those colors,
       // as "a white, blue, black, or red spell" says (CR 105.2).
       .replace(/^Whenever you cast a spell that's ((?:(?:white|blue|black|red|green), )*(?:white|blue|black|red|green),? or (?:white|blue|black|red|green)), /m, "Whenever you cast a $1 spell, ")
+      // Tek, Tribal Golem: "~ gets +0/+2 as long as you control a Plains, has flying as long as you control an Island, ...
+      // and has trample as long as you control a Forest": a static ability for each clause, each with its own condition,
+      // the verb carried over where a clause leaves it out ("haste as long as you control a Goblin").
+      .replace(/^~ (?:has|gets) [^\n]+? as long as you control an? [A-Z][a-z]+(?:, (?:and )?[^\n]+? as long as you control an? [A-Z][a-z]+){2,}\.$/m, (line) => {
+        let verb = "";
+        return line
+          .slice(2, -1)
+          .split(/, (?:and )?/)
+          .map((part) => {
+            const v = /^(has|gets) /.exec(part);
+            if (v) verb = v[1]!;
+            return `~ ${v ? part : `${verb} ${part}`}.`;
+          })
+          .join("\n");
+      })
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // The Genjus: "Enchant Forest" ... "Enchanted Forest becomes ...": the land it's attached to, which is a Forest while
@@ -4191,6 +4206,9 @@ function checkCastingLinks(out: CompiledCard) {
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // Sower of Discord's trigger is about the two players chosen as it entered, and only that.
   if (out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") !== !!out.entersChooseTwoPlayers) bad = true;
+  // "The chosen player's upkeep", "whenever the chosen player casts" (Black Vise, Sewer Nemesis): the player its
+  // "As ~ enters, choose a player" chose.
+  if (out.triggers.some((tr) => tr.chosenPlayersTurn || tr.cast?.by === "chosen") && !out.entersChoosePlayer) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;

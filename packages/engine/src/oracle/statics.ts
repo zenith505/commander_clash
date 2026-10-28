@@ -1196,7 +1196,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return conds.length === 1 ? conds[0]! : m[1] ? { kind: "allOf", conds } : { kind: "anyOf", conds };
   }
   // Narcolepsy: "if enchanted creature is untapped": the creature it's attached to, as it is now.
-  if ((m = /^enchanted creature is (tapped|untapped)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], tapped: m[1] === "tapped", text: `${m[1]} creature` } };
+  // Earthlore: "if enchanted land is untapped"; Nature's Chosen: "if enchanted creature is white and untapped".
+  if ((m = /^enchanted (creature|land) is (?:(white|blue|black|red|green) and )?(tapped|untapped)$/.exec(text)) && (m[1] === "creature" || !m[2]))
+    return { kind: "attachedIs", filter: { kind: "object", types: [capital(m[1]!)], tapped: m[3] === "tapped", ...(m[2] ? { colors: [COLOR_WORDS[m[2]]!] } : {}), text: `${m[2] ? `${m[2]} ` : ""}${m[3]} ${m[1]}` } };
   // Goblin Caves: "As long as enchanted land is a basic Mountain": the land it's attached to, as it is now (CR 205.4a).
   if ((m = /^enchanted land is a basic (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { kind: "attachedIs", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], subtypes: [m[1]!], text: `basic ${m[1]}` } };
   // Faerie Miscreant: "if you control another creature named ~": one other than it with its name (CR 201.2), as it is now.
@@ -2125,6 +2127,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (allColor) return { affects: { kind: "filter", types: ["Creature"] }, mods: [{ kind: "setColors", colors: [COLOR_WORDS[allColor[1]!]!] }], text: line };
   if (/^All permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line };
   if (/^All cards that aren't on the battlefield, spells, and permanents are colorless$/.test(text)) return { affects: { kind: "filter", types: [] }, mods: [{ kind: "setColors", colors: [] }], text: line, offFieldAll: true };
+  // Melting: "All lands are no longer snow": the supertype goes in layer 4 (CR 205.4a), lands that become snow later too.
+  if (/^All lands are no longer snow$/.test(text)) return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "loseTypes", types: ["Snow"] }], text: line };
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);

@@ -475,7 +475,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const t = ctx.targets[i];
     return t?.kind === "object" && !t.many && t.types?.includes("Creature") ? count({ kind: "cardsInHand", who: { ref: "targetController", index: i } }) : null;
   }
-  if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
+  if ((m = /^cards? in (your|that player's|target player's|their|target opponent's|the chosen player's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });
   }
@@ -489,7 +489,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
-  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents') graveyards?$/i.exec(p))) {
+  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);
     if (!who) return null;
     const kinds = m[1]!.trim().replace(/ and /g, " or ");
@@ -673,10 +673,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${singularWord(m[1]!)} an opponent controls`, { chosen: true });
     return spec?.kind === "object" && !spec.owner ? count({ kind: "permanents", filter: { ...spec, owner: "you", text: p } }) : null;
   }
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|the chosen player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+|that didn't attack this turn))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
-    const theirs = /^(target|that|those) /.test(who);
+    const theirs = /^(target|that|those|the chosen) /.test(who);
     const suffix = who === "you control" ? " you control" : who === "on the battlefield" || theirs ? "" : " an opponent controls";
     const spec = parseTargetPhrase(`${words}${suffix}${m[4] ? ` ${m[4]}` : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
@@ -743,6 +743,9 @@ export function parseBoundCount(text: string, ctx: Ctx): AmountExpr | null {
 function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   const x = w.toLowerCase();
   if (x === "your") return { ref: "you" };
+  // Sewer Nemesis, Nyxathid, Black Vise: the player chosen as the permanent entered ("As ~ enters, choose an opponent",
+  // CR 614.12; compile checks it has one), counted in its static and triggered abilities alike.
+  if (x === "the chosen player's") return { ref: "selfChosenPlayer" };
   if (!ctx) return null;
   if (x === "target player's" || x === "target opponent's") {
     const i = addTarget(ctx, { kind: "player", opponent: x === "target opponent's", text: x.replace(/'s$/, "") });

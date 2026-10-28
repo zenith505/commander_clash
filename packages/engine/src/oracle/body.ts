@@ -1236,6 +1236,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
   // Dawn of a New Age: "Then if ~ has no hope counters on it, sacrifice it and you gain 4 life": ~, as it resolves.
   text = text.replace(/\b[Tt]hen if ~ has no ([a-z]+) counters on it, sacrifice it\b/, "If there are no $1 counters on ~, sacrifice ~");
+  // Tourach's Gate: "Remove a time counter from ~. If there are no time counters on ~, sacrifice it": ~, checked after the
+  // removal.
+  text = text.replace(/^(remove an? ([a-z]+) counter from ~\. If there are no \2 counters on ~, sacrifice) it\.$/i, "$1 ~.");
   // Archfiend of the Dross: "Remove an oil counter from ~. Then if it has no oil counters on it, you lose the game": ~,
   // checked after the removal. Thing in the Ice: "..., transform it" too.
   text = text.replace(/(\b[Rr]emove an? ([a-z]+) counter from ~\.) Then if it has no \2 counters on it, (you lose the game|transform it)\./, (_, rm: string, kind: string, then: string) => `${rm} If there are no ${kind} counters on ~, ${then.replace(/ it$/, " ~")}.`);

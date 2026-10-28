@@ -7251,9 +7251,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const whenDiscarded = /^When you discard (?:an? (.+? card)|(a card)) this way, (.+)$/.exec(s);
     if (whenDiscarded) {
       const yourDiscard = (es: Effect[]): boolean => es.some((e) => (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) || (e.type === "may" && !e.pay && yourDiscard(e.effects)));
-      const filter: TargetSpec | null = whenDiscarded[2] ? { kind: "card", text: "card" } : parseSearchFilter(whenDiscarded[1]!);
+      const filter: TargetSpec | null = whenDiscarded[2] ? { kind: "card", text: "card" } : (parseSearchFilter(whenDiscarded[1]!) ?? null);
       whenDiscarded[2] = whenDiscarded[3]!;
-      const reflexive = filter && yourDiscard(effects) && !/that card/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx);
+      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx);
       if (!reflexive) return null;
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
@@ -7542,7 +7542,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(`${handThisWay[1]} card`);
       const before = ctx.targets.length;
       const inner = parseOne(capital(handThisWay[2]!), ctx);
-      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !inner || ctx.targets.length !== before || /(?:it|its|that card)/.test(handThisWay[2]!)) return null;
+      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !inner || ctx.targets.length !== before || /\b(?:it|its|that card)\b/.test(handThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter }, effects: inner });
       continue;
     }
@@ -7586,7 +7586,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const last = effects[effects.length - 1];
       const filter = parseTargetPhrase(tokenIs[1]!);
       const inner = parseOne(capital(tokenIs[2]!), ctx);
-      if (last?.type !== "createTokenCopy" || last.each || last.n !== 1 || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(tokenIs[2]!)) return null;
+      if (last?.type !== "createTokenCopy" || last.each || last.n !== 1 || filter?.kind !== "object" || !inner || /\b(?:it|its|that)\b/.test(tokenIs[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }

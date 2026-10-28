@@ -3913,7 +3913,7 @@ export function compile(d: CardDef): CompiledCard {
     // delayed trigger's text ends with its paragraph (CR 603.7a); the next one is another instruction of the spell.
     const floatingFirst = tail === undefined && spellLines.length > 1 && /^Whenever [^,]+ this turn, /.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
     const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
-    const joined = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
+    const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
     const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;

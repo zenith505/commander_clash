@@ -6,11 +6,12 @@
 // tapped" (Cryptek), "When you discard a card this way" (Talion's Messenger), "Activate only as a sorcery and only once"
 // (In the Trenches), "Whenever a player loses life" and "for each graveyard with seven or more cards in it" (The Master of
 // Lake-town), "you may return that card ... at the beginning of the next end step if ~ is still on the battlefield"
-// (Shirei, Shizo's Caretaker).
+// (Shirei, Shizo's Caretaker), four types in "a Cleric card, a Rogue card, a Warrior card, and/or a Wizard card" (Harper
+// Recruiter).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { applyAction, botActions, controllerOf, graveyardWays, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, controllerOf, graveyardWays, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, power, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -80,6 +81,9 @@ const cryptek = card("Cryptek", "Artifact Creature — Necron Wizard", "{3}{B}",
 const talionsMessenger = card("Talion's Messenger", "Creature — Faerie Noble", "{2}{U}", {"cmc":3,"power":"1","toughness":"3","keywords":["Flying"],"oracleText":"Flying\nWhenever you attack with one or more Faeries, draw a card, then discard a card. When you discard a card this way, put a +1/+1 counter on target Faerie you control.","colors":["U"],"colorIdentity":["U"]});
 const inTheTrenches = card("In the Trenches", "Enchantment", "{1}{W}{W}", {"cmc":3,"keywords":[],"oracleText":"Creatures you control get +1/+1.\n{5}{W}: Exile target nonland permanent you don't control until this enchantment leaves the battlefield. Activate only as a sorcery and only once.","colors":["W"],"colorIdentity":["W"]});
 const theMasterOfLaketown = card("The Master of Lake-town", "Legendary Creature — Human Advisor", "{1}{B}{B}", {"cmc":3,"power":"3","toughness":"2","keywords":["Mill","Deathtouch"],"oracleText":"Deathtouch\nWhenever a player loses life, that player mills that many cards. (Damage causes loss of life.)\nWhen The Master of Lake-town dies, draw a card for each graveyard with seven or more cards in it.","colors":["B"],"colorIdentity":["B"]});
+const harperRecruiter = card("Harper Recruiter", "Creature — Human Warrior", "{2}{W}", {"cmc":3,"power":"3","toughness":"1","keywords":["Flying"],"oracleText":"Flying\nWhenever this creature attacks, look at the top four cards of your library. You may reveal a Cleric card, a Rogue card, a Warrior card, and/or a Wizard card from among them and put those cards into your hand. Put the rest on the bottom of your library in a random order.","colors":["W"],"colorIdentity":["W"]});
+const serumcoreChimera = card("Serum-Core Chimera", "Creature — Phyrexian Chimera", "{2}{U}{R}", {"cmc":4,"power":"2","toughness":"4","keywords":["Flying"],"oracleText":"Flying\nWhenever you cast a noncreature spell, put an oil counter on this creature.\nRemove three oil counters from this creature: Draw a card. Then you may discard a nonland card. When you discard a card this way, this creature deals 3 damage to target creature or planeswalker. Activate only as a sorcery.","colors":["R","U"],"colorIdentity":["R","U"]});
+const mastersCouncillors = card("Master's Councillors", "Creature — Human Advisor", "{1}{U}", {"cmc":2,"power":"1","toughness":"3","keywords":["Vigilance","Mill"],"oracleText":"Vigilance\nThis creature gets +2/+0 for each graveyard with seven or more cards in it.\nWhenever you draw your second card each turn, target player mills three cards. (They put the top three cards of their library into their graveyard.)","colors":["U"],"colorIdentity":["U"]});
 const shireiShizosCaretaker = card("Shirei, Shizo's Caretaker", "Legendary Creature — Spirit", "{4}{B}", {"cmc":5,"power":"2","toughness":"2","keywords":[],"oracleText":"Whenever a creature with power 1 or less is put into your graveyard from the battlefield, you may return that card to the battlefield at the beginning of the next end step if Shirei is still on the battlefield.","colors":["B"],"colorIdentity":["B"]});
 const ALL = [psychomancer, shardOfTheVoidDragon, slagstoneRefinery, blex, zaskSkitteringSwarmlord, firstDayOfClass, beckCall, cryptek, talionsMessenger, inTheTrenches, theMasterOfLaketown, shireiShizosCaretaker];
 
@@ -276,5 +280,55 @@ describe("Round 201", () => {
     s = toStep(s, "main1", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
     expect(s.objects[elf]!.zone).toBe("graveyard");
     expect(s.objects[bear]!.zone).toBe("graveyard");
+  });
+
+  it("Harper Recruiter: up to one Cleric, Rogue, Warrior and Wizard from the top four", () => {
+    const { s: s0, ap, opp } = setup([]);
+    supported(harperRecruiter);
+    const h = putOnBattlefield(s0, ap, harperRecruiter);
+    const rogue = into(s0, ap, creature("Test Rogue", "Human Rogue", 1), "library");
+    const wizard = into(s0, ap, creature("Test Wizard", "Human Wizard", 1), "library");
+    const wizard2 = into(s0, ap, creature("Test Wizard Two", "Human Wizard", 1), "library");
+    const elf = into(s0, ap, creature("Test Elf", "Elf", 1), "library");
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: h, defender: opp }] });
+    s = resolveAll(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: 0, max: 3 });
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [wizard, wizard2] })).toThrow();
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [elf] })).toThrow();
+    s = resolveAll(act(s, { type: "searchLibrary", player: ap, found: [rogue, wizard] }));
+    expect(s.players[ap]!.hand).toEqual(expect.arrayContaining([rogue, wizard]));
+    const lib = s.players[ap]!.library;
+    expect(lib.slice(-2)).toEqual(expect.arrayContaining([wizard2, elf]));
+  });
+
+  it("Serum-Core Chimera: discarding a nonland card deals 3 damage to a target chosen then; declining deals none", () => {
+    const { s: s0, ap, opp } = setup([ping]);
+    supported(serumcoreChimera);
+    const c = putOnBattlefield(s0, ap, serumcoreChimera);
+    s0.objects[c]!.counters.oil = 6;
+    const bear = putOnBattlefield(s0, opp, creature("Test Bear", "Bear", 2));
+    let s = run(s0, planActivate(s0, ap, c, 0));
+    expect(s.objects[c]!.counters.oil).toBe(3);
+    s = resolveAll(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    const declined = resolveAll(act(structuredClone(s), { type: "chooseMay", player: ap, yes: false }));
+    expect(declined.pending ?? null).toBeNull();
+    expect(declined.objects[bear]!.zone).toBe("battlefield");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap });
+    s = act(s, { type: "discard", player: ap, objectIds: [s.players[ap]!.hand.find((id) => name(s, id) === "Test Ping")!] });
+    s = settle(s, [tgt(bear)]);
+    expect(s.objects[bear]!.zone).toBe("graveyard");
+  });
+
+  it("Master's Councillors: +2/+0 for each graveyard with seven or more cards", () => {
+    const { s, ap, opp } = setup([]);
+    supported(mastersCouncillors);
+    const m = putOnBattlefield(s, ap, mastersCouncillors);
+    for (let i = 0; i < 7; i++) into(s, opp, rock(`Test Yard ${i}`), "graveyard");
+    for (let i = 0; i < 6; i++) into(s, ap, rock(`Test Mine ${i}`), "graveyard");
+    expect(power(s, s.objects[m]!)).toBe(3);
+    into(s, ap, rock("Test Mine 6"), "graveyard");
+    expect(power(s, s.objects[m]!)).toBe(5);
   });
 });

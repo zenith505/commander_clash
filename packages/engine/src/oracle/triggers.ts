@@ -399,7 +399,7 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
   if (render) {
     const spec = parseTargetPhrase(render[1]!);
     const body = parseBody(render[2]!);
-    if (spec?.kind !== "object" || spec.controller || !body || /(?:that|those|they|them|it)/.test(render[2]!)) return "fail";
+    if (spec?.kind !== "object" || spec.controller || !body || /\b(?:that|those|they|them|it)\b/.test(render[2]!)) return "fail";
     return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: render[1]! }, opponents: true, combat: true, anyController: true } };
   }
   const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);

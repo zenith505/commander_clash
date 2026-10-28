@@ -651,6 +651,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return (s.resolving?.couldntPick ?? []).filter((p) => !player(s, p).lost);
     case "damagedThisWay":
       return (s.resolving?.playersDamagedThisWay ?? []).filter((p) => !player(s, p).lost);
+    case "clashOpponent": {
+      const p = s.resolving?.clashOpp;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "giftee": {
       const p = gifteeOf(s, ctx);
       return p !== undefined && !player(s, p).lost ? [p] : [];
@@ -980,6 +984,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "permanentPiles":
     case "returnExiled":
     case "exileIfDies":
+    case "exileDyingThisTurn":
     case "exileReturnThisTurn":
     case "exileIfLeaves":
     case "noRegen":
@@ -1150,6 +1155,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "scry":
     case "hideaway":
     case "clash":
+    case "revealDrawn":
     case "surveil":
     case "orderTop":
     case "handToTop":

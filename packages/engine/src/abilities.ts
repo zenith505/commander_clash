@@ -1089,6 +1089,8 @@ export type PlayerRef =
   | { ref: "couldntPick" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
+  /** "That player" after "Clash with an opponent" (Pollen Lullaby, Captivating Glance): the opponent clashed with (CR 701.30b). */
+  | { ref: "clashOpponent" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
   | { ref: "damagedThisWay" }
   /**
@@ -1588,7 +1590,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1938,7 +1940,7 @@ export type Effect =
   | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   /** "Its controller may draw up to two cards" (Arcane Denial): each player chooses how many, 0 to `n`, before drawing (rulings). */
-  | { type: "drawUpTo"; who: PlayerRef; n: number }
+  | { type: "drawUpTo"; who: PlayerRef; n: number; /** Truce: "For each card less than two a player draws this way, that player gains 2 life." */ shortLife?: number }
   /** "Put your commander into your hand from the command zone" (Command Beacon): one of yours there, chosen with two (rulings). */
   | { type: "commanderToHand" }
   /** "Put all commanders you own from the command zone and from your graveyard into your hand" (Campfire, CR 903.3). */
@@ -2350,6 +2352,10 @@ export type Effect =
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   /** `ifCreature`: "If it's a creature, ... if it would die this turn, exile it instead" (Carbonize, any target). */
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
+  /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
+  | { type: "exileDyingThisTurn" }
+  /** "Draw a card and reveal it. If it isn't a land card, discard it." (Sindbad): the cards just drawn, revealed; those not matching `keep` are discarded. */
+  | { type: "revealDrawn"; keep: TargetSpec }
   /**
    * Cosmic Intervention: "If a permanent you control would be put into a graveyard from the battlefield this turn, exile it
    * instead. Return it to the battlefield under its owner's control at the beginning of the next end step." (CR 614.1a,
@@ -2860,7 +2866,7 @@ export type Effect =
   /** Sphinx's Tutelage: "If two nonland cards that share a color were milled this way, repeat this process" (cond "milledShareColor"). */
   /** "Then repeat this process X more times" (Another Round): `effects` `n` times in all, each pass its own choices. */
   | { type: "repeat"; effects: Effect[]; n: Amount }
-  | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" }; then: Effect[] }
+  | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" } | /** Hoarder's Greed: "If you win, repeat this process." */ { kind: "wonClash" }; then: Effect[] }
   /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
   | { type: "rollAgain" }
   /**
@@ -2939,7 +2945,7 @@ export type Effect =
    */
   | { type: "unlockDoor"; what?: ObjRef }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
-  | { type: "clash" }
+  | { type: "clash"; /** "Clash with defending player" (Marvo): that opponent, not one chosen (CR 701.30b). */ with?: PlayerRef }
   /**
    * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
    * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
@@ -3013,7 +3019,7 @@ export type Effect =
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
-  | { type: "cantBlockRule"; filter: TargetSpec }
+  | { type: "cantBlockRule"; filter: TargetSpec; /** Eunuchs' Intrigues: "Other creatures they control": controlled by this player, as it resolves, except the creature that player just chose (ObjRef "created"). */ ofPlayer?: PlayerRef; exceptChosen?: true }
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
   | { type: "cantAttackRule"; filter: TargetSpec; /** "Other creatures can't attack this turn" (Intimidation Bolt): not target `exceptTarget` while it's that object. */ exceptTarget?: number }
   /** "Creatures can't be blocked this turn" (Venser, the Sojourner): a rule for the turn, so also creatures that arrive later (CR 611.2c; rulings). */
@@ -4038,6 +4044,10 @@ export type TriggerEvent =
   | "youFinalChapterResolves" // Narci, Fable Singer: the final chapter ability of a Saga you control finished resolving; the event's amount is the Saga's mana value
   /** "Whenever you scry", "whenever you surveil", "whenever you scry or surveil": after it's done (CR 701.22d, 701.25d). */
   | "youScry"
+  /** "Whenever you clash" (Entangling Trap): each time you clash, whoever started it (CR 701.30, rulings). */
+  | "youClash"
+  /** "Whenever you clash and win", "Whenever you win a clash" (Sylvan Echoes, Marvo): a clash you won (CR 701.30d). */
+  | "youWinClash"
   | "youSurveil"
   | "youScryOrSurveil"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */

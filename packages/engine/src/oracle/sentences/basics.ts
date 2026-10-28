@@ -398,8 +398,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "eachPlayer" }, n: 0, amount }] : null;
   }
   // Invincible Hymn: "Your life total becomes the number of cards in your library" (CR 119.5).
-  if (/^Your life total becomes the number of cards in your library$/.test(s)) {
-    const amount = parseCount("the number of cards in your library", ctx);
+  // Touch of the Eternal: "the number of permanents you control".
+  if ((m = /^Your life total becomes (the number of (?:cards in your library|permanents you control))$/.exec(s))) {
+    const amount = parseCount(m[1]!, ctx);
     return amount && typeof amount === "object" ? [{ type: "setLife", who: { ref: "you" }, n: 0, amount }] : null;
   }
   // Repay in Kind: "Each player's life total becomes the lowest life total among all players."

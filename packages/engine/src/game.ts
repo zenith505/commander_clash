@@ -761,7 +761,7 @@ export function moveObject(
   }
   o.exileIfToGraveyard = undefined;
   // "If that creature would die this turn, exile it instead" (CR 614.1a).
-  if (fromZone === "battlefield" && to === "graveyard" && o.exileIfDiesTurn === s.turn) {
+  if (fromZone === "battlefield" && to === "graveyard" && (o.exileIfDiesTurn === s.turn || (s.exileDyingTurn === s.turn && objIsType(s, o, "Creature")))) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
@@ -776,6 +776,7 @@ export function moveObject(
   o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
   o.blockedTurn = undefined;
+  o.declaredInCombat = undefined;
   o.attackedTurns = undefined;
   o.couldAttack = undefined;
   o.exertedTurn = undefined;
@@ -953,6 +954,7 @@ export function moveObject(
   o.damage = 0;
   o.damagedBy = undefined;
   o.wasDealtDamage = undefined;
+  o.hasDealtDamage = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -2148,6 +2150,7 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     if (archives) {
       // Nothing can dredge, and a draw can't put a card with dredge into the graveyard: every Archive applies.
       log(s, `${player(s, pid).name} draws ${2 ** archives} cards instead of one.`);
+      if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
       made.unshift(...Array<number>(2 ** archives).fill(0));
       continue;
     }
@@ -2182,6 +2185,7 @@ function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep"
 }
 
 function keepOne(s: GameState, p: Player, source: string, cards: ObjectId[], keep?: ObjectId) {
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   log(s, cards.length ? `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${source}).` : `${p.name} would draw from an empty library; ${source} replaces it, so nothing happens.`);
   if (keep !== undefined) moveObject(s, keep, "hand");
   const rest = cards.filter((id) => id !== keep);
@@ -2323,6 +2327,7 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
     if (!pend.instead?.archive || !pend.archives) throw new RulesError("no other way to replace that draw");
     s.pending = null;
     log(s, `${p.name} draws two cards instead of one.`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
     made.unshift(pend.archives - 1, pend.archives - 1);
   } else if (instead === "dig") throw new RulesError("no other way to replace that draw");
   else if (instead && "dredge" in instead) {
@@ -2490,6 +2495,7 @@ export function dredgeAmount(s: GameState, pid: PlayerId, id: ObjectId): number 
  * rest of the draws, and whatever was drawing carries on.
  */
 function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   const n = millCount(s, p.id, dredgeAmount(s, p.id, id)!);
   const milled = p.library.slice(0, n);
   for (const c of milled) moveObject(s, c, "graveyard", { milled: true });
@@ -2503,6 +2509,7 @@ function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
  * those other cards.
  */
 function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", source: string): ObjectId[] {
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   const i = p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land") === (kind === "land"));
   const seen = i < 0 ? [...p.library] : p.library.slice(0, i + 1);
   log(s, `${p.name} chooses ${kind} and reveals ${seen.length ? seen.map((id) => nameOf(s, id)).join(", ") : "nothing"} instead of drawing (${source}).`);
@@ -2545,6 +2552,7 @@ export function continueDraws(s: GameState, pid: PlayerId, left: number, after: 
 
 /** Out of the Tombs instead of a draw: the creature card returns to the battlefield under its owner's control. */
 function returnFromTombs(s: GameState, pid: PlayerId, id: ObjectId, source: string) {
+  if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
   log(s, `${player(s, pid).name} would draw from an empty library and returns ${nameOf(s, id)} from their graveyard to the battlefield instead (${source}).`);
   enterTogether(s, () => moveObject(s, id, "battlefield", { controller: pid }));
 }
@@ -2578,6 +2586,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
   else if (pend.archive) {
     // The Archive first: two draws, which the other Archives and dredge can each still replace.
     log(s, `${p.name} draws two cards instead of one.`);
+    if (s.resolving) s.resolving.drawReplaced = true; // a draw replaced (Sindbad rulings)
     made.unshift(pend.archive - 1, pend.archive - 1);
   } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
   if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made, true)) return;
@@ -8492,6 +8501,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
     const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
     const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
+    o.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
     o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
     if (o.attackedTurns?.at(-1) !== s.turn) o.attackedTurns = [...(o.attackedTurns ?? []), s.turn].slice(-8);
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
@@ -8737,6 +8747,7 @@ function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { bloc
     (bl.blocking ??= []).push(at.id);
     (at.blockedBy ??= []).push(bl.id);
     bl.blockedTurn = s.turn;
+    bl.declaredInCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
     at.becameBlockedTurn = s.turn;
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
@@ -8864,7 +8875,7 @@ export function cantBeBlockedNow(s: GameState, o: GameObject): boolean {
 /** "Can't block": from its abilities, or from a rule for the turn like Falter's. */
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
   // Decayed means "This creature can't block" (CR 702.147a).
-  if (characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false))) return true;
+  if (characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false) && !(r.except && r.except.id === o.id && r.except.zc === (o.zoneChanges ?? 0)))) return true;
   // Void Winnower: an opponent's creature with an even mana value (X is 0, CR 202.3b; a face-down one's is 0).
   const you = controllerOf(s, o);
   return defMv(defOf(s, o)) % 2 === 0 && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== you && abilitiesOf(s, s.objects[id]!).opponentsCantBlockEven);

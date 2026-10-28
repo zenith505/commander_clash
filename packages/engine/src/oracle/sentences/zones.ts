@@ -274,6 +274,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what: { ref: "self" } }, { type: "shuffleIntoLibrary", what }] : null;
   }
+  // Giant Trap Door Spider: "Exile ~ and target creature without flying that's attacking you"; Wall of Vipers: "Destroy ~ and
+  // target creature it's blocking": both, ~ staying if the target is illegal and the ability doesn't resolve, the target
+  // still exiled if ~ has left (rulings, CR 608.2b).
+  if ((m = /^(Exile|Destroy) ~ and (target [^,]+?)$/.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[2]!, ctx);
+    const type = m[1] === "Exile" ? ("exile" as const) : ("destroy" as const);
+    return what?.ref === "target" && !what.n ? [{ type, what: { ref: "self" } }, { type, what }] : null;
+  }
   // Coastal Wizard: "Return ~ and another target creature to their owners' hands": the same way, ~ staying if the target
   // is illegal and the ability doesn't resolve (CR 608.2b). Wizard Mentor: "Return ~ and target creature you control to
   // their owner's hand" (it can target itself, rulings: it's returned once).

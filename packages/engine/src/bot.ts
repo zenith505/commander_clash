@@ -4618,14 +4618,14 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
 }
 
 /**
- * Where we'd put a -1/-1 counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): a creature of ours
- * that survives it (toughness 2 or more), the least valuable, never our commander or a target; null if there's none.
+ * Where we'd put the -1/-1 counters for "Put a -1/-1 counter on a creature you control" (Hatchet Bully) or "blight N": a creature of ours
+ * that survives them (toughness above N), the least valuable, never our commander or a target; null if there's none.
  */
 function spareCounterHost(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>, targeted: Set<string | number>): ObjectId | null {
   if (c.counter !== "-1/-1") return null;
   const pool = counterOnCandidates(s, pid, c)
     .map((x) => obj(s, x))
-    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) >= 2)
+    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) > c.n)
     .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
   return pool[0]?.id ?? null;
 }

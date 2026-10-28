@@ -1,7 +1,7 @@
 # Roadmap
 
-27,004 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,977 of
+27,067 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,981 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -647,6 +647,16 @@ line blocks.
    Colfenor's Urn, Dragon's Fire, Leonin Arbiter, Sigurd, Protection Racket, Sin Prodder, Osgir, Nine-Fingers Keene,
    Phyrexian Processor. Smaller gap: Rakdos, the Showstopper with Krark's Thumb keeps heads for your own creatures and
    tails for the others without asking.
+   Round 197 went on from the top: blight N as a cost (CR 701.68: Gristle Glutton, Sting-Slinger, Spiral into
+   Solitude, Evershrike's Gift, Champion of the Weird), "As an additional cost to cast this spell, blight 1 or pay {3}"
+   (Bogslither's Embrace, Wild Unraveling), optional additional costs "you may blight N" (Burning Curiosity, Cinder
+   Strike, Pyrrhic Strike, Requiting Hex) and "you may behold a Dragon" (Dispelling Exhale, Osseous Exhale, Piercing
+   Exhale, Hyperion's Atomic Vision, Hulk's Thunderclap, Dose of Dawnglow's "it isn't your main phase"); browser
+   tests click through each prompt. An optional additional cost isn't kicker (CR 601.2b): "kicked spell" triggers and
+   Ertai's Trickery ignore it.
+   Out after round 197 (looked at, not done): Dawnhand Dissident (casting from exile by removing counters), Auntie Ool
+   (ward—blight and a "one or more -1/-1 counters are put on" trigger). Smaller gaps: bots blight only a creature that
+   survives the counters, and never their commander.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -778,9 +788,8 @@ line blocks.
    Aura can't enchant the Cat (nothing moves); bots transform Tarrian's Journal only with one card or none in hand; a
    copy's quoted "except it has" ability isn't checked for support when the card compiles (it's compiled on the copy);
    bots use Shay Cormac's {1} like any other ability. Smaller gaps from round 144: behold works for
-   one creature type only, not a planeswalker type (Countersculpt's "behold a Jace") or "you may behold ... if a Dragon
-   was beheld"; bots behold a card from their hand first when it's exiled, a permanent first when it isn't, and never
-   a token or a commander; the log reads "You beholds" (like "You votes"); Champion of the Weird (blight), Champions of
+   one creature type only, not a planeswalker type (Countersculpt's "behold a Jace"); bots behold a card from their hand first when it's exiled, a permanent first when it isn't, and never
+   a token or a commander; the log reads "You beholds" (like "You votes"); Champions of
    the Shoal ("enters or becomes tapped"), Lys Alana Dignitary, Froghemoth, Rysorian Badger and Suffer the Past still
    miss a line each. Smaller gaps from round 143: bots sacrifice to Scavenger's Talent only when the best creature
    card in their graveyard is worth more than the creatures they'd give up; what happens to Palace Jailer's
@@ -2224,7 +2233,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Gomazoa, Mine Worker, Woolly Razorback, Information Dealer, Fractalize, Loxodon Lifechanter,
   Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig.
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
-  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Cinder Strike (blight), Trickster's Talisman,
+  there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond
   March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,

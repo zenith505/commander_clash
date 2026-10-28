@@ -92,7 +92,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const found = e.mayElseHand && !sc.may ? "hand" : e.found;
       // An Aura found for the battlefield: its new controller chooses what it enchants as it enters (CR 303.4f), or it
       // stays in the library (303.4g); with a hand to go to instead, it goes there (rulings on Songbirds' Blessing).
-      const hosts = found === "battlefield" ? chooseAuraHosts(s, hits.map((id) => ({ o: obj(s, id), under: p.id })), src) : new Map<ObjectId, AuraHost>();
+      const hosts = found === "battlefield" ? chooseAuraHosts(s, hits.map((id) => ({ o: obj(s, id), under: e.yours ? ctx.controller : p.id })), src) : new Map<ObjectId, AuraHost>();
       if (hosts === "paused") return "paused";
       const unattached = hits.filter((id) => found === "battlefield" && defOf(s, obj(s, id)).subtypes.includes("Aura") && !hosts.has(id));
       const stays = e.mayElseHand ? [] : unattached;
@@ -120,7 +120,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else
         enterTogether(s, () =>
           hits.forEach((id) => {
-            moveObject(s, id, found, { ...(e.tapped ? { tapped: true } : {}), ...(found === "battlefield" ? { controller: p.id, ...hosts.get(id) } : {}) });
+            moveObject(s, id, found, { ...(e.tapped ? { tapped: true } : {}), ...(found === "battlefield" ? { controller: e.yours ? ctx.controller : p.id, ...hosts.get(id) } : {}) });
             const o = obj(s, id);
             if (attack && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
               o.attacking = attack.player;

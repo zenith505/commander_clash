@@ -1172,6 +1172,11 @@ export function compile(d: CardDef): CompiledCard {
       else if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
       continue;
     }
+    // Brimstone Vandal: "If it's neither day nor night, it becomes day as ~ enters." (CR 731.1), as it enters (614.12).
+    if (line === "If it's neither day nor night, it becomes day as ~ enters.") {
+      out.entersDay = true;
+      continue;
+    }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
     const asEnters = /^(~ enters tapped\. )?As (?:~|it) enters, choose (an? (?:creature type|color)(?: other than \w+)?(?: and an? (?:creature type|color))?)\.$/.exec(line);
     if (asEnters) {

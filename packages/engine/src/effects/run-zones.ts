@@ -2139,6 +2139,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") {
         log(s, `${src} returns ${d.name}, chosen at random, from ${p.name}'s graveyard to their hand.`);
         moveObject(s, o.id, "hand");
+      } else if (e.dest === "exilePlay") {
+        // Tersa Lightshatter: played the usual way, paying its costs and following timing rules (rulings).
+        log(s, `${src}: ${d.name} is chosen at random and exiled. ${p.name} may play it this turn.`);
+        moveObject(s, o.id, "exile");
+        if (o.zone === "exile") o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
       } else if ((e.dest === "battlefield" || isPermanentCard(d)) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
         log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
@@ -2578,9 +2583,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (first) {
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
-          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : "nextEndStep", ctx.controller, first, {
+          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : e.at === "nextBeginCombat" ? "nextBeginCombat" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.haste ? { haste: true as const } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
@@ -2677,7 +2682,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.haste)
         for (const l of came) {
           const c = s.objects[l.id];
-          if (c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: c.id, duration: "game", affected: [c.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+          if (c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: c.id, duration: e.haste === "endOfTurn" ? "endOfTurn" : "game", affected: [c.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
         }
       if (e.haste) invalidateCharacteristics(s);
       const me = e.selfCounter && s.objects[e.selfCounter.id];

@@ -895,6 +895,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
   // "It becomes night" (Unnatural Moonrise): CR 731.1.
   if ((m = /^It becomes (day|night)$/.exec(s))) return [{ type: "becomeDayNight", v: m[1] as "day" | "night" }];
+  // The Celestus: "If it's night, it becomes day. Otherwise, it becomes night." (joined in body.ts): with neither, night.
+  if (s === "If it's night, it becomes day, otherwise it becomes night") return [{ type: "becomeDayNight", v: "switch" }];
   // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
   if ((m = new RegExp(`^You may play (?:an|up to ${NUM}) additional lands? this turn$`, "i").exec(s))) return [{ type: "extraLandThisTurn", n: m[1] ? num(m[1]) : 1 }];
   // Nahiri's Lithoforming: "You may play X additional lands this turn", the spell's X.

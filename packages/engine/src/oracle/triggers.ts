@@ -85,6 +85,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
+  // CR 731.1: the change from one to the other, not the first time it becomes day or night (rulings on The Celestus).
+  [/^Whenever day becomes night or night becomes day, (.+)$/, "dayNightChanges"],
   // CR 701.30: "Whenever you clash" is any clash you take part in, started by you or an opponent (rulings).
   [/^Whenever you clash and win, (.+)$/, "youWinClash"],
   [/^Whenever you win a clash, (.+)$/, "youWinClash"],
@@ -1965,7 +1967,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).

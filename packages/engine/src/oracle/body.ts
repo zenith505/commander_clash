@@ -7490,11 +7490,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s) ??
       // Free the Fae: "Then put an instant, sorcery, or Faerie card from among the milled cards into your hand": one if any
       // matches, not optional.
-      /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards) into your hand$/.exec(s);
+      /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards) into your hand$/.exec(s) ??
+      // Vivien on the Hunt: "Mill five cards, then put any number of creature cards milled this way into your hand".
+      /^(?:Then )?[Pp]ut (any number of .+? cards) milled this way into your hand$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
-      const upTo = /^up to (\w+) (.+) cards?$/.exec(fromMilled[1]!);
+      const upTo = /^up to (\w+) (.+) cards?$/.exec(fromMilled[1]!) ?? /^any number of() (.+) cards$/.exec(fromMilled[1]!);
       const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       const must = /^(?:Then )?[Pp]ut an? /.test(s);
       // Gyruda, Doom of Depths: "each player mills four cards. Put a creature card with an even mana value from among the
@@ -7510,7 +7512,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (milling?.type !== "mill" || milling.who.ref !== "you" || filter === null) return null;
       // "Then put a creature, enchantment, or land card from among the milled cards onto the battlefield" (Fetch Quest): one
       // if any matches, not optional.
-      (inIf ?? effects).push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, ...(must ? {} : { upTo: true as const }), milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: fromMilled[2] === "onto the battlefield" ? ("battlefield" as const) : ("libraryTop" as const) } : {}) });
+      (inIf ?? effects).push({ type: "chooseFromGraveyard", n: upTo ? (upTo[1] ? num(upTo[1]) : 99) : 1, ...(must ? {} : { upTo: true as const }), milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: fromMilled[2] === "onto the battlefield" ? ("battlefield" as const) : ("libraryTop" as const) } : {}) });
       // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
       const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
       if (didnt) {

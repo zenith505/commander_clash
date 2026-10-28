@@ -8,7 +8,8 @@
 // mana ability that returns its source to hand, as a sorcery (Grinning Ignus), "Choose creature or land" for the cards
 // revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence),
 // "up to twice X target cards" (Erebos's Intervention), cheaper cycling (Fluctuator), a color
-// of a permanent you control (Meteor Crater).
+// of a permanent you control (Meteor Crater), "put any number of creature cards milled this way into your hand" (Vivien
+// on the Hunt).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -59,7 +60,8 @@ const vivisPersistence = card("Vivi's Persistence", "Instant", "{1}{R}", {"cmc":
 const erebossIntervention = card("Erebos's Intervention", "Instant", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"Choose one —\n• Target creature gets -X/-X until end of turn. You gain X life.\n• Exile up to twice X target cards from graveyards.","colors":["B"],"colorIdentity":["B"]});
 const fluctuator = card("Fluctuator", "Artifact", "{2}", {"cmc":2,"keywords":[],"oracleText":"Cycling abilities you activate cost {2} less to activate.","colors":[],"colorIdentity":[]});
 const meteorCrater = card("Meteor Crater", "Land", "", {"cmc":0,"keywords":[],"oracleText":"{T}: Choose a color of a permanent you control. Add one mana of that color.","colors":[],"colorIdentity":[]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator, meteorCrater];
+const vivienOnTheHunt = card("Vivien on the Hunt", "Legendary Planeswalker — Vivien", "{4}{G}{G}", {"cmc":6,"loyalty":"4","keywords":["Mill"],"oracleText":"+2: You may sacrifice a creature. If you do, search your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put it onto the battlefield, then shuffle.\n+1: Mill five cards, then put any number of creature cards milled this way into your hand.\n−1: Create a 4/4 green Rhino Warrior creature token.","colors":["G"],"colorIdentity":["G"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator, meteorCrater, vivienOnTheHunt];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -508,5 +510,18 @@ describe("Round 198", () => {
     putOnBattlefield(s, ap, card("Test Azorius", "Artifact", "{W}{U}", { cmc: 2, colors: ["W", "U"] }));
     invalidateCharacteristics(s);
     expect(colors()).toEqual(["G", "U", "W"]);
+  });
+
+  it("Vivien on the Hunt: +1 mills five, then any number of the creature cards milled go to hand", () => {
+    const { s: s0, ap } = setup([]);
+    const vivien = putOnBattlefield(s0, ap, vivienOnTheHunt);
+    const top = [creature("Test Elf", "Elf", 1), card("Test Land", "Land", "", { cmc: 0 }), creature("Test Ox", "Ox", 2), creature("Test Bear", "Bear", 2), card("Test Bolt", "Instant", "{R}", { cmc: 1 })];
+    const tops = [...top].reverse().map((d) => into(s0, ap, d, "library")).reverse();
+    let s = run(s0, planActivate(s0, ap, vivien, 1));
+    s = resolveAll(s);
+    const p = s.pending;
+    expect(p?.kind === "searchLibrary" && p.fromGraveyard === "hand" && [...p.cards].sort()).toEqual([tops[0], tops[2], tops[3]].sort());
+    s = act(s, { type: "searchLibrary", player: ap, found: [tops[0]!, tops[3]!] });
+    expect(tops.map((id) => s.objects[id]!.zone)).toEqual(["hand", "graveyard", "graveyard", "hand", "graveyard"]);
   });
 });

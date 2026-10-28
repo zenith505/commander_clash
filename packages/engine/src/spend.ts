@@ -21,7 +21,8 @@ export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): 
   // "To gain a Class level": its level ability, "~'s level becomes N" (CR 716.2a).
   const level = ab.activateIf?.kind === "classLevel" && ab.body.effects.some((e) => e.type === "classLevel") ? { classLevel: true as const } : {};
   const x = { ...(/\{X\}/.test(ab.manaCost) ? { xCost: true as const } : {}), ...(ab.equip ? { equip: true as const } : {}) };
-  return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [], ...level, ...x, ...(anyColor ? { anyColor } : {}) } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}) };
+  const only = ab.spendOnlyChosenColor ? (o.chosen?.color ? [o.chosen.color] : []) : ab.spendOnly;
+  return only ? { ability: o, onlyColors: only, ...level, ...x, ...(anyColor ? { anyColor } : {}) } : { ability: o, ...level, ...x, ...(anyColor ? { anyColor } : {}) };
 }
 
 /** The mana types a payment may use (all of them unless it says otherwise). */

@@ -1,8 +1,8 @@
 # Roadmap
 
-26,887 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,869 of
-9,979 (88%).
+27,007 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,943 of
+9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -506,6 +506,106 @@ line blocks.
    of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Icebreaker Kraken, Mass
    Diminish, Display of Power, Jason Bright, Spider-Man 2099, Blood for Bones, Quakebringer, Widespread Brutality,
    Belligerent Yearling, Lorthos, Zidane, Discerning Financier, Dragonspark Reactor, Eight-and-a-Half-Tails.
+   Round 190 went on from the top: "that many plus one of each of those kinds of counters" on any permanent you control
+   (Pir, Imaginative Rascal), granted fabricate (Cayth, Famed Mechanist, with Pir), "as long as it was cast" on a static
+   ability (The Tarrasque), a revealed creature put onto the battlefield tapped and attacking (Raph & Mikey), "until you
+   reveal X land cards, where X is ..." (The Ring Goes South), "sacrifice another creature or an artifact" (Gut, True
+   Soul Zealot: Gut itself only while it's an artifact), "whenever you create a Blood token" (Voldaren Bloodcaster; a
+   token-created trigger now sees the token on the battlefield when several enter together), "remove all but one +1/+1
+   counter from it, then you gain 1 life for each ..." (Lily Bowen), Fractals with the total power each player's exiled
+   creatures had (Oversimplify), "target artifact creature's controller sacrifices it. That player may search ..."
+   (Arcum Dagsson), Scrap Mastery, Wedding Announcement, Hex Magic, "whenever ~ or equipped creature attacks" with "its
+   power" (Tanuki Transplanter), Thada Adel ("search that player's library ... Until end of turn, you may play that
+   card").
+   Out after round 190 (looked at, not done): Sewer Nemesis (done in Lane B's round B21, left to it), Aether Refinery
+   ("pay one or more {E}"), Emeritus of Ideation ("becomes prepared"), Welcome to . . . // Jurassic Park, Case of the
+   Uneaten Feast, Raul, Trouble Shooter (cards milled this turn), Cait Sith, Scouring Swarm, Brigid's back face, Bring to
+   Light (colors of mana spent), Fractured Powerstone (planar die), The Lost and the Damned, Oft-Nabbed Goat (only your
+   opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
+   Appropriation, Ixhel, Cybership, Impulsivity, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
+   Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
+   Inexorable, Yuffie, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
+   Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
+   Drowner of Truth, Command the Dreadhorde.
+   Round 191 went on from the top: base power and toughness "and are Juggernauts in addition to their other creature
+   types" (Graaz, Unstoppable Juggernaut), "the exiled card's power/toughness" (Lobelia Sackville-Baggins, with "that was
+   put there from the battlefield this turn"; Morbid Bloom, Scour the Desert), a chosen hand card revealed and put on the
+   bottom of its owner's library, then a draw (Vendilion Clique, browser test), "unless its controller pays twice {X}"
+   and "put up to two of them into your hand" (Thassa's Intervention; Shadow Prophecy, The Mana Rig), "whenever you put
+   a counter on a creature you control" once each turn (Mikey & Leo), "the first non-Lemur creature spell with flying
+   you cast during each of your turns" (Momo, Friendly Flier), "whenever one or more creatures that are enchanted by an
+   Aura you control attack", any player's attack, and "tap up to one target creature and goad it" (Killian, Decisive
+   Mentor), "choose a permanent type" (Creeping Renaissance, browser test), "if you didn't draw cards this way" (Mr.
+   Foxglove), "add twice that much {G}" (Fangorn, Tree Shepherd), "search your graveyard, hand, and library" and "with a
+   legendary Equipment attached to it" (Kassandra, Eagle Bearer), "if you put a Town card into your hand this way" (Town
+   Greeter), starting loyalty X (Nissa, Steward of Elements: CR 306.5b and 107.3m, so X 0 puts it into the graveyard;
+   the bot casts it for 1 or more).
+   Out after round 191 (looked at, not done): Jin Sakai, Ghost of Tsushima ("attacks a player, if no other creatures are
+   attacking that player"), Stiltzkin, Moogle Merchant ("target opponent gains control of another target permanent you
+   control. If they do, ...").
+   Round 192 went on from the top: "at the beginning of your next first main phase, add X mana in any combination of
+   colors, where X is that spell's mana value" (Plasm Capture), "the total power of creatures goaded this way" (Havoc
+   Eater), "choose one or more. Each mode must target a different player" (Vindictive Lich: no more modes than players
+   it can target, the bot too), "or a creature spell you control becomes the target" (Surrak, Elusive Hunter), "reveal
+   cards until you reveal two land cards" (Skyserpent Seeker), "you may have any number of them phase out" (Change of
+   Plans), "each Sliver card in each player's hand has slivercycling" (Homing Sliver), an intervening "if" on a "whenever
+   a source you control deals noncombat damage" trigger (Fear of Burning Alive), "distribute X +1/+1 counters among any
+   number of target creatures" (Grove's Bounty, Broodlord), "exile a nonland card from it until ~ leaves the
+   battlefield" (Deep-Cavern Bat), "it enters tapped and attacking that player" (Shark Shredder), "while it has a +1/+1
+   counter on it, prevent that damage and remove a +1/+1 counter" (Undergrowth Champion), "until the end of your next
+   turn, you may cast that card and you may spend mana as though it were mana of any color" for an exiled creature
+   (Hurl Through Hell). Rules fix: damage that can't be prevented is now dealt to the Phantom creatures (Phantom
+   Centaur and the like), still removing a counter (rulings).
+   Out after round 192 (looked at, not done): Red Sun's Twilight (copies of the destroyed artifacts), Irencrag Feat,
+   Oath of Nissa, Sharae of Numbing Depths and Hylda ("becomes tapped by you"), Sigurd, Dog Umbra, Call for Aid, Narset
+   of the Ancient Way, Razorfield Ripper (reconfigure cost), Silverquill the Disputant (granted casualty), Lorehold the Historian (granted
+   miracle), Coram, Brimaz, Mindleech Mass, The Blue Spirit, Linvala, Shield of Sea Gate, Requiem Monolith, Behemoth of
+   Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
+   Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
+   graveyard"), Horde of Notions (playing a land card during resolution), Undead Alchemist, Auntie Ool (ward—blight),
+   Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
+   Round 193 went on from the top: "whenever you cast a spell this turn" as a Saga chapter (Showdown of the Skalds,
+   Origin of Thor: "deals damage equal to its power to each opponent" too), "if you do, it becomes plotted" (Kellan
+   Joins Up, Jace Reawakened), "reveals cards until they reveal a creature card. Put that card onto the battlefield
+   under your control" (Curse of Unbinding), "exile a card at random from your graveyard. You may play that card this
+   turn" (Tersa Lightshatter), "until your next turn, creatures your opponents control attack each combat if able" and
+   "each tapped creature deals damage to itself" (The Akroan War), "each player chooses three nonland permanents they
+   control. Destroy all other nonland permanents" (Fall of the First Civilization), Primal Surge (repeat the process),
+   "cards of the chosen type" after "choose a creature type" (For the Ancestors), "when you next cast a spell with {X}
+   in its mana cost this turn ... half X life" (Brass Infiniscope), "unless target opponent has ~ deal 3 damage to them"
+   (Pia's Revolution), "attach any number of Equipment you control to target creature you control" (Beatrix, Loyal
+   General; Battlefield Improvisation's "if that creature is attacking"), "at the beginning of the next combat, return
+   those cards ... and those creatures gain haste until end of turn" (Legion's Initiative), and day and night:
+   "whenever day becomes night or night becomes day" (not when it first becomes day or night, rulings), "if it's
+   neither day nor night, it becomes day as this creature enters", The Celestus's switch (The Celestus, Vadrik, Brimstone
+   Vandal, Component Collector, Firmament Sage, Gavony Dawnguard, Obsessive Astronomer, Sunrise Cavalier, Sunstreak
+   Phoenix, Celestus Sanctifier), and "look at the top two cards of your library. Put one of them into your graveyard"
+   (Jace, the Living Guildpact). Rules fix: "half X, rounded down" where X is defined elsewhere (a spell's X) kept the
+   whole X.
+   Out after round 193 (looked at, not done): Shilgengar, Sire of Famine, Armed and Armored ("choose a Dwarf you
+   control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver, Magus Lucea Kane, Make
+   Your Own Luck, Lilah, Undefeated Slickshot, Soulcipher Board ("remove an omen counter ... then if it has no omen
+   counters on it, transform it").
+   Round 194 went on from the top: "each opponent loses life equal to the number of creatures attacking them" (Within
+   Range), "+X/+0, where X is the number of lands defending player controls" (Elturel Survivors), "dies or is put into
+   exile while its power is 4 or greater" (Syr Vondam), "the greatest power among creatures sacrificed this way" and
+   "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend, browser test), "each Dragon you control deals 1 damage to that
+   creature" (Sarkhan the Masterless), "you may pay {X}. If you do, return another target Zombie card with mana value X"
+   (Relentless Dead), "if its power is less than ~'s power. Otherwise" (Shelinda), "you may pay {2} and sacrifice a
+   token" / "pay {1} and sacrifice an artifact" / "pay {1}{R} and discard a card" (Killer Service, Sokenzan Smelter,
+   Wolf of Devil's Breach), "if the creature had power 4 or greater" (Anax), "if it was enchanted or equipped" (Koll),
+   "~ or a commander you control attacks alone" (Ironsoul Enforcer), "as long as you're the monarch, damage doesn't
+   cause you to lose life" (Archon of Coronation), "attach any number of target Equipment to it" (Armory Automaton),
+   "for each opponent, ... target permanent that player controls" without "up to one": required for each opponent who
+   has one (Blatant Thievery, browser test; Frenzied Gorespawn; Sylvan Primordial, banned), "a creature card is put into
+   a graveyard from a library" (Dreadhound), "whenever your opponents are dealt combat damage, if any of that damage was
+   dealt by a Warrior" (Mindblade Render) and "Spend only black mana on X" for an {X} ability (Crypt Rats, Crimson
+   Hellkite).
+   Out after round 194 (looked at, not done): Tangled Colony (damage dealt by a creature this turn), Greymond, Avacyn's
+   Stalwart (two keywords chosen as it enters), Conspiracy Theorist ("you may exile one of the cards discarded this
+   way"), Expand the Sphere, Observed Stasis ("remove enchanted creature from combat"), Captain Howler, Ephara, God of
+   the Polis ("if you had another creature enter ... last turn"), Cache Grab, Abundant Harvest, Endless Sands,
+   Fumiko the Lowblood (bushido X), Historian's Boon ("the final chapter ability of a Saga you control triggers").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -2018,7 +2118,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   card). "~ / Enchanted land is the chosen color" (Alloy Golem, Shimmerwilds Growth; layer 5); Winnow's "if another
   permanent with the same name is on the battlefield", checked as it resolves; Premature Burial's "that entered since
   your last turn ended"; Arsenal Thresher's "reveal any number of other artifact cards from your hand" (amplify's
-  choice). New browser tests: Minion of the Wastes's life, Wood Elemental's Forests, Arsenal Thresher's reveal. +18 (26,887 of 31,936).
+  choice). New browser tests: Minion of the Wastes's life, Wood Elemental's Forests, Arsenal Thresher's reveal. +18 (26,959 of 31,936 with Lane A rounds 190 to 193).
 - Skipped there, with reasons: Angelic Aberration ("each with base power or toughness 1 or less": no base P/T filter);
   Vizkopa Confessor (the opponent reveals that many cards of their choice); Plague of Vermin (paying life in turns
   until no one pays); Kamahl's Summons (each player reveals from their own hand); Gate to the Aether (a "may" the
@@ -2049,7 +2149,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   the rest back on top in any order" (you order them, rulings); Recursive Recruitment's "for every three cards in your
   graveyard". "Put a -1/-1 counter on a creature you control" as a cost (CR 602.2b; Hatchet Bully, Wandering Mage):
   click the creature in the browser; bots pick their least valuable creature that survives it, never the commander.
-  New browser test: Hatchet Bully's counter pick. +28, 27 of them legal (26,914 of 31,936).
+  New browser test: Hatchet Bully's counter pick. +28, 27 of them legal (26,986 of 31,936 with Lane A rounds 190 to 193).
 - Skipped there, with reasons: Tanglewalker (each creature's own defending player controlling an artifact land;
   granting landwalk isn't the same); Baki's Curse (damage by each creature's own Aura count); Rikala, Homarid King
   ("Then if there are four or more tide counters on ~, remove them" and an Island mana trigger); Taste of Paradise

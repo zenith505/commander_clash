@@ -2,15 +2,19 @@
 
 import { objHasKeyword } from "./cards";
 import { transformPermanent } from "./effects/run-permanents";
+import { fireEvent } from "./effects/triggers";
 import { log } from "./game";
 import type { GameState } from "./types";
 
 /** It becomes day or night (CR 731.1), and the daybound and nightbound permanents transform as it does (702.145b, e). */
 export function setDayNight(s: GameState, v: "day" | "night") {
   if (s.dayNight === v) return;
+  const changes = !!s.dayNight;
   log(s, s.dayNight ? (v === "night" ? "Day becomes night." : "Night becomes day.") : `It becomes ${v}.`);
   s.dayNight = v;
   turnWithDayNight(s);
+  // "Whenever day becomes night or night becomes day": not when it first becomes either (rulings on The Celestus).
+  if (changes) fireEvent(s, { type: "dayNightChanged" });
 }
 
 /** A daybound permanent front face up at night, a nightbound one back face up by day: transformed (CR 702.145c, f). */

@@ -6,7 +6,7 @@ import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
-import { checkDayNight, dayNightUntapCheck } from "./daynight";
+import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
@@ -594,6 +594,16 @@ function zoneList(s: GameState, o: GameObject): ObjectId[] | null {
 /** The permanents entering together while `enterTogether` runs, kept off the battlefield list until all have entered. */
 type EnteringTogether = { ids: ObjectId[]; events: Parameters<typeof fireEvent>[1][] };
 let together: EnteringTogether | null = null;
+
+/**
+ * An event that happens as permanents enter: while some enter together (enterTogether), after all of them have, so
+ * what it triggers sees them all on the battlefield (CR 603.2, 603.6a). "Whenever you create a Blood token, if you
+ * control five or more Blood tokens" (Voldaren Bloodcaster) counts the tokens created with it.
+ */
+export function fireOnceEntered(s: GameState, ev: Parameters<typeof fireEvent>[1]) {
+  if (together) together.events.push(ev);
+  else fireEvent(s, ev);
+}
 
 /**
  * Several cards put onto the battlefield at the same time by one instruction (Collected Company, Genesis Wave): each
@@ -1224,12 +1234,15 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   const printed = characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
   if (!characteristics(s, o).hasPrintedAbilities) withCounters = undefined;
   if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
+  // Brimstone Vandal: day from the moment it enters, with neither (CR 731.1, 614.12).
+  if (printed.entersDay && !s.dayNight) setDayNight(s, "day");
   // "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types"
   // (Displaced Dinosaurs): from permanents already on the battlefield, judged by the permanent as it would exist there
   // (CR 614.12, as for othersAddCounters); it's that from the moment it enters (rulings).
   othersChangeIt(s, o);
   // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
-  const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
+  // Nissa, Steward of Elements: loyalty X, the X it was cast with, 0 if it wasn't cast (CR 107.3m, 306.5b).
+  const loyalty = isType(defOf(s, o), "Planeswalker") ? (defOf(s, o).loyalty === "X" ? (opts.x ?? 0) : Number.parseInt(defOf(s, o).loyalty ?? "", 10)) : NaN;
   // The counters it enters with arrive at once (CR 614.1c): its own "enters with", a spell's "additional" ones (opts),
   // and others' "enters with an additional" (Renata). Each kind is one placement, so Hardened Scales adds one, and its
   // controller orders those replacement effects (CR 616.1) the way that gives the most.
@@ -5881,7 +5894,11 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   const permit = s && choices?.via === "turnPermission" ? castPermit(s, choices.objectId, d, x, choices.permit, pid) : undefined;
   // The Defilers: the life chosen to pay for each one (CR 601.2b); castProblem checks each one applies.
   const defilerLife = s ? (choices?.lifeFor ?? []).reduce((n, id) => n + Math.max(0, ...((s.objects[id] && s.objects[id]!.zone === "battlefield" ? abilitiesOf(s, s.objects[id]!).costMods : undefined) ?? []).map((m) => m.payLife ?? 0)), 0) : 0;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(choices?.kicks?.includes(0) ? (compileCard(d).kicker?.extraCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  // "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend): the life too, cast for its madness cost as madness's trigger
+  // resolves (CR 702.35a).
+  const madnessPend = s?.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.player === pid ? s.pending : undefined;
+  const madnessLife = madnessPend && s!.objects[madnessPend.objectId] && defOf(s!, s!.objects[madnessPend.objectId]!).name === d.name ? (compileCard(d).madnessLife ?? 0) : 0;
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(choices?.kicks?.includes(0) ? (compileCard(d).kicker?.extraCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>

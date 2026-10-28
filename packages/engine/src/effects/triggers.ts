@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -163,6 +163,8 @@ export type TriggerSourceEvent =
   | { type: "proliferated"; player: PlayerId }
   /** A player who wasn't the monarch became it (CR 725.3). */
   | { type: "becameMonarch"; player: PlayerId }
+  /** Day became night or night became day (CR 731.1), not the first time it became either. */
+  | { type: "dayNightChanged" }
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
@@ -988,6 +990,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youInvestigate" && (!t.firstEachTurn || ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+  } else if (ev.type === "dayNightChanged") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      add(o, controllerOf(s, o), (e) => e === "dayNightChanges");
+    }
+    // Sunstreak Phoenix: "return this card from your graveyard to the battlefield": its owner's.
+    fromGraveyards((o, owner) => add(o, owner, (e) => e === "dayNightChanges"));
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold" || ev.type === "becameMonarch") {
     const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : ev.type === "becameMonarch" ? "youBecomeMonarch" : "youCollectEvidence";
     for (const id of s.battlefield) {
@@ -1023,7 +1032,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "tokenCreated") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCreateToken");
+      const made = s.objects[ev.id];
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youCreateToken" && (!t.createdFilter || (!!made && objectMatches(s, t.createdFilter, made, ev.player, false))));
     }
   } else if (ev.type === "lifeLost") {
     // Every other player is an opponent (CR 102.3); "that player" is the one who lost life, "that much" how much.
@@ -1250,7 +1260,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       return { player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid, opponent: opp && !a.attackingPermanent, opponentOrPlaneswalker: opp && a.attackingPermanent?.battleController === undefined };
     };
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host !== "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // "Whenever ~ or equipped creature attacks" (Tanuki Transplanter): about ~ itself here, the subject.
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // Glimmer Lens: "Whenever equipped creature and at least one other creature attack" (`withOthers`, as for battalion).
     addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
@@ -1298,7 +1310,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const groupWatch = (o: GameObject, anyone = false, list?: TriggeredAbility[]) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) =>
-        ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
+        // Any player's attack (Killian, Decisive Mentor: "creatures that are enchanted by an Aura you control"): "you" is
+        // the watcher's controller.
+        ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), anyone ? controllerOf(s, o) : ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
       for (const t of list ?? abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
         if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;
@@ -1427,7 +1441,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(attacker, you, (e) => e === "selfAttacksAlone", undefined, undefined, undefined, undefined, undefined, undefined, that);
     addHosted(attacker, (e) => e === "selfAttacksAlone", undefined, attacker, that);
     for (const id of s.battlefield)
-      if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
+      if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || (t.subjectOrSelf && id === attacker.id) || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
     causedBy = null;
   } else if (ev.type === "dealtDamage") {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
@@ -1545,7 +1559,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const g = t.event === "groupDealsDamageToPlayers" ? t.damageGroup : undefined;
         if (!g) continue;
         const fits = (h: (typeof ev.hits)[number]) => {
-          if (h.by !== wc || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
+          if ((h.by !== wc && !g.anyController) || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
           const o = s.objects[h.source];
           if (o?.zone === "battlefield") return objectMatches(s, g.filter, o, wc, false);
           const { kind: _k, text: _t, types = [], subtypes = [], ...rest } = g.filter;
@@ -1801,6 +1815,21 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
       }
     }
+    // Surrak, Elusive Hunter: "or a creature spell you control" (TriggeredAbility.targeted.orSpell): a spell the item
+    // targets, once for each.
+    const spells = new Set<string>();
+    for (const t of item?.targets ?? []) if (t.kind === "stack" && !ev.only) spells.add(t.id);
+    for (const sid of spells) {
+      const target = s.stack.find((x) => x.id === sid);
+      if (target?.kind !== "spell") continue;
+      const by = item!.controller;
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        if (target.controller !== wc) continue;
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orSpell && spellMatches(s, tr.targeted.orSpell, target) && (!tr.targeted.spell || item!.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
+      }
+    }
     // "Whenever you or a permanent you control becomes the target of ..." (Unsettled Mariner): a player the item targets,
     // once however many of its targets name them (rulings).
     const players = new Set<PlayerId>();
@@ -1992,6 +2021,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "beginCombat" && s.thatCombat === d.combat
           : d.when === "nextCleanup"
           ? ev.step === "cleanup"
+          : d.when === "nextBeginCombat"
+          ? ev.step === "beginCombat" && !(d.turn === s.turn && d.step === "beginCombat")
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "yourNextEndStep" || d.when === "playersNextEndStep"
@@ -2002,6 +2033,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? ev.step === "main1" && ev.active === d.controller
               : d.when === "yourNextMain"
               ? (ev.step === "main1" || ev.step === "main2") && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
+              : d.when === "yourNextFirstMain"
+              ? ev.step === "main1" && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
@@ -2090,7 +2123,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       // "Choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program): checked now,
       // as it's put on the stack (rulings on Prophetic Titan); kept for the answer (chooseTriggerModes).
       if (printed.modal.bothIf && staticConditionNow(s, printed.modal.bothIf, t.sourceId, t.controller)) t.both = true;
-      const [min, max] = modeRange(printed, !!t.both);
+      const [min, max0] = modeRange(printed, !!t.both);
+      const max = distinctModeCap(s, printed, t.controller, max0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       // "Choose both instead": both, or the one that can be chosen (CR 603.3c).
       if (t.both && printed.modal.bothExactly && n > 0) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
       else if (n === 0 || n < min) {

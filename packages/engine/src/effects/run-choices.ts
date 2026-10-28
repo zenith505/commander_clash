@@ -609,7 +609,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "revealedIs"
-            ? revealedIs(s, bindChosen(e.cond.filter, ctx.chosen)) !== !!e.cond.not
+            ? revealedIs(s, bindBound(s, bindChosen(e.cond.filter, ctx.chosen), amountCtx(s, ctx))) !== !!e.cond.not
             : e.cond.kind === "movedLinkedIs"
             ? (s.resolving!.movedLinkedIds ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedSharesCreatureType"
@@ -622,6 +622,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !s.resolving!.created?.length
             : e.cond.kind === "putThisWayIs"
             ? (s.resolving!.created ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
+            : e.cond.kind === "putIntoHandIs"
+            ? (s.resolving!.putIntoHand ?? []).some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "impulsedIs"
             ? (s.resolving!.impulsed ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "milledIs"

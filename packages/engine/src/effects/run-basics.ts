@@ -199,9 +199,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "eachDealsDamage": {
       // Each permanent deals its own damage, all at the same time (CR 120.3); lifelink is one life gain per player (CR 119.10).
       const n = amountNow(s, e.amount, ctx);
+      const victim = e.to ? objects(s, e.to, ctx).find((o) => o.zone === "battlefield") : undefined;
+      if (e.to && !victim) return;
       const events: DamageEvent[] = objects(s, e.what, ctx)
         .filter((o) => o.zone === "battlefield")
-        .map((o) => ({ src: objectSource(s, o), to: { player: controllerOf(s, o) }, n }));
+        .map((o) => ({ src: objectSource(s, o), to: victim ? { object: victim.id } : { player: controllerOf(s, o) }, n }));
       const gains = new Map<PlayerId, { n: number }>();
       const dealt = dealPlanned(s, planDamage(s, events), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
       for (const [pid, g] of gains) gainLife(s, pid, g.n);
@@ -495,7 +497,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;
     case "becomeDayNight":
-      setDayNight(s, e.v);
+      setDayNight(s, e.v === "switch" ? (s.dayNight === "night" ? "day" : "night") : e.v);
       return;
     case "extraLandThisTurn": {
       // Only this turn; on another player's turn it lets them play none (rulings on Explore).

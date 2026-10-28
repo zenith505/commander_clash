@@ -318,8 +318,9 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   if (o.zone === "hand")
     for (const id of s.battlefield) {
       const p = s.objects[id]!;
-      const grants = characteristics(s, p).controller === o.owner && characteristics(s, p).hasPrintedAbilities ? compileCard(defOf(s, p)).handGrants : undefined;
-      for (const g of grants ?? []) if (printedMatches(g.filter, defOf(s, o))) own = { ...own, activated: [...own.activated, ...g.activated] };
+      const grants = characteristics(s, p).hasPrintedAbilities ? compileCard(defOf(s, p)).handGrants : undefined;
+      const yours = characteristics(s, p).controller === o.owner;
+      for (const g of grants ?? []) if ((yours || g.everyHand) && printedMatches(g.filter, defOf(s, o))) own = { ...own, activated: [...own.activated, ...g.activated] };
     }
   const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
   if (lent.length) own = withLent(own, lent);

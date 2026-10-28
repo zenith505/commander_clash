@@ -164,6 +164,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who }] : null;
   }
+  // Smoke Teller, Aven Soulgazer: "Look at target face-down creature": only its controller sees what it is, as this
+  // resolves (CR 708.5, rulings).
+  if (/^Look at target face-down creature$/.test(s)) return [{ type: "lookAtFaceDown", what: { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], faceDown: true, text: "target face-down creature" }) } }];
   if ((m = /^(.+?) reveals? (?:their|his or her) hand$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }] : null;

@@ -76,6 +76,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
   // Guardian of the Gateless: "Whenever ~ blocks, it gets +1/+1 until end of turn for each creature it's blocking".
   if (each && /^creature (?:it's|~ is) blocking$/.test(p) && (ctx?.selfIt || /~/.test(p))) return { count: { kind: "itBlocks" } };
+  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3).
+  if (each && p === "permanent you control but don't own") {
+    const filter = parseTargetPhrase(p);
+    return filter?.kind === "object" ? { count: { kind: "permanents", filter: { ...filter, text: p } } } : null;
+  }
   // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
   // battlefield named ~", any player's.
   if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);

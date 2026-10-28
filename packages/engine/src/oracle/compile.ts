@@ -1371,6 +1371,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, doubleIfXAtLeast: Number(twiceX[1]) };
       continue;
     }
+    // Neverwinter Hydra: "As ~ enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of
+    // those results": the X chosen, the dice rolled as it enters, part of the replacement (CR 614.1c, 706.2).
+    if (line === "As ~ enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of those results." && !isSpell) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, rollD: 6 };
+      continue;
+    }
     // Banquet Guests: "~ enters with twice X +1/+1 counters on it": the X chosen, times two (a replacement, CR 614.1c).
     if (line === "~ enters with twice X +1/+1 counters on it." && !isSpell) {
       if (out.entersWithCounters) out.unsupported.push(raw);
@@ -2301,6 +2308,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
       out.powerUpAgain = true;
+      continue;
+    }
+    // Fluctuator: "Cycling abilities you activate cost {2} less to activate": typecycling too (CR 702.29f), generic mana
+    // only (CR 601.2f, 602.2b).
+    const cyclingLess = /^Cycling abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (cyclingLess) {
+      out.cyclingLess = (out.cyclingLess ?? 0) + Number(cyclingLess[1]);
       continue;
     }
     const youActivateLess = /^Abilities you activate that aren't mana abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
@@ -4009,6 +4023,18 @@ export function compile(d: CardDef): CompiledCard {
     if (!out.spell || v.unsupported.length || !v.spell) out.unsupported.push(`Cleave ${cleave.mana}`);
   }
   linkExile(out);
+  // "Target ... card not named ~" (Staff of Eden): this card's name (CR 201.5).
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    b.targets = b.targets.map((t) => (t.notNamed === "~" ? { ...t, notNamed: d.name } : t));
+  // "Target ... of the chosen type": the creature type chosen as this permanent entered (CR 614.12), bound on its
+  // abilities (cards.ts abilitiesOf). Not on a spell, nor with a choice made while it resolves (after its targets).
+  // Mirror of the Forebears: a copy of a creature whose own abilities read "the chosen type" has no type chosen for them
+  // (rulings), but the type chosen for the Mirror stays on the permanent, so it isn't done.
+  const chosenTarget = (b: AbilityBody) => [...b.targets, ...(b.modal?.modes.flatMap((m) => m.targets) ?? [])].some((t) => t.chosen === "type");
+  const choosesType = out.entersChoose?.some((c) => c.what === "creatureType");
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    if (chosenTarget(b) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
+    else if (chosenTarget(b) && allEffects(b.effects).some((e) => e.type === "becomeCopy")) out.unsupported.push(`${b.text} (a copy keeping the type chosen for its source)`);
   // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))

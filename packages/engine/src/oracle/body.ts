@@ -1747,6 +1747,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Wedding Announcement: "Then if ~ has three or more invitation counters on it, transform it" after other instructions.
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\./g, "$1transform ~.");
   text = text.replace(/(\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\.$/, "$1transform ~.");
+  // Sarkhan, Dragon Ascendant: "~ becomes a Dragon in addition to his other types" ("~'s other types" by now): its own.
+  text = text.replace(/(~ becomes [^.]+? in addition to) ~'s other types\b/g, "$1 its other types");
+  // Charitable Levy: "put a collection counter on ~. Then if there are three or more collection counters on it, sacrifice
+  // it. If you do, ...": the counters on ~, then ~ itself.
+  text = text.replace(/(\bcounters? on ~\. Then if) there are (\w+ or more [a-z]+ counters) on (?:it|~), sacrifice it\./g, "$1 ~ has $2 on it, sacrifice ~.");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
@@ -2603,14 +2608,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Priest of the Wakening Sun: "You may reveal a Dinosaur card from your hand. If you do, you gain 2 life.": one card or
     // none, chosen as it resolves (CR 701.20a); the rest only if one was revealed.
-    const revealOne = /^[Yy]ou may reveal an? ([A-Z][a-z]+|[a-z]+) card from your hand$/.exec(s);
+    // Sarkhan, Dragon Ascendant: "You may behold a Dragon. If you do, ...": a Dragon you control or a Dragon card revealed
+    // from your hand (CR 701.4a), chosen as it resolves.
+    const revealOne = /^[Yy]ou may (?:reveal an? ([A-Z][a-z]+|[a-z]+) card from your hand|behold an? ([A-Z][a-z]+))$/.exec(s);
     const revealDo = revealOne && /^If you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
-    if (revealOne && revealDo) {
-      const filter = parseSearchFilter(`${revealOne[1]} card`);
+    if (revealOne && revealDo && (!revealOne[2] || CREATURE_TYPES.has(revealOne[2]))) {
+      const filter = parseSearchFilter(`${revealOne[1] ?? revealOne[2]} card`);
       const before = ctx.targets.length;
       const fx = filter ? parseOne(capital(revealDo[1]!), ctx) : null;
       if (!filter || !fx?.length || ctx.targets.length !== before) return null;
-      effects.push({ type: "revealFromHand", filter, one: true }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
+      effects.push({ type: "revealFromHand", filter, one: true, ...(revealOne[2] ? { orControl: true as const } : {}) }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
       si++;
       continue;
     }
@@ -7676,11 +7683,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s) ??
       // Free the Fae: "Then put an instant, sorcery, or Faerie card from among the milled cards into your hand": one if any
       // matches, not optional.
-      /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards) into your hand$/.exec(s);
+      /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards) into your hand$/.exec(s) ??
+      // Vivien on the Hunt: "Mill five cards, then put any number of creature cards milled this way into your hand".
+      /^(?:Then )?[Pp]ut (any number of .+? cards) milled this way into your hand$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
-      const upTo = /^up to (\w+) (.+) cards?$/.exec(fromMilled[1]!);
+      const upTo = /^up to (\w+) (.+) cards?$/.exec(fromMilled[1]!) ?? /^any number of() (.+) cards$/.exec(fromMilled[1]!);
       const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       const must = /^(?:Then )?[Pp]ut an? /.test(s);
       // Gyruda, Doom of Depths: "each player mills four cards. Put a creature card with an even mana value from among the
@@ -7696,7 +7705,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (milling?.type !== "mill" || milling.who.ref !== "you" || filter === null) return null;
       // "Then put a creature, enchantment, or land card from among the milled cards onto the battlefield" (Fetch Quest): one
       // if any matches, not optional.
-      (inIf ?? effects).push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, ...(must ? {} : { upTo: true as const }), milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: fromMilled[2] === "onto the battlefield" ? ("battlefield" as const) : ("libraryTop" as const) } : {}) });
+      (inIf ?? effects).push({ type: "chooseFromGraveyard", n: upTo ? (upTo[1] ? num(upTo[1]) : 99) : 1, ...(must ? {} : { upTo: true as const }), milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: fromMilled[2] === "onto the battlefield" ? ("battlefield" as const) : ("libraryTop" as const) } : {}) });
       // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
       const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
       if (didnt) {
@@ -8175,8 +8184,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // The Misty Mountains Cold: "Then if you control four or more Treasures, sacrifice this Saga. If you do, create a 6/6
       // red Dragon creature token with flying": only if it was sacrificed, which needs the condition first.
       const condSac = ifDid[1] === "do" && prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : undefined;
+      // Charitable Levy: "If you do, draw a card, then you may search ...": several instructions.
       if (condSac?.type === "sacrifice" && condSac.what.ref === "self") {
-        const inner = parseOne(capital(ifDid[2]!), ctx);
+        const inner = attempt(ctx, () => parseOne(capital(ifDid[2]!), ctx)) ?? attempt(ctx, () => parseThen(capital(ifDid[2]!), ctx, true));
         if (!inner) return null;
         (prev as Extract<Effect, { type: "if" }>).effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
         continue;
@@ -9078,6 +9088,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si++;
         continue;
       }
+      // Winding Way: "Choose creature or land. Reveal the top four cards of your library. Put all cards of the chosen type
+      // revealed this way into your hand and the rest into your graveyard." (see the reveal "Put all" below).
+      const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(sentences[si + 1]!.replace(/\.$/, ""));
+      if (revealN && revealN[1] !== "X" && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard\.?$/.test(sentences[si + 2] ?? "")) {
+        const n = num(revealN[1]!);
+        if (!Number.isInteger(n)) return null;
+        effects.push({ type: "choose", choice: "cardType", options }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+        si += 2;
+        continue;
+      }
       const next = attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx));
       if (!next || !JSON.stringify(next).includes('"chosen":"type"')) return null;
       effects.push({ type: "choose", choice: "cardType", options }, ...(asCardType(next) as Effect[]));
@@ -9836,7 +9856,13 @@ function parseThen(s: string, ctx: Ctx, inIf = false): Effect[] | null {
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const [i, p] of parts.entries()) {
-    const fx = parseOne(i ? p.charAt(0).toUpperCase() + p.slice(1) : p, ctx);
+    let fx = attempt(ctx, () => parseOne(i ? p.charAt(0).toUpperCase() + p.slice(1) : p, ctx));
+    // "Draw a card, then you may search your library for a Plains card, ..." (Charitable Levy): the choice as it's done.
+    const may = i && !fx ? /^you may (.+)$/.exec(p) : null;
+    if (may) {
+      const inner = attempt(ctx, () => parseOne(capital(may[1]!), ctx));
+      fx = inner && [{ type: "may", effects: inner, text: may[1]! }];
+    }
     if (!fx) return null;
     out.push(...fx);
   }

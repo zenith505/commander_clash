@@ -9429,6 +9429,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "69d6b906-5461-4eba-8667-dbb8c0ce3fcb",
+  "name": "Killing Wave",
+  "manaCost": "{X}{B}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each creature, its controller sacrifices it unless they pay X life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inr",
+  "releasedAt": "2025-01-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845d80ee-1cd5-437a-90a5-40dcc657d3aa",
   "name": "Kinsbaile Aspirant",
   "manaCost": "{W}",
@@ -14640,6 +14666,42 @@
   "set": "spg",
   "releasedAt": "2024-09-27",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "71cb48e2-2328-471c-a04a-7b6461f378f4",
+  "name": "Sarkhan, Dragon Ascendant",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Druid"
+  ],
+  "oracleText": "When Sarkhan enters, you may behold a Dragon. If you do, create a Treasure token. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nWhenever a Dragon you control enters, put a +1/+1 counter on Sarkhan. Until end of turn, Sarkhan becomes a Dragon in addition to his other types and gains flying.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Behold",
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

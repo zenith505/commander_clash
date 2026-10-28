@@ -117,6 +117,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const types = [m[2]!, ...(m[3] ? [m[3]] : [])];
     return { ...st, text: line, condition: { kind: "attachedInCombatWith", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: types, text: types.join(" or ") } } };
   }
+  // Thieves' Tools: "Equipped creature can't be blocked as long as its power is 3 or less": its power as blockers are
+  // declared (rulings; CR 509.1b), the rules effect applied after power and toughness (CR 613.11).
+  if ((m = /^(Equipped|Enchanted) creature can't be blocked as long as its power is (\d+) or less$/.exec(text))) {
+    const st = parseStatic(`${m[1]} creature can't be blocked.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], power: { max: Number(m[2]) }, text: `creature with power ${m[2]} or less` } } };
+  }
   // Heroic Defiance: "Enchanted creature gets +3/+3 unless it shares a color with the most common color among all
   // permanents or a color tied for most common".
   if ((m = /^(Enchanted creature gets [+-]\d+\/[+-]\d+) unless it shares a color with the most common color among all permanents or a color tied for most common$/.exec(text))) {

@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, canBeSacrificed, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
-import { abilityProblem, activationLessCost, firstArtifactLess, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, activationLessCost, canActAtSorcerySpeed, firstArtifactLess, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -413,6 +413,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, o.id, pid)) return `${name}'s ability can't be activated now`; // CR 602.5b
   // "Activate only as an instant": when its controller could cast an instant, holding priority (rulings on Lion's Eye Diamond).
   if (ab.instantOnly && (s.priority !== pid || s.pending || s.resolving || s.triggerQueue.length)) return `${name}'s ability can be activated only when you could cast an instant`;
+  if (ab.sorceryOnly && (!canActAtSorcerySpeed(s, pid) || s.resolving || s.triggerQueue.length)) return `${name}'s ability can be activated only as a sorcery`;
   const p = player(s, pid);
   if (ab.lifeCost && payableLife(s, pid) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
@@ -438,7 +439,7 @@ export function manaAbilityCost(s: GameState, pid: PlayerId, o: GameObject, mana
 export function manaPenalty(ab: ManaAbility): number {
   // A storage land's counters are saved-up mana: spent only when nothing else will do.
   const stored = ab.produces.kind === "removeX" ? 6 : 0;
-  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.onceEver ? 8 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter ? 1 : 0);
+  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.returnSelf || ab.onceEver ? 8 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter ? 1 : 0);
 }
 
 /**

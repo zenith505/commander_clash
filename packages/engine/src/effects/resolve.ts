@@ -870,6 +870,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
       : m.kind === "setPower"
       ? { ...m, power: evalAmount(s, m.power, c) }
+      : // Wall of Tombstones: the number is locked in as the effect resolves (CR 608.2h).
+        m.kind === "setToughness"
+      ? { ...m, toughness: evalAmount(s, m.toughness, c) }
       : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
         m.kind === "addKeywords" && m.sharedAmongYours
         ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords) }

@@ -122,6 +122,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (of?.ref !== "target") return null;
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: { count: { kind: "power", of } } }], duration: "game" }];
   }
+  // Wall of Tombstones: "~'s base toughness becomes equal to 1 plus the number of creature cards in your graveyard" (lasting
+  // indefinitely): counted as it resolves and locked in (CR 608.2h), set in layer 7b (CR 613.4b).
+  if ((m = /^~'s base (power|toughness) becomes equal to (\d+) plus (the number of .+)$/.exec(s))) {
+    const n = parseCount(m[3]!, ctx);
+    if (!n || typeof n !== "object" || n.plus || n.times || n.half || n.negate) return null;
+    const amount = { ...n, plus: Number(m[2]) };
+    return [{ type: "continuous", what: { ref: "self" }, mods: [m[1] === "power" ? { kind: "setPower", power: amount } : { kind: "setToughness", toughness: amount }], duration: "game" }];
+  }
   if ((m = /^~'s base power becomes equal to (the number of .+) until end of turn$/.exec(s))) {
     const n = parseCount(m[1]!, ctx);
     if (!n) return null;

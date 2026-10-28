@@ -1749,6 +1749,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // "A kicked spell": kicked as it was cast (CR 702.33d), or a copy of one (CR 707.10).
         if (t.cast.kicked && !item?.kicked?.length) return false;
+        // "A creature spell that has an Adventure" (Garenbrig Squire): the card is an adventurer card (CR 715.2).
+        if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
         if (t.cast.keyword === "Cascade" ? !hasCascade : t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;

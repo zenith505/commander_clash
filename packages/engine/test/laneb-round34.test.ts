@@ -1,7 +1,7 @@
 // Lane B, round 34: the cards the earlier rounds skipped, least played first (`npm run popular -- --least`).
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
 import { attackProblem, botActions, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, power, spellCost, toughness, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -67,6 +67,17 @@ const deepSpawn = () => card("Deep Spawn", "Creature — Homarid", "{5}{U}{U}{U}
 const serendibDjinn = () => card("Serendib Djinn", "Creature — Djinn", "{2}{U}{U}", { cmc: 4, colors: ["U"], power: "5", toughness: "6", keywords: ["Flying"], oracleText: "Flying\nAt the beginning of your upkeep, sacrifice a land. If you sacrifice an Island this way, this creature deals 3 damage to you.\nWhen you control no lands, sacrifice this creature." });
 const formOfTheDinosaur = () => card("Form of the Dinosaur", "Enchantment", "{4}{R}{R}", { cmc: 6, colors: ["R"], oracleText: "When this enchantment enters, your life total becomes 15.\nAt the beginning of your upkeep, this enchantment deals 15 damage to target creature an opponent controls and that creature deals damage equal to its power to you." });
 const sunflareShaman = () => card("Sunflare Shaman", "Creature — Elemental Shaman", "{1}{R}", { cmc: 2, colors: ["R"], power: "2", toughness: "1", oracleText: "{1}{R}, {T}: This creature deals X damage to any target and X damage to itself, where X is the number of Elemental cards in your graveyard." });
+const decoratedGriffin = () => card("Decorated Griffin", "Creature — Griffin", "{4}{W}", { cmc: 5, colors: ["W"], power: "2", toughness: "3", keywords: ["Flying"], oracleText: "Flying\n{1}{W}: Prevent the next 1 combat damage that would be dealt to you this turn." });
+const banshee = () => card("Banshee", "Creature — Spirit", "{2}{B}{B}", { cmc: 4, colors: ["B"], power: "0", toughness: "1", oracleText: "{X}, {T}: This creature deals half X damage, rounded down, to any target, and half X damage, rounded up, to you." });
+const wallOfTombstones = () => card("Wall of Tombstones", "Creature — Wall", "{1}{B}", { cmc: 2, colors: ["B"], power: "0", toughness: "1", keywords: ["Defender"], oracleText: "Defender (This creature can't attack.)\nAt the beginning of your upkeep, this creature's base toughness becomes equal to 1 plus the number of creature cards in your graveyard. (This effect lasts indefinitely.)" });
+const garenbrigSquire = () => card("Garenbrig Squire", "Creature — Human Soldier", "{1}{G}", { cmc: 2, colors: ["G"], power: "2", toughness: "2", oracleText: "Whenever you cast a creature spell that has an Adventure, this creature gets +1/+1 until end of turn. (It doesn't need to have gone on the adventure first.)" });
+const edgewallInnkeeper = () => card("Edgewall Innkeeper", "Creature — Human Peasant", "{G}", { cmc: 1, colors: ["G"], power: "1", toughness: "1", oracleText: "Whenever you cast a creature spell that has an Adventure, draw a card. (It doesn't need to have gone on the adventure first.)" });
+const wandermare = () => card("Wandermare", "Creature — Horse", "{1}{G}{W}", { cmc: 3, colors: ["G","W"], power: "3", toughness: "3", oracleText: "Whenever you cast a creature spell that has an Adventure, put a +1/+1 counter on this creature. (It doesn't need to have gone on the adventure first.)" });
+const highSeas = () => card("High Seas", "Enchantment", "{2}{U}", { cmc: 3, colors: ["U"], oracleText: "Red creature spells and green creature spells cost {1} more to cast." });
+const brazenBorrower = () => scry("adventure", [
+  { name: "Brazen Borrower", mana_cost: "{1}{U}{U}", type_line: "Creature — Faerie Rogue", oracle_text: "Flash\nFlying\nThis creature can block only creatures with flying.", power: "3", toughness: "1" },
+  { name: "Petty Theft", mana_cost: "{1}{U}", type_line: "Instant — Adventure", oracle_text: "Return target nonland permanent an opponent controls to its owner's hand." },
+], { keywords: ["Flying", "Flash"] });
 
 const creature = (name: string, typeLine: string, manaCost: string, p: number, t: number, extra: Partial<CardDef> = {}) => card(name, typeLine, manaCost, { power: String(p), toughness: String(t), ...extra });
 const greenBear = () => creature("Green Bear", "Creature — Bear", "{1}{G}", 2, 2, { cmc: 2, colors: ["G"] });
@@ -86,6 +97,7 @@ describe("Lane B round 34", () => {
   it("compiles every card fully", () => {
     supported(stormEntity(), predatorsGambit(), lingeringDeath(), crowdOfTrueBelievers(), viperCruelConspirator(), aboroth(), sabotageStrategist(), radiantKavu());
     supported(goblinSkiPatrol(), godhunterOctopus(), iriniSengir(), gravebaneZombie(), deepSpawn(), serendibDjinn(), formOfTheDinosaur(), sunflareShaman());
+    supported(decoratedGriffin(), banshee(), wallOfTombstones(), garenbrigSquire(), edgewallInnkeeper(), wandermare(), highSeas());
   });
 });
 
@@ -327,5 +339,88 @@ describe("Damage and dying", () => {
     toZone(s0, ap, greenBear(), "graveyard");
     const s = settle(run(s0, planActivate(s0, ap, shaman, 0, [ply(opp)])));
     expect([life(s, opp), zone(s, shaman)]).toEqual([38, "graveyard"]);
+  });
+});
+
+describe("More", () => {
+  it("Decorated Griffin: each activation prevents the next 1 combat damage to you this turn, not other damage", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const griffin = putOnBattlefield(s0, opp, decoratedGriffin());
+    const bear = putOnBattlefield(s0, ap, greenBear());
+    const drake = putOnBattlefield(s0, ap, windDrake());
+    s0.players[opp]!.manaPool.W = 2;
+    s0.players[opp]!.manaPool.C = 2;
+    s0.players[ap]!.manaPool.R = 1;
+    let s = s0;
+    for (let i = 0; i < 2; i++) {
+      while (waitingOn(s) !== opp) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      s = settle(run(s, planActivate(s, opp, griffin, 0)));
+    }
+    // Shock isn't combat damage: it deals its full 2.
+    s = settle(castNow(s, ap, toZone(s, ap, shock(), "hand"), [ply(opp)]));
+    expect(life(s, opp)).toBe(38);
+    s = attackWith(s, [bear, drake], opp);
+    for (let i = 0; i < 50 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [] });
+    // Two sources at once: the player picks which one each 1-point shield applies to (CR 615.7).
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    for (let k = 0; k < 2; k++) {
+      expect(s.pending).toMatchObject({ kind: "chooseOption", player: opp, what: "damageShield" });
+      s = act(s, { type: "chooseOption", player: opp, choice: (s.pending as { options: string[] }).options[0]! });
+    }
+    s = passUntil(s, "end");
+    // 4 combat damage, 2 of it prevented.
+    expect(life(s, opp)).toBe(36);
+  });
+
+  it("Banshee: half X rounded down to the target, half X rounded up to you", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const banshee0 = putOnBattlefield(s0, ap, banshee());
+    const s = settle(run(s0, planActivate(s0, ap, banshee0, 0, [ply(opp)], undefined, undefined, 5)));
+    expect([life(s, opp), life(s, ap)]).toEqual([38, 37]);
+  });
+
+  it("Wall of Tombstones: each upkeep its base toughness becomes 1 plus the creature cards in your graveyard, locked in then", () => {
+    const { s: s0, ap } = setup([]);
+    s0.players[ap]!.hand = [];
+    const wall = putOnBattlefield(s0, ap, wallOfTombstones());
+    toZone(s0, ap, greenBear(), "graveyard");
+    toZone(s0, ap, windDrake(), "graveyard");
+    toZone(s0, ap, shock(), "graveyard");
+    let s = settle(toNextUpkeep(s0, ap));
+    expect(pt(s, wall)).toBe("0/3");
+    toZone(s, ap, greenBear(), "graveyard");
+    expect(pt(s, wall)).toBe("0/3");
+  });
+
+  it("Garenbrig Squire: +1/+1 for a creature spell that has an Adventure, not the Adventure itself nor another creature spell", () => {
+    const { s: s0, ap, ids, opp } = setup([brazenBorrower(), brazenBorrower(), greenBear()]);
+    const squire = putOnBattlefield(s0, ap, garenbrigSquire());
+    const victim = putOnBattlefield(s0, opp, quietGrove());
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(victim)], undefined, "auto", undefined, { face: 1 })));
+    expect([zone(s, victim), pt(s, squire)]).toEqual(["hand", "2/2"]);
+    s = settle(castNow(s, ap, ids[2]!));
+    expect(pt(s, squire)).toBe("2/2");
+    s = settle(castNow(s, ap, ids[1]!));
+    expect([zone(s, ids[1]!), pt(s, squire)]).toEqual(["battlefield", "3/3"]);
+  });
+
+  it("Edgewall Innkeeper and Wandermare: a card for, and a +1/+1 counter for, a creature spell that has an Adventure", () => {
+    const { s: s0, ap, ids } = setup([brazenBorrower(), greenBear()]);
+    putOnBattlefield(s0, ap, edgewallInnkeeper());
+    const mare = putOnBattlefield(s0, ap, wandermare());
+    const hand = s0.players[ap]!.hand.length;
+    let s = settle(castNow(s0, ap, ids[1]!));
+    expect([s.players[ap]!.hand.length, pt(s, mare)]).toEqual([hand - 1, "3/3"]);
+    s = settle(castNow(s, ap, ids[0]!));
+    expect([s.players[ap]!.hand.length, pt(s, mare)]).toEqual([hand - 1, "4/4"]);
+  });
+
+  it("High Seas: red creature spells and green creature spells cost {1} more; a green noncreature spell doesn't", () => {
+    const { s: s0, ap, ids, opp } = setup([greenBear(), elementalShade(), windDrake(), quietGrove()]);
+    const extra = (s: GameState) => ids.map((id) => spellCost(s, ap, s.objects[id]!).extra);
+    const before = extra(s0);
+    putOnBattlefield(s0, opp, highSeas());
+    expect(extra(s0).map((n, i) => n - before[i]!)).toEqual([1, 1, 0, 0]);
   });
 });

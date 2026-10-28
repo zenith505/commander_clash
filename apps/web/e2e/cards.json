@@ -13685,6 +13685,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7f3b6c25-b855-4ea5-a8ad-d954a6cdffb7",
+  "name": "Prototype Portal",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — When this artifact enters, you may exile an artifact card from your hand.\n{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
   "name": "Pyroblast",
   "manaCost": "{R}",
@@ -19681,6 +19705,28 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "31f15274-301b-47c5-ba19-0ced04520878",
+  "name": "Wayfarer's Bauble",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Sacrifice this artifact: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

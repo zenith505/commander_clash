@@ -1060,7 +1060,7 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
       return !!host && host.zone === "battlefield" && objIsType(s, host, "Creature") && controllerOf(s, host) === pid && objectMatches(s, e.filter, obj(s, id), pid, false);
     });
   const shares = e.filter.sharesPermanentTypeWithSubject ? subjectPermanentTypes(s) : undefined;
-  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))) && (!shares || (id !== shares.id && characteristics(s, obj(s, id)).types.some((t) => shares.types.includes(t)))));
+  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId && !(e.filter.notSourceUnlessArtifact && objIsType(s, obj(s, id), "Artifact"))) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))) && (!shares || (id !== shares.id && characteristics(s, obj(s, id)).types.some((t) => shares.types.includes(t)))));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {

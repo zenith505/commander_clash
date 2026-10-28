@@ -1,8 +1,8 @@
 # Roadmap
 
-26,846 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,867 of
-9,979 (88%).
+26,884 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,882 of
+9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -506,6 +506,27 @@ line blocks.
    of Acclaim (spells with "choose both instead": only triggers do it so far), Symmetry Matrix, Icebreaker Kraken, Mass
    Diminish, Display of Power, Jason Bright, Spider-Man 2099, Blood for Bones, Quakebringer, Widespread Brutality,
    Belligerent Yearling, Lorthos, Zidane, Discerning Financier, Dragonspark Reactor, Eight-and-a-Half-Tails.
+   Round 190 went on from the top: "that many plus one of each of those kinds of counters" on any permanent you control
+   (Pir, Imaginative Rascal), granted fabricate (Cayth, Famed Mechanist, with Pir), "as long as it was cast" on a static
+   ability (The Tarrasque), a revealed creature put onto the battlefield tapped and attacking (Raph & Mikey), "until you
+   reveal X land cards, where X is ..." (The Ring Goes South), "sacrifice another creature or an artifact" (Gut, True
+   Soul Zealot: Gut itself only while it's an artifact), "whenever you create a Blood token" (Voldaren Bloodcaster; a
+   token-created trigger now sees the token on the battlefield when several enter together), "remove all but one +1/+1
+   counter from it, then you gain 1 life for each ..." (Lily Bowen), Fractals with the total power each player's exiled
+   creatures had (Oversimplify), "target artifact creature's controller sacrifices it. That player may search ..."
+   (Arcum Dagsson), Scrap Mastery, Wedding Announcement, Hex Magic, "whenever ~ or equipped creature attacks" with "its
+   power" (Tanuki Transplanter), Thada Adel ("search that player's library ... Until end of turn, you may play that
+   card").
+   Out after round 190 (looked at, not done): Sewer Nemesis (done in Lane B's round B21, left to it), Aether Refinery
+   ("pay one or more {E}"), Emeritus of Ideation ("becomes prepared"), Welcome to . . . // Jurassic Park, Case of the
+   Uneaten Feast, Raul, Trouble Shooter (cards milled this turn), Cait Sith, Scouring Swarm, Brigid's back face, Bring to
+   Light (colors of mana spent), Fractured Powerstone (planar die), The Lost and the Damned, Oft-Nabbed Goat (only your
+   opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
+   Appropriation, Ixhel, Cybership, Impulsivity, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
+   Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
+   Inexorable, Yuffie, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
+   Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
+   Drowner of Truth, Command the Dreadhorde.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

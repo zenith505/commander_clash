@@ -655,6 +655,8 @@ export interface TargetSpec {
   notId?: ObjectId;
   /** With `notSource`: "target creatures and/or other planeswalkers" (Sorin, Lord of Innistrad): the source can be chosen while it's a creature (rulings). */
   notSourceUnlessCreature?: true;
+  /** With `notSource`, a permanent picked (not targeted): "you may sacrifice another creature or an artifact" (Gut, True Soul Zealot): the source too while it's an artifact (rulings). */
+  notSourceUnlessArtifact?: true;
   /**
    * "A creature of their choice that dealt combat damage to you this turn" (Witch-king of Angmar): "you" being the resolving
    * ability's controller, whoever picks it (turnLog.combatDamagedBy, this object as it was then).
@@ -1599,7 +1601,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked"; not?: true }
+  | { kind: "self"; is: "attacking" | /** "~ is blocking" (CR 509.1g). */ "blocking" | /** "~ is blocked": an attacking creature blocked this combat, even with its blockers gone (CR 509.1h). */ "blocked" | /** "At least one creature is blocking ~" (Grizzled Wolverine): blocked, by a creature still blocking it. */ "hasBlockers" | /** "Two or more creatures are blocking ~" (Rampaging Cyclops). */ "twoOrMoreBlockers" | "attackingOrBlocking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | /** "If ~ attacked or blocked this combat" (Kjeldoran Home Guard): declared as one in this combat (CR 508.1, 509.1). */ "attackedOrBlockedThisCombat" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared" | /** Its impending cost was paid and it has a time counter on it (CR 702.176a). */ "impending" | /** "If a counter was put on ~ this turn" (Wakka): as it entered too (CR 122.6). */ "countersPutThisTurn" | /** "~ isn't legendary if it's a token" (Aeve). */ "token" | /** "If ~ was dealt damage this turn" (Wall of Resistance): read by triggers only. */ "dealtDamageThisTurn" | /** "If ~ dealt damage to an opponent this turn" (Whirling Dervish): read by triggers only. */ "dealtDamageToOpponentThisTurn" | /** "As long as it has dealt damage" (Karakyk Guardian's "hasn't dealt damage yet" is its `not`): since it became this object. */ "hasDealtDamage" | /** "If ~ wasn't kicked" (Skizzik): the permanent's spell was (CR 702.33d). */ "kicked" | /** "As long as it was cast" (The Tarrasque): it entered as a resolving spell, from any zone (rulings). */ "cast"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -2310,9 +2312,10 @@ export type Effect =
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
    * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
-   * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control.
+   * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control. Scrap Mastery:
+   * the same with artifacts (`cardType`).
    */
-  | { type: "livingDeath" }
+  | { type: "livingDeath"; cardType?: "Artifact" }
   /**
    * "Put all creatures on the bottom of their owners' libraries" (Terminus): all at once (rulings); each owner orders
    * their cards first, without revealing the order (CR 401.4).
@@ -2566,7 +2569,7 @@ export type Effect =
      */
     eachOther?: { among: TargetSpec; self?: true; caster?: true; onlySelf?: true }; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept;
     /** "That player copies it and may choose new targets for the copy" (Bonus Round): the spell's controller copies it and chooses the copy's targets, not this ability's controller. */ byController?: true }
-  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
+  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; /** "allButOne": "remove all but one +1/+1 counter from it" (Lily Bowen). */ n: Amount | "all" | "allButOne"; /** "Remove a hope counter from ~. If you do, ..." (Dawn of a New Age): whether that many were removed is what "if you do" asks. */ setsDid?: true }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   /**
    * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
@@ -2625,6 +2628,8 @@ export type Effect =
       /** "You may put that card onto the battlefield. If you don't, put it into your hand." (Songbirds' Blessing): `found` is "battlefield", if its controller chooses and it can go there. */
       mayElseHand?: true;
       tapped?: true;
+      /** "Onto the battlefield tapped and attacking" (Raph & Mikey, CR 508.4): during combat, attacking a player, planeswalker or battle its controller chooses (rulings). */
+      attacking?: true;
       /** "Shuffle": "then shuffles all other cards revealed this way into their library" (Polymorph), a shuffle of the library. */
       /** "Graveyard": "and all other cards revealed this way into your graveyard" (Hermit Druid): the whole library if none is found. */
       rest: "exile" | "bottom" | "shuffle" | "graveyard";
@@ -4230,6 +4235,8 @@ export interface TriggeredAbility {
    * ("put a wind counter on it").
    */
   tappedFilter?: TargetSpec;
+  /** "Whenever you create a Blood token" (Voldaren Bloodcaster): event "youCreateToken" for a token matching this only. */
+  createdFilter?: TargetSpec;
   /**
    * "If it isn't being declared as an attacker" (Verity Circle): not when it's tapped as it's declared as an attacker
    * (CR 508.1f); tapped any other way, an attacking one too (rulings).

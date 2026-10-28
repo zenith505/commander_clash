@@ -1,6 +1,6 @@
 import type { Effect, ObjRef, TokenSpec } from "../abilities";
 import { defOf, isPermanentCard, isType, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, obj, opponents, player } from "../game";
+import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, fireOnceEntered, livingPlayers, log, moveObject, nameOf, newObject, obj, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
 import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -429,7 +429,8 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     const { same: k, extra } = tokenBatch(s, pid, e.token, each ? amountNow(s, e.n, { ...ctx, eachOne: pid }) : n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
     const defender = e.attackingEvent ? eventDefender(s, ctx, pid) : e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
-    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
+    // Oversimplify: each player's own number of counters (PlayerRef eachOne).
+    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, JSON.stringify(e.counters.n).includes('"eachOne"') ? { ...ctx, eachOne: pid } : ctx) } : undefined;
     const blocking = e.blocking ? objects(s, e.blocking, ctx)[0] : undefined;
     const tapped = e.tapped || (e.attacking && !e.untapped);
     const opts = { tapped, attacking: defender, ...(counters ? { counters } : {}), ...(blocking ? { blocking } : {}) };
@@ -543,7 +544,7 @@ function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
   ((s.turnLog ??= {}).tokensCreated ??= []).push({ player: pid, subtypes: [...defOf(s, o).subtypes] });
   (s.zoneBatch ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, to: "battlefield", owner: o.owner, notCard: true, card: o.cardId, createdBy: pid });
   // "Whenever you create a token" (not a copy of a permanent spell becoming one, CR 111.12).
-  fireEvent(s, { type: "tokenCreated", player: pid, id: o.id });
+  fireOnceEntered(s, { type: "tokenCreated", player: pid, id: o.id });
 }
 
 /** "All attack ...": the answer for every token still to be asked about, at once (an option with several tokens left). */

@@ -119,7 +119,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
   // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
   // their library (CR 701.23a); a permanent found comes under your control.
-  const theirs = /^Search (target opponent's|target player's) library for (an? (?:.+? )?card) and (put that card onto the battlefield under your control|exile it)$/.exec(s);
+  const theirs = /^[Ss]earch (target opponent's|target player's|that player's) library for (an? (?:.+? )?card) and (put that card onto the battlefield under your control|exile it)$/.exec(s);
   if (theirs) {
     const filter = parseSearchFilter(theirs[2]!.replace(/^an? /, ""));
     if (filter === null) return null;

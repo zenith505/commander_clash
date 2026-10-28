@@ -595,6 +595,16 @@ type EnteringTogether = { ids: ObjectId[]; events: Parameters<typeof fireEvent>[
 let together: EnteringTogether | null = null;
 
 /**
+ * An event that happens as permanents enter: while some enter together (enterTogether), after all of them have, so
+ * what it triggers sees them all on the battlefield (CR 603.2, 603.6a). "Whenever you create a Blood token, if you
+ * control five or more Blood tokens" (Voldaren Bloodcaster) counts the tokens created with it.
+ */
+export function fireOnceEntered(s: GameState, ev: Parameters<typeof fireEvent>[1]) {
+  if (together) together.events.push(ev);
+  else fireEvent(s, ev);
+}
+
+/**
  * Several cards put onto the battlefield at the same time by one instruction (Collected Company, Genesis Wave): each
  * enters without seeing the others, so their replacement effects and "enters with" counts don't count each other
  * (CR 614.12), nor can one enter as a copy of another; then they're all there before anything triggers, so each one's

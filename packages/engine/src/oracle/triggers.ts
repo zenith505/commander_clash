@@ -260,7 +260,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm). Simian Sling:
     // "Whenever ~ or equipped creature becomes blocked, it deals 1 damage to defending player": whichever became blocked
     // (rulings), the subject either way.
-    const whichever = !!m[1] && event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text);
+    // Tanuki Transplanter: "Whenever ~ or equipped creature attacks, add an amount of {G} equal to its power": the power of
+    // whichever attacked, as the ability resolves or as it last existed (rulings).
+    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
@@ -1989,6 +1991,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (expend) {
     const t = parseTrigger(`Whenever you proliferate, ${expend[2]}`);
     return t && t !== "fail" && t.event === "youProliferate" && Object.keys(t).every((k) => k === "event" || k === "body") ? { ...t, event: "youExpend", expend: Number(expend[1]) } : "fail";
+  }
+  // Voldaren Bloodcaster: "Whenever you create a Blood token, ...": once for each token of that kind you create (CR 111.2).
+  const createdKind = /^Whenever you create an? ([A-Z][a-z]+) token, (.+)$/.exec(line);
+  if (createdKind) {
+    const filter = pickFilter(createdKind[1]!);
+    const t = parseTrigger(`Whenever you create a token, ${createdKind[2]}`);
+    if (!filter || filter.kind !== "object" || !filter.subtypes?.length || filter.types?.length) return "fail";
+    return t && t !== "fail" && t.event === "youCreateToken" ? { ...t, createdFilter: { ...filter, text: `${createdKind[1]} token` } } : "fail";
   }
   // Marshal's Anthem: "When ~ enters, return up to X target creature cards from your graveyard to the battlefield, where X
   // is the number of times ~ was kicked": X is known as the ability is put on the stack, when its targets are chosen

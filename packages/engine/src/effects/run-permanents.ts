@@ -804,7 +804,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) {
         const had = o.counters[e.counter] ?? 0;
         const can = removableCounters(s, o, e.counter);
-        const want = e.n === "all" ? had : amountNow(s, e.n, ctx);
+        const want = e.n === "all" ? had : e.n === "allButOne" ? had - 1 : amountNow(s, e.n, ctx);
         const n = Math.min(can, want);
         if (n <= 0) continue;
         if (e.setsDid && s.resolving) s.resolving.did = n === want;

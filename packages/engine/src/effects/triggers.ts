@@ -1023,7 +1023,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "tokenCreated") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCreateToken");
+      const made = s.objects[ev.id];
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youCreateToken" && (!t.createdFilter || (!!made && objectMatches(s, t.createdFilter, made, ev.player, false))));
     }
   } else if (ev.type === "lifeLost") {
     // Every other player is an opponent (CR 102.3); "that player" is the one who lost life, "that much" how much.
@@ -1250,7 +1251,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       return { player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid, opponent: opp && !a.attackingPermanent, opponentOrPlaneswalker: opp && a.attackingPermanent?.battleController === undefined };
     };
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host !== "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // "Whenever ~ or equipped creature attacks" (Tanuki Transplanter): about ~ itself here, the subject.
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && t.host === "orSelf" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // Glimmer Lens: "Whenever equipped creature and at least one other creature attack" (`withOthers`, as for battalion).
     addHosted(o, (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).

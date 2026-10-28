@@ -17,6 +17,8 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
   if (s === "Put all creatures on the bottom of their owners' libraries") return [{ type: "putAllOnBottom", filter: { kind: "object", types: ["Creature"], text: "creature" } }];
   // Living Death: each part for all players at once (rulings, Effect livingDeath).
   if (s === "Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath" }];
+  // Scrap Mastery: the same with artifacts (rulings: only the cards exiled by the first part come back).
+  if (s === "Each player exiles all artifact cards from their graveyard, then sacrifices all artifacts they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath", cardType: "Artifact" }];
   if (ctx.spell) return undefined;
   // Memory Jar: each player's hand, face down, then everyone draws seven (CR 608.2c); at the next end step, everyone
   // discards their hand and gets back the cards they exiled (only the same objects, CR 400.7).
@@ -1338,6 +1340,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const half = roundOf(m[3], ctx);
     if (among?.ref !== "target" || !filter || filter.kind !== "object" || !half) return null;
     return [{ type: "pick", who: { ref: "you" }, among, filter, n: { count: { kind: "permanents", filter, whose: among }, half }, action: "bounce" }];
+  }
+  // Gut, True Soul Zealot: "you may sacrifice another creature or an artifact": an artifact or a creature other than the
+  // source, and the source too while it's an artifact (rulings).
+  if ((m = /^[Ss]acrifice another creature or an artifact$/.exec(s)) && !ctx.spell) {
+    const filter = pickFilter("artifact or creature");
+    return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, notSourceUnlessArtifact: true, text: "other creature or an artifact" }, n: 1, action: "sacrifice" }] : null;
   }
   // "You may sacrifice another creature" (Cavalier of Night): one other than the source (a permanent's ability).
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {

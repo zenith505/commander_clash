@@ -1709,6 +1709,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Wedding Announcement: "Then if ~ has three or more invitation counters on it, transform it" after other instructions.
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\./g, "$1transform ~.");
   text = text.replace(/(\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\.$/, "$1transform ~.");
+  // Charitable Levy: "put a collection counter on ~. Then if there are three or more collection counters on it, sacrifice
+  // it. If you do, ...": the counters on ~, then ~ itself.
+  text = text.replace(/(\bcounters? on ~\. Then if) there are (\w+ or more [a-z]+ counters) on (?:it|~), sacrifice it\./g, "$1 ~ has $2 on it, sacrifice ~.");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
@@ -7982,8 +7985,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // The Misty Mountains Cold: "Then if you control four or more Treasures, sacrifice this Saga. If you do, create a 6/6
       // red Dragon creature token with flying": only if it was sacrificed, which needs the condition first.
       const condSac = ifDid[1] === "do" && prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : undefined;
+      // Charitable Levy: "If you do, draw a card, then you may search ...": several instructions.
       if (condSac?.type === "sacrifice" && condSac.what.ref === "self") {
-        const inner = parseOne(capital(ifDid[2]!), ctx);
+        const inner = attempt(ctx, () => parseOne(capital(ifDid[2]!), ctx)) ?? attempt(ctx, () => parseThen(capital(ifDid[2]!), ctx, true));
         if (!inner) return null;
         (prev as Extract<Effect, { type: "if" }>).effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
         continue;
@@ -9626,7 +9630,13 @@ function parseThen(s: string, ctx: Ctx, inIf = false): Effect[] | null {
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const [i, p] of parts.entries()) {
-    const fx = parseOne(i ? p.charAt(0).toUpperCase() + p.slice(1) : p, ctx);
+    let fx = attempt(ctx, () => parseOne(i ? p.charAt(0).toUpperCase() + p.slice(1) : p, ctx));
+    // "Draw a card, then you may search your library for a Plains card, ..." (Charitable Levy): the choice as it's done.
+    const may = i && !fx ? /^you may (.+)$/.exec(p) : null;
+    if (may) {
+      const inner = attempt(ctx, () => parseOne(capital(may[1]!), ctx));
+      fx = inner && [{ type: "may", effects: inner, text: may[1]! }];
+    }
     if (!fx) return null;
     out.push(...fx);
   }

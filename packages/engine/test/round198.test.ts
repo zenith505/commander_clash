@@ -2,7 +2,9 @@
 // Pennant, Kindred Boon, From the Rubble), "unless its controller has ~ deal damage to them equal to ~'s power" (Combustion
 // Man), "card not named ~" targets and "for each permanent you control but don't own" (Staff of Eden, Vault's Key), "can't
 // be blocked as long as its power is 3 or less" (Thieves' Tools), "As ~ enters, roll X d6" for its counters (Neverwinter
-// Hydra), "For each creature, its controller sacrifices it unless they pay X life" (Killing Wave).
+// Hydra), "For each creature, its controller sacrifices it unless they pay X life" (Killing Wave), "Then if there are three
+// or more collection counters on it, sacrifice it. If you do, draw a card, then you may search ..." (Charitable Levy),
+// "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -42,7 +44,9 @@ const staffOfEdenVaultsKey = card("Staff of Eden, Vault's Key", "Legendary Artif
 const thievesTools = card("Thieves' Tools", "Artifact — Equipment", "{1}{B}", {"cmc":2,"keywords":["Treasure","Equip"],"oracleText":"When this Equipment enters, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nEquipped creature can't be blocked as long as its power is 3 or less.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)","colors":["B"],"colorIdentity":["B"]});
 const neverwinterHydra = card("Neverwinter Hydra", "Creature — Hydra", "{X}{X}{G}{G}", {"cmc":2,"power":"0","toughness":"0","keywords":["Trample","Ward"],"oracleText":"As this creature enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of those results.\nTrample\nWard {4} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {4}.)","colors":["G"],"colorIdentity":["G"]});
 const killingWave = card("Killing Wave", "Sorcery", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"For each creature, its controller sacrifices it unless they pay X life.","colors":["B"],"colorIdentity":["B"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave];
+const charitableLevy = card("Charitable Levy", "Enchantment", "{1}{W}", {"cmc":2,"keywords":[],"oracleText":"Noncreature spells cost {1} more to cast.\nWhenever a player casts a noncreature spell, put a collection counter on this enchantment. Then if there are three or more collection counters on it, sacrifice it. If you do, draw a card, then you may search your library for a Plains card, put it onto the battlefield tapped, then shuffle.","colors":["W"],"colorIdentity":["W"]});
+const edeaPossessedSorceress = card("Edea, Possessed Sorceress", "Legendary Creature — Human Warlock", "{2}{U}{B}{R}", {"cmc":5,"power":"2","toughness":"5","keywords":["Ward"],"oracleText":"Ward {2}\nAt the beginning of combat on your turn, gain control of target creature an opponent controls until end of turn. Untap that creature. It gains haste until end of turn.\nWhenever a creature you control but don't own dies, return it to the battlefield under its owner's control and you draw a card.","colors":["B","R","U"],"colorIdentity":["B","R","U"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -248,5 +252,53 @@ describe("Round 198", () => {
     expect(s.objects[big]!.zone).toBe("battlefield");
     expect(s.objects[small]!.zone).toBe("graveyard");
     expect(s.players[opp]!.life).toBe(36);
+  });
+  it("Charitable Levy: a collection counter for each noncreature spell; at three it's sacrificed, then a card and a Plains", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const levy = putOnBattlefield(s0, ap, charitableLevy);
+    const plains = into(s0, ap, card("Plains", "Basic Land — Plains"), "library");
+    // Not the card it draws.
+    s0.players[ap]!.library = [...s0.players[ap]!.library.slice(1), plains];
+    const spell = card("Test Ponder", "Sorcery", "{U}", { cmc: 1, oracleText: "Draw a card.", colors: ["U"] });
+    let s = s0;
+    // Its controller's spells count too ("a player"), each costing {1} more.
+    for (let i = 0; i < 3; i++) {
+      const id = into(s, ap, spell, "hand");
+      s = run(s, planCast(s, ap, id));
+      if (i < 2) {
+        s = resolveAll(s);
+        expect(s.objects[levy]!.counters.collection).toBe(i + 1);
+      }
+    }
+    const hand = s.players[ap]!.hand.length;
+    s = resolveAll(s);
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true } as Action);
+    if (s.pending?.kind === "searchLibrary") s = act(s, { type: "searchLibrary", player: ap, found: [plains] } as Action);
+    s = resolveAll(s);
+    expect(s.objects[levy]!.zone).toBe("graveyard");
+    // Levy's card, then the spell's (the trigger resolves first, rulings).
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.objects[plains]!.zone).toBe("battlefield");
+    expect(s.objects[plains]!.tapped).toBe(true);
+  });
+
+  it("Edea, Possessed Sorceress: a creature you control but don't own that dies returns to its owner, and you draw", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, edeaPossessedSorceress);
+    const stolen = putOnBattlefield(s0, opp, creature("Test Their Ox", "Ox", 2));
+    s0.objects[stolen]!.controller = ap;
+    const mine = putOnBattlefield(s0, ap, creature("Test Ox", "Ox", 2));
+    invalidateCharacteristics(s0);
+    const hand = s0.players[ap]!.hand.length;
+    s0.objects[stolen]!.damage = 2;
+    s0.objects[mine]!.damage = 2;
+    invalidateCharacteristics(s0);
+    let s = act(s0, { type: "passPriority", player: waitingOn(s0)! });
+    s = resolveAll(s);
+    expect(s.objects[stolen]!.zone).toBe("battlefield");
+    expect(s.objects[stolen]!.controller).toBe(opp);
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
   });
 });

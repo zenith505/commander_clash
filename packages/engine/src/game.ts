@@ -6921,6 +6921,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -6948,6 +6949,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(countersRemoved !== undefined ? { countersRemoved } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
+    // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
+    ...(!ab.station && tappedOne !== undefined ? { stationed: { id: tappedOne, zc: obj(s, tappedOne).zoneChanges ?? 0, power: power(s, obj(s, tappedOne)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),

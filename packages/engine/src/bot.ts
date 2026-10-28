@@ -3041,6 +3041,8 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
       return ok.filter((o) => o.isToken).slice(0, strikers).map((o) => o.id);
     }
     if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
+    // Sweep (Plow Through Reito), Landslide: the lands already tapped for mana, each one more for the spell.
+    if (here.filter.subtypes?.length && (here.action === "bounce" || next?.type === "damage")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
     // "Exile any number of ... until ~ leaves the battlefield" (Abdel Adrian, Glorious Protector): the nontoken ones that
     // come back with an enters ability, and, when a token is made for each, cheap tokens.
     if (next?.type === "exile" && next.until) {

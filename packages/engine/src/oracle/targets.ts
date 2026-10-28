@@ -531,6 +531,11 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const g = parseGroup(subjectAnd[1]!);
     return g?.other && !/ (?:with|that|who|which) /i.test(subjectAnd[1]!) ? { ref: "each", filter: g.filter, andSubject: true } : null;
   }
+  // "Sacrifice ~: Enchanted creature and other creatures that share a creature type with it get +1/+1 until end of turn"
+  // (Crown of Vigor): what the Aura enchanted, as it last existed once it's sacrificed, and every other creature sharing
+  // a creature type with it as this resolves (CR 608.2h).
+  if (!ctx.spell && /^enchanted creature and other creatures that share a creature type with it$/i.test(x))
+    return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature that shares a creature type with enchanted creature" }, andAttached: true };
   // "It and other creatures you control that share a creature type with it each get +2/+0 ... until end of turn" (Haunted
   // One): the source while it's still there, and the others as this resolves (CR 611.2c).
   // "~ and Drakes you control each get +X/+X" (Alandra, Sky Dreamer): the same, the source counted once if it's one too.

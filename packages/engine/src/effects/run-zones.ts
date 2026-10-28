@@ -239,8 +239,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const ch = characteristics(s, o);
         (s.resolving.sacrificedThisWay ??= []).push({ id, power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types], subtypes: [...ch.subtypes], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), ...(o.isCommander ? { commander: true as const } : {}) });
       }
-      if (e.action === "bounce" && s.resolving) (s.resolving.bouncedThisWay ??= []).push({ id, subtypes: [...characteristics(s, o).subtypes] });
+      const bounced = e.action === "bounce" && s.resolving ? { id, subtypes: [...characteristics(s, o).subtypes] } : undefined;
+      if (bounced) (s.resolving!.bouncedThisWay ??= []).push(bounced);
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
+      if (bounced && s.objects[id]?.zone === "hand") (bounced as { returned?: true }).returned = true;
     }
 }
 

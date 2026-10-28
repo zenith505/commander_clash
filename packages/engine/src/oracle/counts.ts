@@ -361,6 +361,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.excessDamage && /^(?:the )?(?:amount of )?excess damage dealt(?: to (?:that creature|that permanent))? this way$|^that excess damage$/i.test(p)) return { count: { kind: "excessThisWay" } };
   // "For each creature tapped this way", "the number of creatures tapped this way" after "tap any number of untapped
   // creatures you control" (Harmony of Nature), or in its reflexive trigger (Teferi Akosa of Zhalfir).
+  // Keldon Battlewagon: "Tap an untapped creature you control: ~ gets +X/+0 until end of turn, where X is the power of the
+  // creature tapped this way"; Unerring Sling: "the tapped creature's power". compile() checks the ability has that cost.
+  if (ctx?.activated && /^(?:the power of the creature tapped this way|the tapped creature's power)$/i.test(p)) return { count: { kind: "stationPower" } };
   if (ctx?.tappedThisWay && /^(?:the number of )?(?:[A-Z][a-z]+ )?(?:creatures?|artifacts?|Gates?|Humans?|permanents?) tapped this way$/.test(p)) return { count: { kind: "tappedThisWay" } };
   // "For each card manifested this way" (Kozilek, the Broken Reality), after its manifest-from-hand instruction.
   if (ctx?.manifested && each && /^card manifested this way$/i.test(p)) return { count: { kind: "manifestedThisWay" } };
@@ -409,6 +412,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Sweep (Plow Through Reito): "for each Plains returned this way", "the number of Mountains returned this way".
+  if (ctx?.bouncedAny && (m = /^(?:the number of )?([A-Z][a-z]+) returned this way$/.exec(p)) && (each || p.startsWith("the number")) && singularWord(m[1]!) === singularWord(ctx.bouncedAny))
+    return count({ kind: "bouncedThisWayCount" });
+  // Devouring Rage: "For each Spirit sacrificed this way" is its X, the number its additional cost sacrificed (CR 107.3a).
+  if (each && ctx?.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) return count({ kind: "x" });
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
   if (each && ctx?.afterYourDiscard && /^card discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".

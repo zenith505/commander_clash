@@ -770,13 +770,13 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
-      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill || r.counterOn || r.countersOn || r.dealTo) ?? (preventedAll(s, e) ? undefined : rules[0]);
       if (rule) {
         // The player being dealt it may apply amount replacements first (CR 616.1): when the prevention gains its
         // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
         let n = e.n;
         const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
-        if ((rule.gainLife || rule.dealBack || rule.tokens) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
+        if ((rule.gainLife || rule.dealBack || rule.tokens || rule.countersOn || rule.dealTo) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
         if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n: n * (rule.millSelf ?? 1), card: cardName(s, rule), ...(rule.millSelf ? { self: true as const } : {}) });
@@ -1122,7 +1122,14 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const gainLater = (r: DamageRule, n: number, src: DamageSource) => {
     if (colorsOk(r.gainLife, src)) gains.set(r.id, { pid: r.controller, n: (gains.get(r.id)?.n ?? 0) + n });
     if (r.tokens) madeLater.set(r.id, { r, n: (madeLater.get(r.id)?.n ?? 0) + n });
+    // Temper: "For each 1 damage prevented this way, put a +1/+1 counter on that creature", at the same time (rulings);
+    // Sacred Boon's end step counters count it up for then.
+    if (r.countersOn?.tally) (s.preventedTally ??= {})[r.id] = (s.preventedTally?.[r.id] ?? 0) + n;
+    else if (r.countersOn && r.to?.object) ruleCountersLater.push({ ...r.to.object, counter: r.countersOn.counter, n, by: r.controller, card: cardName(s, r) });
+    // Vengeful Archon deals that much damage to the target fixed as it resolved, right after (rulings).
+    if (r.dealTo) back.push({ cardId: r.cardId, controller: r.controller, to: "player" in r.dealTo ? r.dealTo.player : r.controller, n, ...("object" in r.dealTo ? { toObject: r.dealTo } : {}) });
   };
+  const ruleCountersLater: { id: ObjectId; zc: number; counter: string; n: number; by: PlayerId; card: string }[] = [];
   // Vigor's +1/+1 counters, put once the damage is prevented.
   const plusOnesLater: { id: ObjectId; n: number; by: PlayerId }[] = [];
   const countersLater: { id: ObjectId; counter: string; by: PlayerId; card: string }[] = [];
@@ -1212,6 +1219,14 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (n > 0) log(s, `${card} gets ${n === 1 ? `${/^[aeiou]/.test(counter) ? "an" : "a"} ${counter}` : `${n} ${counter}`} counter${n === 1 ? "" : "s"}.`);
   }
   if (countersLater.length) invalidateCharacteristics(s);
+  for (const { id, zc, counter, n, by, card } of ruleCountersLater) {
+    // On that creature only while it's still the same object (CR 400.7).
+    const o = s.objects[id];
+    if (n <= 0 || !o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== zc) continue;
+    const put = withPutter(by, () => putCounters(s, o, counter, n));
+    if (put > 0) log(s, `${card}: ${defOf(s, o).name} gets ${put === 1 ? `${/^[aeiou]/.test(counter) ? "an" : "a"} ${counter}` : `${put} ${counter}`} counter${put === 1 ? "" : "s"}.`);
+  }
+  if (ruleCountersLater.length) invalidateCharacteristics(s);
   for (const [id, { n, by, body }] of reflectLater) {
     const o = s.objects[id];
     if (!o) continue;

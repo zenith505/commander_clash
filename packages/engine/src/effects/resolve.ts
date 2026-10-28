@@ -299,6 +299,26 @@ function convokerTypes(s: GameState, ctx: ResolveCtx): (Set<string> | "all")[] {
   });
 }
 
+/**
+ * What the Aura or Equipment an ability came from is attached to, while it's still that object (CR 400.7); if it's
+ * gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h). `here`: that
+ * permanent is still on the battlefield as the same object.
+ */
+function attachedHost(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number; here: boolean } | undefined {
+  const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (!me) return undefined;
+  const same = ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc;
+  let was: { id: ObjectId; zc: number } | undefined;
+  if (me.zone === "battlefield" && same) was = me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined;
+  else {
+    const lk = s.lastKnown?.[me.id];
+    was = lk && lk.zc === ctx.sourceZc ? lk.attachedTo : undefined;
+  }
+  if (!was) return undefined;
+  const o = s.objects[was.id];
+  return { ...was, here: o?.zone === "battlefield" && (o.zoneChanges ?? 0) === was.zc };
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
@@ -448,19 +468,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
-    // What the Aura or Equipment is attached to, while it's still the object the ability came from (CR 400.7).
-    // If it's gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h).
-    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    if (!me) return [];
-    const same = ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc;
-    let host: GameObject | undefined;
-    if (me.zone === "battlefield" && same) host = me.attachedTo ? s.objects[me.attachedTo] : undefined;
-    else {
-      const lk = s.lastKnown?.[me.id];
-      const was = lk && lk.zc === ctx.sourceZc ? lk.attachedTo : undefined;
-      host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
-    }
-    return host?.zone === "battlefield" ? [host] : [];
+    const host = attachedHost(s, ctx);
+    return host?.here ? [s.objects[host.id]!] : [];
   }
   if (ref.ref === "targetHost") {
     // Unforge: the permanent the target Equipment is attached to, or was attached to as it was destroyed (rulings).
@@ -481,6 +490,16 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     // Only while it's still the same object on the battlefield (CR 400.7).
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
+  }
+  if (ref.ref === "each" && ref.andAttached) {
+    // Crown of Vigor: the creature it enchanted (or as it last existed, CR 608.2h) and the others sharing a type with it.
+    const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
+    const host = attachedHost(s, ctx);
+    const h = host && s.objects[host.id];
+    const lk = host && !host.here ? s.lastKnown?.[host.id] : undefined;
+    const types = host?.here ? creatureTypesOf(s, h!) : lk?.zc === host?.zc && lk?.creatureTypes ? (lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes)) : undefined;
+    const others = !types ? [] : s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== host!.id && objectMatches(s, filter, o, ctx.controller, false) && shareCreatureType(types, creatureTypesOf(s, o)));
+    return host?.here ? [h!, ...others] : others;
   }
   if (ref.ref === "each" && ref.andSubject) {
     const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));

@@ -4461,6 +4461,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "19a8c2d3-b06e-4a76-bb28-8928ce84186c",
+  "name": "Devouring Rage",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of Spirits.\nTarget creature gets +3/+0 until end of turn. For each Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a9abed25-9256-4fc7-8afb-edb4286e18f4",
   "name": "Dina's Guidance",
   "manaCost": "{1}{B}{G}",
@@ -7604,6 +7632,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7ac433a7-c107-46de-b36b-d7419c9ec565",
+  "name": "Hana Kami",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "{1}{G}, Sacrifice this creature: Return target Arcane card from your graveyard to your hand.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0e735ba6-7fd1-4d12-b20c-21525dc1e2b5",
   "name": "Hanweir Battlements",
   "manaCost": "",
@@ -9002,6 +9060,36 @@
   "commanderLegal": "legal",
   "set": "bbd",
   "releasedAt": "2018-06-08",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e937e0f5-ca35-4dce-9f05-8f2075731628",
+  "name": "Kami of Ancient Law",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Sacrifice this creature: Destroy target enchantment.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -13116,6 +13204,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e04f151a-66bb-4bc3-a625-91cd23cb1b18",
+  "name": "Plow Through Reito",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Sweep — Return any number of Plains you control to their owner's hand. Target creature gets +1/+1 until end of turn for each Plains returned this way.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Sweep"
+  ],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "23b36aef-961f-4a78-9652-8594ad73102e",
   "name": "Plow Under",
   "manaCost": "{3}{G}{G}",
@@ -15699,6 +15817,38 @@
   "keywords": [],
   "producedMana": [
    "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac8cc74d-e43b-4118-bba0-dfa8b9c04d45",
+  "name": "Snow-Covered Plains",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Basic Snow Land — Plains",
+  "supertypes": [
+   "Basic",
+   "Snow"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Plains"
+  ],
+  "oracleText": "({T}: Add {W}.)",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
   ],
   "commanderLegal": "legal",
   "set": "khm",

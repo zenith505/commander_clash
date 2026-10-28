@@ -1,7 +1,7 @@
 # Roadmap
 
-26,671 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,829 of
+26,733 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,848 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -472,6 +472,23 @@ line blocks.
    Killer Service ("you may pay {2} and sacrifice a token": a paid "may" with a sacrifice in it), Vivi's Persistence
    ("whenever your commander enters or attacks" from the graveyard: "your commander attacks" isn't parsed), Abundant
    Harvest ("choose land or nonland": a new choice).
+   Round 188 went on from the top: "choose odd or even" (Extinction Event, Mutinous Massacre, Twins of Discord,
+   Zimone's Hypothesis, Thanos, Gollum, Ashling's Prerogative; zero is even; new Odd/Even buttons with a browser test),
+   "sacrifice two untapped lands instead" (Lotus Vale, Scorched Ruins; both picked together, browser test) and "an
+   untapped Mountain / Island" (Balduvian Trading Post, Soldevi Excavations), Gatta and Luzzu (damage prevented
+   becomes +1/+1 counters), "that player / target opponent becomes the monarch" (M'Baku, Starscream), Sapling of
+   Colfenor, Gix's Command ("on up to one creature", anyone's), Thunderous Velocipede, Kibo ("each player creates" a
+   named token), Botanical Brawler ("the first time +1/+1 counters have been put on that permanent this turn"),
+   Wolverine ("double all damage ~ would deal", "if ~ dealt damage to another creature this turn"), Elvish Guidance
+   ("an additional {G} for each Elf on the battlefield"), Ringwraiths ("when the Ring tempts you" from the graveyard),
+   Slime Against Humanity, Morningtide's Light ("until your next turn, prevent all damage that would be dealt to you").
+   Fixed: "until your next turn" damage effects (Lightning, Army of One) now end when that turn begins; before, they
+   came back on every other player's turn.
+   Out after round 188 (looked at, not done): Protean Hydra (a trigger on counters removed by any cause), Caustic Bronco
+   (no "saddled" condition), Jared Carthalion, Garland, Royal Kidnapper, Lavabrink Venturer, Staff of Eden ("card not
+   named ~" as a graveyard target needs the source's name bound; "permanents you control but don't own" count),
+   Haakon (cast only from the graveyard), Earthshape, Sigarda's Splendor ("note your life total"), Basri Ket's -2,
+   Ochre Jelly, Kamahl's Druidic Vow, Green Sun's Twilight, Industrial Advancement, Froghemoth.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

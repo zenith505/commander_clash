@@ -140,7 +140,7 @@ export type Count =
   /** "The discarded card's mana value" after "draw a card, then discard a card" (Ninja's Blades): of the cards discarded while this resolves, X counting 0 (CR 107.3). */
   | { kind: "discardedManaValue" }
   /** "Reveal the top card of your library. Draw cards equal to that card's mana value." (Interpret the Signs): the card "revealTop" revealed, while it's still that card. */
-  | { kind: "revealedManaValue" }
+  | { kind: "revealedManaValue"; /** "Gain life equal to that card's toughness, lose life equal to its power" (Sapling of Colfenor): the revealed card's toughness or power instead, as it is in the library (CR 604.3). */ stat?: "power" | "toughness" }
   /** "The total mana value of those exiled cards" (Ensnared by the Mara): of the cards an "exile the top N cards" before it exiled (GameState.resolving.exiledTopCards). */
   | { kind: "exiledTopManaValue" }
   /** "For each card of the chosen color exiled this way" (Oona, Queen of the Fae): of the cards the "exile the top X cards" before it exiled, those matching `filter` (a chosen color bound as it resolves), still in exile. */
@@ -760,7 +760,9 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast" | /** "With mana value of the chosen quality" (Chosen.parity): `parity.is`, once it's known. */ "parity";
+  /** "With mana value of the chosen quality" (Extinction Event), "with power of that quality" (Zimone's Hypothesis): odd or even, zero being even. */
+  parity?: { of: "manaValue" | "power"; is?: "odd" | "even"; /** "Without mana value of the chosen quality": the other one. */ not?: true };
   /**
    * "With mana value, power, or toughness equal to the chosen number" (Talion): one of these is that number, filled in
    * as `equals` once it's known (bindChosen). Only creature spells have power and toughness (CR 208.3).
@@ -1575,6 +1577,8 @@ export type StaticCondition =
   | { kind: "selfCommandOrBattlefield" }
   /** "If ~ is in the command zone" (Oloro, Ageless Ascetic): an ability that works only there (CR 113.6). */
   | { kind: "selfInCommand" }
+  /** "If ~ dealt damage to another creature this turn" (Wolverine, Best There Is): as the object it is now (TurnLog.damagedCreature). */
+  | { kind: "selfDamagedCreature" }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
   | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
@@ -1642,7 +1646,7 @@ export type StaticCondition =
    */
   | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
-  | { kind: "monarch"; /** "If an opponent is the monarch" (Queen Marchesa). */ opponent?: true; /** "If you're not the monarch" (Court of Vantress). */ not?: true; /** "If there is no monarch" (Crown of Gondor): no player is (CR 725). */ none?: true }
+  | { kind: "monarch"; /** "If an opponent is the monarch" (Queen Marchesa). */ opponent?: true; /** "If you're not the monarch" (Court of Vantress). */ not?: true; /** "If there is no monarch" (Crown of Gondor): no player is (CR 725). */ none?: true; /** "If that player is the monarch" (M'Baku, Jabari Chieftain): the trigger's player. */ eventPlayer?: true }
   /** "If ~ is suspected" (CR 701.60); `not`: "if it's not suspected". */
   | { kind: "suspected"; not?: true }
   /** "If you have the initiative" (CR 726.1). */
@@ -2108,7 +2112,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** The whole question, when `filter` and `action` don't say it (Garnet's "remove a lore counter from each of any number of Sagas"); "~" is the source's name. */ prompt?: string; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a); Witch-king, Bringer of Ruin: the least power. */ least?: "toughness" | "power"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays; /** "Put a +1/+1 counter on a creature" (Zimone's Hypothesis): any player's, not only `who`'s own (not targeted). */ anyController?: true }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -3564,7 +3568,7 @@ export type Effect =
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
 /** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
-export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number";
+export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of your choice" (Prismatic Lace): one or more colors, chosen at once (CR 105.3). */ "colors" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number" | /** "Choose odd or even" (Chosen.parity). */ "parity";
 
 /**
  * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,
@@ -4832,9 +4836,10 @@ export interface ManaTrigger {
    * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
    * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
    * any type that land produced" (picking one of them if it made several, rulings on Mana Flare). The mana has none
-   * of the riders of the mana that permanent made (rulings on Mana Flare).
+   * of the riders of the mana that permanent made (rulings on Mana Flare). Fixed mana with `times` is that mana once
+   * for each ("an additional {G} for each Elf on the battlefield", Elvish Guidance), counted as it resolves.
    */
-  adds: { kind: "fixed"; mana: ManaType[] } | { kind: "anyColor"; n: number } | { kind: "chosenColor" } | { kind: "produced" };
+  adds: { kind: "fixed"; mana: ManaType[]; times?: Amount } | { kind: "anyColor"; n: number } | { kind: "chosenColor" } | { kind: "produced" };
 }
 
 /**
@@ -5264,6 +5269,8 @@ export interface CompiledCard {
    * (rulings), however it would have entered.
    */
   entersSacrificeInstead?: TargetSpec;
+  /** Lotus Vale: "sacrifice two untapped lands instead": how many, all at once (rulings: with fewer, it never enters). */
+  entersSacrificeInsteadN?: number;
   /** Trinisphere: "As long as ~ is untapped, each spell that would cost less than three mana to cast costs three mana to cast" (CR 601.2f). */
   spellCostAtLeast?: { n: number; whileUntapped?: true };
   /**

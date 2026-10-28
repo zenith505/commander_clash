@@ -1071,6 +1071,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, o) !== ev.player) continue;
       add(o, ev.player, (e, t) => (e === "ringTemptsYou" && (!t.ifOtherBearer || (ev.chosen !== undefined && ev.chosen !== o.id))) || (e === "youChooseRingBearer" && ev.chosen !== undefined));
     }
+    // Ringwraiths: "When the Ring tempts you, return ~ from your graveyard to your hand" works from its owner's graveyard.
+    fromGraveyards((o, owner) => owner === ev.player && add(o, ev.player, (e, t) => e === "ringTemptsYou" && !t.ifOtherBearer));
   } else if (ev.type === "tapped") {
     // "Whenever ~ becomes tapped", "whenever enchanted land becomes tapped", "whenever a Dwarf you control becomes
     // tapped" (the tapped permanent is the subject: "put a wind counter on it").
@@ -1140,7 +1142,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "permanentCountersPut" && !t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+      // Botanical Brawler: "if it's the first time +1/+1 counters have been put on that permanent this turn".
+      add(w, ctrl, (e, t) => e === "permanentCountersPut" && !t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id) && (!t.countersFirstTime || (t.countersKind === undefined ? first : firstOfKind)), undefined, undefined, o, undefined, undefined, undefined, info);
       // "Whenever a -1/-1 counter is put on a creature" (Flourishing Defenses): once for each counter.
       for (let i = 0; i < ev.amount; i++) add(w, ctrl, (e, t) => e === "permanentCountersPut" && !!t.countersEach && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, { amount: 1 });
     }

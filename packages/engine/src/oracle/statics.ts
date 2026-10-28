@@ -891,6 +891,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you're not the monarch$/.test(text)) return { kind: "monarch", not: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
+  if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
@@ -994,6 +995,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^an? (artifact|creature|enchantment|land|planeswalker) was put into your graveyard from the battlefield this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "typeToYourGraveyardThisTurn", type: capital(m[1]!) } }, min: 1 };
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  // Wolverine, Best There Is: "if ~ dealt damage to another creature this turn".
+  if (/^~ dealt damage to another creature this turn$/.test(text)) return { kind: "selfDamagedCreature" };
   // Bloodcrazed Goblin: "unless an opponent has been dealt damage this turn" (bloodthirst's condition, CR 702.54a).
   if (/^an opponent (?:has been|was) dealt damage this turn$/.test(text)) return { kind: "opponentLostLife", damaged: true };
   // Grim Repriser: "if an opponent has been dealt noncombat damage this turn", whenever it was dealt (rulings).

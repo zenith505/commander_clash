@@ -35,6 +35,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
+  // Slime Against Humanity: "the total number of cards you own in exile and in your graveyard that are Oozes or are named
+  // ~": face-up ones only (rulings), either kind counted once.
+  if (!each && (m = /^the total number of cards you own in exile and in your graveyard that are ([A-Z][a-z]+)s or are named ~$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) {
+    const card = { kind: "card" as const, types: [], notTypes: [], notColors: [] };
+    return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { ...card, anyOf: [{ ...card, subtypes: [m[1]!], text: `${m[1]} card` }, { ...card, named: "~", text: "card named ~" }], text: `${m[1]} card or card named ~` }, graveyardToo: true } };
+  }
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).
   if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };

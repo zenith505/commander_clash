@@ -1154,6 +1154,16 @@ export function parseTargetPhrase(
     extra.chosen = chosen[3] ? (chosen[1] ? "notTypesChosen" : "typesChosen") : chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
     p = (p.slice(0, chosen.index) + p.slice(chosen.index + chosen[0].length)).trim();
   }
+  // "With mana value of the chosen quality" after "choose odd or even" (Extinction Event), "with power of that quality"
+  // (Zimone's Hypothesis): zero is even.
+  // Ashling's Prerogative: "without mana value of the chosen quality", the other one.
+  const parityOf = / with(out)? (mana value|power) of (?:the chosen|that) quality\b/.exec(p);
+  if (parityOf) {
+    if (!opts.chosen || extra.chosen) return null;
+    extra.chosen = "parity";
+    extra.parity = { of: parityOf[2] === "power" ? "power" : "manaValue", ...(parityOf[1] ? { not: true as const } : {}) };
+    p = (p.slice(0, parityOf.index) + p.slice(parityOf.index + parityOf[0].length)).trim();
+  }
   // "Spell with the chosen name" (Declaration of Naught), "cards with that name" after "choose a card name" (CR 201.4).
   const withName = / with (?:the chosen|that) name\b/.exec(p);
   if (withName) {

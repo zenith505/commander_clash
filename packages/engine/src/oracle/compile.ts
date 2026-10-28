@@ -962,6 +962,12 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push({ ...st, text: line });
       continue;
     }
+    // Ashling's Prerogative: "Each creature without mana value of the chosen quality enters tapped": the quality chosen as
+    // it entered; each one's mana value as it would exist on the battlefield, X being 0 (CR 614.12, rulings).
+    if (line === "Each creature without mana value of the chosen quality enters tapped." && out.entersChoose?.some((c) => c.what === "parity")) {
+      (out.othersEnterTapped ??= []).push({ filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], chosen: "parity", parity: { of: "manaValue", not: true }, text: "creature without mana value of the chosen quality" }, text: line });
+      continue;
+    }
     // "Creatures your opponents control enter tapped." "Artifacts and lands enter tapped." "Creatures and nonbasic
     // lands your opponents control enter tapped." An ability word may come first (CR 207.2c).
     const othersTapped = /^(?:[A-Z][A-Za-z' -]+ — )?([A-Z][^.—]*?) enter tapped\.$/.exec(line);
@@ -1024,6 +1030,25 @@ export function compile(d: CardDef): CompiledCard {
       const self = g?.filter.kind === "object" && fits(g.filter);
       if (!g || g.other || self || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || !mods) out.unsupported.push(raw);
       else (out.othersEnterAs ??= []).push({ filter: g.filter, mods, text: line });
+      continue;
+    }
+    // Thunderous Velocipede: "Each other Vehicle and creature you control enters with an additional +1/+1 counter on it if
+    // its mana value is 4 or less. Otherwise, it enters with three additional +1/+1 counters on it.": each Vehicle and each
+    // creature, by its mana value as it would exist on the battlefield (CR 614.12, X being 0).
+    if (line === "Each other Vehicle and creature you control enters with an additional +1/+1 counter on it if its mana value is 4 or less. Otherwise, it enters with three additional +1/+1 counters on it.") {
+      const base = { kind: "object" as const, types: [], notTypes: [], notColors: [], controller: "you" as const, anyOf: [{ kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, { kind: "object" as const, types: [], notTypes: [], notColors: [], subtypes: ["Vehicle"], text: "Vehicle" }] };
+      (out.othersEnterWithCounters ??= []).push({ filter: { ...base, manaValue: { max: 4 }, text: "Vehicle or creature you control with mana value 4 or less" }, counter: "+1/+1", n: 1, text: line }, { filter: { ...base, manaValue: { min: 5 }, text: "Vehicle or creature you control with mana value 5 or greater" }, counter: "+1/+1", n: 3, text: line });
+      continue;
+    }
+    // Twins of Discord: "Each other colorless creature you control has bloodthirst 2": as each one would enter, it has
+    // bloodthirst (CR 614.12), so it enters with two more +1/+1 counters if an opponent was dealt damage this turn (CR
+    // 702.54a); instances add up (rulings).
+    const grantedBloodthirst = /^Each other (.+? you control) has bloodthirst (\d+)\.$/.exec(line);
+    if (grantedBloodthirst) {
+      const g = parseGroup(`each ${grantedBloodthirst[1]}`);
+      const cond = parseStaticCondition("an opponent was dealt damage this turn", { affects: { kind: "self" }, mods: [], text: line });
+      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen || !cond) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: "+1/+1", n: Number(grantedBloodthirst[2]), while: cond, text: line });
       continue;
     }
     // Vampire Socialite: "As long as an opponent lost life this turn, each other Vampire you control enters with an
@@ -1185,6 +1210,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
     // as Chosen.number (CR 614.12; CR 107.1: the game uses only integers, and no mana value is negative, so 0 or more).
+    // "As ~ enters, choose odd or even." (Gollum, Riddle Master), kept as Chosen.parity (CR 614.12).
+    if (line === "As ~ enters, choose odd or even.") {
+      if (out.entersChoose?.some((c) => c.what === "parity")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "parity" });
+      continue;
+    }
     const asNumber = /^As (?:~|it) enters, choose a number(?: between (\d+) and (\d+))?\.$/.exec(line);
     if (asNumber) {
       if (out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push(raw);
@@ -2054,9 +2085,13 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Lake of the Dead: "If ~ would enter, sacrifice a Swamp instead. If you do, ...": one permanent of a land type.
-    const sacInstead = /^If ~ would enter, sacrifice an? ([A-Z][a-z]+) instead\. If you do, put ~ onto the battlefield\. If you don't, put it into its owner's graveyard\.$/.exec(line);
-    if (sacInstead && /^(?:Plains|Island|Swamp|Mountain|Forest)$/.test(sacInstead[1]!) && !out.entersSacrificeInstead && !out.entersDiscardInstead) {
-      out.entersSacrificeInstead = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [sacInstead[1]!], controller: "you", text: sacInstead[1]! };
+    // Balduvian Trading Post: "an untapped Mountain"; Lotus Vale: "two untapped lands", both at once (CR 614.1a).
+    const sacInstead = /^If ~ would enter, sacrifice (an? |two )(untapped )?([A-Z][a-z]+|lands) instead\. If you do, put ~ onto the battlefield\. If you don't, put it into its owner's graveyard\.$/.exec(line);
+    const sacTwo = sacInstead?.[1] === "two ";
+    if (sacInstead && (sacTwo ? sacInstead[3] === "lands" : /^(?:Plains|Island|Swamp|Mountain|Forest)$/.test(sacInstead[3]!)) && !out.entersSacrificeInstead && !out.entersDiscardInstead) {
+      const what = `${sacInstead[2] ?? ""}${sacTwo ? "land" : sacInstead[3]!}`;
+      out.entersSacrificeInstead = { kind: "object", types: sacTwo ? ["Land"] : [], notTypes: [], notColors: [], ...(sacTwo ? {} : { subtypes: [sacInstead[3]!] }), controller: "you", ...(sacInstead[2] ? { tapped: false } : {}), text: what };
+      if (sacTwo) out.entersSacrificeInsteadN = 2;
       continue;
     }
     if (line === "If a nontoken creature would enter and it wasn't cast, exile it instead.") {
@@ -4117,7 +4152,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "Cards exiled with ~" by its cost (Mechtitan Core): an activated ability that exiles other permanents as its cost.
     if (o.type === "returnExiled" && o.fromCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string" && o.kind !== "setColors") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : needs.add("creatureType"));
+    if (typeof o.chosen === "string" && o.kind !== "setColors") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : o.chosen === "parity" ? needs.add("parity") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen === true)) needs.add("color");
     if (o.kind === "setColors" && o.chosen === "colors") needs.add("colors");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");

@@ -5059,6 +5059,20 @@ function Controls({
         ))}
       </div>
     );
+  // "Choose odd or even" (Extinction Event, Gollum): zero is even.
+  if (pending?.kind === "chooseOption" && pending.what === "parity" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> choose odd or even (zero is even)
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o === "odd" ? "Odd" : "Even"}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "colors" && pending.player === HUMAN) return <ColorsPick key={pending.source} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && pending.what === "color" && pending.player === HUMAN)
     return (

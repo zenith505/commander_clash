@@ -2000,7 +2000,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const returned = e.attachToCreated ? (s.resolving?.created ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "battlefield" && objIsType(s, o, "Creature")) : undefined;
       // "Put it onto the battlefield attacking" (Senu): only during combat, attacking what its controller chooses as it
       // enters (CR 508.4, rulings); outside combat it just enters (CR 506.3d).
-      const attackOptions = e.attacking && inCombat(s) && entering.some((o) => isType(defOf(s, o), "Creature")) ? attackChoices(s, ctx.controller, ctx.sourceId) : [];
+      // Shark Shredder: "attacking that player", the trigger's player, if they're still in the game.
+      const foe = e.attackingEvent ? ctx.event?.player : undefined;
+      const attackOptions = e.attacking && inCombat(s) && entering.some((o) => isType(defOf(s, o), "Creature")) ? (e.attackingEvent ? (foe !== undefined && foe !== ctx.controller && !player(s, foe).lost ? [{ key: String(foe), label: player(s, foe).name, player: foe }] : []) : attackChoices(s, ctx.controller, ctx.sourceId)) : [];
       const sc = (s.resolving!.scratch ??= {});
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, entering.find((o) => isType(defOf(s, o), "Creature"))!).name} attacks` };
@@ -2143,6 +2145,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") {
         log(s, `${src} returns ${d.name}, chosen at random, from ${p.name}'s graveyard to their hand.`);
         moveObject(s, o.id, "hand");
+      } else if (e.dest === "exilePlay") {
+        // Tersa Lightshatter: played the usual way, paying its costs and following timing rules (rulings).
+        log(s, `${src}: ${d.name} is chosen at random and exiled. ${p.name} may play it this turn.`);
+        moveObject(s, o.id, "exile");
+        if (o.zone === "exile") o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
       } else if ((e.dest === "battlefield" || isPermanentCard(d)) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
         log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
@@ -2306,6 +2313,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
       if (e.chooser && found.length === 1) s.resolving!.chosenFromYard = { id: found[0]!, zc: obj(s, found[0]!).zoneChanges ?? 0 };
       if (e.milled) s.resolving!.did = found.length > 0;
+      if (e.milled && (e.dest ?? "hand") === "hand") s.resolving!.putIntoHand = found;
       return;
     }
     case "reorderGraveyard": {
@@ -2342,7 +2350,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const t = e.sameNameAs !== undefined ? ctx.targets[e.sameNameAs] : undefined;
         const name = t?.kind === "object" && s.objects[t.id] ? defOf(s, obj(s, t.id)).name : undefined;
         if (e.sameNameAs !== undefined && name === undefined) return;
-        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (name === undefined || sameName(defOf(s, obj(s, id)).name, name)) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
+        // "Cards of the chosen type" (Creeping Renaissance): the type chosen as it resolved.
+        const filter = bindChosen(e.filter, ctx.chosen);
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(filter, defOf(s, obj(s, id))) && (name === undefined || sameName(defOf(s, obj(s, id)).name, name)) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
         if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${e.who.ref === "you" ? `${player(s, ctx.controller).name}'s hand` : "their owners' hands"}.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;
@@ -2432,8 +2442,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "livingDeath": {
       const who = apnap(s, livingPlayers(s));
       const exiled: [ObjectId, number][] = [];
+      const type = e.cardType ?? "Creature";
       for (const pid of who) {
-        const cards = player(s, pid).graveyard.filter((id) => objIsType(s, obj(s, id), "Creature"));
+        const cards = player(s, pid).graveyard.filter((id) => objIsType(s, obj(s, id), type));
         if (cards.length) log(s, `${player(s, pid).name} exiles ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
         for (const id of cards) {
           moveObject(s, id, "exile");
@@ -2441,7 +2452,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
       }
       for (const pid of who) {
-        const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), type));
         if (mine.length) log(s, `${player(s, pid).name} sacrifices ${mine.map((id) => characteristics(s, obj(s, id)).name).join(", ")}.`);
         for (const id of mine) moveObject(s, id, "graveyard", { sacrificed: true });
       }
@@ -2579,9 +2590,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (first) {
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
-          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : "nextEndStep", ctx.controller, first, {
+          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : e.at === "yourNextUpkeep" ? "yourNextUpkeep" : e.at === "nextBeginCombat" ? "nextBeginCombat" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.haste ? { haste: true as const } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.haste ? { haste: e.haste } : {}), ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
@@ -2678,7 +2689,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.haste)
         for (const l of came) {
           const c = s.objects[l.id];
-          if (c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: c.id, duration: "game", affected: [c.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+          if (c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: c.id, duration: e.haste === "endOfTurn" ? "endOfTurn" : "game", affected: [c.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
         }
       if (e.haste) invalidateCharacteristics(s);
       const me = e.selfCounter && s.objects[e.selfCounter.id];

@@ -7,6 +7,7 @@ import { parseAdditionalCost } from "./keyword-abilities";
 import { pickFilter } from "./targets";
 import { parseOnlyClauses } from "./statics";
 import { parseCount } from "./counts";
+import type { ManaType } from "../types";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
 const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
@@ -265,6 +266,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // being that player; "but only during their turn" is the activator's turn.
   let anyPlayer = false;
   let spendOnlyChosenColor = false;
+  let spendOnly: ManaType[] | undefined;
   const anyone = / Any player may activate this ability(?: but only ([^.]+))?\.$/.exec(effectText);
   if (anyone) {
     anyPlayer = true;
@@ -313,6 +315,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (/ Spend only mana of the chosen color to activate this ability\.$/.test(effectText) && !spendOnlyChosenColor) {
       spendOnlyChosenColor = true;
       effectText = effectText.slice(0, effectText.length - " Spend only mana of the chosen color to activate this ability.".length);
+      found = true;
+    }
+    // "Spend only black mana on X." (Crypt Rats, Crimson Hellkite): with {X} the whole mana cost, all of it (CR 107.3).
+    const onlyOnX = / Spend only (white|blue|black|red|green) mana on X\.$/.exec(effectText);
+    if (onlyOnX && !spendOnly) {
+      spendOnly = [({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[onlyOnX[1] as "white"]];
+      effectText = effectText.slice(0, onlyOnX.index);
       found = true;
     }
     // "This ability can't be copied and X can't be 0." (Gogo, Master of Mimicry): a copy effect makes no copy of it
@@ -449,11 +458,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
   // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.
   if (spendOnlyChosenColor && (mana !== "stack" || !manaCost || fromYard || fromHand)) return "fail";
+  if (spendOnly && (mana !== "stack" || manaCost !== "{X}" || spendOnlyChosenColor)) return "fail";
   if (anyPlayer && (tap || untapSelf || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
   return {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(ownerOnly ? { ownerOnly: true as const } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
+    ...(spendOnly ? { spendOnly } : {}),
     manaCost,
     ...(water ? { waterbend: water[1] === "X" ? ("X" as const) : Number(water[1]) } : {}),
     tap,

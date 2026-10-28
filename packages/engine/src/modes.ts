@@ -207,7 +207,7 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
  * effects' references to it cover them all, and the targets after it move up. With no opponent it stays one target,
  * cast as if it didn't have it. Already done, as is.
  */
-export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[]): AbilityBody {
+export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[], able?: (spec: TargetSpec) => boolean): AbilityBody {
   const i = body.targets.findIndex((t) => t.perOpponent);
   if (i < 0) return body;
   const n = Math.max(1, opponents.length);
@@ -222,8 +222,11 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[]): Abi
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
-  const { perOpponent: _p, perPlayer: _e, controller: _c, ...spec } = body.targets[i]!;
-  const copies: TargetSpec[] = opponents.length ? opponents.map((pid) => ({ ...spec, optional: true, controlledBy: pid })) : [{ ...spec, skip: true }];
+  const { perOpponent: _p, perPlayer: _e, controller: _c, perOpponentRequired: required, ...spec } = body.targets[i]!;
+  // Not "up to one" (Blatant Thievery, Sylvan Primordial): one must be chosen for each opponent who has one (rulings),
+  // none for an opponent who doesn't.
+  const one = (pid: PlayerId): TargetSpec => (required ? (able && !able({ ...spec, controlledBy: pid }) ? { ...spec, controlledBy: pid, skip: true } : { ...spec, controlledBy: pid }) : { ...spec, optional: true, controlledBy: pid });
+  const copies: TargetSpec[] = opponents.length ? opponents.map(one) : [{ ...spec, skip: true }];
   return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
 }
 

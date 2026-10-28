@@ -856,7 +856,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // Aku Djinn: "each creature each opponent controls" is each creature your opponents control.
   p = p.replace(/^(each (?:[a-z]+ )?creature) each opponent controls$/, "$1 your opponents control");
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
-  p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
+  p = p.replace(/^((?:all |each )?)(creatures|creature tokens) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
   p = p.replace(/^((?:all |each )?)(creatures?) that(?:'s| is| are|'re) enchanted by an Aura you control$/i, "$1aura-yours-enchanted $2");
   // "Each permanent you control that's a creature or Vehicle" (Ao, the Dawn Sky): each creature or Vehicle you control.
@@ -1336,6 +1336,13 @@ export function parseTargetPhrase(
   if (without) {
     extra.notCounter = counterKind(without[1]!);
     p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();
+  }
+  // Kassandra, Eagle Bearer: "a creature you control with a legendary Equipment attached to it" (CR 301.5a).
+  const legendaryEquipped = / with a legendary equipment attached to it$/i.exec(p);
+  if (legendaryEquipped) {
+    if (extra.status) return null;
+    extra.status = "legendaryEquipped";
+    p = p.slice(0, legendaryEquipped.index);
   }
   // Due Diligence: "target creature you control other than enchanted creature": not the one the source is attached to.
   const notHost = / other than enchanted creature$/.exec(p);

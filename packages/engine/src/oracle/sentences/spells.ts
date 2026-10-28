@@ -4,7 +4,7 @@ import { parseBoundCount, parseCount, roundOf } from "../counts";
 import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
 import type { SkipWhat } from "../../types";
 import { NUM, NUMX, X, amt, isGroup, isSeveral, num } from "../words";
-import { parseUnlessPays, addTarget } from "../body";
+import { parseUnlessPays, addTarget, parseBody, replaceX } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
@@ -342,7 +342,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // The creature is the source of damage to itself (its deathtouch, lifelink, infect apply).
     const a = parseObject(m[1]!, ctx);
     // Wave of Reckoning: "Each creature deals damage to itself equal to its power": each one, all at the same time.
-    if (a && isGroup(a) && /^each creature\b/i.test(m[1]!)) return [{ type: "bite", a, b: a, self: true }];
+    // The Akroan War: "Each tapped creature ..." the same, those tapped as it resolves.
+    if (a && isGroup(a) && /^each (?:tapped )?creature\b/i.test(m[1]!)) return [{ type: "bite", a, b: a, self: true }];
     return a && !isGroup(a) && !isSeveral(a) ? [{ type: "bite", a, b: a }] : null;
   }
   // "Each of those creatures deals damage equal to its power to ~" (Polukranos, Living Inferno): each of the targets
@@ -391,11 +392,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Target creature you control deals damage equal to its power to target player" (Gravitic Punch): from that creature,
   // its power as this resolves; none if either target is illegal (rulings).
-  if ((m = /^(Target creature you control) deals damage equal to its power to (target (?:player|opponent))$/.exec(s))) {
+  // Origin of Thor: "... to each opponent", each of them at once, from that creature.
+  if ((m = /^(Target creature you control) deals damage equal to its power to (target (?:player|opponent)|each opponent)$/.exec(s))) {
     const a = parseObject(m[1]!.toLowerCase(), ctx);
     if (a?.ref !== "target" || a.n) return null;
     const to = parseDamageRecipient(m[2]!, ctx);
-    return to?.ref === "target" && !to.n ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
+    return (to?.ref === "target" && !to.n) || to?.ref === "eachOpponent" ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
   }
   // "Target creature you control deals damage equal to twice its power to target creature you don't control" (Polliwallop).
   if ((m = /^(target creature you control) deals damage equal to twice its power to (target .+)$/i.exec(s))) {
@@ -443,7 +445,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     if (filter?.kind !== "spell") return null;
     const before = ctx.targets.length;
-    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
+    // Brass Infiniscope: "When you next cast a spell with {X} in its mana cost this turn, you draw a card and gain half X
+    // life, rounded down": the X of that spell (CR 107.3a), as it is on the stack, or last was (rulings).
+    const spellX = filter.xInCost && /\bX\b/.test(m[2]!) && !/\bwhere X is\b/.test(m[2]!);
+    const xBody = spellX ? parseBody(`${m[2]!.replace(/^./, (c) => c.toUpperCase())}.`, { castSpell: true, ownX: true }) : undefined;
+    if (xBody === null || (xBody && xBody.targets.length)) return null;
+    const inner = xBody ? replaceX(xBody.effects, { count: { kind: "castSpellX" } }) : parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
     if (!inner || ctx.targets.length !== before) return null;
     if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
     return [{ type: "nextCast", filter, effects: inner, text: m[2]!, ...(fromHand ? { fromHand: true as const } : {}) }];

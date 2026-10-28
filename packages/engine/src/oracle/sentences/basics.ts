@@ -119,7 +119,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
   // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
   // their library (CR 701.23a); a permanent found comes under your control.
-  const theirs = /^Search (target opponent's|target player's) library for (an? (?:.+? )?card) and (put that card onto the battlefield under your control|exile it)$/.exec(s);
+  const theirs = /^[Ss]earch (target opponent's|target player's|that player's) library for (an? (?:.+? )?card) and (put that card onto the battlefield under your control|exile it)$/.exec(s);
   if (theirs) {
     const filter = parseSearchFilter(theirs[2]!.replace(/^an? /, ""));
     if (filter === null) return null;
@@ -938,6 +938,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
   // "It becomes night" (Unnatural Moonrise): CR 731.1.
   if ((m = /^It becomes (day|night)$/.exec(s))) return [{ type: "becomeDayNight", v: m[1] as "day" | "night" }];
+  // The Celestus: "If it's night, it becomes day. Otherwise, it becomes night." (joined in body.ts): with neither, night.
+  if (s === "If it's night, it becomes day, otherwise it becomes night") return [{ type: "becomeDayNight", v: "switch" }];
   // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
   if ((m = new RegExp(`^You may play (?:an|up to ${NUM}) additional lands? this turn$`, "i").exec(s))) return [{ type: "extraLandThisTurn", n: m[1] ? num(m[1]) : 1 }];
   // Nahiri's Lithoforming: "You may play X additional lands this turn", the spell's X.

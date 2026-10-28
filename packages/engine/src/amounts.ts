@@ -269,6 +269,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
       return ctx.event?.groupPower ?? 0;
+    case "totalPowerOf":
+      return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
       return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
     case "exchangedLifeDifference": {
@@ -909,6 +911,8 @@ function describeCount(c: Count): string {
       return "#those cards still exiled";
     case "eventGroupPower":
       return "the total power of those creatures";
+    case "totalPowerOf":
+      return "the total power of those creatures";
     case "lifeLostThisWay":
       return "the life you lost";
     case "exchangedLifeDifference":
@@ -1094,6 +1098,8 @@ function describeCount(c: Count): string {
 /** Replace X in an amount with what the text defines it as ("where X is ..."). */
 export function substituteX(a: Amount, x: AmountExpr): Amount {
   if (typeof a === "number" || a.count.kind !== "x") return a;
+  // "Half X life, rounded down" with X defined as a plain count (Brass Infiniscope's spell's X): halved all the same.
+  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
   // "Half X damage, rounded up, ..., where X is the number of Mountains you control" (Eternal Flame): half the definition.

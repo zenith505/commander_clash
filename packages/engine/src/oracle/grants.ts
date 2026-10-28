@@ -190,6 +190,12 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
+    // Fabricate N is an enters trigger too (CR 702.123a), so one granted to a creature as it enters triggers (CR 603.6a,
+    // 603.10): "Other nontoken creatures you control have fabricate 1" (Cayth, Famed Mechanist).
+    if (/^fabricate \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Fabricate ${/\d+/.exec(w)![0]}` });
+      continue;
+    }
     // Afterlife N is one too (CR 702.135a), each instance on its own (702.135b): "Enchanted creature gets +1/+1 and has
     // afterlife 1" (Indebted Spirit). The creature had it as it last existed, with the Aura still attached (CR 603.10a).
     if (/^afterlife \d+$/i.test(w)) {

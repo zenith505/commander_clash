@@ -495,7 +495,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;
     case "becomeDayNight":
-      setDayNight(s, e.v);
+      setDayNight(s, e.v === "switch" ? (s.dayNight === "night" ? "day" : "night") : e.v);
       return;
     case "extraLandThisTurn": {
       // Only this turn; on another player's turn it lets them play none (rulings on Explore).

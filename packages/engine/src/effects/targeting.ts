@@ -5,7 +5,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePowerNow, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
-import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
+import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -249,6 +249,10 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
     if (!ac) continue;
     if (status === "enchantedByYours") {
       if (ac.subtypes.includes("Aura") && ac.controller === you) return true;
+      continue;
+    }
+    if (status === "legendaryEquipped") {
+      if (ac.subtypes.includes("Equipment") && ac.supertypes.includes("Legendary")) return true;
       continue;
     }
     if (status !== "enchanted" && ac.subtypes.includes("Equipment")) return true;
@@ -615,7 +619,9 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
  */
 export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): TargetSpec {
   // Mistfolk: "target spell that targets ~": the source, as it is now (TargetSpec.targetsSource).
-  const spec: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
+  const spec1: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
+  // Nissa, Steward of Elements: "a land card or a creature card with mana value less than or equal to ...": one of them.
+  const spec: TargetSpec = spec1.anyOf?.some((x) => x.bound) ? { ...spec1, anyOf: spec1.anyOf.map((x) => bindBound(s, x, ctx)) } : spec1;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.
@@ -1041,7 +1047,21 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
   if (again !== undefined) return `"${body.modal.modes[again]!.text}" has already been chosen${body.modal.unchosen === "turn" ? " this turn" : ""}`;
   const legal = legalModes(s, body, controller, src, sourceId);
   const bad = modes.find((i) => !legal[i]);
-  return bad === undefined ? null : `can't choose "${body.modal.modes[bad]!.text}": no legal targets`;
+  if (bad !== undefined) return `can't choose "${body.modal.modes[bad]!.text}": no legal targets`;
+  // "Each mode must target a different player" (CR 115.3): the chosen modes' targets all together.
+  if (body.modal.distinctTargets && body.modal.min < body.modal.max && !hasLegalTargets(s, withModes(body, modes).targets, controller, src, sourceId)) return "each mode must target a different player";
+  return null;
+}
+
+/**
+ * "Choose one or more. Each mode must target a different player" (Vindictive Lich): no more modes than there are players
+ * its modes could target (rulings). Modes chosen in a fixed number ("you may choose two") keep their range.
+ */
+export function distinctModeCap(s: GameState, body: AbilityBody, controller: PlayerId, max: number, src?: SourceQuality, sourceId?: ObjectId): number {
+  const m = body.modal;
+  if (!m?.distinctTargets || m.min >= m.max) return max;
+  const players = new Set(m.modes.flatMap((mode) => mode.targets.flatMap((spec) => legalTargets(s, spec, controller, undefined, src, sourceId).flatMap((t) => (t.kind === "player" ? [t.id] : [])))));
+  return Math.max(m.min, Math.min(max, players.size));
 }
 
 // ---------------------------------------------------------------------------
@@ -1066,7 +1086,7 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
       return !!host && host.zone === "battlefield" && objIsType(s, host, "Creature") && controllerOf(s, host) === pid && objectMatches(s, e.filter, obj(s, id), pid, false);
     });
   const shares = e.filter.sharesPermanentTypeWithSubject ? subjectPermanentTypes(s) : undefined;
-  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))) && (!shares || (id !== shares.id && characteristics(s, obj(s, id)).types.some((t) => shares.types.includes(t)))));
+  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId && !(e.filter.notSourceUnlessArtifact && objIsType(s, obj(s, id), "Artifact"))) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))) && (!shares || (id !== shares.id && characteristics(s, obj(s, id)).types.some((t) => shares.types.includes(t)))));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {

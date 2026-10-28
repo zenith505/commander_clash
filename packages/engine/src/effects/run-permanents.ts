@@ -362,6 +362,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "phaseOut": {
       // Only what's on the battlefield: "it" may have left (CR 702.26b).
       const ids = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id);
+      if (e.anyNumber) {
+        // Change of Plans: which of them, chosen as it resolves (rulings: after they've connived), none too.
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.chosen?.[ctx.controller]) {
+          if (!ids.length) return;
+          sc.queue = [ctx.controller];
+          sc.chosen = {};
+          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "phaseOut", what: "of those creatures", options: ids, count: ids.length, min: 0 };
+          return "paused";
+        }
+        const picked = sc.chosen[ctx.controller]!.filter((id) => ids.includes(id));
+        sc.chosen = undefined;
+        sc.queue = undefined;
+        if (picked.length) phaseOut(s, picked);
+        return;
+      }
       if (e.untilSourceLeaves) {
         // Oubliette: with the source gone already, nothing happens (rulings, CR 610.3a).
         const me = objects(s, { ref: "self" }, ctx)[0];
@@ -804,7 +820,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) {
         const had = o.counters[e.counter] ?? 0;
         const can = removableCounters(s, o, e.counter);
-        const want = e.n === "all" ? had : amountNow(s, e.n, ctx);
+        const want = e.n === "all" ? had : e.n === "allButOne" ? had - 1 : amountNow(s, e.n, ctx);
         const n = Math.min(can, want);
         if (n <= 0) continue;
         if (e.setsDid && s.resolving) s.resolving.did = n === want;
@@ -1315,13 +1331,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!sc.queue) {
         const options = s.battlefield.filter((id) => {
           const o = obj(s, id);
-          return controllerOf(s, o) === ctx.controller && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
+          return controllerOf(s, o) === ctx.controller && (!e.equipment || characteristics(s, o).subtypes.includes("Equipment")) && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
         });
         if (!options.length) return;
         sc.queue = [ctx.controller];
         sc.chosen = {};
         const to = host ? defOf(s, host).name : player(s, (t as { id: PlayerId }).id).name;
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true };
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
         return "paused";
       }
       const chosen = sc.chosen?.[ctx.controller] ?? [];

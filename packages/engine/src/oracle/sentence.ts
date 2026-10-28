@@ -44,7 +44,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
   }
   if (dig.into === undefined) {
     // Stargaze: "Put X cards from among them into your hand", the X it was cast with.
-    if ((m = new RegExp(`^Put (one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
+    // Browse, Eye of Yawgmoth: "Put one (of them) into your hand and exile the rest".
+    if ((m = /^Put (one|two|three) (?:of (?:them|those cards) )?into your hand and exile the rest$/.exec(s))) {
+      Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand", rest: "exile" });
+    } else if ((m = new RegExp(`^Put (one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
       if (m[1] === "X" && !ctx?.spell) return null;
       Object.assign(dig, m[1] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[1]!), upTo: false, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));

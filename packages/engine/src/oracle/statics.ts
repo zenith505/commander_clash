@@ -783,6 +783,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const g = parseGroup(`all ${m[1]}`);
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: 0, max: 0 } : null;
   }
+  // Common Cause: "Nonartifact creatures get +2/+2 as long as they all share a color".
+  if (text === "they all share a color" && st.affects.kind === "filter" && st.affects.spec && !st.affects.controller && !st.affects.other) return { kind: "allShareColor", filter: st.affects.spec };
+  // Tidal Influence: "Cast ~ only if no permanents named ~ are on the battlefield": anyone's, with the card's name (CR 201.5).
+  if (text === "no permanents named ~ are on the battlefield") {
+    const amount = parseCount("the number of permanents on the battlefield named ~", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, max: 0 } : null;
+  }
   // Biovisionary: "if you control four or more creatures named ~": with the source's name (CR 201.5), ~ itself among them.
   // Phoenix Fleet Airship: "if you control eight or more permanents named ~".
   if ((m = new RegExp(`^you control ${NUM} or more (creatures|permanents) named ~$`).exec(text))) {
@@ -798,6 +805,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // artifacts (rulings).
   if ((m = new RegExp(`^you control ${NUM} or more (artifacts|creatures|permanents) with the same name as one another$`).exec(text)))
     return { kind: "sameNamed", types: m[2] === "permanents" ? [] : [capital(m[2]!.slice(0, -1))], n: num(m[1]!) };
+  // Chrome Replicator: "if you control two or more nonland, nontoken permanents with the same name as one another".
+  if ((m = new RegExp(`^you control ${NUM} or more nonland,? nontoken permanents with the same name as one another$`).exec(text)))
+    return { kind: "sameNamed", types: [], notTypes: ["Land"], nontoken: true, n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
   if (/^you played a land this turn$/.test(text)) return { kind: "playedLandThisTurn" };
   if ((m = new RegExp(`^a player has ${NUM} or fewer cards in hand$`).exec(text))) return { kind: "someHandAtMost", n: num(m[1]!) };
@@ -862,6 +872,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // "If there are two or more ki counters on ~" (the Kamigawa flip cards).
   if ((m = new RegExp(`^there are ${NUM} or more ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
+  // Homarid, Tidal Influence: "As long as there is exactly one tide counter on ~", "there are exactly three tide counters".
+  if ((m = new RegExp(`^there (is|are) exactly ${NUM} ${COUNTER} counters? on ~$`).exec(text)) && (m[1] === "is") === (num(m[2]!) === 1) && (num(m[2]!) === 1) === !/counters on/.test(text))
+    return { kind: "selfCounters", counter: counterKind(m[3]!), min: num(m[2]!), max: num(m[2]!) };
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };

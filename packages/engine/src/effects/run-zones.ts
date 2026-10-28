@@ -2349,7 +2349,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.found = [];
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         // "With mana value X" (Fix What's Broken, Immortal Servitude): exactly X.
-        const { xRange, ...rest } = bindChosen(e.filter, ctx.chosen);
+        // Demigod of Revenge: "all cards named ~", the source's name (CR 201.5).
+        const { xRange, ...rest } = bindChosen(e.filter.named === "~" ? { ...e.filter, named: ctx.sourceDef.name } : e.filter, ctx.chosen);
         const x = ctx.x ?? 0;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "least" ? { min: x } : { max: x } } : rest;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).

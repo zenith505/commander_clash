@@ -1006,8 +1006,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // An object with no name (face down) shares a name with nothing (CR 201.2a).
       const byName = new Map<string, number>();
       for (const [id, c] of chars)
-        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && c.name && !s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
+        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && !cond.notTypes?.some((t) => c.types.includes(t)) && !(cond.nontoken && s.objects[id]!.isToken) && c.name && !s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
       return [...byName.values()].some((n) => n >= cond.n);
+    }
+    case "allShareColor": {
+      // The colors the earlier layers left them (CR 613.1e), every player's.
+      let shared: Color[] | undefined;
+      for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) shared = (shared ?? c.colors).filter((k) => c.colors.includes(k));
+      return !!shared?.length;
     }
     case "handsEmpty":
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);

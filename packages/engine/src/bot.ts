@@ -43,6 +43,7 @@ import {
   craftCandidates,
   untapViaMana,
   counterCostCandidates,
+  counterOnCandidates,
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
@@ -2813,6 +2814,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const picks = spareCounters(s, pid, obj(s, id), c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "putCounter") {
+      const pick = spareCounterHost(s, pid, c, targeted);
+      if (!pick) return null;
+      out.counterOn = [pick];
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -3204,6 +3209,17 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   }
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
+  // Knight of the Mists: "you may pay {U}. If you don't, destroy target Knight": pay only when that would hit our own.
+  // Without a target (Chaos Spewer's "If you don't, blight 2"), it's always ours: pay (below).
+  if (e.pay && !e.effects.length && !e.keep && e.otherwise?.some((x) => allEffects([x]).some((y) => targetIndexOf(y) !== undefined))) {
+    let hurt = 0;
+    for (const inner of allEffects(e.otherwise)) {
+      const i = targetIndexOf(inner);
+      const t = i === undefined ? undefined : targets[i];
+      if (i !== undefined && t && t.kind !== "none" && r.legal[i]) hurt += harm[i] === isMine(s, pid, t) ? 1 : -1;
+    }
+    return hurt > 0;
+  }
   let v = 0;
   // "You may discard a card. If you do, draw a card": what follows counts too.
   const then = r.body.effects[r.next + 1];
@@ -4580,9 +4596,26 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = spareCounters(s, pid, o, c);
       if (!picks) return null;
       out.counters = picks;
+    } else if (c.kind === "putCounter") {
+      const pick = spareCounterHost(s, pid, c, targeted);
+      if (!pick) return null;
+      out.counterOn = [pick];
     } else return null;
   }
   return out;
+}
+
+/**
+ * Where we'd put a -1/-1 counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): a creature of ours
+ * that survives it (toughness 2 or more), the least valuable, never our commander or a target; null if there's none.
+ */
+function spareCounterHost(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>, targeted: Set<string | number>): ObjectId | null {
+  if (c.counter !== "-1/-1") return null;
+  const pool = counterOnCandidates(s, pid, c)
+    .map((x) => obj(s, x))
+    .filter((o) => !o.isCommander && !targeted.has(o.id) && objIsType(s, o, "Creature") && toughness(s, o) >= 2)
+    .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+  return pool[0]?.id ?? null;
 }
 
 /**

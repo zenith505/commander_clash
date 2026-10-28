@@ -7598,6 +7598,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "860affd6-8f48-4630-b613-d147299b0355",
+  "name": "Hatchet Bully",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Goblin Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warrior"
+  ],
+  "oracleText": "{2}{R}, {T}, Put a -1/-1 counter on a creature you control: This creature deals 2 damage to any target.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eve",
+  "releasedAt": "2008-07-25",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "334c284e-7bc3-4c18-9f8d-4d846f80008e",
   "name": "Haunting Voyage",
   "manaCost": "{4}{B}{B}",

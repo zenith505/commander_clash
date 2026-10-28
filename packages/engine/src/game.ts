@@ -5907,9 +5907,14 @@ export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
-  c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters";
-const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" =>
-  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
+  c.kind === "sacrifice" || c.kind === "craft" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters" || c.kind === "putCounter";
+const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" | "craft" | "counterOn" =>
+  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : c.kind === "putCounter" ? "counterOn" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "craft");
+
+/** What can get the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully): ~ too. */
+export function counterOnCandidates(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "putCounter" }>): ObjectId[] {
+  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false) && !countersBanned(s, obj(s, id), c.counter));
+}
 
 /** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
 export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
@@ -5934,6 +5939,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
   if (choices?.craft?.length && !costs.some((c) => c.kind === "craft")) return `${d.name} doesn't ask you to exile materials`;
   if (choices?.counters?.length && !costs.some((c) => c.kind === "removeCounters")) return `${d.name} doesn't ask you to remove counters`;
+  if (choices?.counterOn?.length && !costs.some((c) => c.kind === "putCounter")) return `${d.name} doesn't ask you to put a counter on a permanent`;
   if (costs.filter((c) => c.kind === "collectEvidence").length > 1) return `${d.name} would collect evidence twice`;
   for (const c of costs) {
     if (c.kind === "collectEvidence") {
@@ -5986,6 +5992,18 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       const used = new Map<string, number>();
       for (const x of chosen) used.set(`${x.id}|${x.kind}`, (used.get(`${x.id}|${x.kind}`) ?? 0) + 1);
       if (chosen.length !== c.n || [...used].some(([k, n]) => n > (pool.find((x) => `${x.id}|${x.kind}` === k)?.n ?? 0))) return `choose ${what} to remove`;
+      continue;
+    }
+    if (c.kind === "putCounter") {
+      // Hatchet Bully: one permanent you control that matches, not one counters can't be put on (rulings on Solemnity).
+      const pool = counterOnCandidates(s, pid, c);
+      const what = `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+      const chosen = choices?.counterOn;
+      if (!chosen) {
+        if (!pool.length) return `you need to put a ${c.counter} counter on ${what} to ${doing}`;
+        continue;
+      }
+      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put a ${c.counter} counter on`;
       continue;
     }
     if (c.kind === "mill") {
@@ -6254,6 +6272,12 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       }
       for (const [id, kinds] of done) for (const [kind, n] of Object.entries(kinds)) removeCountersCost(s, obj(s, id), { counter: kind, n });
       log(s, `${p.name} removes ${[...done].map(([id, kinds]) => `${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(" and ")} counter${Object.values(kinds).reduce((a, b) => a + b, 0) === 1 ? "" : "s"} from ${nameOf(s, id)}`).join(", ")}.`);
+    } else if (c.kind === "putCounter") {
+      // Through the replacement effects on counters, as any counter put on a permanent (CR 122.6).
+      for (const id of choices.counterOn ?? []) {
+        const put = putCounters(s, obj(s, id), c.counter, 1);
+        log(s, `${p.name} puts ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
+      }
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
       for (const id of ids) (c.untap ? untapPermanent : tapPermanent)(s, obj(s, id));

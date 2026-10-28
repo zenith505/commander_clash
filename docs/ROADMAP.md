@@ -2027,6 +2027,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   creature's controller, as Lingering Death); Conundrum Sphinx and Sphinx Ambassador (each player or another player
   naming a card about their own reveal or your search). Known bot gap: bots may cast Winnow on a permanent with no
   namesake (it still draws).
+- Round B25 (harder skipped cards, least played first): punishers another player answers, as it resolves (rulings):
+  "Target player discards two cards at random unless that player has ~ deal 4 damage to them" (Skullscorch), "Then
+  that player discards another card at random unless they pay {1}" (Flay), "~ gets +2/+2 until end of turn unless a
+  player has ~ deal 4 damage to them" (Barbarian Bully) and "unless any player pays {2}" (Nakaya Shade), each player
+  asked in APNAP order; "you gain 2 life unless that creature's controller pays {2}" (Soul Charmer). Tide counters:
+  "As long as there is exactly one / are exactly three tide counters on ~" and the "Whenever there are four or more"
+  state trigger (CR 603.8; Homarid, Tidal Influence with "Cast this spell only if no permanents named ~ are on the
+  battlefield"). "Nonartifact creatures get +2/+2 as long as they all share a color" (Common Cause, every creature on
+  the battlefield, CR 105.4); Dead Ringers' "unless either one is a color the other isn't", checked as it resolves
+  (rulings); Eternal Flame's "and half X damage, rounded up, to you"; "an additional +2/+2 ... for each card named ~"
+  (Growth Cycle, Compound Fracture, Desert's Due); "return all cards named ~ from your graveyard to the battlefield"
+  (Demigod of Revenge's cast trigger); intervening ifs with "nonblack, nonland permanent" (Urborg Stalker) and "two or
+  more nonland, nontoken permanents with the same name as one another" (Chrome Replicator, one token only); Instill
+  Furor's "sacrifice this creature unless it attacked this turn"; "you may pay {U}. If you don't, destroy target
+  Knight and it can't be regenerated" (Knight of the Mists; bots pay only to save their own) and "If you don't,
+  blight 2" (Chaos Spewer; bots pay); Descendant of Masumaro's counters added then removed (rulings: no state check in
+  between); Shower of Coals' threshold "to each of those permanents and/or players instead"; "put one of them into your
+  hand and exile the rest" (Browse, Eye of Yawgmoth's "a number of cards equal to the sacrificed creature's power");
+  Ransack's "any number of them on the bottom ... and the rest on top"; Sealed Fate's "exile one of those cards and put
+  the rest back on top in any order" (you order them, rulings); Recursive Recruitment's "for every three cards in your
+  graveyard". "Put a -1/-1 counter on a creature you control" as a cost (CR 602.2b; Hatchet Bully, Wandering Mage):
+  click the creature in the browser; bots pick their least valuable creature that survives it, never the commander.
+  New browser test: Hatchet Bully's counter pick. +28, 27 of them legal (26,914 of 31,936).
+- Skipped there, with reasons: Tanglewalker (each creature's own defending player controlling an artifact land;
+  granting landwalk isn't the same); Baki's Curse (damage by each creature's own Aura count); Rikala, Homarid King
+  ("Then if there are four or more tide counters on ~, remove them" and an Island mana trigger); Taste of Paradise
+  ("pay {1}{G} any number of times" as an additional cost). Known bot gaps: bots target Dead Ringers
+  without matching colors, and Ransack's target is chosen as for any library effect.
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid

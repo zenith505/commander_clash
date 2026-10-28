@@ -1096,6 +1096,8 @@ export function substituteX(a: Amount, x: AmountExpr): Amount {
   if (typeof a === "number" || a.count.kind !== "x") return a;
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
+  // "Half X damage, rounded up, ..., where X is the number of Mountains you control" (Eternal Flame): half the definition.
+  if (a.half) return t === 1 && !a.plus && !a.negate && !x.half && !x.third && !x.per && !x.negate ? { ...x, half: a.half } : a;
   if (t === 1 && !a.plus) return { ...x, ...(a.negate !== x.negate ? { negate: true } : { negate: undefined }) };
   return { count: x.count, times: t * (x.times ?? 1), plus: t * (x.plus ?? 0) + (a.plus ?? 0), ...(a.negate ? { negate: true } : {}) };
 }

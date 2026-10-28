@@ -12198,6 +12198,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "acc74d59-f587-46a2-a90b-865f721d494d",
+  "name": "Nulltread Gargantuan",
+  "manaCost": "{1}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "When this creature enters, put a creature you control on top of its owner's library.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arb",
+  "releasedAt": "2009-04-30",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d39b9f64-dc9b-413f-8d05-e21ef46d6756",
   "name": "Oblivion Sower",
   "manaCost": "{6}",
@@ -12602,6 +12634,37 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6ca49880-4e12-494b-b14e-e49385d0f7f5",
+  "name": "Painbringer",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Minion",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Minion"
+  ],
+  "oracleText": "{T}, Exile any number of cards from your graveyard: Target creature gets -X/-X until end of turn, where X is the number of cards exiled this way.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -3180,6 +3180,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const after = r?.body.effects[r.next + 1];
   if (r && e?.type === "eachMay" && !e.each && after?.type === "if" && after.cond.kind === "theyChose") {
     const life = player(s, pid).life;
+    // Mtenda Lion: "defending player may pay {U}. If that player does, prevent all combat damage that would be dealt by
+    // ~": always, it's cheap and the attacker is ours to fear.
+    if (e.pay && !e.effects.length && !after.cond.not && after.effects.every((x) => x.type === "continuous" && x.what.ref === "self" && x.mods.every((m) => m.kind === "preventDamage" && m.by))) return true;
+    // Shrouded Serpent: "If that player doesn't, ~ can't be blocked this turn": pay only with a creature that could block.
+    if (e.pay && !e.effects.length && after.cond.not && after.effects.every((x) => x.type === "continuous" && x.what.ref === "self" && x.mods.every((m) => m.kind === "cantBeBlocked")))
+      return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !obj(s, id).tapped && objIsType(s, obj(s, id), "Creature"));
     if (!after.cond.not) return life <= 20;
     // Wandering Archaic: "they may pay {2}. If they don't, you may copy that spell": pay, so it isn't copied.
     if (e.pay && !e.effects.length && allEffects(after.effects).some((x) => x.type === "copySpell")) return true;

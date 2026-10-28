@@ -555,7 +555,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     }
     case "skipUntap":
       // Its controller's next untap step skips it, then it untaps as usual (CR 502.3).
-      for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
+      // "Next two untap steps" (Telekinesis): the one after that too, whoever controls it then (rulings); another effect
+      // that skips the next one overlaps this one's first.
+      for (const o of objects(s, e.what, ctx)) {
+        o.skipNextUntap = true;
+        if ((e.n ?? 1) > 1) o.skipMoreUntaps = Math.max(o.skipMoreUntaps ?? 0, e.n! - 1);
+      }
       return;
     case "noUntapNext":
       for (const pid of players(s, e.who, ctx)) {

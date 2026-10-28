@@ -340,6 +340,8 @@ export interface GameObject {
   escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
+  /** How many more of its controller's untap steps it skips after the next one (Telekinesis). */
+  skipMoreUntaps?: number;
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
   damagedBy?: ObjectId[];
   /** It was dealt damage this turn (forgotten in the cleanup step, CR 514.2, and when it leaves the battlefield). */
@@ -2079,6 +2081,8 @@ export interface Resolving {
   joinForcesPaidBy?: Record<PlayerId, number>;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
+  /** A spell this countered (Fold into Aether's "If that spell is countered this way"). */
+  spellCountered?: true;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
   endTurn?: true;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
@@ -2260,6 +2264,7 @@ export interface Resolving {
     mayEach?: { at: number; yes: number[] };
     mayAnswer?: boolean;
     found?: ObjectId[]; // the cards a library search found
+    toughnessGained?: true; // Talara's Bane's life was gained before the discard waited on a choice
     picking?: true; // an opponent is choosing among revealed cards (Gifts Ungiven); `picked`, what they chose
     picked?: ObjectId[];
     /** Separating cards into two piles (Fact or Fiction, CR 700.3): `separating` while it's being done, `pileOne` the first pile, `pileChoice` the pile chosen (0 or 1). */

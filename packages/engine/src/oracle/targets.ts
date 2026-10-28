@@ -1060,6 +1060,12 @@ export function parseTargetPhrase(
     const anyOf = [twoKinds[2]!, twoKinds[3]!].map((w) => parseTargetPhrase(`${w} creature`, opts));
     if (anyOf.every((x) => x?.kind === "object" && !x.anyOf)) return { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase()}` };
   }
+  // Nissa's Defeat: "Forest, green enchantment, or green planeswalker": a permanent that's any of them.
+  const landHued = /^(target )?(Plains|Island|Swamp|Mountain|Forest), (white|blue|black|red|green) enchantment, or (white|blue|black|red|green) planeswalker$/.exec(phrase.trim());
+  if (landHued) {
+    const anyOf = [landHued[2]!, `${landHued[3]} enchantment`, `${landHued[4]} planeswalker`].map((w) => parseTargetPhrase(w, opts));
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().replace(/^target /, "")}` };
+  }
   // Bumi Bash: "land creature or nonbasic land": a permanent that's either one, or both.
   const landOr = /^(target )?(land|artifact) creature or nonbasic land$/.exec(phrase.trim());
   if (landOr) {

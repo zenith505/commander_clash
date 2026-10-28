@@ -16,7 +16,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 export const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
@@ -871,6 +871,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   p = p.replace(/^((?:all |each )?)(creatures|creature tokens) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "Each creature that's enchanted by an Aura you control" (Eriette of the Charmed Apple): the Aura yours, the creature anyone's.
   p = p.replace(/^((?:all |each )?)(creatures?) that(?:'s| is| are|'re) enchanted by an Aura you control$/i, "$1aura-yours-enchanted $2");
+  // Archon of the Wild Rose: "other creatures you control that are enchanted by Auras you control": yours, with an Aura of
+  // yours on it.
+  p = p.replace(/^((?:all |each )?(?:other )?)(creatures) (you control) that are enchanted by Auras you control$/i, "$1aura-yours-enchanted $2 $3");
   // "Each permanent you control that's a creature or Vehicle" (Ao, the Dawn Sky): each creature or Vehicle you control.
   p = p.replace(/^((?:all |each )?)permanents? you control that(?:'s| is| are|'re) (?:an? )?creatures? or (?:an? )?Vehicles?$/i, "$1creature or Vehicle you control");
   // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
@@ -1259,6 +1262,12 @@ export function parseTargetPhrase(
   if (entered) {
     extra.enteredThisTurn = true;
     p = p.slice(0, entered.index);
+  }
+  // Let the Galaxy Burn: "each creature that didn't enter this turn".
+  const notEntered = / that didn't enter (?:the battlefield )?this turn$/.exec(p);
+  if (notEntered) {
+    extra.notEnteredThisTurn = true;
+    p = p.slice(0, notEntered.index);
   }
   // The Gitrog, Ravenous Ride: "a creature that saddled it this turn" (CR 702.171c), "it" the source; only in a choice
   // made as the source's ability resolves (see pickOptions).

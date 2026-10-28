@@ -86,7 +86,7 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   // Two to the power of it (Mathemagics); past 1024 the number can't matter, it's more than all the cards in the game.
   const v0 = a.pow2 ? 2 ** Math.min(Math.max(0, c), 10) : Math.floor(c / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
-  const n = a.signed ? v : Math.max(0, a.half ? (a.third ? (a.half === "up" ? Math.ceil(v / 3) : Math.floor(v / 3)) : halve(v, a.half)) : v);
+  const n = a.signed ? v : Math.max(0, a.half ? (a.third || a.tenth ? ((d) => (a.half === "up" ? Math.ceil(v / d) : Math.floor(v / d)))(a.tenth ? 10 : 3) : halve(v, a.half)) : v);
   return a.negate ? -n : n;
 }
 
@@ -865,7 +865,7 @@ export function describeAmount(a: Amount): string {
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
-  const v1 = a.half ? `${a.third ? "a third of" : "half"} ${v0}, rounded ${a.half}` : v0;
+  const v1 = a.half ? `${a.third ? "a third of" : a.tenth ? "a tenth of" : "half"} ${v0}, rounded ${a.half}` : v0;
   const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
   return a.negate ? `-(${v})` : v;
 }
@@ -1153,11 +1153,11 @@ function describeCount(c: Count): string {
 export function substituteX(a: Amount, x: AmountExpr): Amount {
   if (typeof a === "number" || a.count.kind !== "x") return a;
   // "Half X life, rounded down" with X defined as a plain count (Brass Infiniscope's spell's X): halved all the same.
-  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
+  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.tenth && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
   // "Half X damage, rounded up, ..., where X is the number of Mountains you control" (Eternal Flame): half the definition.
-  if (a.half) return t === 1 && !a.plus && !a.negate && !x.half && !x.third && !x.per && !x.negate ? { ...x, half: a.half } : a;
+  if (a.half) return t === 1 && !a.plus && !a.negate && !x.half && !x.third && !x.tenth && !x.per && !x.negate ? { ...x, half: a.half } : a;
   if (t === 1 && !a.plus) return { ...x, ...(a.negate !== x.negate ? { negate: true } : { negate: undefined }) };
   return { count: x.count, times: t * (x.times ?? 1), plus: t * (x.plus ?? 0) + (a.plus ?? 0), ...(a.negate ? { negate: true } : {}) };
 }

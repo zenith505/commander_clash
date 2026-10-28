@@ -322,7 +322,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
       // discards the rest (n is per player then).
       const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
-      const nFor = e.downToFewest ? {} : amountFor(s, e.n, ctx, who);
+      const keepN = e.keep !== undefined ? amountNow(s, e.keep, ctx) : 0;
+      const nFor = e.downToFewest ? {} : e.keep !== undefined ? Object.fromEntries(who.map((pid) => [pid, Math.max(0, player(s, pid).hand.length - keepN)])) : amountFor(s, e.n, ctx, who);
       if (e.random && !e.hand) {
         // Picked once, before anyone is asked about Library of Leng.
         const rp = (sc0.randomPicks ??= Object.fromEntries(
@@ -549,6 +550,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         let n = amountNow(s, e.n, ctx);
         // Enhanced Surveillance: more cards in a surveil of one or more (CR 701.25c: surveil 0 isn't surveilling).
         if (e.type === "surveil" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).surveilMore ?? 0;
+        // Kenessos, Priest of Thassa: a scry of one or more is a scry of one more, for each (CR 614.1a; scry 0 isn't a scry,
+        // 701.22b).
+        if (e.type === "scry" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).scryMore ?? 0;
         const cards = p.library.slice(0, n);
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).

@@ -2081,7 +2081,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" }; /** "Pay X life, where X is its power" (Mask of Griselbrand). */ payLife?: AmountExpr } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" }; /** "Pay X life, where X is its power" (Mask of Griselbrand). */ payLife?: AmountExpr; /** "Pay life equal to its power. If you do, ... that many": "that many" is that X. */ thatMany?: true } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -6052,6 +6052,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!then) return null;
       // Mask of Griselbrand: "If you do, draw X cards", the X of the life paid; that sentence alone.
       if (payFirst.payLife) {
+        if (payFirst.thatMany) then[1] = then[1]!.replace(/\bthat many\b/, "X");
         const inner = si + 1 === sentences.length ? attempt(ctx, () => parseOne(capital(then[1]!), ctx)) : null;
         if (!inner || !/\bX\b/.test(then[1]!)) return null;
         effects.push({ type: "may", effects: replaceX(inner, payFirst.payLife), payLife: payFirst.payLife, text: `${payFirst.text}. If you do, ${then[1]}` });
@@ -6185,11 +6186,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
-    const payLifeX = /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
+    // Madame Null, Power Broker: "you may pay life equal to its power. If you do, put that many +1/+1 counters on it": the
+    // same, "that many" being the life paid (its power as it resolves, or as it last existed, rulings).
+    const payLifeEq = /^[Yy]ou may pay life equal to (its power)$/.exec(s);
+    const payLifeX = payLifeEq ?? /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
     if (payLifeX) {
       const n = parseCount(payLifeX[1]!, ctx);
       if (!n || typeof n !== "object" || !("count" in n)) return null;
-      payFirst = { pay: {}, payLife: n, text: `pay X life, where X is ${payLifeX[1]}` };
+      payFirst = { pay: {}, payLife: n, text: payLifeEq ? `pay life equal to ${payLifeX[1]}` : `pay X life, where X is ${payLifeX[1]}`, ...(payLifeEq ? { thatMany: true } : {}) };
       continue;
     }
     // Killer Service: "you may pay {2} and sacrifice a token. If you do, ...", Conspiracy Theorist's "pay {1} and discard

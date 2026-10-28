@@ -51,6 +51,10 @@ export interface Ctx {
   sacrificedIt?: boolean;
   /** A revealFromHand instruction came before, here or in the ability whose reflexive trigger this is: "for each card revealed this way". */
   revealedFromHand?: boolean;
+  /** The sentence just read exiled target N (noteLast): "the exiled card", "that card" after it (Deicide). */
+  exiledTarget?: number;
+  /** The sentence just read exiled one card from a player's hand (Pick the Brain's "the exiled card"). */
+  exiledFromHand?: boolean;
   /** After "may have you ...": "you mill three cards, then ... the total mana value of those cards" (Combustible Gearhulk). */
   milledThisWay?: boolean;
   /** A damage instruction came before: "the excess damage dealt this way" (CR 120.10). */
@@ -979,6 +983,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
   text = text.replace(/(Choose target permanent card in your graveyard\.) If it has mana value (\d+) or less, you may put it onto the battlefield\. If you don't put it onto the battlefield, put it into your hand\./, "$1 Put that card onto the battlefield if it has mana value $2 or less and you choose to, else into your hand.");
+  // Doubling Chant: "For each creature you control, you may search your library for a creature card with the same name as
+  // that creature. Put those cards onto the battlefield, then shuffle.": one search, up to one card for each of them (the
+  // name each has now, rulings), shuffled even with none (rulings). Dichotomancy: the same for the tapped nonland
+  // permanents target opponent controls, in that player's library, the cards coming under your control.
+  text = text.replace(/^For each creature you control, you may search your library for a creature card with the same name as that creature\. Put those cards onto the battlefield, then shuffle\.$/, "Search your library for any number of creature cards with the same name as each creature you control, put them onto the battlefield, then shuffle.");
+  text = text.replace(/^For each (tapped nonland permanent) target opponent controls, search that player's library for a card with the same name as that permanent\. Put those cards onto the battlefield under your control, then that player shuffles\.$/, "Search target opponent's library for cards with the same name as each $1 that player controls and put them onto the battlefield under your control. Then that player shuffles.");
   // Analyze the Pollen: "Search your library for a basic land card. If evidence was collected, instead search your
   // library for a creature or land card. Reveal that card, put it into your hand, then shuffle.": either search, each
   // revealed and put into your hand.
@@ -5261,6 +5271,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Hour of Glory: "Exile target creature. If that creature was a God, its controller reveals their hand and exiles all
+    // cards from it with the same name as that creature.": a God as it last existed on the battlefield (CR 608.2h, checked
+    // before it's exiled), its controller then, and the name it had.
+    if (/^Exile target creature$/.test(s) && /^If that creature was a God, its controller reveals their hand and exiles all cards from it with the same name as that creature\.?$/.test(sentences[si + 1] ?? "")) {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "exile") return null;
+      const who: PlayerRef = { ref: "targetController", index: before };
+      const yes: Effect[] = [...fx, { type: "lookAtHand", who, reveal: true }, { type: "exileNamed", who, filter: { kind: "card", text: "card with the same name as that creature" }, all: true, sameAs: before, handOnly: true }];
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["God"], text: "a God" } }, effects: yes, otherwise: structuredClone(fx) });
+      si++;
+      continue;
+    }
     // Hidetsugu's Second Rite: "If target player has exactly 10 life, ~ deals 10 damage to that player.": that life total
     // as it resolves (CR 608.2c); the target is chosen either way.
     const exactLife = /^If target player has exactly (\d+) life, (~ deals \d+ damage to) that player$/.exec(s);
@@ -5780,6 +5803,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (filter === null) return null;
       effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : typeof then !== "string" && /third from the top/.test(then[0]) ? "libraryThird" : typeof then !== "string" && /shuffles/.test(then[0]) ? "shuffleIn" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
       if (!choose[3]) si++;
+      // Pick the Brain: "the exiled card" in the sentence after is this one.
+      ctx.exiledFromHand = !!(choose[3] || (typeof then !== "string" && /^(?:That player exiles|Exile) that card$/.test(then[0]))) && !until;
       continue;
     }
     // "Look at the top twenty cards of your library, put any number of land cards from among them onto the battlefield
@@ -6382,6 +6407,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!t || t.kind !== "card" || t.many || t.optional || !moved || !prev || !("what" in prev) || prev.what?.ref !== "target" || prev.what.index !== i || !filter) return null;
       const inner = parseOne(wasCard[2]!.charAt(0).toUpperCase() + wasCard[2]!.slice(1), ctx);
       if (!inner || ctx.targets.length !== i + 1 || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
+      continue;
+    }
+    // Deicide: "Exile target enchantment. If the exiled card is a God card, search its controller's graveyard, hand, and
+    // library for ...": the card in exile, by its printed characteristics (rulings: a God card whatever the devotion was).
+    const exiledCardIs = /^If the exiled card is an? ([A-Z][a-z]+) card, (.+)$/.exec(s);
+    if (exiledCardIs) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${exiledCardIs[1]!} card`);
+      if (!t || t.kind !== "object" || t.many || t.optional || prev?.type !== "exile" || prev.what.ref !== "target" || prev.what.index !== i || !filter) return null;
+      const inner = parseOne(capital(exiledCardIs[2]!), ctx);
+      if (!inner || ctx.targets.length !== i + 1) return null;
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
       continue;
     }
@@ -8677,7 +8716,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         inner[0] = { ...inner[0]!, noRegen: true };
         si++;
       }
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo")) return null;
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo" && e.type !== "revealFromHand")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf, ...insteadSubject }, effects: done, otherwise: previous });
@@ -8799,8 +8838,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^That player shuffles$/.test(s)) {
       const prev = effects[effects.length - 1];
       if (prev?.type === "search" && prev.library) continue;
-      // "Search target player's graveyard, hand, and library for ... Then that player shuffles" (Memoricide).
-      if (prev?.type === "exileNamed") continue;
+      // "Search target player's graveyard, hand, and library for ... Then that player shuffles" (Memoricide); Deicide's
+      // under its "if", the search shuffling only if it happens.
+      if (prev?.type === "exileNamed" || (prev?.type === "if" && !prev.otherwise && prev.effects[prev.effects.length - 1]?.type === "exileNamed")) continue;
       return null;
     }
     // Thada Adel: "search that player's library for an artifact card and exile it. Then that player shuffles. Until end
@@ -10013,6 +10053,10 @@ function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false
 /** What "it", "they" and "those creatures" can mean after these effects (the token just created, the group changed). */
 function noteLast(ctx: Ctx, fx: Effect[]) {
   const last = fx[fx.length - 1];
+  // "Exile target enchantment. If the exiled card is a God card, ... as that card" (Deicide), "You choose a nonland card
+  // from it and exile that card. ... as the exiled card" (Pick the Brain): what the sentence just read exiled.
+  ctx.exiledTarget = last?.type === "exile" && last.what.ref === "target" && !last.what.n ? last.what.index : undefined;
+  ctx.exiledFromHand = last?.type === "takeFromHand" && last.action === "exile" && last.n === undefined && !last.until;
   // "Create a 2/2 red Mutant creature token. It gains haste until end of turn. Destroy it at the beginning of the next end
   // step" (Old Hob): an instruction about the tokens just created leaves "it" meaning them.
   if (last && "what" in last && (last.what as ObjRef).ref === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;

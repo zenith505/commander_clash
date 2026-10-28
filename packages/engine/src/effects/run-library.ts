@@ -11,6 +11,7 @@ import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } 
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { attackChoices, chooseAuraHosts } from "./run-zones";
+import { namesFrom } from "./run-names";
 import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
@@ -470,6 +471,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (o.zone !== "exile") continue;
+          // Pick the Brain: "the same name as the exiled card" (SameNameRef exiledThisWay).
+          (s.resolving!.exiledCards ??= []).push(id);
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
@@ -950,7 +953,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
       const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
-      const filter = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
+      const filter3 = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
+      // "With the same name as target nontoken creature" (Bifurcate), "as that creature" (Remembrance), "as the revealed
+      // card" (Assembly Hall: the chosen name): the name or names as it resolves (CR 201.2); with none, nothing fits.
+      const filter4 = filter3?.chosen === "name" ? bindChosen(filter3, ctx.chosen) : filter3;
+      const names = e.sameName && namesFrom(s, e.sameName, ctx);
+      // Doubling Chant: one card for each of those permanents, with its name (the found cards matched to them one to one).
+      const single = (filter4?.text.replace(/ with the same name as .+$/, "") ?? "card").replace(/\bcards\b/, "card");
+      const perName = e.sameName && "each" in e.sameName && e.sameName.each ? (names || []).map((n) => ({ ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: [n], text: `${single} named ${n}` })) : undefined;
+      const oneOfEach = perName ?? e.oneOfEach;
+      const filter = names ? { ...(filter4 ?? { kind: "card" as const, text: "card" }), namedAny: names, ...(names.length === 1 && filter4 ? { text: filter4.text.replace(/ with the same name as .+$/, ` named ${names[0]}`) } : {}) } : filter4;
       const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
@@ -989,7 +1001,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (queue.length) {
         const p = player(s, queue[0]!);
-        const n = (sc.n ??= amountNow(s, e.n, ctx));
+        const n = (sc.n ??= perName ? perName.length : amountNow(s, e.n, ctx));
         // "Search your library and/or graveyard": the library too, or not (then no shuffle), chosen before looking. Only
         // asked when the graveyard has a card that fits; otherwise both are searched.
         const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));
@@ -1020,7 +1032,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const agent = !yardOnly && libOf(p.id) === p ? searchAgent(s, p.id) : undefined;
         if (agent?.exileFor !== undefined) sc.searchExileFor = agent.exileFor;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
-        const what = e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
+        const what = perName ? `up to one ${single} for each of these names: ${perName.map((f) => f.namedAny[0]).join(", ")}` : e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
           player: agent?.controller ?? p.id,
@@ -1034,7 +1046,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others), ...(e.firstN ? { firstN: e.firstN } : {}) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),
-          ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}),
+          ...(oneOfEach ? { oneOfEach } : {}),
           ...(e.away && agent === undefined ? { away: true as const } : {}),
         };
         return "paused";

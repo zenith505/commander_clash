@@ -2298,6 +2298,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   tapped for the Sweep spells and Landslide. Skipped there: Thelon's Chant, Tourach's Chant, Nature's Wrath and
   Overburden ("the player who put it onto the battlefield", which the engine doesn't track and the rulings say isn't
   always its controller).
+- Round B30 (harder skipped cards, least played first): "a card with the same name as ..." (CR 201.2), with the name
+  read as the effect resolves or as the object last existed (CR 608.2h; a Clone's copied name counts, a face-down one
+  has none, CR 708.2). Searches for the name of a target creature or card (Bifurcate, Mask of the Mimic, Pack Hunt,
+  Secret Salvage), of a creature that died (Remembrance, Verdant Succession: its controller searches), of another
+  creature you control (Pattern Matcher), of a card in your graveyard (Frostpyre Arcanist), of a card revealed from your
+  hand (Assembly Hall must reveal a creature card if there is one; Infernal Tutor, with hellbent's "instead"), one card
+  for each creature you control or each tapped nonland permanent target opponent controls (Doubling Chant, Dichotomancy:
+  one search, a card for each name). Exiling the cards with that name: Haunting Echoes (all of them from the library,
+  for each nonbasic card exiled from the graveyard), Deicide (the exiled card is a God card in exile, so a God that
+  wasn't a creature counts, CR 205.1b), Pick the Brain and Invasive Surgery with delirium (checked after the exile or
+  the counter, rulings), Hour of Glory (the God's controller exiles those cards from their hand). A search for a card
+  with a stated quality may find nothing (CR 701.23b). Bots pick the target whose name their library still has (and
+  don't cast Bifurcate without one) and reveal a card with a copy left. Browser tests for Assembly Hall's reveal and
+  Doubling Chant's search. +17 (27,223 of 31,936 with main and round 198).
+- Out after round B30: March of Burgeoning Life ("with mana value less than X": a target bound to X), Mishra,
+  Artificer Prodigy ("graveyard, hand, and/or library": one card looked for in several zones), Clarion Ultimatum
+  ("Choose five permanents you control"), Retraced Image and Mitotic Manipulation ("the same name as a permanent":
+  any controller's, chosen as it resolves), Moratorium Stone ("and all permanents with that name" with the graveyard
+  cards), Candles of Leng ("if it has the same name as a card in your graveyard ... Otherwise").
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid

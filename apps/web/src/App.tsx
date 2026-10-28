@@ -3914,7 +3914,7 @@ function LibrarySearch({
               : pending.behold
                 ? `${pending.source}: you may behold ${pending.what} (reveal one from your hand or choose one you control)`
               : pending.reveal
-                ? `${pending.source}: you may reveal ${pending.what} from your hand`
+                ? `${pending.source}: ${pending.min ? "reveal" : "you may reveal"} ${pending.what} from your hand`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
                 : pending.fromHand && pending.exile

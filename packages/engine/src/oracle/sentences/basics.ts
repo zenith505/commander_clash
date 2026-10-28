@@ -2,7 +2,7 @@
 
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
-import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
+import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, SameNameRef, TargetSpec } from "../../abilities";
 import { COLOR_WORDS, NUM, NUMX, X, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular, COUNTER } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
@@ -176,7 +176,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (sr?.type !== "search" || sr.n !== 1 || sr.dest.zone !== "battlefield") return null;
     return [sr, { type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" } }];
   }
-  if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx));
+  if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx), (ref) => sameNameRef(ref, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
   // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information
@@ -186,7 +186,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^([Ii]ts controller|[Tt]hat creature's controller|[Tt]hat permanent's controller|[Tt]hat land's controller|That player|[Tt]arget player) may search their library for (.+)$/.exec(s))) {
     const who = m[1] === "That player" ? (ctx.lastPlayerTarget === undefined && ctx.lastObjectTarget !== undefined ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
     if (!who || / your /.test(m[2]!)) return null;
-    const fx = parseSearch(`Search your library for ${m[2]!.replace(/ their hand\b/, " your hand")}`);
+    const fx = parseSearch(`Search your library for ${m[2]!.replace(/ their hand\b/, " your hand")}`, undefined, (ref) => sameNameRef(ref, ctx));
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ type: "eachMay", who, text: `search their library for ${m[2]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
   }
@@ -1441,4 +1441,32 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     } else return null;
   }
   return out.length ? out : null;
+}
+
+/**
+ * What "the same name as ..." in a search names (parseSearch's `same`, SameNameRef): a target it chooses ("target nontoken
+ * creature", Bifurcate), the one an earlier sentence chose ("that card" after "Exile target nonland card from your
+ * graveyard", Secret Salvage), the card revealed from your hand (Assembly Hall), the creature a trigger is about
+ * (Remembrance), the spell a cast trigger is about, "another creature you control" (Pattern Matcher), or "a card in your
+ * graveyard" (Frostpyre Arcanist). Null for anything else.
+ */
+export function sameNameRef(ref: string, ctx: Ctx): SameNameRef | null {
+  if (/^target /.test(ref)) {
+    const o = parseObject(ref, ctx);
+    return o?.ref === "target" && !isGroup(o) ? { target: o.index } : null;
+  }
+  if (ref === "that card" && ctx.revealedFromHand && !ctx.targets.length) return { revealed: true };
+  const that = /^that (creature|card|permanent)$/.exec(ref);
+  if (that) {
+    // The one target the spell or ability has (a card target isn't an "object" one, so not lastObjectTarget).
+    const t = ctx.targets.length === 1 ? ctx.targets[0]! : undefined;
+    if (t && !t.many) return (that[1] === "card") === (t.kind === "card") && t.kind !== "spell" ? { target: 0 } : null;
+    return that[1] === "creature" && (ctx.subject || ctx.subjectIt) && !ctx.targets.length ? { subject: true } : null;
+  }
+  if (ref === "that spell" && ctx.castSpell && !ctx.targets.length) return { spell: true };
+  if (ref === "another creature you control") return { permanents: { kind: "object", types: ["Creature"], text: "creature you control" }, other: true };
+  // Doubling Chant (as parseBody joins its two sentences): one card for each creature you control.
+  if (ref === "each creature you control") return { permanents: { kind: "object", types: ["Creature"], text: "creature you control" }, each: true };
+  if (ref === "a card in your graveyard") return { yourGraveyard: true };
+  return null;
 }

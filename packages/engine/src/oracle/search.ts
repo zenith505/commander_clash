@@ -1,5 +1,5 @@
 import { DRAFTED_NAME } from "./draft";
-import type { AmountExpr, Effect, SearchDest, TargetSpec } from "../abilities";
+import type { AmountExpr, Effect, SameNameRef, SearchDest, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { NUMBER_WORDS, X, BASIC_TYPES } from "./words";
 import { parseTargetPhrase } from "./targets";
@@ -21,9 +21,19 @@ function searchDest(text: string): SearchDest {
  * (CR 701.23), and the variants: "put one onto the battlefield tapped and the other into your
  * hand" (Cultivate), "then shuffle and put that card on top" (Vampiric Tutor).
  */
-export function parseSearch(s: string, count?: (text: string) => AmountExpr | null): Effect[] | null {
+export function parseSearch(s: string, count?: (text: string) => AmountExpr | null, same?: (ref: string) => SameNameRef | null): Effect[] | null {
   const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|six|seven|eight|nine|ten|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then|exile) .+)$/i.exec(s);
   if (!m) return null;
+  // "A permanent card with the same name as target nontoken creature" (Bifurcate), "a card with the same name as that
+  // creature" (Remembrance): the search as without it, finding only cards with that name (CR 201.2), worked out as it
+  // resolves (`same` says from what, registering a target if there is one).
+  const sm = / with the same name as (.+)$/.exec(m[3]!);
+  if (sm) {
+    const ref = same?.(sm[1]!);
+    const fx = ref && parseSearch(s.replace(sm[0], ""), count);
+    if (!ref || fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.oneEach || fx[0]!.oneOfEach || fx[0]!.filter?.anyOf) return null;
+    return [{ ...fx[0]!, filter: { ...(fx[0]!.filter ?? { kind: "card" }), text: m[3]! }, sameName: ref }];
+  }
   const upTo = !!m[1] || m[2] === "any number of";
   // "Up to X basic land cards" (New Frontiers): the X it was cast with. "X cards" (Insidious Dreams) too: as many as
   // there are, up to X (CR 701.23d).

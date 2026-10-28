@@ -1205,9 +1205,12 @@ export interface DamageRuleSpec {
 export const refCovers = (r: object, i: number): boolean =>
   "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
 
+/** Is it kicker (CR 702.33), so a spell cast paying it is "kicked" for other cards, not replicate, waterbend and the like? */
+export const isRealKicker = (k: CompiledCard["kicker"]): boolean => !!k && (kickerName(k) === "kicker" || kickerName(k) === "multikicker");
+
 /** What a card's kicker-like cost is called (see CompiledCard.kicker). */
-export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" | "waterbend" =>
-  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.waterbend !== undefined ? "waterbend" : k.multi ? "multikicker" : "kicker";
+export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" | "waterbend" | "additional cost" =>
+  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.waterbend !== undefined ? "waterbend" : k.optional ? "additional cost" : k.multi ? "multikicker" : "kicker";
 
 export interface TokenSpec {
   name: string;
@@ -1869,7 +1872,7 @@ export type StaticCondition =
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
    */
-  | { kind: "phase"; phase: "main" | "combat" | "end"; yours?: true; first?: true }
+  | { kind: "phase"; phase: "main" | "combat" | "end"; yours?: true; first?: true; /** "If it isn't your main phase" (Dose of Dawnglow). */ not?: true }
   /** "If it's attacking the player with the most life or tied for most life" (Scourge of the Throne; dethrone's test, CR 702.105a). */
   | { kind: "attackingMostLife" }
   /** "While you have the most life or are tied for most life" (Preacher of the Schism). */
@@ -5112,7 +5115,7 @@ export type AdditionalCost =
    * matches, chosen as it's paid (CR 602.2b, 601.2h; CostChoices.counterOn), the source too. Not payable on one counters
    * can't be put on (rulings on Solemnity).
    */
-  | { kind: "putCounter"; counter: CounterKind; n: number; filter: TargetSpec }
+  | { kind: "putCounter"; counter: CounterKind; n: number; filter: TargetSpec; /** Blight N (CR 701.68a): `n` -1/-1 counters on one creature you control. */ blight?: true }
   /**
    * Craft's materials (CR 702.167a-b): "Exile [materials] from among permanents you control and/or cards in your
    * graveyard", `n` objects that match `filter` (a permanent by its characteristics, a card by its printed ones), any mix
@@ -6182,6 +6185,12 @@ export interface CompiledCard {
      */
     extraCosts?: AdditionalCost[];
     text?: string;
+    /**
+     * "As an additional cost to cast this spell, you may blight 1", "you may behold a Dragon" (CR 601.2b): an optional
+     * additional cost that isn't kicker, its one cost `extraCosts[0]`, chosen and paid the same way. "If this spell's
+     * additional cost was paid", "if a Dragon was beheld" read as kicked. Not "kicked" for other cards.
+     */
+    optional?: true;
   };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];

@@ -353,6 +353,8 @@ type CastDraft = {
   tap?: string[];
   /** Counters removed for Quilled Greatwurm's "removing six counters from among creatures you control". */
   counters?: { id: string; kind: string }[];
+  /** The creature blighted for "blight 1 or pay {3}" (Bogslither's Embrace) or "you may blight 1" (Cinder Strike). */
+  counterOn?: string[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -777,7 +779,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "putCounter") {
         // "Put a -1/-1 counter on a creature you control" (Hatchet Bully): click the creature (CR 602.2b).
         if (d.counterOn !== undefined) continue;
-        return setCostPick({ activate: d, kind: "counterOn", label: cardOf(s, d.objectId).name, what: `put a ${c.counter} counter on ${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`, n: 1, candidates: counterOnCandidates(s, HUMAN, c), chosen: [] });
+        return setCostPick({ activate: d, kind: "counterOn", label: cardOf(s, d.objectId).name, what: counterOnWhat(c), n: 1, candidates: counterOnCandidates(s, HUMAN, c), chosen: [] });
       }
       if (c.kind === "returnToHand") {
         // Ninjutsu: click the unblocked attacker to return (CR 702.49a).
@@ -1002,7 +1004,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
-      if (c.kind === "craft" || c.kind === "putCounter") continue; // an ability's cost only (CR 702.167a)
+      if (c.kind === "craft") continue; // an ability's cost only (CR 702.167a)
+      // Blight N (CR 701.68a): the one creature you control to put the counters on.
+      if (c.kind === "putCounter") {
+        if (d.counterOn !== undefined) continue;
+        return setCostPick({ draft: d, kind: "counterOn", label: card.name, what: counterOnWhat(c), n: 1, candidates: counterOnCandidates(s, HUMAN, c), chosen: [] });
+      }
       // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
       if (c.kind === "removeCounters") {
         if (d.counters !== undefined) continue;
@@ -1082,6 +1089,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}),
       ...(d.tap?.length ? { tap: d.tap } : {}),
       ...(d.counters?.length ? { counters: d.counters } : {}),
+      ...(d.counterOn?.length ? { counterOn: d.counterOn } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -2037,6 +2045,12 @@ const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback
 /** "creature" to "creatures"; a text that is plural already ("other artifact creatures and/or Vehicles") stays. */
 const plural = (what: string) => (/s$/.test(what) ? what : `${what}s`);
 
+/** "put a -1/-1 counter on a creature you control", "blight 2 (put two -1/-1 counters on a creature you control)". */
+function counterOnWhat(c: Extract<AdditionalCost, { kind: "putCounter" }>): string {
+  const put = `put ${c.n === 1 ? `a ${c.counter} counter` : `${c.n} ${c.counter} counters`} on ${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+  return c.blight ? `blight ${c.n} (${put})` : put;
+}
+
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${plural(what)}`);
@@ -2051,6 +2065,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "reveal" && c.orControl) return `behold ${beholdWhat(c)}${c.exile ? " and exile it" : ""}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
+  if (c.kind === "putCounter") return counterOnWhat(c);
   if (c.kind === "mill") return c.exile ? `exile the top ${c.n === 1 ? "card" : `${c.n} cards`} of your library` : `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
@@ -2318,6 +2333,20 @@ function KickPickBar({
       </div>
     );
   }
+  // "As an additional cost to cast this spell, you may blight 1", "you may behold a Dragon": pay it or not.
+  if (pick.name === "additional cost" && pick.text)
+    return (
+      <div className="targeting">
+        <span>
+          <strong>{pick.label}</strong>: as an additional cost, you may {pick.text}
+        </span>
+        <button disabled={!can([0])} onClick={() => onDone([0])}>
+          {pick.text.charAt(0).toUpperCase() + pick.text.slice(1)}
+        </button>
+        <button onClick={() => onDone([])}>Don't</button>
+        {cancel}
+      </div>
+    );
   if (pick.costs.length === 1)
     return (
       <div className="targeting">
@@ -2356,7 +2385,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? "Put the counter and activate" : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "counterOn" ? `${pick.what.startsWith("blight") ? "Blight" : "Put the counter"} and ${pick.draft ? "cast" : "activate"}` : pick.kind === "returnToHand" ? (pick.faceUp ? "Return and turn face up" : pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : `${pick.exile ? "Exile" : "Sacrifice"} and ${pick.faceUp ? "turn face up" : pick.activate ? "activate" : "cast"}`}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>

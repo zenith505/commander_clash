@@ -1203,6 +1203,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
   // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
   text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
+  // Cinder Strike: "It deals 4 damage to that creature instead if this spell's additional cost was paid" (read as kicked):
+  // the same as "If ~ was kicked, it deals 4 damage instead".
+  text = text.replace(/^(~ deals \d+ damage to target creature\. )It deals (\d+) damage to that creature instead if ~ was kicked\.$/, "$1If ~ was kicked, it deals $2 damage instead.");
   // Lithomantic Barrage: "It deals 5 damage instead if that target is white and/or blue": a permanent that's white, blue
   // or both, as it resolves (CR 608.2c), the same as Lightning Dart's "If that creature is white or blue".
   text = text.replace(/^(~ deals \d+ damage to target creature or planeswalker\. )It deals (\d+) damage instead if that target is (white|blue|black|red|green) and\/or (white|blue|black|red|green)\.$/, "$1If that permanent is $3 or $4, ~ deals $2 damage instead.");
@@ -3411,6 +3414,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences[si + 2]?.replace(/\.$/, "") === "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost"
     ) {
       effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachPlayer" }, oneOf: true, life: true });
+      si += 2;
+      continue;
+    }
+    // Burning Curiosity: "Exile the top two cards of your library. If this spell's additional cost was paid, exile the top
+    // three cards instead. Until the end of your next turn, you may play those cards.": one impulse, of more cards when that
+    // cost was paid (read as kicked).
+    const kickedTop = exTop && exTop[1] && !impulseIf && !exEqual ? new RegExp(`^If ~ was kicked, exile the top ${NUM} cards instead\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (kickedTop && /^Until the end of your next turn, you may play those cards\.?$/.test(sentences[si + 2] ?? "") && num(kickedTop[1]!) > num(exTop![1]!)) {
+      const base = num(exTop![1]!);
+      effects.push({ type: "impulse", n: { count: { kind: "wasKicked" }, times: num(kickedTop[1]!) - base, plus: base }, until: "nextTurn" });
       si += 2;
       continue;
     }
@@ -8395,7 +8408,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // counter was just put on, as it resolves (rulings: not if it has left the battlefield).
     const justCounted = effects[effects.length - 1];
     const selfCounted = !!ifState && !ctx.spell && /^(?:it|~) has .+ counters? on it$/.test(ifState[1]!) && justCounted?.type === "counters" && justCounted.what.ref === "self";
-    const stateCond = ifState && (selfTapped || selfCounted || !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const stateCond = ifState && (selfTapped || selfCounted || !/^(it|~)\b(?!'s (?:your|not your|the first) | isn't your main phase$)/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
@@ -9475,6 +9488,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;
     return { effects: [{ ...prev, amount: amt(more[1]!) }], instead };
+  }
+  // Dispelling Exhale: "Counter target spell unless its controller pays {2}. If a Dragon was beheld, counter that spell
+  // unless its controller pays {4} instead" (beheld read as kicked): the same counter, a bigger payment.
+  const morePay = instead ? /^Counter that spell unless its controller pays (\{\d+\})$/.exec(t) : null;
+  if (morePay) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "counterSpell" || !prev.unless || Object.keys(prev.unless).join() !== "cost") return null;
+    return { effects: [{ ...prev, unless: { cost: morePay[1]! } }], instead };
   }
   // Chocobo Kick: "Target creature you control deals damage equal to its power to target creature an opponent controls. If
   // ~ was kicked, the creature you control deals twice that much damage instead": the same bite, at twice its power.

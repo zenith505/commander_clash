@@ -5665,6 +5665,7 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   const k = compileCard(d).kicker!;
   const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
   const name = kickerName(k);
+  if (k.optional) return `, paying its additional cost (${k.text})`;
   if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
   if (k.extraCosts) return `, kicked (${k.text})`;
   if (k.multi || k.costs.length === 1) return kicks.length === 1 ? ", kicked" : `, kicked${times}`;
@@ -6014,13 +6015,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "putCounter") {
       // Hatchet Bully: one permanent you control that matches, not one counters can't be put on (rulings on Solemnity).
       const pool = counterOnCandidates(s, pid, c);
+      // Blight N: all N counters on one creature you control (CR 701.68a, rulings), which can't be done with none (701.68b).
       const what = `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+      const counters = c.n === 1 ? `a ${c.counter} counter` : `${c.n} ${c.counter} counters`;
       const chosen = choices?.counterOn;
       if (!chosen) {
-        if (!pool.length) return `you need to put a ${c.counter} counter on ${what} to ${doing}`;
+        if (!pool.length) return c.blight ? `you need a creature to blight ${c.n} to ${doing}` : `you need to put ${counters} on ${what} to ${doing}`;
         continue;
       }
-      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put a ${c.counter} counter on`;
+      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put ${counters} on`;
       continue;
     }
     if (c.kind === "mill") {
@@ -6219,7 +6222,7 @@ export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: 
 
 /** "An Elf" for "behold an Elf". */
 export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
-  const kind = c.filter.subtypes?.[0] ?? c.filter.text;
+  const kind = c.filter.subtypes?.[0] ? `${c.filter.subtypes[0]}${c.filter.types?.includes("Creature") ? " creature" : ""}` : c.filter.text;
   return `${c.n === 1 ? (/^[AEIOU]/.test(kind) ? "an" : "a") : c.n} ${kind}`;
 };
 
@@ -6292,8 +6295,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     } else if (c.kind === "putCounter") {
       // Through the replacement effects on counters, as any counter put on a permanent (CR 122.6).
       for (const id of choices.counterOn ?? []) {
-        const put = putCounters(s, obj(s, id), c.counter, 1);
-        log(s, `${p.name} puts ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
+        const put = putCounters(s, obj(s, id), c.counter, c.n);
+        log(s, `${p.name} ${c.blight ? `blights ${c.n}, putting` : "puts"} ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
       }
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];

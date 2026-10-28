@@ -426,6 +426,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.tookFromHand = 0;
+        s.resolving!.exiledFromHandCards = [];
         // "Choose X cards from it" (Mind Warp): as many as there are, if fewer (CR 609.3).
         const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         if (!cards.length || n <= 0) return;
@@ -477,6 +478,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           moveObject(s, id, "exile");
           const o = obj(s, id);
           if (o.zone !== "exile") continue;
+          (s.resolving!.exiledFromHandCards ??= []).push({ id, zc: o.zoneChanges ?? 0 });
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };

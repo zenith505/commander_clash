@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -537,9 +537,11 @@ function sacrificedTargets(s: GameState, targets: TargetChoice[] | undefined): O
  * Like planCast, for an activated ability. A crew ability needs the creatures to tap (`tapCreatures`). `pick`: for a
  * mana ability, the color and the triggered abilities' mana, as for activateMana.
  */
-export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices, pick?: { mana?: ManaType; extra?: ManaType[] }): Action[] | null {
+export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, pick?: { mana?: ManaType; extra?: ManaType[] }): Action[] | null {
   // "Untap a tapped creature you control" with a creature that's untapped: it's tapped for mana first (Halo Fountain).
   const ab0 = abilitiesOf(s, obj(s, objectId)).activated[index];
+  // Prototype Portal: an X the ability sets (CR 107.3c).
+  const x = x0 ?? (ab0 && definedX(s, obj(s, objectId), ab0)) ?? undefined;
   const untapCost = ab0?.costs?.find((c) => c.kind === "tap" && c.untap);
   const forMana = untapCost ? (costs?.tap ?? []).find((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped) : undefined;
   if (forMana !== undefined) {

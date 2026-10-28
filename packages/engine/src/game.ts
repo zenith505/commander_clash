@@ -12,7 +12,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, cardPT, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
@@ -6508,13 +6508,28 @@ const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   (!!o && (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === true || (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === "enteredThisTurn" && o.enteredTurn === s.turn))) ||
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
-export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {
+/**
+ * The X an ability's own text sets (CR 107.3c), its controller not choosing it: Prototype Portal's "X is the mana value of
+ * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
+ * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
+ */
+export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility): number | null | undefined {
+  if (ab.xIs !== "linkedCardMv") return undefined;
+  const card = linkedCards(s, o.id)[0];
+  return card ? defMv(defOf(s, obj(s, card.id))) : null;
+}
+
+export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices): string | null {
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
+  const fixedX = definedX(s, o, ab);
+  if (fixedX === null) return `no card is exiled with ${d.name}, so X isn't defined`;
+  if (fixedX !== undefined && x0 !== undefined && x0 !== fixedX) return `X is ${fixedX} for ${d.name}'s ability`;
+  const x = x0 ?? fixedX;
   // Stabilizer: "Players can't cycle cards" (typecycling too, CR 702.29f).
   if (ab.cycling) {
     const ban = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noCycling);
@@ -6526,6 +6541,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (ab.zone === "graveyard") {
     // Unearth works only while the card is in your graveyard (CR 702.84a).
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
+    // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
+    const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
+    if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;
   } else if (ab.zone === "command") {
     // Derevi: only from the command zone (rulings).
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
@@ -6900,10 +6918,12 @@ function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number
  * Activate an ability (CR 602.2). Returns whether it was a mana ability, which resolved right away instead of going on
  * the stack (CR 605.3b). `mana` and `extra`: for a mana ability, as for activateMana.
  */
-function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
+function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
   const o = obj(s, id);
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
+  // Prototype Portal: an X its text sets (CR 107.3c).
+  const x = x0 ?? (ab && definedX(s, o, ab)) ?? undefined;
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);

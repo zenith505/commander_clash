@@ -577,6 +577,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // A card in a graveyard (CR 109.2a). Nothing in the engine changes characteristics in a
     // graveyard, so the printed card is what's checked; hexproof only works on the battlefield.
     if (o.zone !== (spec.linkedExile ? "exile" : "graveyard") || s.players[o.owner]?.lost) return false;
+    // Ground Seal: "Cards in graveyards can't be the targets of spells or abilities."
+    if (o.zone === "graveyard" && s.battlefield.some((b) => abilitiesOf(s, obj(s, b)).graveyardUntargetable)) return false;
     if (spec.owner === "you" && o.owner !== controller) return false;
     if (spec.owner === "opponent" && o.owner === controller) return false;
     // One opponent's slot of "for each opponent, ... from that player's graveyard" (TargetSpec.perOpponent): their card.
@@ -639,7 +641,10 @@ export function bindBound(s: GameState, spec0: TargetSpec, ctx: AmountCtx): Targ
   // Mistfolk: "target spell that targets ~": the source, as it is now (TargetSpec.targetsSource).
   const spec1: TargetSpec = spec0.targetsSource ? (({ targetsSource: _, ...r }) => ({ ...r, targetsWhat: { kind: "object", objectId: ctx.sourceId ?? "", text: "~" } }))(spec0) : spec0;
   // Nissa, Steward of Elements: "a land card or a creature card with mana value less than or equal to ...": one of them.
-  const spec: TargetSpec = spec1.anyOf?.some((x) => x.bound) ? { ...spec1, anyOf: spec1.anyOf.map((x) => bindBound(s, x, ctx)) } : spec1;
+  const spec2: TargetSpec = spec1.anyOf?.some((x) => x.bound) ? { ...spec1, anyOf: spec1.anyOf.map((x) => bindBound(s, x, ctx)) } : spec1;
+  // Crown of Doom: "target player other than ~'s owner" (owners never change, CR 108.3).
+  const owner = spec2.notSourceOwner && ctx.sourceId ? s.objects[ctx.sourceId]?.owner : undefined;
+  const spec: TargetSpec = owner !== undefined ? { ...spec2, notPlayer: owner } : spec2;
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.

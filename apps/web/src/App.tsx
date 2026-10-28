@@ -8,6 +8,7 @@ import {
   landFaces,
   registerFace,
   abilityProblem,
+  definedX,
   altCost,
   altCostsFor,
   canCast,
@@ -712,6 +713,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setTapPick({ kind: "station", objectId, index, chosen: best ? [best.id] : [] });
     }
     if (ab.body.modal && !modes) return setModePick({ mode: "activate", objectId, index, label, body: ab.body });
+    // Prototype Portal: an X the ability's text sets isn't chosen (CR 107.3c).
+    const fixedX = definedX(s, s.objects[objectId]!, ab);
+    if (x === undefined && fixedX != null) x = fixedX;
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
     if (x === undefined && parseManaCost(ab.manaCost).hasX) {
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));

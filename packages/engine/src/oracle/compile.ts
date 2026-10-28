@@ -3040,6 +3040,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Playing a land from there is still allowed (rulings on Grafdigger's Cage): it isn't cast (CR 305.1).
+    // Ashes of the Abhorrent: "Players can't cast spells from graveyards or activate abilities of cards in graveyards."
+    if (line === "Players can't cast spells from graveyards or activate abilities of cards in graveyards.") {
+      out.cantCastFrom = { zones: ["graveyard"] };
+      out.noGraveyardActivations = true;
+      continue;
+    }
+    if (line === "Cards in graveyards can't be the targets of spells or abilities.") {
+      out.graveyardUntargetable = true;
+      continue;
+    }
     const noCasting = /^Players can't cast (spells|noncreature spells) from (graveyards|graveyards or libraries|graveyards or exile)\.$/.exec(line);
     if (noCasting) {
       out.cantCastFrom = { zones: noCasting[2]!.split(" or ").map((z) => (z === "graveyards" ? "graveyard" : z === "libraries" ? "library" : "exile")), ...(noCasting[1] === "noncreature spells" ? { noncreature: true as const } : {}) };
@@ -4306,7 +4316,11 @@ function linkExile(out: CompiledCard) {
     const plain = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const exiles = plain.length ? plain : all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
+    // Prototype Portal: "Imprint — When ~ enters, you may exile an artifact card from your hand": its only exile.
+    const imprints = all.filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile");
+    const imprintOnly = !exiles.length && imprints.length === 1 && !imprints[0]!.until && out.triggers.some((t) => t.event === "selfEnters" && allEffects(t.body.effects).includes(imprints[0]!)) && !all.some((e) => e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
+    if (imprintOnly && !out.spell) imprints[0]!.linked = true;
+    else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));

@@ -109,6 +109,8 @@ export interface Ctx {
   afterYourDiscard?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
   discardedOne?: boolean;
+  /** After "you may exile a creature card from your hand. If you do": "the exiled card" is that card (Nexus of Becoming). */
+  exiledFromHand?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
@@ -8285,6 +8287,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const inner = parseOne(capital(ifDid[2]!), ctx);
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "exiledThisWay", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "permanent" } } }, min: 1 }, effects: inner });
+        continue;
+      }
+      // "You may exile an artifact or creature card from your hand. If you do, create a token that's a copy of the exiled
+      // card" (Nexus of Becoming): only if a card was exiled, which can't be with none that fits in hand (CR 609.3).
+      const fromHand = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0]! : undefined;
+      if (ifDid[1] === "do" && fromHand?.type === "takeFromHand" && fromHand.who.ref === "you" && fromHand.action === "exile" && (fromHand.n === undefined || fromHand.n === 1) && !fromHand.upTo && !fromHand.until && !fromHand.ownerMay && !fromHand.plot && !fromHand.linked && !noDamage && !where) {
+        const inner = parseOne(capital(ifDid[2]!), { ...ctx, exiledFromHand: true });
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "tookFromHand" } }, min: 1 }, effects: inner });
         continue;
       }
       // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent

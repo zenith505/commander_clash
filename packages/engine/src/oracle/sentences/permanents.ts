@@ -1022,6 +1022,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Humble Defector: "Target opponent gains control of ~", for the rest of the game (layer 2); if ~ has left the
   // battlefield, nothing happens (rulings).
   // Sleeper Agent: "When ~ enters, target opponent gains control of it": the same, "it" being ~.
+  // Crown of Doom: "Target player other than ~'s owner gains control of it" (an activated ability: "it" is ~).
+  if (ctx.activated && !ctx.spell && /^Target player other than ~'s owner gains control of (?:it|~)$/.test(s)) {
+    const who = parsePlayer("target player", ctx);
+    if (who?.ref !== "target") return null;
+    ctx.targets[who.index] = { ...ctx.targets[who.index]!, notSourceOwner: true, text: "target player other than ~'s owner" };
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }];
+  }
   if (((m = /^([Tt]arget player|[Tt]arget opponent) gains control of ~$/.exec(s)) || (ctx.selfIt && (m = /^([Tt]arget player|[Tt]arget opponent) gains control of it$/.exec(s)))) && !ctx.spell) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;

@@ -653,6 +653,8 @@ export interface TargetSpec {
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   notPlayer?: PlayerId;
+  /** "Target player other than ~'s owner" (Crown of Doom): `notPlayer` set to that owner as targets are chosen and checked. */
+  notSourceOwner?: true;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
   optional?: boolean;
   /**
@@ -1040,6 +1042,8 @@ export type ObjRef =
   | { ref: "milled" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
   | { ref: "exiledTop" }
+  /** "The exiled card" after "you may exile a creature card from your hand" (Nexus of Becoming): the one card this resolution's takeFromHand exiled, while it's still that card in exile (CR 400.7). */
+  | { ref: "exiledFromHand" }
   /** "Defending player chooses a nonland card in your graveyard. Return that card to your hand." (O-Kagachi Made Manifest): the card this resolution's chooseFromGraveyard moved, where it went, while it's still that card (CR 400.7). */
   | { ref: "chosenFromYard" }
   /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
@@ -4770,6 +4774,11 @@ export interface ActivatedAbility {
   maxPerTurn?: number;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
   xMin?: number;
+  /**
+   * "{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card." (Prototype Portal): X is
+   * defined by the ability, not chosen (CR 107.3c), worked out as it's activated; with no card exiled it can't be (rulings).
+   */
+  xIs?: "linkedCardMv";
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -5797,6 +5806,10 @@ export interface CompiledCard {
   cantEnterFrom?: { zones: ("graveyard" | "library")[]; what: "creature" | "permanent" | "nonlandPermanent" };
   /** "Players can't cast spells from graveyards or libraries." (Grafdigger's Cage), "... noncreature spells from graveyards or exile" (Soulless Jailer). */
   cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
+  /** Ashes of the Abhorrent: "Players can't ... activate abilities of cards in graveyards." Triggered abilities still work (rulings). */
+  noGraveyardActivations?: true;
+  /** Ground Seal: "Cards in graveyards can't be the targets of spells or abilities." Untargeted effects still reach them (rulings). */
+  graveyardUntargetable?: true;
   /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
   opponentsSearchTop?: number;
   /**

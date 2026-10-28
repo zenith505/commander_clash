@@ -2083,6 +2083,8 @@ export interface Resolving {
   endTurn?: true;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
   tookFromHand?: number;
+  /** The cards it exiled from your hand ("You may exile a creature card from your hand. If you do, create a token that's a copy of the exiled card"). */
+  exiledFromHandCards?: { id: ObjectId; zc: number }[];
   /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */

@@ -243,6 +243,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let oncePerTurn = keyword === "Boast" || keyword === "Forecast";
   let maxPerTurn: number | undefined;
   let xMin: number | undefined;
+  let xIs: ActivatedAbility["xIs"];
   let uncopyable = false;
   let onceEver = keyword === "Exhaust" || keyword === "Power-up";
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
@@ -327,6 +328,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (/ This ability can't be copied\.$/.test(effectText) && !uncopyable) {
       uncopyable = true;
       effectText = effectText.slice(0, effectText.length - " This ability can't be copied.".length);
+      found = true;
+    }
+    // Prototype Portal, Soul Foundry: "X is the mana value of that card": the card its imprint ability exiled (CR 107.3c).
+    if (/ X is the mana value of (?:that|the exiled) card\.$/.test(effectText) && !xIs && costs === "{X}, {T}" && /^Create a token that's a copy of the exiled card\./.test(effectText)) {
+      xIs = "linkedCardMv";
+      // The card exiled with ~ (CR 607.2a): its one imprint ability's card (linked in compile.ts).
+      effectText = effectText.replace(/ X is the mana value of (?:that|the exiled) card\.$/, "").replace(/^Create a token that's a copy of the exiled card\./, "Create a token that's a copy of a card exiled with ~.");
       found = true;
     }
     // "X can't be 0." (Ruthless Technomancer, Lair of the Hydra's {X}{G}): only with an X in its costs.
@@ -485,6 +493,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(keyword ? { keyword } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),
     ...(xMin ? { xMin } : {}),
+    ...(xIs ? { xIs } : {}),
     ...(costLess ? { costLess } : {}),
     ...(costLessIf ? { costLessIf } : {}),
     ...(activateIf ? { activateIf } : {}),

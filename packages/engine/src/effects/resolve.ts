@@ -404,6 +404,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = s.resolving?.discardedCards?.length === 1 ? s.objects[s.resolving.discardedCards[0]!.id] : undefined;
     return o && o.zone === "graveyard" && (o.zoneChanges ?? 0) === s.resolving!.discardedCards![0]!.zc ? [o] : [];
   }
+  if (ref.ref === "exiledFromHand") {
+    const ex = s.resolving?.exiledFromHandCards;
+    const o = ex?.length === 1 ? s.objects[ex[0]!.id] : undefined;
+    return o && o.zone === "exile" && (o.zoneChanges ?? 0) === ex![0]!.zc ? [o] : [];
+  }
   if (ref.ref === "exiledTop") {
     const ex = s.resolving?.exiledTop;
     const o = ex && s.objects[ex.id];

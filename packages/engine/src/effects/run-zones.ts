@@ -5,6 +5,7 @@ import { graveyardWays, freeCastable, canPlayLandNow, loseLife, opponents, tapPe
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
+import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
@@ -165,7 +166,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       // Imperial Edict ("Target opponent chooses a creature they control. Destroy that creature."): the question says what
       // happens to the one chosen.
       const after = e.action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
-      const fate = (after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : undefined;
+      // Drop of Honey, Purging Scythe: one of those tied for the least power or toughness, anyone's.
+      const tied = e.anyController && e.least ? `click a creature tied for the least ${e.least} (anyone's). ${src} ${after?.type === "destroy" ? "destroys it" : after?.type === "damage" ? `deals ${describeAmount(after.amount)} damage to it` : "chooses it"}.` : undefined;
+      const fate = tied ?? ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created" ? `click ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} you control. ${src} ${after.type === "destroy" ? "destroys" : "exiles"} it.` : undefined);
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, ...(fate ? { prompt: fate } : {}), what: e.least ? `${e.filter.text} with the least ${e.least}` : e.greatest ? `${e.filter.text} with the greatest ${e.greatest === "power" ? "power" : "mana value"}` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}), ...(among !== undefined && among !== pid ? { of: among } : {}) };
       return "paused";
     }
@@ -1796,6 +1799,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const shown = sc.found.filter((id) => p.hand.includes(id));
       sc.found = undefined;
       s.resolving!.revealedFromHand = shown.length;
+      if (!e.bottom) s.resolving!.revealedFromHandIds = shown;
       if (e.bottom) {
         // In the order picked, the first lowest (its owner orders them, CR 401.4).
         for (const id of [...shown].reverse()) moveObject(s, id, "library");
@@ -1853,10 +1857,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        if (e.until) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        // Face up (CR 406.3); "the exiled cards" of its leaves ability (Wormfang Behemoth).
+        if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       s.resolving!.exiledFromHand = ids.length;
-      log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand and may play them until the end of their next turn.` : `${p.name} has no cards in hand to exile.`);
+      log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand${e.until ? " and may play them until the end of their next turn" : ""}.` : `${p.name} has no cards in hand to exile.`);
       return;
     }
     case "putFromHand": {

@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
@@ -626,6 +626,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.putIntoHand ?? []).some((id) => s.objects[id]?.zone === "hand" && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "impulsedIs"
             ? (s.resolving!.impulsed ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
+            : e.cond.kind === "revealedTopIs"
+            ? ((f) => (s.resolving!.revealedUntil ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(((f) => (f.named === "~" ? { ...f, named: ctx.sourceDef.name } : f))((e.cond as { filter: TargetSpec }).filter))
             : e.cond.kind === "milledIs"
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
@@ -911,6 +913,11 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "untap" && e.what.ref === "target" && !objects(s, e.what, ctx).some((o) => o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
+    // "Gain control of target land ... for as long as you control ~" (Orcish Squatters): over before it begins if you no
+    // longer control ~ (CR 611.2b), so it can't be done.
+    if (e.type === "continuous" && e.duration === "whileControlled" && !e.whileOnBattlefield && !(ctx.sourceId && whileControlledHolds(s, { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, controller: ctx.controller }))) return false;
+    // "You may have it assign no combat damage this turn" (Cloak of Confusion): only a creature still on the battlefield.
+    if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
     if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;
@@ -1114,9 +1121,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
 const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
 
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
-function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number } {
+function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number; discards?: number; losesSource?: true } {
   const [f] = e.effects;
   if (e.effects.length !== 1 || !f) return {};
+  if (f.type === "sacrifice" && f.what.ref === "self") return { losesSource: true };
   if (f.type === "loseLife" && typeof f.n === "number") return { lose: f.n };
   if (f.type === "damage" && typeof f.amount === "number") return { lose: f.amount };
   if (f.type === "createToken") return { tokens: 1 };

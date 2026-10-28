@@ -1,6 +1,6 @@
 # Roadmap
 
-27,067 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,158 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,981 of
 9,979 (89%).
 
@@ -929,7 +929,7 @@ line blocks.
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
    that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Ancient Imperiosaur, Everything Comes
    to Dust and Knight-Errant of Eos (what convoked them); Nissa's two-sentence "Nth time" branches; Rose Room
-   Treasurer, Soulbright Flamekin; Eivor and Sludge Titan ("and/or" after a mill); Spinal Parasite, Brightflame,
+   Treasurer, Soulbright Flamekin; Eivor and Sludge Titan ("and/or" after a mill); Brightflame,
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or
@@ -1704,7 +1704,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Shrine); Avatar of Discord ("unless you discard two cards" with one card in hand: a partial payment question);
   Polar Kraken and Phyrexian Soulgorger (cumulative upkeep paid by sacrificing); Stand United (an "if" effect that
   pauses for a scry); Nissa's Defeat (its target phrase); Wargling (an ability word before "until end of turn,");
-  Phoenix Fleet Airship ("permanents named ~"); Galactus and Kookus (a name with ~ in it); Festering Newt, Ruin in
+  Phoenix Fleet Airship ("permanents named ~"); Galactus (a name with ~ in it); Festering Newt, Ruin in
   Their Wake, Rix Maadi Guildmage, Dragon Hunter, Will of the All-Hunter, Foe-liage, Inflame and Executioner's Swing
   (each needs a check not modeled: which creatures were dealt damage this turn, "if it's blocking", Dragons as
   though reach, lands entering during your turn).
@@ -2204,29 +2204,96 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   ("Then if there are four or more tide counters on ~, remove them" and an Island mana trigger); Taste of Paradise
   ("pay {1}{G} any number of times" as an additional cost). Known bot gaps: bots target Dead Ringers
   without matching colors, and Ransack's target is chosen as for any library effect.
+- Round B26 (harder skipped cards, least played first): the Shrines' "X is the number of cards in all graveyards
+  with the same name as that spell" (Aven, Nantuko, Dwarven, Cabal and Cephalid Shrine; the name the spell had as it
+  was cast, CR 709.3b; a face-down spell has none, CR 708.2a). "Whenever ~ attacks and isn't blocked, you may ... If
+  you do, ~ assigns no combat damage this turn" (CR 510.1; Floral Spuzzem, where "if you do" means the artifact was
+  destroyed, so an indestructible one doesn't stop the damage, CR 702.12b; Kukemssa Pirates, Orcish Squatters with
+  "for as long as you control ~", Goblin Vandal's "pay {R}. If you do, destroy ... and", Rysorian Badger's "gain 1 life
+  for each card exiled this way and", Cloak of Confusion's "you may have it assign no combat damage"). Costs to attack
+  that aren't mana, "~ can't attack unless you sacrifice a land / two Islands / return an enchantment you control to
+  its owner's hand" (CR 508.1g-i; Exalted Dragon, Leviathan, Floodtide Serpent): attacks are refused unless every
+  cost can be paid at once, each permanent paying only one cost; you click what to pay as attackers are declared
+  (browser test); bots attack with Exalted Dragon only with seven or more lands left, sacrificing the least useful.
+  "Destroy the creature with the least power. It can't be regenerated. If two or more creatures are tied for least
+  power, you choose one of them" (Drop of Honey, Porphyry Nodes; not targeted, anyone's, never an indestructible one
+  when one of those tied can be destroyed, rulings) and "~ deals 2 damage to the creature with the least toughness"
+  (Purging Scythe): click one of those tied (browser test); bots pick an opponent's, the most valuable. "When there are
+  no creatures on the battlefield, sacrifice ~" (CR 603.8; also Task Mage Assembly). Fixed: a discard of 0 cards no
+  longer asks for one. +18 (27,025 of 31,936 with Lane A round 194).
+- Known limit there: the "no creatures" state trigger is checked when a player would get priority, so a creature
+  flickered in the middle of a resolution (rulings on Drop of Honey with Momentary Blink) doesn't make it trigger.
+- Round B27 (harder skipped cards, least played first): negative printed power and toughness (Char-Rumbler, Spinal
+  Parasite, Loot, the Anomaly; a creature with power 0 or less assigns no combat damage, CR 510.1a) and Loot's "assigns
+  combat damage as though his power were positive" (only combat damage, rulings; a toughness rule still comes first).
+  Chroma, counting mana symbols of a color like devotion, a hybrid symbol once for each of its colors (CR 700.5,
+  rulings on Sanity Grinding): in the mana costs of permanents you control (Heartlash Cinder, Outrage Shaman,
+  Primalcrux, Springjack Shepherd), cards in your graveyard (Umbra Stalker), each creature's own (Light from Within),
+  the sacrificed creature's (Fiery Bombardment), the revealed cards' (Phosphorescent Feast, Sanity Grinding with "Then
+  put the cards you revealed this way on the bottom in any order"). Grandeur, "Discard another card named ~" (Baru,
+  Korlash, Linessa with her one-at-a-time creature, artifact, enchantment and land, Oriss's "can't cast spells, and
+  creatures that player controls can't attack this turn" as a rule for the turn, Page, Skoa, Tarox; browser test).
+  "If a card named ~ was revealed this way" (Stomping Slabs), Lammastide Weave's "gain life equal to its mana value",
+  Vigean Intuition's "Choose a card type ... Put all cards of the chosen type", Thought Hemorrhage's damage for each
+  card with the chosen name revealed. "Exile a creature card from your graveyard" as a cost read back as "the exiled
+  card's power / mana value", a "*" by its characteristic-defining ability (CR 604.3; Corpse Lunge, Corpse Explosion,
+  Draconic Intervention, Dread Defiler, Necropolis), and "Exile another creature card from your graveyard" (Gallia,
+  Scrapheap Scrounger, Helbrute's Sarcophagus). Linked leaves-the-battlefield returns (CR 607.2a): "that player gains
+  N life" (Soul Scourge, Laquatus's Champion: the target of the enters trigger, rulings), Wormfang Behemoth's "exile all
+  cards from your hand ... return the exiled cards", Saprazzan Bailiff. Also "named" tokens and creatures as costs
+  (Jungle Patrol's Wood, Bubbling Cauldron's Festering Newt, Kyscu Drake) and Kookus ("Keeper of Kookus" keeps its
+  name; "deals 3 damage to you and attacks this turn if able"). +39 (27,089 of 31,936 with Lane A round 195).
+- Skipped there: Hypnox and Realm Razer (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
+  round that checks "if you cast it from your hand" and "under their owners' control"), Gravegouger, Wormfang Newt and
+  Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
+  state trigger), Detention Sphere (left to Lane A, near the top). Known limit: a "*" creature card's power outside the
+  battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
+  the stack); characteristics() still shows it as 0 there.
+- Round B28 (harder skipped cards, least played first): "Remove X [kind] counters from ~" as a cost, X announced up
+  to how many it has (CR 107.3a, 602.2b; the Bakus with Blademane's "for each counter removed", Infused Arrows,
+  Mercadian Lift's "a creature card with mana value X from your hand", Talon of Pain and Night Dealings with "a source
+  you control (other than ~) deals damage to an opponent / another player", Arcbound Javelineer, Auntie Blyte, Chamber
+  Sentry, Cruel Sadist; the X picker names the counters, browser test; bots use it in main 2; a mana ability with this
+  cost stays unsupported). Sacrificing "a white creature, a blue creature, and a black creature" (the Heralds, three
+  different creatures, one for each) and Urborg Panther's named creatures and itself. Essence Filter's "all
+  enchantments or all nonwhite enchantments"; Hooded Horror's "defending player controls the most creatures or is tied";
+  Cosmic Horror's "If ~ is destroyed this way" (not when indestructible, rulings); Toil to Renown's "each tapped
+  artifact, creature, and land"; Obelisk of Undoing's "you both own and control"; Tetsuo's "tapped or blocking" and
+  "can't be the target of Aura spells"; Doorman's "power 2 or less and/or Walls"; Valakut Fireboar's switch; Riptide
+  Mangler's base power, locked in as it resolves (CR 608.2h); Impetuous Protege's "tapped creatures your opponents
+  control"; Tenacious Hunter's "a creature has a -1/-1 counter on it"; Spellbane Centaur and Dense Foliage; Sanguine
+  Praetor's "the same mana value as the sacrificed creature" and Endemic Plague's "share a creature type with the
+  sacrificed creature"; Icy Prison's "unless any player pays {3}" (its controller's bot pays, the others don't). +34
+  (27,140 of 31,936 with rounds 194-196).
+- Known limits there: bots never use Urborg Panther's search (it sacrifices itself), Sanguine Praetor or Endemic Plague
+  (no value for "the sacrificed creature's" group), and may use Riptide Mangler or Obelisk of Undoing without a good
+  reason. Skipped there: Crucible of the Spirit Dragon, Haruspex and Petalmane Baku (mana abilities with an X counter
+  cost); Insubordination, Erosion, Curse Artifact, Wicked Guardian, Mausoleum Turnkey, Desecrator Hag, Cinder Cloud,
+  Cragganwick Cremator, Lumengrid Augur, Mind Maggots, Gravebane Zombie, Lichenthrope, Territorial Dispute (each needs
+  a template of its own).
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
-  Fire (a number chosen as a cost), Forethought Amulet; Exalted Dragon (an attack cost that isn't mana).
+  Fire (a number chosen as a cost), Forethought Amulet; Shrouded Serpent ("defending player may pay").
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
-  cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
+  cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Storm Entity
   ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Sabotage Strategist, Lavabrink Venturer (odd or even).
   Then up from about 21,900 (round B8 took the easier ones; these are left): Wall of Shadows, Festering Newt,
   Flameskull, Defiant Greatmaw, Aegis Sculptor, Fickle Efreet, Burn Away ("when that creature dies this turn"), Bill
   Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame
   Discharge (modified creatures as you cast it), Rayami, Touch of Moonglove, Library of Lat-Nam, Carrion Rats,
   Shifting Loyalties, Madcap Experiment, Wall of Resurgence, Silhana Wayfinder, Resolute Strike, Forgestoker Dragon,
-  Aven Shrine, Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
+  Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
   Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Haunted Plate
-  Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Porphyry Nodes, Gnarlbark Elm, Time to Feed,
+  Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Gnarlbark Elm, Time to Feed,
   Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,
-  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dense Foliage, Dralnu's Crusade.
+  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dralnu's Crusade.
   Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):
   Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
   before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch
   Paladin, Dragon's Disciple, Dream Salvage, Misinformation, Obscura Interceptor, Rewrite History, Wight, Frenzy Sliver,
-  Mondo Gecko, Baru, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
+  Mondo Gecko, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
   Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Lo and Li, Chisei,
   Withercrown, Throne of Makindi, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
   Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
@@ -2239,7 +2306,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Witch Hunt, Bridge from
-  Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex, Corpse Explosion,
+  Below, Demonfire, Drain Life, Desolation, War Tax, Blood Clock, Urza's Sylex,
   Hollow One, Diabolic Servitude, Murktide Regent, Shared Fate, Pelt Collector, Infernal Genesis, Soul Exchange.
   Then up from about 15,100 to 13,200 (round B11 took the easier ones; about 470 are still unsupported there, its skips
   included): Sandman's Quicksand (mayhem), Aeon Engine, Workshop Elders, Turtle Van, Haunting Imitation, The Fugitive

@@ -26,6 +26,8 @@ import {
   attackablePermanentProblem,
   attackProblem,
   attackCost,
+  attackCostOptions,
+  attackCostsPayable,
   attackTaxOf,
   attackYouLimit,
   combatLimit,
@@ -117,6 +119,7 @@ import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
+import { removableCounters } from "./counters";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -307,6 +310,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
     // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
+    // A cost to attack (Exalted Dragon): the least valuable permanents that leave the other costs payable.
+    if (pend.kind === "pickPermanents" && pend.attackCost) {
+      const rest = s.declaring?.costs?.slice(1) ?? [];
+      const ids: ObjectId[] = [];
+      for (const id of [...pend.options].sort((a, b) => permanentWorth(s, pid, a) - permanentWorth(s, pid, b))) {
+        if (ids.length < pend.count && attackCostsPayable(s, pid, rest, [...ids, id])) ids.push(id);
+      }
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
@@ -2323,7 +2335,9 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
     return cards.reduce((t, id) => t + (isType(defOf(s, obj(s, id)), "Land") ? (lands(s, pid) >= 6 ? 1.5 : 5) : 4 + Math.min(3, mv(s, id) / 2)), 0);
   };
   // "Discards two cards unless ...": the two cards it would cost (as many as there are).
-  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Icy Prison: its controller keeps it if no one else does; the others let it go.
+  const sourceWorth = pu.losesSource && controller === pid && !settled && s.resolving?.item.sourceId && s.objects[s.resolving.item.sourceId]?.zone === "battlefield" ? Math.max(3, worth(s, pid, obj(s, s.resolving.item.sourceId))) : 0;
+  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];
@@ -2945,8 +2959,14 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const given = new Set((s.resolving.countersPutThisWay ?? []).map((c) => c.id));
     return [...options].sort((a, b) => Number(given.has(a)) - Number(given.has(b)) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   }
-  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   const after = action === "choose" && s.resolving ? s.resolving.body.effects[s.resolving.next + 1] : undefined;
+  // Drop of Honey, Purging Scythe: a tied creature of anyone's to destroy or damage: an opponent's, worth the most to them;
+  // else our least useful one.
+  if ((after?.type === "destroy" && after.what.ref === "created") || (after?.type === "damage" && JSON.stringify(after.to) === '{"ref":"created"}')) {
+    const rank = (id: ObjectId) => (controllerOf(s, obj(s, id)) !== pid ? -1000 - worth(s, pid, obj(s, id)) : worth(s, pid, obj(s, id)));
+    return [...options].sort((a, b) => rank(a) - rank(b)).slice(0, count);
+  }
+  // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": our least useful one.
   if ((after?.type === "destroy" || after?.type === "exile") && after.what.ref === "created") return [...options].sort((a, b) => worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
@@ -3877,7 +3897,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // a target worth it (mana value 3 or more), as much energy as we have at most.
       const energyX = ab.energyX && !ab.costs?.length && !xTarget ? Math.min(player(s, pid).energy ?? 0, player(s, pid).library.length - 2) : 0;
       const discardX = discardXCount(s, pid, id, ab);
-      if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
+      // "Remove X ki counters from ~" (the Bakus): as many as it has, or as the mana for an {X} allows (Talon of Pain).
+      const counterX = ab.removeCounters?.x ? Math.min(removableCounters(s, o, ab.removeCounters.counter), parseManaCost(ab.manaCost).hasX ? Math.max(0, availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(parseManaCost(ab.manaCost))) : Infinity) : 0;
+      if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3) && !(counterX > 0)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
@@ -3904,6 +3926,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       // Craft's "return this card" finds the card only once the cost has exiled it: the back face is what it's worth.
       if (!craft && doesNothingNow(s, id, ab.body)) continue;
+      // "Search your library for a card named Sphinx Sovereign" (the Heralds): not with none of them left to find.
+      if (ab.body.effects.some((e) => e.type === "search" && typeof e.filter?.named === "string" && e.filter.named !== "~" && !player(s, pid).library.some((c) => defOf(s, obj(s, c)).name === e.filter!.named))) continue;
       // Chainer, Nightmare Adept: a permission to cast from our graveyard only in our main phase, with none unused yet,
       // for a card there we could pay for afterwards.
       const yardCast = ab.body.effects.find((e) => e.type === "graveyardCastThisTurn");
@@ -3929,7 +3953,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (!craft && (groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
-      const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
@@ -5406,6 +5430,14 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can only attack alone (Master of Cruelties) stays home when others attack (CR 506.5).
   if (attacks.length > 1) attacks = attacks.filter((a) => !characteristics(s, obj(s, a.attacker)).onlyAttacksAlone);
+  // Exalted Dragon, Leviathan: they attack when the lands to sacrifice are spare (seven left after), and only if all such
+  // costs can be paid together (CR 508.1i). Floodtide Serpent's returning an enchantment isn't weighed: it stays home.
+  const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+  const costsOf = (a: { attacker: ObjectId }) => characteristics(s, obj(s, a.attacker)).ownAttackCosts;
+  const spare = (a: { attacker: ObjectId }) => costsOf(a).every((c) => c.action === "sacrifice" && attackCostOptions(s, pid, c).every((id) => objIsType(s, obj(s, id), "Land")));
+  attacks = attacks.filter((a) => !costsOf(a).length || spare(a));
+  const landsPaid = attacks.reduce((n, a) => n + costsOf(a).reduce((t, c) => t + c.n, 0), 0);
+  if (landsPaid && (lands - landsPaid < 7 || !attackCostsPayable(s, pid, attacks.flatMap(costsOf)))) attacks = attacks.filter((a) => !costsOf(a).length);
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");

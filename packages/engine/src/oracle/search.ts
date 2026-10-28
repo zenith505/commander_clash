@@ -135,6 +135,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     if (!spec || head === null || spec.kind !== "card" || !spec.bound) return null;
     return { ...(head ?? { kind: "card" }), bound: spec.bound, text: p };
   }
+  // Night Dealings, Mercadian Lift: "a nonland card with mana value X": exactly the X announced (CR 107.3a).
+  const exactX = / with mana value X$/.exec(p);
+  if (exactX) {
+    const head = parseSearchFilter(p.slice(0, exactX.index));
+    if (head === null) return null;
+    return { ...(head ?? { kind: "card" }), bound: { key: "manaValue", at: "exact", amount: X }, text: p };
+  }
   // Sisay, Weatherlight Captain: "a legendary permanent card with mana value less than ~'s power": at most one less, which
   // below 0 matches nothing.
   const under = count && / with mana value less than (?!or )(.+)$/.exec(p);

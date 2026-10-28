@@ -4736,6 +4736,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "383e9005-5869-4d1d-917d-30e5f214fbd9",
+  "name": "Drop of Honey",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, destroy the creature with the least power. It can't be regenerated. If two or more creatures are tied for least power, you choose one of them.\nWhen there are no creatures on the battlefield, sacrifice this enchantment.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arn",
+  "releasedAt": "1993-12-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5bb32efd-9e58-4021-bbda-4ffccfa1d601",
   "name": "Druid of Purification",
   "manaCost": "{3}{G}",
@@ -5456,6 +5482,38 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c901805e-c196-4b9d-8d5a-e17367fb37bc",
+  "name": "Exalted Dragon",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\nThis creature can't attack unless you sacrifice a land. (This cost is paid as attackers are declared.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "exo",
+  "releasedAt": "1998-06-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -15524,6 +15582,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "74466fa6-34d9-42f9-8590-c7f1fa672bf5",
+  "name": "Skullmane Baku",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Whenever you cast a Spirit or Arcane spell, you may put a ki counter on this creature.\n{1}, {T}, Remove X ki counters from this creature: Target creature gets -X/-X until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d3d8dd6e-a80b-4063-a542-ff67ef8dad4f",
   "name": "Skullwinder",
   "manaCost": "{2}{G}",
@@ -16972,6 +17060,42 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e195f2f8-2db7-46b8-948c-c3c27f2e5825",
+  "name": "Tarox Bladewing",
+  "manaCost": "{2}{R}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying, haste\nGrandeur — Discard another card named Tarox Bladewing: Tarox Bladewing gets +X/+X until end of turn, where X is its power.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Grandeur",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

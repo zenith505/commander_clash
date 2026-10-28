@@ -149,6 +149,8 @@ export interface Characteristics {
   ownAttackTax: number;
   /** Generic mana to block with this creature (Qal Sisma Behemoth, Oppressive Rays). */
   ownBlockTax: number;
+  /** Costs to attack with this creature that aren't mana (Exalted Dragon's "sacrifice a land", CR 508.1g). */
+  ownAttackCosts: { action: "sacrifice" | "bounce"; filter: TargetSpec; n: number }[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -242,6 +244,8 @@ export interface Characteristics {
   /** Doran: assigns combat damage by its toughness, always or only while its toughness is greater than its power. */
   assignsToughness: boolean;
   assignsToughnessIfGreater: boolean;
+  /** Loot, the Anomaly: a negative power assigns that much combat damage as a positive number. */
+  assignsAbsPower: boolean;
   attackDespiteDefender: boolean;
   /** "Can attack as though it had haste" (Instill Energy, CR 302.6). */
   attackAsThoughHaste: boolean;
@@ -317,6 +321,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     blockTax: 0,
     ownAttackTax: 0,
     ownBlockTax: 0,
+    ownAttackCosts: [],
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -348,6 +353,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     mustBlock: false,
     assignsToughness: false,
     assignsToughnessIfGreater: false,
+    assignsAbsPower: false,
     attackDespiteDefender: false,
     attackAsThoughHaste: false,
     attackDespiteDefenderVs: false,
@@ -888,6 +894,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
     case "defendingHasRad":
       return src.attacking !== undefined && (s.players[src.attacking]?.rad ?? 0) > 0;
+    case "defenderMostCreatures": {
+      if (src.attacking === undefined) return false;
+      const count = (p: PlayerId) => s.battlefield.filter((id) => { const c = chars.get(id); return !!c && c.controller === p && c.types.includes("Creature"); }).length;
+      const theirs = count(src.attacking);
+      return s.turnOrder.every((p) => s.players[p]!.lost || count(p) <= theirs);
+    }
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];
       return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);
@@ -1472,6 +1484,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "blockTax":
       c.blockTax += m.n;
       return;
+    case "ownAttackCost":
+      c.ownAttackCosts = [...c.ownAttackCosts, { action: m.action, filter: m.filter, n: m.n }];
+      return;
     case "ownAttackTax":
     case "ownBlockTax": {
       // Phyrexian Marauder, Myr Prototype: {1} for each +1/+1 counter on it now (its counters invalidate the
@@ -1625,6 +1640,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "assignsToughness":
       if (m.ifGreater) c.assignsToughnessIfGreater = true;
       else c.assignsToughness = true;
+      return;
+    case "assignsAbsPower":
+      c.assignsAbsPower = true;
       return;
     case "blockAdditional":
       c.extraBlocks += m.n;

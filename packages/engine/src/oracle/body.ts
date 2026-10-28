@@ -39,6 +39,8 @@ export interface Ctx {
   exiledTop?: boolean;
   /** After "you may reveal the top card of your library. If you do": "that card" is the revealed card. */
   revealedTop?: boolean;
+  /** "Reveal the top ten cards of your library" kept them there: "the revealed cards" are those (Sanity Grinding). */
+  revealedTopN?: boolean;
   /** "Reveal cards ... until you reveal a nonland card" kept them in the library: "Put the revealed cards on the bottom of your library in any order" can follow (Erratic Explosion). */
   revealedUntil?: boolean;
   /** The instruction before exiled cards from the top of a library (face up): "for each blue card exiled this way" (Oona, Queen of the Fae). */
@@ -368,6 +370,13 @@ const checkableMay = (e: Effect): boolean =>
   // "You may have target creature you control get +2/+0 and gain haste until end of turn. If you do, ..." (Hazoret's
   // Favor), "you may have it get +4/+0 until end of turn" (Attack-in-the-Box): done if that permanent is still there.
   (e.type === "continuous" && (e.what.ref === "self" || (e.what.ref === "target" && !e.what.n)) && e.duration === "endOfTurn") ||
+  // "You may have it assign no combat damage this turn. If you do, ..." (Cloak of Confusion): done if that creature is
+  // still on the battlefield.
+  (e.type === "noCombatDamage" && (e.what.ref === "self" || e.what.ref === "subject" || e.what.ref === "attached")) ||
+  // "You may gain control of target artifact defending player controls. If you do, ..." (Kukemssa Pirates; "for as long
+  // as you control ~", Orcish Squatters): done if that target is still legal, which a lone target must be for the
+  // ability to resolve at all (CR 608.2b).
+  (e.type === "continuous" && e.what.ref === "target" && !e.what.n && !e.giveTo && e.mods.length === 1 && e.mods[0]!.kind === "control" && (e.duration === "game" || e.duration === "whileControlled")) ||
   // "You may have that player gain control of equipped creature until end of turn. If you do, untap it." (Assault Suit).
   (e.type === "continuous" && e.what.ref === "attached" && e.giveTo?.ref === "eventPlayer" && e.duration === "endOfTurn") ||
   // "You may have ~ become a copy of another target creature you control until end of turn ... If you do, ..." (Gogo,
@@ -937,6 +946,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
   text = text.replace(/^((?:Each (?:player|opponent)|Target (?:player|opponent)) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
+  // Linessa, Zephyr Mage: "Target player returns a creature they control to its owner's hand, then repeats this process for
+  // an artifact, an enchantment, and a land": one after another, so an artifact creature returned first can't count as
+  // the artifact too (rulings).
+  text = text.replace(/^Target player returns a creature they control to its owner's hand, then repeats this process for an artifact, an enchantment, and a land\.$/, "Target player returns a creature they control to its owner's hand. That player returns an artifact they control to its owner's hand. That player returns an enchantment they control to its owner's hand. That player returns a land they control to its owner's hand.");
+  // Oriss, Samite Guardian: "Target player can't cast spells this turn, and creatures that player controls can't attack
+  // this turn": two instructions.
+  text = text.replace(/^(Target player can't cast spells this turn), and creatures that player controls can't attack this turn\.$/, "$1. Creatures that player controls can't attack this turn.");
   const effects: Effect[] = [];
   // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
@@ -2011,7 +2027,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     .flatMap((x) => {
       // Wormwood Dryad: "~ gains forestwalk until end of turn and deals 1 damage to you": the same.
       const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn|~ gains [a-z]+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
-      return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+      // Kookus: "~ deals 3 damage to you and attacks this turn if able": the same, in order.
+      const k = /^(~ deals \d+ damage to you) and (attacks this turn if able)$/.exec(x);
+      return m ? [m[1]!, `~ ${m[2]!}`] : k ? [k[1]!, `~ ${k[2]!}`] : [x];
     })
     .filter(Boolean);
   let prevStart = 0;
@@ -2230,7 +2248,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Reign of Terror: "Destroy all green creatures or all white creatures"; Lava Storm: "~ deals 2 damage to each attacking
     // creature or ~ deals 2 damage to each blocking creature": one or the other, chosen as it resolves (CR 608.2d).
-    const orAll = /^(Destroy all (?:[a-z]+ )?creatures) or all ((?:[a-z]+ )?creatures)$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
+    // Essence Filter: "Destroy all enchantments or all nonwhite enchantments".
+    const orAll = /^(Destroy all (?:[a-z]+ )?(?:creatures|enchantments)) or all ((?:[a-z]+ )?(?:creatures|enchantments))$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
     if (orAll) {
       const halves = [orAll[1]!, /^Destroy/.test(orAll[1]!) ? `Destroy all ${orAll[2]}` : orAll[2]!];
       const options = halves.map((h) => parseOne(h, ctx));
@@ -3704,6 +3723,50 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // graveyard." (Mulch, Wrenn and Seven): every matching card, no choice; the rest where they go (CR 401.4 for "any order").
     // "Put all creature and land cards revealed this way" (Lair Delve): each that's either. "The top X cards" (Enshrined
     // Memories): X as it was cast.
+    // Thought Hemorrhage: "Target player reveals their hand. ~ deals 3 damage to that player for each card with the chosen
+    // name revealed this way.": the cards with that name in the hand just revealed (nothing happens in between, rulings),
+    // dealt as one amount (rulings).
+    const perRevealed = /^~ deals (\d+) damage to that player for each card with the chosen name revealed this way$/.exec(s);
+    if (perRevealed) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      effects.push({ type: "damage", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } }, times: Number(perRevealed[1]) }, to: prev.who });
+      continue;
+    }
+    // Vigean Intuition: "Choose a card type, then reveal the top four cards of your library. Put all cards of the chosen type
+    // revealed this way into your hand and the rest into your graveyard." The type is chosen first, as it resolves (CR
+    // 608.2d): Mulch's dig with that type.
+    const typeThenReveal = /^Choose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
+    if (typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard$/.test(sentences[si + 2] ?? "")) {
+      const n = num(typeThenReveal[1]!);
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+      si += 2;
+      continue;
+    }
+    // Sanity Grinding: "Reveal the top ten cards of your library. For each blue mana symbol in the mana costs of the revealed
+    // cards, target opponent mills a card. Then put the cards you revealed this way on the bottom of your library in any
+    // order." Stomping Slabs: "Reveal the top seven cards of your library, then put those cards on the bottom of your library
+    // in any order. If a card named ~ was revealed this way, ~ deals 7 damage to any target." The cards stay on top while
+    // they're counted, then go to the bottom in the order you choose (all of them if there are fewer, rulings).
+    const revealKeep = new RegExp(`^Reveal the top ${NUM} cards of your library$`).exec(s);
+    const forEachRevealed = revealKeep && /^For each (white|blue|black|red|green) mana symbol in the mana costs of the revealed cards, (target opponent mills a card)$/.exec(sentences[si + 1] ?? "");
+    if (revealKeep && forEachRevealed && /^Then put the cards you revealed this way on the bottom of your library in any order$/.test(sentences[si + 2] ?? "")) {
+      ctx.revealedTopN = true;
+      const mill = parseOne(`${capital(forEachRevealed[2]!)} for each ${forEachRevealed[1]} mana symbol in the mana costs of the revealed cards`, ctx);
+      ctx.revealedTopN = false;
+      if (!mill) return null;
+      effects.push({ type: "revealTop", n: num(revealKeep[1]!) }, ...mill, { type: "revealedUntilToBottom" });
+      si += 2;
+      continue;
+    }
+    const namedRevealed = revealKeep && /^[Pp]ut those cards on the bottom of your library in any order$/.test(sentences[si + 1] ?? "") ? /^If a card named ~ was revealed this way, (.+)$/.exec(sentences[si + 2] ?? "") : null;
+    if (revealKeep && namedRevealed) {
+      const inner = parseOne(capital(namedRevealed[1]!), ctx);
+      if (!inner || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "revealTop", n: num(revealKeep[1]!) }, { type: "revealedUntilToBottom" }, { type: "if", cond: { kind: "revealedTopIs", filter: { kind: "card", types: [], notTypes: [], notColors: [], named: "~", text: "card named ~" } }, effects: inner });
+      si += 2;
+      continue;
+    }
     const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
     const putAll = revealN && /^Put all (.+?) cards revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (revealN && putAll) {
@@ -5040,6 +5103,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetSharesName", index: before }, effects: fx });
       continue;
     }
+    // Drop of Honey: "Destroy the creature with the least power. It can't be regenerated. If two or more creatures are tied
+    // for least power, you choose one of them." Purging Scythe: "~ deals 2 damage to the creature with the least toughness.
+    // If two or more ...": any player's, not targeted (rulings); you choose among those tied. A tied one with
+    // indestructible can't be chosen to be destroyed while another can (Drop of Honey's rulings).
+    const least = /^([Dd]estroy|~ deals (\d+) damage to) the creature with the least (power|toughness)$/.exec(s);
+    const leastNoRegen = /^[Dd]estroy$/.test(least?.[1] ?? "") && /^It can't be regenerated\.?$/.test(sentences[si + 1] ?? "");
+    if (least && new RegExp(`^If two or more creatures are tied for least ${least[3]}, you choose one of them\\.?$`).test(sentences[si + (leastNoRegen ? 2 : 1)] ?? "")) {
+      const filter: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+      const destroy = /^[Dd]estroy$/.test(least[1]!);
+      effects.push(
+        { type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", least: least[3] as "power" | "toughness", anyController: true, ...(destroy ? { destroyable: true as const } : {}) },
+        destroy ? { type: "destroy", what: { ref: "created" }, ...(leastNoRegen ? { noRegen: true } : {}) } : { type: "damage", amount: Number(least[2]), to: { ref: "created" } },
+      );
+      si += leastNoRegen ? 2 : 1;
+      continue;
+    }
     // Wretched Banquet: "Destroy target creature if it has the least power or is tied for least power among creatures on
     // the battlefield": any creature may be the target; its power is checked as it resolves (rulings).
     const leastIf = /^(Destroy target creature) if it has the least power or is tied for least power among creatures on the battlefield$/.exec(s);
@@ -5901,7 +5980,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner =
         attempt(ctx, () => parseOne(cap(then[1]!), ctx)) ??
         attempt(ctx, () => {
-          const parts = then[1]!.split(/, then (?!shuffle)/);
+          // Goblin Vandal: "If you do, destroy target artifact defending player controls and ~ assigns no combat damage this
+          // turn": two instructions, both paid for.
+          const parts = then[1]!.split(/, then (?!shuffle)| and (?=~ assigns no combat damage this turn$)/);
           if (parts.length < 2) return null;
           const all: Effect[] = [];
           for (const p of parts) {
@@ -7009,6 +7090,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // toughness as it last existed (CR 608.2h).
     // Demonic Junker: "If a creature you controlled was destroyed this way, ...": controlled as it was destroyed
     // (CR 608.2h).
+    // Cosmic Horror: "destroy ~ unless you pay {3}{B}{B}{B}. If ~ is destroyed this way, it deals 7 damage to you": only
+    // if it was destroyed, not regenerated or indestructible (rulings); the damage from it as it last existed (CR 608.2h).
+    const selfDestroyed = /^If ~ is destroyed this way, it deals (\d+) damage to you$/.exec(s);
+    const prevMay = effects[effects.length - 1];
+    if (selfDestroyed && prevMay?.type === "may" && prevMay.otherwise?.length === 1 && prevMay.otherwise[0]!.type === "destroy" && prevMay.otherwise[0]!.what.ref === "self") {
+      const inner = parseOne(`~ deals ${selfDestroyed[1]} damage to you`, ctx);
+      if (!inner) return null;
+      prevMay.otherwise.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      continue;
+    }
     const ifDestroyed = /^If a creature (you controlled was|is) destroyed this way, (.+)$/.exec(s);
     if (ifDestroyed) {
       const prev = effects[effects.length - 1];
@@ -7311,7 +7402,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       let back = effects.length - 1;
       while (back >= 0 && effects[back]!.type === "if" && (effects[back] as { cond: SpellCondition }).cond.kind === "milledIs") back--;
       const prev = effects[back];
-      // Not "its mana value" (Lammastide Weave): which card that is isn't kept.
+      // Lammastide Weave: "you gain life equal to its mana value" after milling one card: that card.
+      if (filter && prev?.type === "mill" && prev.n === 1 && then === "you gain life equal to its mana value") {
+        effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "milledManaValue" } } }] });
+        continue;
+      }
       if (!filter || prev?.type !== "mill" || /\b(?:it|its)\b|\brepeat\b/.test(then)) return null;
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -8040,12 +8135,28 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: mayThen ? [{ type: "may", effects: inner, text: mayThen[1]! }] : inner });
         continue;
       }
+      // Rysorian Badger: "If you do, you gain 1 life for each card exiled this way and ~ assigns no combat damage this turn":
+      // both depend on it (CR 510.1: an attacking creature that assigns no combat damage deals none).
+      const noDamage = ifDid[1] === "do" ? /^(.+) and ~ assigns no combat damage this turn$/.exec(ifDid[2]!) : null;
+      const thenFx = (): Effect[] | null => {
+        const fx = parseOne(capital(noDamage ? noDamage[1]! : ifDid[2]!), ctx);
+        return fx && noDamage ? [...fx, { type: "noCombatDamage", what: { ref: "self" } }] : fx;
+      };
+      // Floral Spuzzem: "you may destroy target artifact defending player controls. If you do, ...": only if it was
+      // destroyed. An indestructible permanent can't be (CR 702.12b), and regeneration replaces it (CR 701.19a).
+      const destroyed = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0]! : undefined;
+      if (ifDid[1] === "do" && destroyed?.type === "destroy" && destroyed.what.ref === "target" && !destroyed.what.n && ctx.targets[destroyed.what.index]?.kind === "object") {
+        const inner = thenFx();
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+        continue;
+      }
       // Uchuulon: "Exile up to one target creature card from an opponent's graveyard. If you do, create a token that's a copy
       // of ~": only if a card was exiled (none chosen, or the target gone, and it wasn't).
       // Also "You may exile target creature card from a graveyard. If you do, ..." (Boneclad Necromancer): declined, none is.
       const exiled = prev?.type === "may" && !prev.pay && prev.effects.length === 1 ? prev.effects[0]! : prev;
-      if (ifDid[1] === "do" && exiled?.type === "exile" && !exiled.until && !exiled.linked && !exiled.ownerMay && !exiled.youMay && exiled.what.ref === "target" && !exiled.what.n && ctx.targets[exiled.what.index]?.kind === "card") {
-        const inner = parseOne(capital(ifDid[2]!), ctx);
+      if (ifDid[1] === "do" && exiled?.type === "exile" && !exiled.until && !exiled.linked && !exiled.ownerMay && !exiled.youMay && exiled.what.ref === "target" && (!exiled.what.n || noDamage) && ctx.targets[exiled.what.index]?.kind === "card") {
+        const inner = thenFx();
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsExiledThisWay" } }, min: 1 }, effects: inner });
         continue;
@@ -8111,7 +8222,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       // "If you do, scry 2, then draw a card" (Lord Skitter's Butcher): an "if" keeps its place among its instructions, so
       // one that waits on a player may come before another.
-      const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : attempt(ctx, () => parseOne(capital(ifDid[2]!), ctx)) ?? (ifDid[1] === "do" ? attempt(ctx, () => parseThen(capital(ifDid[2]!), ctx, true)) : null);
+      const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : attempt(ctx, thenFx) ?? (ifDid[1] === "do" && !noDamage ? attempt(ctx, () => parseThen(capital(ifDid[2]!), ctx, true)) : null);
       if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       // Its own "where X is ..." (CR 107.3c).
       const ok = !!inner && defineX();
@@ -8541,7 +8652,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         // gain first strike", "... enchanted creature fight target creature": they do it, if you choose (CR 608.2d).
         // Embodiment of Insight: "you may have target land you control become a 3/3 Elemental creature ...".
         // Shadow Puppeteers: "you may have it become a red Dragon ... until end of turn", "it" being the trigger's subject.
-        .replace(/^Have (.+?) (get|gain|lose|fight|deal|become) (?=\S)/, (all, who: string, verb: string, at: number, whole: string) => {
+        // Cloak of Confusion: "you may have it assign no combat damage this turn" (CR 510.1).
+        .replace(/^Have (.+?) (get|gain|lose|fight|deal|become|assign) (?=\S)/, (all, who: string, verb: string, at: number, whole: string) => {
           if (/^(?:target (?:player|opponent)|that player|its controller|each opponent|you)$/.test(who)) return all;
           const it = /^(?:it|her|him)$/.test(who);
           const subject = it ? (ctx.selfIt || ctx.selfCard ? "~" : "It") : who.charAt(0).toUpperCase() + who.slice(1);

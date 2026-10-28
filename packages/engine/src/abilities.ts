@@ -108,7 +108,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; /** "Enchanted creature gets +1/+1 for each other creature you control" (Bravado), "Each legendary creature you control gets +1/+1 for each other legendary creature you control" (Heroes' Podium): other than the permanent the static effect is applied to, not the source. */ otherThanAffected?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each different power among creatures you control" (Golden Ratio): each power once. */ differentPowers?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; /** "The number of Curses attached to them" (Curse of Thirst): only permanents attached to that player. */ attachedToPlayer?: PlayerRef; /** "Target attacking creature gets +1/+1 for each other attacking creature" (Paladin Class): not that target. */ otherThanTarget?: number; /** "Whenever equipped creature attacks alone, it gets +1/+1 ... for each other creature you control" (Sigil of Valor): other than the trigger's subject. */ otherThanSubject?: true; /** "Enchanted creature gets +1/+1 for each other creature you control" (Bravado), "Each legendary creature you control gets +1/+1 for each other legendary creature you control" (Heroes' Podium): other than the permanent the static effect is applied to, not the source. */ otherThanAffected?: true; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each different mana value among nonland permanents you control" (Lunar Insight): each mana value once; a face-down permanent's is 0 (CR 708.2). */ differentManaValues?: true; /** "Each different power among creatures you control" (Golden Ratio): each power once. */ differentPowers?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Other creature you control that shares a creature type with it" (Titan of Littjara), "it" being ~: sharing a type with the source, as it last existed if it's gone (CR 608.2h). */ sharesTypeWithSource?: true; /** With `sharesTypeWithSubject`: "creatures you control that share a creature type with it" (Mana Echoes): the subject counts too, if it matches (it shares a type with itself, rulings); gone, its creature types as it last existed (CR 608.2h). */ includeSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true; /** "The number of creatures attacking them" (Within Range): attacking one of these players themselves, not a planeswalker or battle (CR 506.3, 508.1b). */ attackingWho?: PlayerRef }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef; /** "The number of white cards in their hand" (Inquisition): only cards like this. */ filter?: TargetSpec }
   /**
@@ -153,6 +153,8 @@ export type Count =
   | { kind: "cardsExiledThisWay"; filter?: TargetSpec }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
   | { kind: "sacrificedThisWayCount" }
+  /** "The greatest power among creatures sacrificed this way" (Shadowgrange Archfiend): of what this resolution sacrificed, as each last existed (CR 608.2h); 0 if none. */
+  | { kind: "sacrificedThisWayGreatestPower" }
   /** Vengeful Regrowth: "Return up to three target land cards ... to the battlefield tapped. Create that many ...": the permanents this resolution just put onto the battlefield. */
   | { kind: "putThisWay" }
   /** She-Hulk, Wallbreaker: "for each creature blocking it": the creatures blocking the source (`subject`: the trigger's attacker) as it resolves. */
@@ -853,6 +855,10 @@ export interface TargetSpec {
   perOpponent?: true;
   /** With `perOpponent`: "for each player" (Nils, Discipline Enforcer), its controller first, then the others in turn order. */
   perPlayer?: true;
+  /** With `perOpponent`: "For each opponent, gain control of target permanent that player controls" (Blatant Thievery): not
+   * "up to one", so each opponent's target must be chosen if that opponent has one to target (CR 601.2c; rulings on
+   * Sylvan Primordial), and none for one who doesn't. */
+  perOpponentRequired?: true;
   /** Original text, for display. */
   text: string;
 }
@@ -1115,6 +1121,8 @@ export type PlayerRef =
   | { ref: "selfChosenPlayer" }
   /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
   | { ref: "selfController" }
+  /** "Defending player" in a static ability of an attacking creature (Elturel Survivors): the player it's attacking, or whose planeswalker or battle it's attacking (CR 506.2); none while it isn't attacking. */
+  | { ref: "selfDefending" }
   /** "Enchanted artifact's controller" (Gremlin Infestation): who controls the permanent the source is attached to now. */
   | { ref: "hostController" }
   /** "The player to your right" (Bucknard's Everfull Purse): the one before you in turn order, "to your left" the one after (CR 101.4). */
@@ -1950,7 +1958,7 @@ export type Effect =
    * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
    * damage, all dealt at the same time (CR 120.3, 120.4).
    */
-  | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController: true }
+  | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController?: true; /** "Each Dragon you control deals 1 damage to that creature" (Sarkhan the Masterless): to this permanent instead, if it's still on the battlefield. */ to?: ObjRef }
   | { type: "draw"; who: PlayerRef; n: Amount }
   /** "Its controller may draw up to two cards" (Arcane Denial): each player chooses how many, 0 to `n`, before drawing (rulings). */
   | { type: "drawUpTo"; who: PlayerRef; n: number; /** Truce: "For each card less than two a player draws this way, that player gains 2 life." */ shortLife?: number }
@@ -4336,6 +4344,8 @@ export interface TriggeredAbility {
   };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
+  /** With `subjectFilter`: "Whenever ~ or a commander you control attacks alone" (Ironsoul Enforcer): the source itself matches too. */
+  subjectOrSelf?: true;
   /**
    * "Whenever ~ blocks or becomes blocked by one or more black creatures" (Serra Inquisitors), "blocks one or more black
    * creatures" (Rashka the Slayer): once per combat, if any creature it blocks or that blocks it matches (rulings).
@@ -4354,7 +4364,7 @@ export interface TriggeredAbility {
    * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
    * once for each player dealt damage, "that player" them.
    */
-  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true };
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "sourceYouControlDamagesOpponent" and "opponentDealtDamageBySource": "deals 5 or more damage" at once (Dragonborn Champion). */
@@ -4603,6 +4613,8 @@ export interface ActivatedAbility {
   borrowed?: true;
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
   spendOnlyChosenColor?: true;
+  /** "{X}: ... Spend only black mana on X." (Crypt Rats): with {X} its whole mana cost, only mana of these types pays it. */
+  spendOnly?: ManaType[];
   manaCost: string; // "{2}{R}" or ""
   /**
    * "Waterbend {N}" (CR 701.67a): the {N} is part of `manaCost`, and up to N of its generic mana (X for "Waterbend {X}")
@@ -5617,6 +5629,9 @@ export interface CompiledCard {
   lifeFloor?: number;
   /** "If you control a creature, damage that would ..." (Serra the Benevolent's emblem): `lifeFloor` only while this holds. */
   lifeFloorIf?: StaticCondition;
+  /** "As long as you're the monarch, damage doesn't cause you to lose life" (Archon of Coronation): the damage is still
+   * dealt, with all its other results (lifelink, triggers, commander damage; rulings). Only while the condition holds. */
+  damageNoLifeLossIf?: StaticCondition;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
    * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
   drawTwoInstead?: true | "always";
@@ -6168,6 +6183,8 @@ export interface CompiledCard {
   }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
+  /** "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend): life paid as part of the madness cost (CR 702.35a, 119.4). */
+  madnessLife?: number;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */
   suspend?: { n: number; cost: string };
   /** Reconfigure (CR 702.151): attached to a creature, this Equipment isn't a creature (702.151b). */

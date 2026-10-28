@@ -1287,11 +1287,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "attach": {
       // CR 701.3: attach the source to the object; it gets a new timestamp (CR 613.7e).
       const host = objects(s, e.what, ctx)[0];
-      const me = e.source ? objects(s, e.source, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (!host || !me) return;
-      // Something that isn't an Equipment (or an Aura, for "attach target Aura") doesn't move (CR 701.3b).
-      if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) return;
-      attachTo(s, me, host, e.asCreature);
+      // Armory Automaton: "any number of target Equipment", each legal one in turn.
+      const mine = e.source ? objects(s, e.source, ctx) : ctx.sourceId && s.objects[ctx.sourceId] ? [s.objects[ctx.sourceId]!] : [];
+      if (!host) return;
+      for (const me of e.source?.ref === "target" && e.source.n ? mine : mine.slice(0, 1)) {
+        // Something that isn't an Equipment (or an Aura, for "attach target Aura") doesn't move (CR 701.3b).
+        if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) continue;
+        attachTo(s, me, host, e.asCreature);
+      }
       return;
     }
     case "becomeLicid": {

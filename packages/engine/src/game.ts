@@ -5891,7 +5891,11 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
   const permit = s && choices?.via === "turnPermission" ? castPermit(s, choices.objectId, d, x, choices.permit, pid) : undefined;
   // The Defilers: the life chosen to pay for each one (CR 601.2b); castProblem checks each one applies.
   const defilerLife = s ? (choices?.lifeFor ?? []).reduce((n, id) => n + Math.max(0, ...((s.objects[id] && s.objects[id]!.zone === "battlefield" ? abilitiesOf(s, s.objects[id]!).costMods : undefined) ?? []).map((m) => m.payLife ?? 0)), 0) : 0;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(choices?.kicks?.includes(0) ? (compileCard(d).kicker?.extraCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
+  // "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend): the life too, cast for its madness cost as madness's trigger
+  // resolves (CR 702.35a).
+  const madnessPend = s?.pending?.kind === "castFree" && s.pending.how === "madness" && s.pending.player === pid ? s.pending : undefined;
+  const madnessLife = madnessPend && s!.objects[madnessPend.objectId] && defOf(s!, s!.objects[madnessPend.objectId]!).name === d.name ? (compileCard(d).madnessLife ?? 0) : 0;
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(madnessLife ? [{ kind: "payLife" as const, n: madnessLife }] : []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(choices?.kicks?.includes(0) ? (compileCard(d).kicker?.extraCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>

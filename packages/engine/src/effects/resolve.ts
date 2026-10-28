@@ -588,6 +588,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? controllerOf(s, me) : lk && lk.zc === ctx.sourceZc ? lk.controller : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "selfDefending": {
+      // The player the source is attacking (CR 506.2).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const p = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.attacking : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "neighbor": {
       // Seats follow turn order, which goes to each player's left (CR 101.4); players who left the game have no seat.
       const seats = s.turnOrder.filter((p) => !player(s, p).lost || p === ctx.controller);

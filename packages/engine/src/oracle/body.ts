@@ -1,7 +1,7 @@
 import { parseFromTop } from "./compile";
 import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification } from "../abilities";
 import { substituteX } from "../amounts";
-import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS } from "./words";
+import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -5747,6 +5747,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       payFirst = null;
       continue;
     }
+    // Relentless Dead: "you may pay {X}. If you do, return another target Zombie creature card with mana value X from your
+    // graveyard to the battlefield": the target is chosen as the trigger is put on the stack, and only paying its mana
+    // value returns it (rulings: you choose whether to pay as it resolves), so it's {1} for each of its mana value.
+    const payMvReturn = /^[Yy]ou may pay \{X\}$/.test(s) ? /^If you do, return (another target .+? card) with mana value X (from your graveyard to the battlefield)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (payMvReturn && !payFirst) {
+      const before = ctx.targets.length;
+      const inner = parseOne(`Return ${payMvReturn[1]} ${payMvReturn[2]}`, ctx);
+      if (!inner || ctx.targets.length !== before + 1 || ctx.targets[before]!.kind !== "card") return null;
+      ctx.targets[before] = { ...ctx.targets[before]!, text: `${ctx.targets[before]!.text} with mana value X` };
+      effects.push({ type: "may", effects: inner, pay: { mana: "{1}" }, payTimes: { count: { kind: "manaValue", of: { ref: "target", index: before } } }, text: `pay {X}. If you do, return ${payMvReturn[1]!.replace(/^another target /, "")} with mana value X ${payMvReturn[2]}`.replace(/^pay \{X\}\. If you do, return (.+)$/, "pay {X}, X being that card's mana value. If you do, return it") });
+      si++;
+      continue;
+    }
     // "You may pay {X}. If you do, ..." (Decree of Justice), "... {X}{R} ..." (Flameblast Dragon), "you may pay {X}, where
     // X is less than or equal to the amount of life you gained" (Well of Lost Dreams): X chosen as it resolves.
     const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
@@ -5790,6 +5803,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const n = parseCount(payLifeX[1]!, ctx);
       if (!n || typeof n !== "object" || !("count" in n)) return null;
       payFirst = { pay: {}, payLife: n, text: `pay X life, where X is ${payLifeX[1]}` };
+      continue;
+    }
+    // Killer Service: "you may pay {2} and sacrifice a token. If you do, ...", Conspiracy Theorist's "pay {1} and discard
+    // a card": both or neither, as it resolves (someone who can't do both isn't asked).
+    const payAnd = /^[Yy]ou may pay ((?:\{[^}]+\})+) and ((?:sacrifice|discard) an? [a-z ]+)$/.exec(s);
+    if (payAnd && plainMana(payAnd[1]!) && /^If you do, /.test(sentences[si + 1] ?? "")) {
+      const inner = parseOne(capital(payAnd[2]!), ctx);
+      if (!inner || inner.length !== 1 || inner[0]!.type !== (/^sacrifice/.test(payAnd[2]!) ? "pick" : "discard")) return null;
+      const then = parseOne(capital(sentences[si + 1]!.replace(/^If you do, /, "").replace(/\.$/, "")), ctx);
+      if (!then) return null;
+      effects.push({ type: "may", effects: inner, pay: { mana: payAnd[1]! }, text: `pay ${payAnd[1]} and ${payAnd[2]}` }, { type: "if", cond: { kind: "youDid" }, effects: then });
+      si++;
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
@@ -7381,7 +7406,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
       // Wedding Announcement: "If you attacked with two or more creatures this turn, draw a card. Otherwise, create ...".
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
@@ -8012,6 +8037,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner) return null;
       const n = num(subjPT[3]!);
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: subjPT[2] as "power" | "toughness", ...(subjPT[4] === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
+    // Anax, Hardened in the Forge: "create a 1/1 red Satyr creature token ... If the creature had power 4 or greater, create
+    // two of those tokens instead": the creature that died, its power as it last existed (CR 603.10a).
+    const hadPower = !ctx.spell ? new RegExp(`^If the creature had power ${NUM} or greater, create (two|three) of those tokens instead$`).exec(s) : null;
+    const tokenPrev = effects[effects.length - 1];
+    if (hadPower && tokenPrev?.type === "createToken" && tokenPrev.n === 1 && tokenPrev.who.ref === "you" && effects.length === 1) {
+      effects[effects.length - 1] = { type: "if", cond: { kind: "amountsCompare", a: { count: { kind: "power", of: { ref: "subject" } } }, atLeast: num(hadPower[1]!) }, effects: [{ ...tokenPrev, n: num(hadPower[2]!) }], otherwise: [tokenPrev] };
+      continue;
+    }
+    // Shelinda, Yevon Acolyte: "put a +1/+1 counter on that creature if its power is less than ~'s power. Otherwise, put a
+    // +1/+1 counter on ~": both powers as it resolves, each as it last existed if it has left (CR 608.2h).
+    const lessThanSelf = (ctx.subject || ctx.subjectIt) && !ctx.spell ? /^(put an? (?:\+1\/\+1|[a-z]+) counter on that creature) if its power is less than ~'s power$/i.exec(s) : null;
+    if (lessThanSelf) {
+      const a = parseCount("~'s power", ctx);
+      const b = parseCount("that creature's power", ctx);
+      const inner = parseOne(capital(lessThanSelf[1]!), ctx);
+      if (!a || !b || typeof b !== "object" || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountsCompare", a, atLeast: { ...b, plus: (b.plus ?? 0) + 1 } }, effects: inner });
       continue;
     }
     // Yorvo, Lord of Garenbrig: "Then if that creature's power is greater than ~'s power, put another +1/+1 counter on ~":
@@ -9599,13 +9643,16 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const who = / up to one (other )?target (.+?) (?:that player|that opponent|they) controls?\b/;
   // "Up to one target creature card from that player's graveyard" (Sepulchral Primordial): owned by that opponent.
   const yard = / up to one target (.+? card) from that player's graveyard\b/;
+  // Blatant Thievery: "For each opponent, gain control of target permanent that player controls": one each, required.
+  const whoRequired = / target (.+?) that player controls\b/;
+  const req = !every && !who.test(` ${m[1]!}`) && !/\bup to\b/.test(m[1]!) ? whoRequired.exec(` ${m[1]!}`) : null;
   const w = who.exec(` ${m[1]!}`);
-  const t = w ? [w[0], w[2]] : yard.exec(` ${m[1]!}`);
+  const t = w ? [w[0], w[2]] : req ? [req[0], req[1]] : yard.exec(` ${m[1]!}`);
   if (!t) return null;
-  const card = !w;
+  const card = !w && !req;
   const other = w?.[1] ? "another " : "";
   if (other && (!every || ctx.spell)) return null;
-  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from ${every ? "a" : "an opponent's"} graveyard`).trim() : ` ${m[1]!}`.replace(who, every ? ` ${other}target ${t[1]}` : ` target ${t[1]} an opponent controls`).trim();
+  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from ${every ? "a" : "an opponent's"} graveyard`).trim() : ` ${m[1]!}`.replace(req ? whoRequired : who, every ? ` ${other}target ${t[1]}` : ` target ${t[1]} an opponent controls`).trim();
   if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
   const before = ctx.targets.length;
   // "For each opponent, you may put ...": a choice for each of them, as it resolves.
@@ -9622,7 +9669,7 @@ function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
   const spec = ctx.targets[before]!;
   if (card ? spec.kind !== "card" || spec.owner !== (every ? undefined : "opponent") || spec.linkedExile : spec.kind !== "object" || spec.controller !== (every ? undefined : "opponent")) return null;
   if (spec.optional || spec.distinctFrom || (spec.notSource && !other)) return null;
-  ctx.targets[before] = { ...spec, perOpponent: true, ...(every ? { perPlayer: true as const } : {}), text: card ? `target ${t[1]} from that player's graveyard` : `target ${t[1]} that player controls` };
+  ctx.targets[before] = { ...spec, perOpponent: true, ...(every ? { perPlayer: true as const } : {}), ...(req ? { perOpponentRequired: true as const } : {}), text: card ? `target ${t[1]} from that player's graveyard` : `target ${t[1]} that player controls` };
   ctx.lastObjectTarget = undefined;
   ctx.lastTargets = { index: before, n: 2 };
   return fx;
@@ -9861,7 +9908,12 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
       const index = addTarget(ctx, { kind: "object", types: ["Creature"], ...(/you control$/.test(what) ? { controller: "you" as const } : {}), text: what });
       return replaceX(fx, { count: { kind: (of[1] ?? of[4]) as "power" | "toughness", of: { ref: "target", index } } });
     }
+    // "Each opponent loses life equal to the number of creatures attacking them" (Within Range): each that player's own
+    // number, "them" being the one losing life.
+    const each = /^each (?:opponent|player) (?:gains|loses) life equal to /i.test(s);
+    if (each) ctx.eachOne = true;
     const def = fx && parseCount(m[group ?? m.length - 1]!, ctx);
+    if (each) ctx.eachOne = undefined;
     return fx && def ? replaceX(fx, def) : null;
   }
   return null;

@@ -1,7 +1,7 @@
 # Roadmap
 
-26,941 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,924 of
+26,962 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,941 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -586,6 +586,26 @@ line blocks.
    control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver, Magus Lucea Kane, Make
    Your Own Luck, Lilah, Undefeated Slickshot, Soulcipher Board ("remove an omen counter ... then if it has no omen
    counters on it, transform it").
+   Round 194 went on from the top: "each opponent loses life equal to the number of creatures attacking them" (Within
+   Range), "+X/+0, where X is the number of lands defending player controls" (Elturel Survivors), "dies or is put into
+   exile while its power is 4 or greater" (Syr Vondam), "the greatest power among creatures sacrificed this way" and
+   "Madness—{2}{B}, Pay 8 life" (Shadowgrange Archfiend, browser test), "each Dragon you control deals 1 damage to that
+   creature" (Sarkhan the Masterless), "you may pay {X}. If you do, return another target Zombie card with mana value X"
+   (Relentless Dead), "if its power is less than ~'s power. Otherwise" (Shelinda), "you may pay {2} and sacrifice a
+   token" / "pay {1} and sacrifice an artifact" / "pay {1}{R} and discard a card" (Killer Service, Sokenzan Smelter,
+   Wolf of Devil's Breach), "if the creature had power 4 or greater" (Anax), "if it was enchanted or equipped" (Koll),
+   "~ or a commander you control attacks alone" (Ironsoul Enforcer), "as long as you're the monarch, damage doesn't
+   cause you to lose life" (Archon of Coronation), "attach any number of target Equipment to it" (Armory Automaton),
+   "for each opponent, ... target permanent that player controls" without "up to one": required for each opponent who
+   has one (Blatant Thievery, browser test; Frenzied Gorespawn; Sylvan Primordial, banned), "a creature card is put into
+   a graveyard from a library" (Dreadhound), "whenever your opponents are dealt combat damage, if any of that damage was
+   dealt by a Warrior" (Mindblade Render) and "Spend only black mana on X" for an {X} ability (Crypt Rats, Crimson
+   Hellkite).
+   Out after round 194 (looked at, not done): Tangled Colony (damage dealt by a creature this turn), Greymond, Avacyn's
+   Stalwart (two keywords chosen as it enters), Conspiracy Theorist ("you may exile one of the cards discarded this
+   way"), Expand the Sphere, Observed Stasis ("remove enchanted creature from combat"), Captain Howler, Ephara, God of
+   the Polis ("if you had another creature enter ... last turn"), Cache Grab, Abundant Harvest, Endless Sands,
+   Fumiko the Lowblood (bushido X), Historian's Boon ("the final chapter ability of a Saga you control triggers").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

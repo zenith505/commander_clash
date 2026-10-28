@@ -1075,6 +1075,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = !from ? null : /^(~|any target|any other target|another target|target .+|another target .+)$/i.test(m[5]!) ? parseDamageRecipient(m[5]!, ctx) : m[5] === "you" ? ({ ref: "you" } as const) : m[5] === "its owner" && m[3] === "~" ? ({ ref: "selfOwner" } as const) : null;
     return from && to ? [{ type: "redirectNext", n: amt(m[1]!), from, to }] : null;
   }
+  // Sarkhan the Masterless: "each Dragon you control deals 1 damage to that creature", the attacker: each one a source of
+  // its own damage, all dealt at once (CR 120.3).
+  if ((m = new RegExp(`^each ([A-Z][a-z]+) you control deals ${NUMX} damage to (that creature|it)$`, "i").exec(s))) {
+    const what = parseObject(`each ${m[1]} you control`, ctx);
+    const to = parseObject(m[3]!, ctx);
+    return what && isGroup(what) && to?.ref === "subject" ? [{ type: "eachDealsDamage", what, amount: amt(m[2]!), to }] : null;
+  }
   // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
   if ((m = new RegExp(`^(each (?:[a-z]+ )?creature(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {
     const what = parseObject(m[1]!.toLowerCase(), ctx);

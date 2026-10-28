@@ -1064,13 +1064,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source }] : null;
   }
   // "Attach target Aura you control to target creature" (Aura Finesse), "target Aura or Equipment you control" (Codsworth).
-  if ((m = /^Attach ((?:up to one )?target (?:Equipment|Aura|Aura or Equipment)\b(?:(?! to )(?! attached to ).)*(?: attached to an? creature(?: you control)?)?) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
+  // Armory Automaton: "attach any number of target Equipment to it", all of them to the source (rulings).
+  if ((m = /^Attach ((?:up to one |any number of )?target (?:Equipment|Aura|Aura or Equipment)\b(?:(?! to )(?! attached to ).)*(?: attached to an? creature(?: you control)?)?) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
     const pronoun = !/\btarget\b/i.test(m[2]!);
     if (pronoun && ctx.spell) return null;
     const hostFirst = pronoun ? parseObject(m[2]!, ctx) : null;
     const source = parseObject(m[1]!, ctx);
     const what = hostFirst ?? (pronoun ? null : parseObject(m[2]!, ctx));
-    if (source?.ref !== "target" || source.n || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref)) return null;
+    const many = /^any number of /i.test(m[1]!);
+    if (source?.ref !== "target" || (source.n && !many) || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref) || (many && what.ref !== "self")) return null;
     return [{ type: "attach", what, source }];
   }
   // Inventory Management: "For each Aura and Equipment you control, you may attach it to a creature you control": each in

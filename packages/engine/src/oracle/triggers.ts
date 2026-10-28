@@ -391,6 +391,15 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
     const body = { ...replaceX(body0, { count: { kind: "eventAmount" } }), text: line.replace(/^[^,]+, /, "") };
     return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: skaab[1]! }, opponents: true, combat: true } };
   }
+  // Mindblade Render: "Whenever your opponents are dealt combat damage, if any of that damage was dealt by a Warrior, ...":
+  // once for each combat damage step (rulings), a Warrior anyone controls dealing it to one of your opponents (rulings).
+  const render = /^Whenever your opponents are dealt combat damage, if any of that damage was dealt by an? ([A-Z][a-z]+), (.+)$/.exec(line);
+  if (render) {
+    const spec = parseTargetPhrase(render[1]!);
+    const body = parseBody(render[2]!);
+    if (spec?.kind !== "object" || spec.controller || !body || /(?:that|those|they|them|it)/.test(render[2]!)) return "fail";
+    return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: render[1]! }, opponents: true, combat: true, anyController: true } };
+  }
   const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
   if (!m) return null;
   const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "));
@@ -937,9 +946,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Iron Apprentice: "When ~ dies, if it had counters on it, put those counters on target creature you control.": an
   // intervening if on ~ as it last existed (CR 603.4, 603.10a), the same as "~ or another creature" about ~ alone.
   // Deathknell Berserker: "When ~ dies, if its power was 3 or greater, ...": the same, its power as it last existed.
-  const selfHad = /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+)$/.exec(line);
+  // Syr Vondam, Sunstar Exemplar: "When ~ dies or is put into exile while its power is 4 or greater, ...": the same, to
+  // either zone, its power as it last existed on the battlefield (CR 603.10a).
+  const whilePower = /^When ~ dies or is put into exile while its power is (\d+) or greater, (.+)$/.exec(line);
+  const selfHad = whilePower ? ["", `if its power was ${whilePower[1]} or greater, ${whilePower[2]}`] : /^When(?:ever)? ~ dies, (if it had (?:counters|one or more counters|a counter) on it, .+|if its power was \d+ or greater, .+)$/.exec(line);
   if (selfHad) {
-    const t = parseDiesTrigger(`When ~ or another creature dies, ${selfHad[1]}`);
+    const t = parseDiesTrigger(`When ~ or another creature ${whilePower ? "dies or is put into exile" : "dies"}, ${selfHad[1]}`);
     if (!t || t === "fail" || !t.dies?.orSelf) return "fail";
     const { orSelf: _, ...dies } = t.dies;
     return { ...t, dies: { ...dies, self: true } };
@@ -1015,6 +1027,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (wasType) bodyText = wasType[2]!;
   const wasHistoric = attached && attachedM![3] === "leaves the battlefield" ? /^if it was historic, (.+)$/.exec(bodyText) : null;
   if (wasHistoric) bodyText = wasHistoric[1]!;
+  // Koll, the Forgemaster: "if it was enchanted or equipped": what was attached to it as it last existed (CR 603.10a).
+  const wasAttached = attached ? null : /^if it was (enchanted or equipped|enchanted|equipped), (.+)$/.exec(bodyText);
+  if (wasAttached) bodyText = wasAttached[2]!;
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
@@ -1063,11 +1078,13 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const kind = m![1]!.toLowerCase();
   const had = hadKw && kw ? (hadKw[1] === "had" ? { keywords: [...(filter.keywords ?? []), ...kw] } : { notKeywords: [...(filter.notKeywords ?? []), ...kw] }) : {};
   if (wasPT && filter[wasPT[1] as "power" | "toughness"]) return "fail";
+  if (wasAttached && (filter.status || hadKw || wasPT)) return "fail";
+  const attachedStatus = wasAttached ? { status: wasAttached[1] === "enchanted or equipped" ? ("enchantedOrEquipped" as const) : (wasAttached[1] as "enchanted" | "equipped") } : {};
   const wasRange = wasPT ? { [wasPT[1]!]: ptRange } : {};
   return {
     event: "permanentDies",
     dies: {
-      filter: { ...filter, ...had, ...wasRange, text: hadKw ? `${phrase} ${hadKw[1] === "had" ? "with" : "without"} ${hadKw[2]}` : wasPT ? `${phrase} with ${wasPT[1]} ${wasPT[0].slice(`if its ${wasPT[1]} was `.length, wasPT[0].length - wasPT[6]!.length - 2)}` : phrase },
+      filter: { ...filter, ...had, ...wasRange, ...attachedStatus, text: wasAttached ? `${phrase} that was ${wasAttached[1]}` : hadKw ? `${phrase} ${hadKw[1] === "had" ? "with" : "without"} ${hadKw[2]}` : wasPT ? `${phrase} with ${wasPT[1]} ${wasPT[0].slice(`if its ${wasPT[1]} was `.length, wasPT[0].length - wasPT[6]!.length - 2)}` : phrase },
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),
@@ -1547,7 +1564,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // attackers of that declaration.
   const those = event === "creaturesYouControlAttack" && !(anyone && min) && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
   // "Creatures you control with counters on them gain double strike" (Chocobo Knights): not about the attackers.
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
+  // Within Range: "each opponent loses life equal to the number of creatures attacking them": each one's own attackers.
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(/^each opponent loses life equal to the number of creatures attacking them\.?$/, "").replace(/ with (?:[+-]1\/[+-]1 )?counters on them\b/g, "").replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
@@ -1667,7 +1685,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       if (!body) return "fail";
       return { event: "batch", batch, body, eventX: true };
     }
-  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere(?: other than the battlefield)?)( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from (?:anywhere(?: other than the battlefield)?|a library))( during your turn)?, (.+)$/.exec(line))) {
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
     // leaves your graveyard": once for each card (CR 603.2c). Kishla Skimmer: "Whenever a card leaves your graveyard
     // during your turn".
@@ -1675,7 +1693,8 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (filter === null) return "fail";
     const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
     // Bloodchief Ascension: "a card is put into an opponent's graveyard from anywhere", "that player" being its owner.
-    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : {}), each: true };
+    // Dreadhound: "a creature card is put into a graveyard from a library", any library, any way (not only milled).
+    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : / a library$/.test(m[2]!) ? { from: "library" as const } : {}), each: true };
     yourTurn = !!m[3];
     rest = m[4]!;
     eachOwner = true;
@@ -2334,6 +2353,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (hostBattalion) {
     const t = parseTrigger(`Whenever equipped creature attacks, ${hostBattalion[2]}`);
     return t && t !== "fail" && t.host === "attached" ? { ...t, withOthers: num(hostBattalion[1]!) } : "fail";
+  }
+  // Ironsoul Enforcer: "Whenever ~ or a commander you control attacks alone": either one, the only creature declared as an
+  // attacker (CR 506.5).
+  const selfOrCmdAlone = /^Whenever ~ or a commander you control attacks alone, (?!if )(.+)$/.exec(line);
+  if (selfOrCmdAlone) {
+    if (/\b(?:it|its|that creature)\b/.test(selfOrCmdAlone[1]!)) return "fail";
+    const body = parseBody(selfOrCmdAlone[1]!, { defending: true });
+    return body ? { event: "creatureYouControlAttacksAlone", body, subjectFilter: { kind: "object", types: ["Creature"], commander: true, text: "commander you control" }, subjectOrSelf: true } : "fail";
   }
   // "Whenever a creature you control attacks alone" (exalted's event, CR 702.83a, 506.5): that creature is the subject.
   const alone = /^Whenever an? (.+?) you control attacks alone, (?!if )(.+)$/.exec(line);

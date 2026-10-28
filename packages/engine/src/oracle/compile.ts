@@ -855,6 +855,7 @@ export function compile(d: CardDef): CompiledCard {
         }
         if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
         if (costKw.madness) out.madness = costKw.madness;
+        if (costKw.madnessLife) out.madnessLife = costKw.madnessLife;
         if (costKw.miracle) out.miracle = costKw.miracle;
         if (costKw.plot) out.plot = costKw.plot;
         if (costKw.foretell) out.foretell = costKw.foretell;
@@ -2034,6 +2035,12 @@ export function compile(d: CardDef): CompiledCard {
     if (floor && floorIf !== null) {
       out.lifeFloor = Number(floor[3]);
       if (floorIf) out.lifeFloorIf = floorIf;
+      continue;
+    }
+    // Archon of Coronation (CR 120.3a): the damage is dealt but its life loss doesn't happen.
+    const noLoss = /^As long as (you're the monarch), damage doesn't cause you to lose life\.$/.exec(line);
+    if (noLoss) {
+      out.damageNoLifeLossIf = { kind: "monarch" };
       continue;
     }
     if (line === "Room abilities of dungeons you own trigger an additional time.") {
@@ -3635,6 +3642,8 @@ export function compile(d: CardDef): CompiledCard {
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
+      // Dreadhound: "Whenever a creature dies or a creature card is put into a graveyard from a library, ...": the same.
+      /^Whenever (a creature dies) or (a creature card is put into a graveyard from a library), (.+)$/.exec(line) ??
       // Trouble in Pairs: "Whenever an opponent attacks you with two or more creatures, draws their second card each
       // turn, or casts their second spell each turn, you draw a card": three triggers (rulings: each can trigger).
       /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line) ??
@@ -3700,6 +3709,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ${twice[1]} dies, ${effect}`, `Whenever ${twice[1]} deals combat damage to a player, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
+            : /^Whenever a creature dies or a creature card is put into a graveyard from a library, /.test(line)
+              ? [`Whenever ${twice[1]}, ${effect}`, `Whenever ${twice[2]}, ${effect}`]
             : / is turned face up, /.test(line) && twice.length === 4
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[2]} is turned face up, ${effect}`]
             : / enters or is turned face up, /.test(line) && /^Whenever an? /.test(line)

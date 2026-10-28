@@ -1441,7 +1441,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(attacker, you, (e) => e === "selfAttacksAlone", undefined, undefined, undefined, undefined, undefined, undefined, that);
     addHosted(attacker, (e) => e === "selfAttacksAlone", undefined, attacker, that);
     for (const id of s.battlefield)
-      if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
+      if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || (t.subjectOrSelf && id === attacker.id) || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
     causedBy = null;
   } else if (ev.type === "dealtDamage") {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
@@ -1559,7 +1559,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const g = t.event === "groupDealsDamageToPlayers" ? t.damageGroup : undefined;
         if (!g) continue;
         const fits = (h: (typeof ev.hits)[number]) => {
-          if (h.by !== wc || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
+          if ((h.by !== wc && !g.anyController) || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
           const o = s.objects[h.source];
           if (o?.zone === "battlefield") return objectMatches(s, g.filter, o, wc, false);
           const { kind: _k, text: _t, types = [], subtypes = [], ...rest } = g.filter;

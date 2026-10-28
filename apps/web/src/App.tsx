@@ -1387,7 +1387,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {targeting && (
             <div className="targeting">
               <span>
-                <strong>{targeting.label}</strong>: choose {nextSpec?.text}{" "}
+                {/* Blatant Thievery: one required target for each opponent, named. */}
+                <strong>{targeting.label}</strong>: choose {nextSpec?.controlledBy !== undefined && !inRun ? nextSpec.text.replace(/\bthat player\b/, nextSpec.controlledBy === HUMAN ? "you" : s.players[nextSpec.controlledBy]!.name) : nextSpec?.text}{" "}
                 {inRun
                   ? `(optional, one for each ${targeting.specs.slice(targeting.chosen.length, runEnd).some((sp) => sp.controlledBy === HUMAN) ? "player" : "opponent"}: ${targeting.specs
                       .slice(targeting.chosen.length, runEnd)
@@ -4526,7 +4527,8 @@ function Controls({
         <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
           {pending.how === "madness" ? (
             <>
-              <strong>Madness:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it goes to your graveyard.
+              <strong>Madness:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />
+              {compileCard(d).madnessLife ? ` and ${compileCard(d).madnessLife} life` : ""}? If you don&apos;t, it goes to your graveyard.
             </>
           ) : pending.how === "miracle" ? (
             <>

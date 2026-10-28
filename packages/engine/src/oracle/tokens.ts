@@ -149,9 +149,10 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Mauhúr, Uruk-hai Captain: "on an Army, Goblin, or Orc you control" (creature types, so a changeling counts).
   m = /^If one or more \+1\/\+1 counters would be put on an? ([A-Z][a-z]+), ([A-Z][a-z]+), or ([A-Z][a-z]+) you control, that many plus one \+1\/\+1 counters are put on it instead\.$/.exec(line);
   if (m && [m[1]!, m[2]!, m[3]!].every((st) => CREATURE_TYPES.has(st))) return { what: "counters", counter: "+1/+1", on: "permanent", who: "you", op: "plusOne", subtypes: [m[1]!, m[2]!, m[3]!] };
-  // Winding Constrictor: counters of any kind (each kind one more, rulings).
-  if (line === "If one or more counters would be put on an artifact or creature you control, that many plus one of each of those kinds of counters are put on that permanent instead.")
-    return { what: "counters", on: "artifactOrCreature", who: "you", op: "plusOne" };
+  // Winding Constrictor: counters of any kind (each kind one more, rulings). Pir, Imaginative Rascal: on any permanent
+  // you control ("your team" is you outside a team game, CR 102.4; rulings: as permanents enter with counters too).
+  m = /^If one or more counters would be put on (an artifact or creature|a permanent) you control, that many plus one of each of those kinds of counters are put on that permanent instead\.$/.exec(line);
+  if (m) return { what: "counters", on: m[1] === "a permanent" ? "permanent" : "artifactOrCreature", who: "you", op: "plusOne" };
   if (line === "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead.") return { what: "counters", onPlayer: true, op: "plusOne" };
   // Vizier of Remedies.
   if (line === "If one or more -1/-1 counters would be put on a creature you control, that many -1/-1 counters minus one are put on it instead.")

@@ -1449,6 +1449,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2f24637d-8d8e-49de-b229-4cdb97595ed7",
+  "name": "Beatrix, Loyal General",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nAt the beginning of combat on your turn, you may attach any number of Equipment you control to target creature you control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "74c9cc13-c03f-4322-82af-b7bce1f2a0d8",
   "name": "Beloved Beggar // Generous Soul",
   "manaCost": "{1}{W}",
@@ -3672,6 +3707,34 @@
   "set": "lea",
   "releasedAt": "1993-08-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e2375f13-fd45-4087-abd1-c884acc6c736",
+  "name": "Creeping Renaissance",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a permanent type. Return all cards of the chosen type from your graveyard to your hand.\nFlashback {5}{G}{G} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13101,6 +13164,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "44b12ccc-81cb-4ec1-891e-4bf706e53aa4",
+  "name": "Primal Surge",
+  "manaCost": "{8}{G}{G}",
+  "cmc": 10,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you do, repeat this process.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d4a3c9a5-3c91-4135-a19d-98eb5bcf5e00",
   "name": "Prismatic Lace",
   "manaCost": "{U}",
@@ -18292,6 +18381,42 @@
   "commanderLegal": "legal",
   "set": "mkm",
   "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "244d4807-0802-41bc-9460-55ac38a28a72",
+  "name": "Vendilion Clique",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Faerie Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Wizard"
+  ],
+  "oracleText": "Flash\nFlying\nWhen Vendilion Clique enters, look at target player's hand. You may choose a nonland card from it. If you do, that player reveals the chosen card, puts it on the bottom of their library, then draws a card.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "mm2",
+  "releasedAt": "2015-05-22",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

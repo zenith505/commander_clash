@@ -944,7 +944,7 @@ export interface DelayedTrigger {
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
-  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
+  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -2021,6 +2021,8 @@ export interface Resolving {
   chosenFromYard?: { id: ObjectId; zc: number };
   /** The cards "exile the top two cards of your library. You may play them" exiled (Bonehoard Dracosaur). */
   impulsed?: ObjectId[];
+  /** "You may put a land card from among them into your hand" after a mill (Town Greeter): the cards it put there. */
+  putIntoHand?: ObjectId[];
   /** The cards its "hold" flicker exiled, for the search after it to put onto the battlefield with what it finds. */
   held?: { id: ObjectId; zc: number }[];
   /** The cards its mill instructions milled, as they are in the graveyard ("if a card with the chosen name was milled this way"). */
@@ -2132,6 +2134,8 @@ export interface Resolving {
     numbers?: { queue: PlayerId[]; chosen: Record<string, number>; pick?: number; step?: "discard" | "draw"; draws?: PlayerId[] };
     /** Tainted Pact: the names exiled so far, and the card the player is asked about. */
     pact?: { names: string[]; asking?: ObjectId };
+    /** Primal Surge: the permanent card just exiled, waiting for the answer to "you may put it onto the battlefield". */
+    surgeId?: ObjectId;
     /** "For each creature exiled this way, its controller searches ..." (Winds of Abandon): the players done so far. */
     forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)

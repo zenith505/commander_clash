@@ -221,8 +221,9 @@ export function isFullySupported(d: CardDef): boolean {
   const cost = parseManaCost(d.manaCost);
   if (!cost.supported) return false;
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;
-  // A planeswalker needs a printed loyalty number to enter with (CR 306.5b); "X" loyalty isn't modeled.
-  if (d.types.includes("Planeswalker") && !/^\d+$/.test(d.loyalty ?? "")) return false;
+  // A planeswalker needs a printed loyalty number to enter with (CR 306.5b), or "X" with {X} in its mana cost: the X it
+  // was cast with (CR 107.3m; Nissa, Steward of Elements).
+  if (d.types.includes("Planeswalker") && !/^\d+$/.test(d.loyalty ?? "") && !(d.loyalty === "X" && cost.hasX)) return false;
   const c = compileCard(d);
   // Creatures, and Vehicles that can become creatures (CR 301.7a), need numbers for power and toughness,
   // or a characteristic-defining ability that says what a "*" is (CR 604.3).
@@ -1195,6 +1196,11 @@ export function compile(d: CardDef): CompiledCard {
       // Glacierwood Siege: "• Sultai — You may play lands from your graveyard." (the permission of Crucible of Worlds).
       else if (out.entersAnchor!.includes(anchored[1]!) && anchored[2] === "You may play lands from your graveyard." && !out.landsFromGraveyardIf) out.landsFromGraveyardIf = { kind: "anchor", word: anchored[1]! };
       else if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
+      continue;
+    }
+    // Brimstone Vandal: "If it's neither day nor night, it becomes day as ~ enters." (CR 731.1), as it enters (614.12).
+    if (line === "If it's neither day nor night, it becomes day as ~ enters.") {
+      out.entersDay = true;
       continue;
     }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
@@ -2285,13 +2291,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
     // "Each creature card in your hand has cycling {1}{U}" (Rhet-Tomb Mystic): the same (CR 702.29a).
-    const handGrant = /^Each ([a-z]+) card in your hand has ((?:ninjutsu|cycling) (?:\{[^}]+\})+)\.$/.exec(line);
+    // Homing Sliver: "Each Sliver card in each player's hand has slivercycling {3}": in every player's hand (CR 702.29e).
+    const handGrant = /^Each ([a-z]+|[A-Z][a-z]+) card in (your|each player's) hand has ((?:ninjutsu|cycling|[a-z]+cycling) (?:\{[^}]+\})+)\.$/.exec(line);
     if (handGrant) {
       // The card's kind read as a graveyard card's, without the graveyard.
       const f = parseTargetPhrase(`${handGrant[1]} card from a graveyard`);
-      const kw = keywordAbilities(handGrant[2]!, d);
+      const kw = keywordAbilities(handGrant[3]!.replace(/^./, (c) => c.toUpperCase()), d);
+      const every = handGrant[2] === "each player's";
       if (f?.kind !== "card" || kw?.activated.length !== 1 || kw.triggers.length || kw.statics.length) out.unsupported.push(raw);
-      else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in your hand` }, activated: kw.activated });
+      else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in ${every ? "each player's" : "your"} hand` }, activated: kw.activated, ...(every ? { everyHand: true as const } : {}) });
       continue;
     }
     const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);
@@ -2780,8 +2788,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
-    if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
+    // Unbreathing Horde: "... prevent that damage and remove a +1/+1 counter from it." the same; Undergrowth Champion's
+    // "while it has a +1/+1 counter on it" only while it has one (rulings).
+    if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." || line === "If ~ would be dealt damage, prevent that damage and remove a +1/+1 counter from it.") {
       out.phantom = true;
+      continue;
+    }
+    if (line === "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove a +1/+1 counter from ~.") {
+      out.phantom = "whileCounter";
       continue;
     }
     // The Mindskinner (CR 615.5, 615.12): see staticRules in damage.ts.
@@ -4418,7 +4432,7 @@ function joinModes(lines: string[]): string[] {
     // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
-    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /you may choose two\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
+    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
   close();

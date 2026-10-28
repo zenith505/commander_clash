@@ -437,10 +437,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
   }
   // "The first creature spell you cast each turn costs {2} less to cast", "The second spell you cast each turn ...".
-  if ((m = /^The (first|second) (.*?)spell you cast each turn costs \{(\d+)\} less to cast$/.exec(text))) {
+  // Momo, Friendly Flier: "The first non-Lemur creature spell with flying you cast during each of your turns costs {1}
+  // less to cast": the spell's own flying (as Warden of Evos Isle's), only during your turn; one that matches but has
+  // no generic mana to reduce still uses it up (rulings).
+  if ((m = /^The (first|second) (.*?)spell( with (?:flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace))? you cast (each turn|during each of your turns) costs \{(\d+)\} less to cast$/.exec(text))) {
     const filter = m[2] ? parseTargetPhrase(`${m[2]}spell`) : { kind: "spell" as const, text: "spell" };
     if (!filter || filter.kind !== "spell") return "fail";
-    return { costMod: { who: "you", filter: { ...filter, text: `${m[2]}spells` }, n: -Number(m[3]), nth: m[1] === "first" ? 1 : 2, text: line } };
+    const kw = m[3] ? { keywords: [capital(m[3].slice(6))] } : {};
+    return { costMod: { who: "you", filter: { ...filter, ...kw, text: `${m[2]}spells${m[3] ?? ""}` }, n: -Number(m[5]), nth: m[1] === "first" ? 1 : 2, ...(m[4] === "each turn" ? {} : { turn: "yours" as const }), text: line } };
   }
   // Warden of Evos Isle: "Creature spells with flying you cast cost {1} less to cast": the spell's own printed flying, not
   // flying it would get on the battlefield (rulings).
@@ -967,6 +971,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
   // Karakyk Guardian: "~ has hexproof as long as it hasn't dealt damage yet": since it became this object (CR 400.7).
   if (/^(?:~|it) hasn't dealt damage yet$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "hasDealtDamage", not: true };
+  // The Tarrasque: "~ has haste and ward {10} as long as it was cast": it entered as a spell, cast from any zone (rulings).
+  // Only for a static ability's own effect: "When ~ enters, if it was cast" is the trigger's `ifCast`.
+  if (/^(?:~|it) was cast$/.test(text) && st.mods.length && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "cast" };
   // Cactuar: "if ~ didn't enter the battlefield this turn".
   if (/^~ didn't enter (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn", not: true };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
@@ -1465,7 +1472,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   };
   // Raised by Giants: "have base power and toughness 10/10 and are Giants in addition to their other types" (layers 4
   // and 7b, CR 613.1d, 613.4b).
-  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)(?: and (?:is an? ([A-Z][a-z]+)|are ([A-Z][a-z]+)) in addition to (?:its|their) other types)?$/.exec(rest))) {
+  // Graaz, Unstoppable Juggernaut: "... and are Juggernauts in addition to their other creature types".
+  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)(?: and (?:is an? ([A-Z][a-z]+)|are ([A-Z][a-z]+)) in addition to (?:its|their) other (?:creature )?types)?$/.exec(rest))) {
     const t = m[3] ?? (m[4] && singular(m[4]));
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];

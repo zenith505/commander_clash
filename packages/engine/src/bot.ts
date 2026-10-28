@@ -136,9 +136,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
       const printed = triggerBody(s, t);
-      // "You may choose both instead" (SOLDIER Military Program): one or both, now.
-      const range = t.both ? modeRange(printed, true) : undefined;
-      const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0], max: range[1] } } : printed;
+      // "You may choose both instead" (SOLDIER Military Program): one or both, now. "Each mode must target a different
+      // player" (Vindictive Lich): no more than there are players to target (the question's range).
+      const range = t.both ? modeRange(printed, true) : printed.modal?.distinctTargets ? [pend.min, pend.max] : undefined;
+      const body = range ? { ...printed, modal: { ...printed.modal!, min: range[0]!, max: range[1]! } } : printed;
       return [{ type: "chooseModes", player: pid, modes: chooseModes(s, pid, body, true, t.sourceId)!.modes }];
     }
     if (pend.kind === "chooseTargets") {
@@ -246,6 +247,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.thumb) return [{ type: "chooseMay", player: pid, yes: true }];
     // Rona, Tolarian Obliterator: a land exiled from a hand at random, ours to put onto the battlefield.
     if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
+    // Primal Surge: every permanent is worth having, and saying no ends it.
+    if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "surge") return [{ type: "chooseMay", player: pid, yes: true }];
     // Dina's Guidance: the creature card found goes into the hand, not the graveyard (bots don't plan reanimation).
     const searching = s.resolving?.body.effects[s.resolving.next];
     if (pend.kind === "chooseMay" && searching?.type === "search" && searching.mayInstead?.dest.zone === "graveyard") return [{ type: "chooseMay", player: pid, yes: false }];
@@ -2024,6 +2027,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const lands = player(s, pid).hand.filter((h) => h !== id && isType(defOf(s, obj(s, h)), "Land")).length;
     xs = xs.filter((x) => x !== undefined && x >= 1 && x <= lands);
   }
+  // Nissa, Steward of Elements: X loyalty, so X 0 would put it straight into the graveyard (CR 306.5b, 704.5i).
+  if (cost.hasX && d.loyalty === "X") xs = xs.filter((x) => x !== undefined && x >= 1);
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
     if (plan) return plan;
@@ -3475,6 +3480,13 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
       const o = obj(s, id);
       return controllerOf(s, o) === tp.id && characteristics(s, o).types.includes(ty) && !!o.tapped === (tp.id === pid) ? n + Math.max(1, worth(s, pid, o)) : n;
     }, 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
+  // Creeping Renaissance: "Return all cards of the chosen type from your graveyard to your hand": the type with the most
+  // cards there, a land worth half a spell.
+  const regrow = s.resolving && allEffects(s.resolving.body.effects).some((e) => e.type === "returnAllFromGraveyard" && e.filter.chosen === "cardType");
+  if (what === "cardType" && regrow) {
+    const score = (ty: string) => s.players[pid]!.graveyard.reduce((n, id) => (defOf(s, obj(s, id)).types.includes(ty) ? n + (ty === "Land" ? 0.5 : 1) : n), 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
   if (what === "cardType") {

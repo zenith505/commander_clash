@@ -71,10 +71,15 @@ const phyrexianProcessor = card("Phyrexian Processor", "Artifact", "{4}", {"cmc"
 const brokenVisage = card("Broken Visage", "Instant", "{4}{B}", {"cmc":5,"oracleText":"Destroy target nonartifact attacking creature. It can't be regenerated. Create a black Spirit creature token. Its power is equal to that creature's power and its toughness is equal to that creature's toughness. Sacrifice the token at the beginning of the next end step."});
 const kalitasBloodchiefOfGhet = card("Kalitas, Bloodchief of Ghet", "Legendary Creature — Vampire Warrior", "{5}{B}{B}", {"cmc":7,"power":"5","toughness":"5","oracleText":"{B}{B}{B}, {T}: Destroy target creature. If that creature dies this way, create a black Vampire creature token. Its power is equal to that creature's power and its toughness is equal to that creature's toughness."});
 const ritualOfTheReturned = card("Ritual of the Returned", "Instant", "{3}{B}", {"cmc":4,"oracleText":"Exile target creature card from your graveyard. Create a black Zombie creature token. Its power is equal to that card's power and its toughness is equal to that card's toughness."});
+const avenWindreader = card("Aven Windreader", "Creature — Bird Soldier Wizard", "{3}{U}{U}", {"cmc":5,"power":"3","toughness":"3","keywords":["Flying"],"oracleText":"Flying (This creature can't be blocked except by creatures with flying or reach.)\n{1}{U}: Target player reveals the top card of their library."});
+const cerebralEruption = card("Cerebral Eruption", "Sorcery", "{2}{R}{R}", {"cmc":4,"oracleText":"Target opponent reveals the top card of their library. Cerebral Eruption deals damage equal to the revealed card's mana value to that player and each creature that player controls. If a land card is revealed this way, return Cerebral Eruption to its owner's hand."});
+const petraSphinx = card("Petra Sphinx", "Creature — Sphinx", "{2}{W}{W}{W}", {"cmc":5,"power":"3","toughness":"4","oracleText":"{T}: Target player chooses a card name, then reveals the top card of their library. If that card has the chosen name, that player puts it into their hand. If it doesn't, the player puts it into their graveyard."});
+const vexingArcanix = card("Vexing Arcanix", "Artifact", "{4}", {"cmc":4,"colors":[],"oracleText":"{3}, {T}: Target player chooses a card name, then reveals the top card of their library. If that card has the chosen name, that player puts it into their hand. Otherwise, they put it into their graveyard and this artifact deals 2 damage to them."});
 
 describe("Lane B round 24", () => {
   it("supports every card of the round", () => {
-    supported(woodElemental, dracoplasm, shimatsuTheBloodcloaked, minionOfTheWastes, namelessRace, phyrexianProcessor, brokenVisage, kalitasBloodchiefOfGhet, ritualOfTheReturned);
+    supported(woodElemental, dracoplasm, shimatsuTheBloodcloaked, minionOfTheWastes, namelessRace, phyrexianProcessor, brokenVisage, kalitasBloodchiefOfGhet, ritualOfTheReturned,
+      avenWindreader, cerebralEruption, petraSphinx, vexingArcanix);
   });
 
   it("Wood Elemental: only untapped Forests can be sacrificed as it enters, and its P/T is how many were (rulings)", () => {
@@ -239,5 +244,73 @@ describe("Lane B round 24", () => {
     const zombie = mine(s, ap, "Zombie Token").concat(mine(s, ap, "Zombie"));
     expect(zombie.length).toBe(1);
     expect(pt(s, zombie[0]!)).toBe("4/5");
+  });
+  it("Aven Windreader has the target player reveal their top card, which stays there", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const reader = putOnBattlefield(s0, ap, avenWindreader);
+    const top = into(s0, opp, bigBeast(), "library");
+    pool(s0, ap, { U: 1, C: 1 });
+    const s = settle(activateNow(s0, ap, reader, 0, [ply(opp)]));
+    expect(s.players[opp]!.library[0]).toBe(top);
+    expect(s.log.some((l) => /reveals Big Beast from the top of their library/.test(typeof l === "string" ? l : JSON.stringify(l)))).toBe(true);
+  });
+
+  it("Cerebral Eruption deals the revealed card's mana value to the opponent and each of their creatures; a land returns it to hand", () => {
+    const { s: s0, ap, ids, opp } = setup([cerebralEruption]);
+    const bear = putOnBattlefield(s0, opp, greenBear());
+    const mine0 = putOnBattlefield(s0, ap, greenBear());
+    into(s0, opp, bigBeast(), "library");
+    pool(s0, ap, { R: 2, C: 2 });
+    let s = settle(castNow(s0, ap, ids[0]!, [ply(opp)]));
+    expect(life(s, opp)).toBe(36);
+    expect(zone(s, bear)).toBe("graveyard");
+    expect(zone(s, mine0)).toBe("battlefield");
+    expect(zone(s, ids[0]!)).toBe("graveyard");
+    // A land: no damage (mana value 0), and the spell goes back to its owner's hand (rulings).
+    const { s: s1, ap: ap1, ids: ids1, opp: opp1 } = setup([cerebralEruption]);
+    into(s1, opp1, card("Wastes", "Basic Land"), "library");
+    pool(s1, ap1, { R: 2, C: 2 });
+    s = settle(castNow(s1, ap1, ids1[0]!, [ply(opp1)]));
+    expect(life(s, opp1)).toBe(40);
+    expect(zone(s, ids1[0]!)).toBe("hand");
+    expect(s.players[ap1]!.hand).toContain(ids1[0]!);
+  });
+
+  it("Petra Sphinx: the target player names a card; a right guess goes to their hand, a wrong one to their graveyard", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const sphinx = putOnBattlefield(s0, ap, petraSphinx);
+    const top = into(s0, opp, bigBeast(), "library");
+    let s = settle(activateNow(s0, ap, sphinx, 0, [ply(opp)]), at("chooseOption", opp));
+    expect(s.pending?.kind === "chooseOption" && s.pending.what).toBe("cardName");
+    expect(s.pending?.player).toBe(opp);
+    s = settle(act(s, { type: "chooseOption", player: opp, choice: "Big Beast" }));
+    expect(zone(s, top)).toBe("hand");
+    const { s: s1, ap: ap1, opp: opp1 } = setup([]);
+    const sphinx1 = putOnBattlefield(s1, ap1, petraSphinx);
+    const top1 = into(s1, opp1, bigBeast(), "library");
+    s = settle(activateNow(s1, ap1, sphinx1, 0, [ply(opp1)]), at("chooseOption", opp1));
+    s = settle(act(s, { type: "chooseOption", player: opp1, choice: "Forest" }));
+    expect(zone(s, top1)).toBe("graveyard");
+  });
+
+  it("Vexing Arcanix deals 2 damage on a wrong guess, nothing with an empty library (rulings); a bot guesses its most common card", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const arcanix = putOnBattlefield(s0, ap, vexingArcanix);
+    const top = into(s0, opp, bigBeast(), "library");
+    pool(s0, ap, { C: 3 });
+    let s = settle(activateNow(s0, ap, arcanix, 0, [ply(opp)]), at("chooseOption", opp));
+    // The deck is 60 Forests and 39 Bears: a bot names Forest.
+    expect(botActions(s, opp)).toEqual([{ type: "chooseOption", player: opp, choice: "Forest" }]);
+    s = settle(act(s, { type: "chooseOption", player: opp, choice: "Forest" }));
+    expect(zone(s, top)).toBe("graveyard");
+    expect(life(s, opp)).toBe(38);
+    const { s: s1, ap: ap1, opp: opp1 } = setup([]);
+    const arcanix1 = putOnBattlefield(s1, ap1, vexingArcanix);
+    for (const id of s1.players[opp1]!.library) s1.objects[id]!.zone = "exile";
+    s1.players[opp1]!.library = [];
+    pool(s1, ap1, { C: 3 });
+    s = settle(activateNow(s1, ap1, arcanix1, 0, [ply(opp1)]), at("chooseOption", opp1));
+    if (s.pending?.kind === "chooseOption") s = settle(act(s, { type: "chooseOption", player: opp1, choice: "Forest" }));
+    expect(life(s, opp1)).toBe(40);
   });
 });

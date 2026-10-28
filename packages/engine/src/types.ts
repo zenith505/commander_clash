@@ -506,6 +506,8 @@ export interface GameObject {
   enteredFromExile?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** A resolving spell's "return ~ to its owner's hand" (Cerebral Eruption): it goes there as it finishes resolving. */
+  toHandOnResolve?: true;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
   discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */

@@ -4386,6 +4386,44 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Petra Sphinx, Vexing Arcanix: "Target player chooses a card name, then reveals the top card of their library. If that
+    // card has the chosen name, that player puts it into their hand. If it doesn't, the player puts it into their
+    // graveyard." / "Otherwise, they put it into their graveyard and ~ deals 2 damage to them.": the target player names a
+    // card as it resolves (rulings on Vexing Arcanix); with an empty library nothing else happens, no damage (rulings).
+    // (", then" splits the first sentence in two.)
+    const guessTop = /^([Tt]arget player) chooses a card name$/.exec(s) && /^Reveals the top card of their library$/.test(sentences[si + 1] ?? "") ? /^([Tt]arget player)/.exec(s) : null;
+    if (guessTop) {
+      const who = parsePlayer(guessTop[1]!, ctx);
+      const hit = /^If that card has the chosen name, that player puts it into their hand\.?$/.test(sentences[si + 2] ?? "");
+      const miss = /^(?:If it doesn't, the player puts it into their graveyard|Otherwise, they put it into their graveyard(?: and ~ deals (\d+) damage to them)?)\.?$/.exec(sentences[si + 3] ?? "");
+      if (!who || who.ref !== "target" || !hit || !miss) return null;
+      const named: TargetSpec = { kind: "card", chosen: "name", text: "card with the chosen name" };
+      const otherwise: Effect[] = [{ type: "putInGraveyard", what: { ref: "revealed" } }, ...(miss[1] ? [{ type: "damage" as const, amount: Number(miss[1]), to: who }] : [])];
+      effects.push(
+        { type: "choose", choice: "cardName", who, purpose: "guess" },
+        { type: "revealTop", who },
+        { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", text: "card" } }, effects: [{ type: "if", cond: { kind: "revealedIs", filter: named }, effects: [{ type: "bounce", what: { ref: "revealed" } }], otherwise }] },
+      );
+      si += 3;
+      continue;
+    }
+    // Aven Windreader: "Target player reveals the top card of their library." (CR 701.20a), on its own; Cerebral Eruption:
+    // "Target opponent reveals ...", then "the revealed card's mana value" and "If a land card is revealed this way, ...".
+    const theyRevealTop = /^([Tt]arget player|[Tt]arget opponent) reveals the top card of their library$/.exec(s);
+    if (theyRevealTop && (si === sentences.length - 1 || /\bthe revealed card's\b/.test(sentences[si + 1] ?? ""))) {
+      const who = parsePlayer(theyRevealTop[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealTop", who });
+      ctx.revealedTop = true;
+      continue;
+    }
+    // Cerebral Eruption: "If a land card is revealed this way, return ~ to its owner's hand.": the spell goes to its
+    // owner's hand from the stack as it finishes resolving, not to the graveyard (rulings).
+    const eruption = ctx.revealedTop && ctx.spell && /^If a land card is revealed this way, return ~ to its owner's hand$/.test(s);
+    if (eruption) {
+      effects.push({ type: "if", cond: { kind: "revealedIs", filter: { kind: "card", types: ["Land"], text: "land card" } }, effects: [{ type: "spellToHand" }] });
+      continue;
+    }
     // Elven Farsight: "Scry 3, then you may reveal the top card of your library. If a creature card is revealed this way,
     // draw a card.": the card on top after the scry, revealed only if you choose to (CR 701.20a).
     const farsight = /^[Yy]ou may reveal the top card of your library$/.test(s);

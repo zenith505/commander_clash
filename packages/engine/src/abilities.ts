@@ -2916,6 +2916,8 @@ export type Effect =
    */
   | { type: "revealedUntilToBottom"; hand?: true }
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
+  /** "Return ~ to its owner's hand" as the spell resolves (Cerebral Eruption): it goes there, not to the graveyard, as it finishes resolving (GameObject.toHandOnResolve). */
+  | { type: "spellToHand" }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
   | { type: "revealRevealed" }
   /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */

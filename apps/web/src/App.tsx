@@ -3191,6 +3191,11 @@ function Seat({
             🏙 City's blessing
           </span>
         )}
+        {p.enduringStory && (
+          <span className="monarch blessing" title="An enduring story (storied): kept for the rest of the game.">
+            📜 Enduring story
+          </span>
+        )}
         {p.ring && (
           <span
             className="monarch"
@@ -4869,7 +4874,7 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "number" || pending.what === "payLife" || pending.what === "lifeAsEnters" || pending.what === "payEnergy") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "reselectAttack" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "sacrificeInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer" || pending.what === "villainous" || pending.what === "unlockDoor" || pending.what === "damageWhom" || pending.what === "counterChoice" || pending.what === "timeTravel") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

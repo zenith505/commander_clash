@@ -361,6 +361,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!inner || ctx.targets.length !== before || allEffects(inner).some((y) => ("what" in y && !selfTransform(y)) || ("who" in y && (y.who as { ref: string }).ref !== "you"))) return null;
     return [{ type: "delayed", when: "nextTurnUpkeep", effects: inner, text: m[1]! }];
   }
+  // Time travel (CR 701.56a): "Time travel three times" (The Tenth Doctor) is three time travel actions, one after another.
+  if (/^Time travel$/i.test(s)) return [{ type: "timeTravel" }];
+  if ((m = /^Time travel (twice|three times)$/i.exec(s))) return [{ type: "repeat", n: m[1] === "twice" ? 2 : 3, effects: [{ type: "timeTravel" }] }];
   // Proliferate (CR 701.27), amass (CR 701.47).
   if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
   if (/^Proliferate twice$/i.test(s)) return [{ type: "proliferate", twice: true }];

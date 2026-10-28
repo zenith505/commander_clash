@@ -1060,6 +1060,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "blockLimitThisCombat":
     case "phaseOut":
     case "proliferate":
+    case "timeTravel":
     case "amass":
     case "connive":
     case "recruit":
@@ -1159,6 +1160,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealUntilLandToGraveyard":
     case "exileUntilTotalMv":
     case "exileTop":
+    case "suspendExiledTop":
     case "putFromExiledTop":
     case "returnDiedThisWay":
     case "revealTopToHand":

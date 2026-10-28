@@ -517,6 +517,22 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
     }
+    // Time travel (CR 701.56a): a suspended card or an impending permanent comes sooner with one fewer; a permanent with
+    // vanishing lasts longer, and one whose mana or power counts its time counters grows, with one more. Anything else
+    // stays as it is.
+    if (pend.kind === "chooseOption" && pend.what === "timeTravel") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const mine = o?.zone === "battlefield" && controllerOf(s, o) === pid;
+      const cc = o ? compileCard(defOf(s, o)) : undefined;
+      const choice = !o
+        ? "none"
+        : o.zone === "exile" || (mine && o.castAlt === "impending")
+          ? "remove"
+          : mine && (cc!.triggers.some((t) => t.event === "selfLastTimeCounterRemoved") || /"counter":"time"/.test(JSON.stringify([cc!.mana, cc!.statics])))
+            ? "add"
+            : "none";
+      return [{ type: "chooseOption", player: pid, choice }];
+    }
     // "Enters with your choice of a flying counter or a first strike counter": evasion first, then what wins fights.
     if (pend.kind === "chooseOption" && pend.what === "counterChoice") {
       const rank = ["flying", "deathtouch", "menace", "trample", "+1/+1", "first strike", "hexproof", "lifelink", "reach", "vigilance"];

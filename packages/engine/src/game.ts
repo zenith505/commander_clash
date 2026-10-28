@@ -3592,9 +3592,32 @@ export function giveCitysBlessing(s: GameState, pid: PlayerId, any = false): boo
   return true;
 }
 
-/** Ascend on permanents (CR 702.131b) isn't a triggered ability: it applies any time its condition is true. */
+/**
+ * An enduring story (CR 702.195a): a player who controls a permanent with storied and three or more permanents that are
+ * artifacts, Sagas and/or legendary gets it for the rest of the game. Continuous effects see it at once (702.195c).
+ */
+function giveEnduringStory(s: GameState, pid: PlayerId): boolean {
+  const p = player(s, pid);
+  if (p.enduringStory || p.lost) return false;
+  const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid);
+  if (!mine.some((o) => objHasKeyword(s, o, "Storied"))) return false;
+  const storied = (o: GameObject) => {
+    const c = characteristics(s, o);
+    return c.types.includes("Artifact") || c.supertypes.includes("Legendary") || c.subtypes.includes("Saga");
+  };
+  if (mine.filter(storied).length < 3) return false;
+  p.enduringStory = true;
+  invalidateCharacteristics(s);
+  log(s, `${p.name} has an enduring story.`);
+  return true;
+}
+
+/**
+ * Ascend on permanents (CR 702.131b) isn't a triggered ability: it applies any time its condition is true. Neither is
+ * storied (CR 702.195a).
+ */
 export function checkAscend(s: GameState) {
-  for (const p of s.players) giveCitysBlessing(s, p.id);
+  for (const p of s.players) giveCitysBlessing(s, p.id), giveEnduringStory(s, p.id);
 }
 
 /**
@@ -6736,7 +6759,9 @@ function equipAtInstantSpeed(s: GameState, pid: PlayerId): boolean {
 export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): boolean {
   if (!ab.equip || ab.costs?.length || ab.tap || s.turnLog?.equipped?.includes(pid)) return false;
   return s.battlefield.some((id) => {
-    const f = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).firstEquipFree : undefined;
+    const a = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    const f = a?.firstEquipFree;
+    if (a?.firstEquipFreeWhile && !staticConditionNow(s, a.firstEquipFreeWhile, id, pid)) return false;
     return f === "eachTurn" || (f === "yourTurn" && s.activePlayer === pid);
   });
 }
@@ -7666,6 +7691,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "timeTravel") {
+    const st = r.scratch?.timeTravel;
+    if (!st || !pend.about || !pend.options.includes(choice)) throw new RulesError("put a time counter on it, remove one, or leave it");
+    st.picks[pend.about] = choice;
     continueResolution(s);
     return;
   }

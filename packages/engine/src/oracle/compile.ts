@@ -11,7 +11,7 @@ import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
-import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
+import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses, parseActivateCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
@@ -1742,9 +1742,12 @@ export function compile(d: CardDef): CompiledCard {
       out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
       continue;
     }
-    const firstEquip = /^You may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
-    if (firstEquip) {
-      out.firstEquipFree = firstEquip[1] === "each turn" ? "eachTurn" : "yourTurn";
+    // Kíli the Resourceful: "As long as you have an enduring story, you may pay {0} ...": only while that's so.
+    const firstEquip = /^(?:As long as ([^,]+), y|Y)ou may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
+    const firstEquipWhile = firstEquip?.[1] ? parseActivateCondition(firstEquip[1]) : undefined;
+    if (firstEquip && firstEquipWhile !== null) {
+      out.firstEquipFree = firstEquip[2] === "each turn" ? "eachTurn" : "yourTurn";
+      if (firstEquipWhile) out.firstEquipFreeWhile = firstEquipWhile;
       continue;
     }
     if (line === "You may play lands from your graveyard.") {
@@ -4662,6 +4665,13 @@ export function parseFromTop(text: string): FromTop | null | undefined {
  * "if a triggered ability of a Ninja creature you control triggers, ..." (Splinter): CR 603.2d.
  */
 function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgain"]>[number] | null {
+  // Bifur, Melodic Rider: "As long as you have an enduring story, if a triggered ability of a Dwarf you control triggers,
+  // ..." (CR 702.195b).
+  const story = /^As long as you have an enduring story, if (.+)$/.exec(line);
+  if (story) {
+    const again = triggersAgainLine(`If ${story[1]!}`);
+    return again && !again.anchor ? { ...again, enduringStory: true } : null;
+  }
   // "Wolf or battle you control", "land or Bird you control": any of them.
   // "Colorless spell you control or another colorless permanent you control" (Echoes of Eternity): spells too, when
   // `spells`.

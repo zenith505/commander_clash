@@ -422,7 +422,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
-  if (each && ctx?.afterYourDiscard && /^card discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
+  // Balin, Loremaster: "you may discard your hand. Draw X cards, where X is the number of cards discarded this way".
+  if (each && ctx?.afterYourDiscard && /^cards? discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".
   if (each && (m = /^(non[a-z]+|creature|land|artifact|instant|sorcery|enchantment) card discarded this way$/i.exec(p))) {
     const filter = parseSearchFilter(`${m[1]!.toLowerCase()} card`);

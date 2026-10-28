@@ -10,7 +10,7 @@ import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches, sayB
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
-import { attackChoices, chooseAuraHosts } from "./run-zones";
+import { attackChoices, chooseAuraHosts, suspendExiled } from "./run-zones";
 import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
@@ -140,6 +140,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           log(s, `${player(s, ctx.controller).name} puts ${put.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield.`);
           enterTogether(s, () => put.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
         }
+      }
+      return;
+    case "suspendExiledTop":
+      for (const id of s.resolving?.exiledTopCards ?? []) {
+        const o = s.objects[id];
+        if (o?.zone === "exile" && printedMatches(e.filter, defOf(s, o))) suspendExiled(s, o, defMv(defOf(s, o)));
       }
       return;
     case "putFromExiledTop": {

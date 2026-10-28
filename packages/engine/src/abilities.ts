@@ -1702,6 +1702,8 @@ export type StaticCondition =
   | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
+  /** "As long as you have an enduring story" (CR 702.195b). */
+  | { kind: "enduringStory"; /** "Unless you have an enduring story". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */
   | { kind: "yourTurn"; not?: true }
   /** "During extra turns" (Medomai the Ageless): the turn being taken is an extra turn (CR 500.7), whoever's it is. */
@@ -2399,6 +2401,8 @@ export type Effect =
   | { type: "turnFaceUp"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
+  /** Time travel (CR 701.56a): for each permanent you control with a time counter and suspended card you own, you may put a time counter on it or remove one. */
+  | { type: "timeTravel" }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
   | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true; /** "Proliferate X times, where X is ..." (Tromell): that many proliferate actions. */ n?: Amount }
@@ -2927,6 +2931,8 @@ export type Effect =
    * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
    */
   | { type: "returnDiedThisWay"; filter: TargetSpec; /** "Return each card put into a graveyard this way" (Sorin, Lord of Innistrad): all of them, not one. */ each?: true; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
+  /** "For each nonland card exiled this way, put a number of time counters on that card equal to its mana value. If it doesn't have suspend, it gains suspend." (The Parting of the Ways): the cards the exileTop before it exiled. */
+  | { type: "suspendExiledTop"; filter: TargetSpec }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** The cards are linked to the source, for its "play cards exiled with ~" (CR 607.2a). */ linked?: true; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
@@ -6033,6 +6039,8 @@ export interface CompiledCard {
    * turns" (`"yourTurn"`); Bruenor Battlehammer: "... you activate each turn" (`"eachTurn"`).
    */
   firstEquipFree?: "yourTurn" | "eachTurn";
+  /** Kíli the Resourceful: only as long as this holds ("as long as you have an enduring story"). */
+  firstEquipFreeWhile?: StaticCondition;
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
    * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).
@@ -6047,7 +6055,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true; /** Wizard's Staff: "If a triggered ability of equipped creature triggers": the creature it's attached to, whoever controls either. */ ofEquipped?: true; /** The Masamune's granted "a triggered ability of this creature or an emblem you own": this permanent's own abilities and its controller's emblems'. */ selfOrEmblems?: true; /** Bifur: "As long as you have an enduring story" (CR 702.195b). */ enduringStory?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

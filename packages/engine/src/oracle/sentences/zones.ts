@@ -838,7 +838,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
   }
-  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
     const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
@@ -1175,6 +1175,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`, { chosen: true });
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
   }
+  // The Motherlode, Excavator: "creatures that player controls without flying can't block this turn" (that player being the
+  // defending player): a rule for the turn, so also creatures that lose flying or come under their control later
+  // (rulings).
+  if ((m = /^[Cc]reatures defending player controls( without flying)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
+    const of = parsePlayer("defending player", ctx);
+    return filter?.kind === "object" && of ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` }, ofPlayer: of }] : null;
+  }
   // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.
   if ((m = /^([A-Z][a-z]+)s can't block this turn$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], text: `${m[1]}s` } }];
   // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until
@@ -1293,6 +1301,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^Return ${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  }
+  // Killing Wave: "For each creature, its controller sacrifices it unless they pay X life": each player chooses which of
+  // theirs to keep, paying X life for each, the active player first and each knowing the choices before theirs; then
+  // they all pay and sacrifice at the same time (rulings). No more than they can pay for (CR 119.4).
+  if ((m = /^For each creature, its controller sacrifices it unless they pay (X|\d+) life$/.exec(s))) {
+    const among: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+    return [{ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter: among, n: 0, upTo: true }], among, payLife: m[1] === "X" ? { count: { kind: "x" } } : Number(m[1]) }];
   }
   // "Each player chooses from among the permanents they control an artifact, a creature, an enchantment, and a land,
   // then sacrifices the rest" (Cataclysm), "... an artifact, a creature, an enchantment, and a planeswalker from among the

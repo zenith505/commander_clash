@@ -890,10 +890,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (e.exchange) {
           // Morality Shift: both at once (CR 701.12a); the library's cards go to the graveyard together, so their owner
           // orders them when the order matters (CR 404.3, see graveyard.ts; rulings).
+          // Mordenkainen: "Exchange your hand and library": into the hand, not drawn (rulings).
           const lib = [...p.library];
           for (const id of ids) moveObject(s, id, "library");
-          for (const id of lib) moveObject(s, id, "graveyard");
-          log(s, `${p.name} exchanges their graveyard (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
+          for (const id of lib) moveObject(s, id, e.hand ? "hand" : "graveyard");
+          log(s, `${p.name} exchanges their ${e.hand ? "hand" : "graveyard"} (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
           continue;
         }
         if (e.bottom) {

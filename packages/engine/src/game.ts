@@ -18,6 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { countersBanned, countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
+import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
@@ -1121,7 +1122,8 @@ export function moveObject(
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
-    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
+    // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
+    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
       s.battlefield = s.battlefield.filter((x) => x !== id);
@@ -1403,7 +1405,9 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
     return;
   }
   const ewc = printed.entersWithCounters?.afterChoice ? undefined : printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  const n0 = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
+  const n = ewc?.rollD && n0 > 0 ? rollDice(s, o.controller, ewc.rollD, n0, realDefOf(s, o).name).result : n0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
@@ -4070,6 +4074,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
+  if (ab.returnSelf) {
+    log(s, `${p.name} returns ${name} to its owner's hand for mana.`);
+    moveObject(s, id, "hand");
+  }
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
@@ -5669,6 +5677,7 @@ function describeKicks(d: CardDef, kicks: number[]): string {
   const k = compileCard(d).kicker!;
   const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
   const name = kickerName(k);
+  if (k.optional) return `, paying its additional cost (${k.text})`;
   if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
   if (k.extraCosts) return `, kicked (${k.text})`;
   if (k.multi || k.costs.length === 1) return kicks.length === 1 ? ", kicked" : `, kicked${times}`;
@@ -6018,13 +6027,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "putCounter") {
       // Hatchet Bully: one permanent you control that matches, not one counters can't be put on (rulings on Solemnity).
       const pool = counterOnCandidates(s, pid, c);
+      // Blight N: all N counters on one creature you control (CR 701.68a, rulings), which can't be done with none (701.68b).
       const what = `${/^[aeiou]/i.test(c.filter.text) ? "an" : "a"} ${c.filter.text}`;
+      const counters = c.n === 1 ? `a ${c.counter} counter` : `${c.n} ${c.counter} counters`;
       const chosen = choices?.counterOn;
       if (!chosen) {
-        if (!pool.length) return `you need to put a ${c.counter} counter on ${what} to ${doing}`;
+        if (!pool.length) return c.blight ? `you need a creature to blight ${c.n} to ${doing}` : `you need to put ${counters} on ${what} to ${doing}`;
         continue;
       }
-      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put a ${c.counter} counter on`;
+      if (chosen.length !== 1 || !pool.includes(chosen[0]!)) return `choose ${what} to put ${counters} on`;
       continue;
     }
     if (c.kind === "mill") {
@@ -6224,7 +6235,7 @@ export function beholdCandidates(s: GameState, pid: PlayerId, o: GameObject, c: 
 
 /** "An Elf" for "behold an Elf". */
 export const beholdWhat = (c: Extract<AdditionalCost, { kind: "reveal" }>) => {
-  const kind = c.filter.subtypes?.[0] ?? c.filter.text;
+  const kind = c.filter.subtypes?.[0] ? `${c.filter.subtypes[0]}${c.filter.types?.includes("Creature") ? " creature" : ""}` : c.filter.text;
   return `${c.n === 1 ? (/^[AEIOU]/.test(kind) ? "an" : "a") : c.n} ${kind}`;
 };
 
@@ -6297,8 +6308,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     } else if (c.kind === "putCounter") {
       // Through the replacement effects on counters, as any counter put on a permanent (CR 122.6).
       for (const id of choices.counterOn ?? []) {
-        const put = putCounters(s, obj(s, id), c.counter, 1);
-        log(s, `${p.name} puts ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
+        const put = putCounters(s, obj(s, id), c.counter, c.n);
+        log(s, `${p.name} ${c.blight ? `blights ${c.n}, putting` : "puts"} ${put === 1 ? "a" : put} ${c.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
       }
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
@@ -6607,6 +6618,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
   if (!ab.mana)
     for (const id of s.battlefield) {
       const src = obj(s, id);
+      if (ab.cycling && controllerOf(s, src) === pid) less += abilitiesOf(s, src).cyclingLess ?? 0;
       const z = controllerOf(s, src) === pid ? abilitiesOf(s, src).youActivateLess : undefined;
       if (!z) continue;
       less += z.n;

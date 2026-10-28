@@ -194,6 +194,8 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
  * Card types/subtypes whose rules we don't model yet, whatever their text says. Kindred is modeled (CR 308): cast and
  * resolved as its other card type, its subtypes creature types.
  */
+/** An optional additional cost paid like kicker ("you may waterbend {2}", "you may blight 1", "you may behold a Dragon"). */
+const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|behold an? [A-Z][a-z]+(?: creature)?)\.$/m;
 const UNSUPPORTED_TYPES = ["Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES: string[] = [];
 
@@ -473,6 +475,7 @@ export function compile(d: CardDef): CompiledCard {
   // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
   // "Choose one. If this spell was kicked, choose any number instead." (Inscriptions) too.
   let both: "teamwork" | "commander" | "kicked" | "control" | undefined;
+  let kickedBoth = false;
   let bothIf: string | undefined;
   // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
   let repeat = false;
@@ -489,8 +492,11 @@ export function compile(d: CardDef): CompiledCard {
       // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
       // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
       .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
-      // "If this spell's additional cost was paid" with "you may waterbend" as that cost: whether it was paid, like kicker.
-      .replace(/\bIf ~'s additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "If ~ was kicked" : x))
+      // "If this spell's additional cost was paid" with "you may waterbend", "you may blight 1" or "you may behold a Dragon"
+      // as that cost: whether it was paid, like kicker. "If a Dragon was beheld" is the same: whether a Dragon card was
+      // revealed or a Dragon chosen for that cost, whatever happens to it later (CR 701.4b, rulings).
+      .replace(/\b([Ii])f ~'s additional cost was paid\b/g, (x, i: string, _i, text: string) => (MAY_COST.test(text) ? `${i}f ~ was kicked` : x))
+      .replace(/\bIf an? ([A-Z][a-z]+(?: creature)?) was beheld\b/g, (x, what: string, _i, text: string) => (new RegExp(`^As an additional cost to cast ~, you may behold an? ${what}\\.$`, "m").test(text) ? "If ~ was kicked" : x))
       .replace(/\bunless (?:her|his|its|~'s) additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "unless ~'s waterbend cost was paid" : x))
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
@@ -539,6 +545,12 @@ export function compile(d: CardDef): CompiledCard {
         }
         if (/^Choose one\. If ~ was kicked, choose any number instead\.$/.test(l.trim())) {
           both = "kicked";
+          return "Choose one —";
+        }
+        // Pyrrhic Strike: "Choose one. If this spell's additional cost was paid, choose both instead.": exactly both then.
+        if (/^Choose one\. If ~ was kicked, choose both instead\.$/.test(l.trim())) {
+          both = "kicked";
+          kickedBoth = true;
           return "Choose one —";
         }
         // "If you control a Wizard as you cast ~, you may choose two instead" (Flame of Anor): one or two.
@@ -1359,6 +1371,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, doubleIfXAtLeast: Number(twiceX[1]) };
       continue;
     }
+    // Neverwinter Hydra: "As ~ enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of
+    // those results": the X chosen, the dice rolled as it enters, part of the replacement (CR 614.1c, 706.2).
+    if (line === "As ~ enters, roll X d6. It enters with a number of +1/+1 counters on it equal to the total of those results." && !isSpell) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, rollD: 6 };
+      continue;
+    }
     // Banquet Guests: "~ enters with twice X +1/+1 counters on it": the X chosen, times two (a replacement, CR 614.1c).
     if (line === "~ enters with twice X +1/+1 counters on it." && !isSpell) {
       if (out.entersWithCounters) out.unsupported.push(raw);
@@ -1565,6 +1584,16 @@ export function compile(d: CardDef): CompiledCard {
         (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: plumb[2]! }, n: 0, x: true, optional: true });
         (out.triggers ??= []).push({ event: "selfCast", ifX: 1, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: { count: { kind: "x" } }, newTargets: true }], text: `When you do, copy ~ for each ${plumb[2]} sacrificed this way.` } });
       }
+      continue;
+    }
+    // "As an additional cost to cast this spell, you may blight 1", "you may behold a Dragon" (CR 601.2b, 701.68a,
+    // 701.4a): an optional additional cost, chosen and paid like a kicker cost with no mana (CompiledCard.kicker.optional),
+    // which isn't kicker for other cards. Not with no creature to blight (CR 701.68b) or nothing to behold.
+    const mayCost = /^As an additional cost to cast ~, you may (blight \d+|behold an? [A-Z][a-z]+(?: creature)?)\.$/.exec(line);
+    if (mayCost) {
+      const cost = parseAdditionalCost(mayCost[1]!);
+      if (!cost || out.kicker) out.unsupported.push(raw);
+      else out.kicker = { costs: [""], extraCosts: [cost], text: mayCost[1]!, optional: true };
       continue;
     }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
@@ -2279,6 +2308,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
       out.powerUpAgain = true;
+      continue;
+    }
+    // Fluctuator: "Cycling abilities you activate cost {2} less to activate": typecycling too (CR 702.29f), generic mana
+    // only (CR 601.2f, 602.2b).
+    const cyclingLess = /^Cycling abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (cyclingLess) {
+      out.cyclingLess = (out.cyclingLess ?? 0) + Number(cyclingLess[1]);
       continue;
     }
     const youActivateLess = /^Abilities you activate that aren't mana abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
@@ -3878,10 +3914,12 @@ export function compile(d: CardDef): CompiledCard {
   if (both === "kicked") {
     // "Choose any number instead" when kicked: a "Choose one —" list, and a kicker to pay (one kicker cost).
     const modal = out.spell?.modal;
-    if (modal && modal.min === 1 && modal.max === 1 && out.kicker?.costs.length === 1 && !out.kicker.multi) modal.both = both;
-    else if (out.spell) {
+    if (modal && modal.min === 1 && modal.max === 1 && out.kicker?.costs.length === 1 && !out.kicker.multi && (!kickedBoth || modal.modes.length === 2)) {
+      modal.both = both;
+      if (kickedBoth) modal.bothExactly = true;
+    } else if (out.spell) {
       delete out.spell;
-      out.unsupported.push("Choose one. If ~ was kicked, choose any number instead.");
+      out.unsupported.push(`Choose one. If ~ was kicked, choose ${kickedBoth ? "both" : "any number"} instead.`);
     }
   } else if (both) {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
@@ -3985,6 +4023,18 @@ export function compile(d: CardDef): CompiledCard {
     if (!out.spell || v.unsupported.length || !v.spell) out.unsupported.push(`Cleave ${cleave.mana}`);
   }
   linkExile(out);
+  // "Target ... card not named ~" (Staff of Eden): this card's name (CR 201.5).
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    b.targets = b.targets.map((t) => (t.notNamed === "~" ? { ...t, notNamed: d.name } : t));
+  // "Target ... of the chosen type": the creature type chosen as this permanent entered (CR 614.12), bound on its
+  // abilities (cards.ts abilitiesOf). Not on a spell, nor with a choice made while it resolves (after its targets).
+  // Mirror of the Forebears: a copy of a creature whose own abilities read "the chosen type" has no type chosen for them
+  // (rulings), but the type chosen for the Mirror stays on the permanent, so it isn't done.
+  const chosenTarget = (b: AbilityBody) => [...b.targets, ...(b.modal?.modes.flatMap((m) => m.targets) ?? [])].some((t) => t.chosen === "type");
+  const choosesType = out.entersChoose?.some((c) => c.what === "creatureType");
+  for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
+    if (chosenTarget(b) && (b === out.spell || !choosesType || allEffects(b.effects).some((e) => e.type === "choose"))) out.unsupported.push(`${b.text} (a target of the chosen type, with no type chosen as it entered)`);
+    else if (chosenTarget(b) && allEffects(b.effects).some((e) => e.type === "becomeCopy")) out.unsupported.push(`${b.text} (a copy keeping the type chosen for its source)`);
   // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
   if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))

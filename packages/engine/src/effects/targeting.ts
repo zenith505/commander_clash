@@ -707,7 +707,7 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
  */
 export function manyX(s: GameState, targets: TargetSpec[], controller: PlayerId, sourceId: ObjectId | undefined, x = 0): number {
   const spec = targets[manySlot(targets)];
-  return spec?.manyCount ? Math.max(0, evalAmount(s, spec.manyCount, targetingCtx(s, controller, sourceId))) : x;
+  return spec?.manyCount ? Math.max(0, evalAmount(s, spec.manyCount, targetingCtx(s, controller, sourceId))) : x * (spec?.manyTimes ?? 1);
 }
 
 /**

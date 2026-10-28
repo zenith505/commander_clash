@@ -325,7 +325,9 @@ export function planCast(
   // tapping the target for mana first mustn't make it count.
   const targetIds = compileCard(d).costLessIfTargets ? (targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])) : [];
   // Creatures tapped for teamwork, conspire or harmonize as it's cast can't also be tapped for mana.
-  const tapping = [...(choices.teamwork ?? []), ...(choices.conspire ?? []), ...(choices.harmonize !== undefined ? [choices.harmonize] : [])];
+  // "Tap two untapped artifacts, creatures, and/or lands you control" (Warlord's Elite): the lands chosen for that cost
+  // aren't tapped for its mana.
+  const tapping = [...(choices.teamwork ?? []), ...(choices.conspire ?? []), ...(choices.harmonize !== undefined ? [choices.harmonize] : []), ...(choices.tap ?? [])];
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = poolFor(s, pid, use).pool;
   const rainbow = (compileCard(d).countsColors || gainsSunburst(s, pid, d)) && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];

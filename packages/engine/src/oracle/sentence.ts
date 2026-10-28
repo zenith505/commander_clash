@@ -502,6 +502,8 @@ export function parseBecomes(text: string): Modification[] | null {
   // "Becomes snow" (Arcum's Weathervane, Thermal Flux): it gains the supertype and keeps its others (CR 205.4a, rulings).
   if (/^snow$/i.test(rest)) return [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Snow"] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
+  // Deepwood Elder: "X target lands become Forests": each one (plural subject).
+  if ((m = /^(Plains|Islands|Swamps|Mountains|Forests)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!.replace(/(?<!Plain)s$/, "")] }];
   // "Becomes an Island in addition to its other types" (Xolatoyac's flood counters): the land keeps its types and abilities
   // and has the basic land type's mana ability too (CR 305.6, 305.7; rulings).
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other types$/.exec(rest))) return [{ kind: "addTypes", types: [], subtypes: [m[1]!] }];

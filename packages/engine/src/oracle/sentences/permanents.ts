@@ -783,6 +783,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAnyCounters", what, n: /^a$/i.test(m[2]!) ? 1 : amt(m[2]!), ...(m[1] ? { upTo: true as const } : {}) }] : null;
   }
+  // Gremlin Mine: "Remove up to four charge counters from target noncreature artifact": as many of them as its controller
+  // chooses as it resolves, none to four (only that kind).
+  if ((m = new RegExp(`^Remove up to (${NUM.slice(1, -1)}) ${COUNTER} counters from (target .+)$`, "i").exec(s))) {
+    const what = parseObject(m[3]!, ctx);
+    return what && !isGroup(what) ? [{ type: "removeAnyCounters", what, n: num(m[1]!), upTo: true, kinds: [counterKind(m[2]!)] }] : null;
+  }
   // The Ozolith: "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
   // Resourceful Defense: "... put those counters on target permanent you control", the same way.

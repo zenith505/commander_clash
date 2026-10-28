@@ -343,6 +343,9 @@ export function normalizeSelf(d: CardDef): string {
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
   if (full) {
+    // "Return target card named Rekindling Phoenix" in its token's ability (Sound the Call, Deathpact Angel): a name, the
+    // card's, not the object with the ability (CR 201.4b), so it stays as written for that ability's own compile.
+    t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`(\\bnamed )${esc(full)}(?![\\w'-])`, "g"), (_, a: string) => `${a}\u0002${otherNames.push(full) - 1}\u0002`));
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
     // The card named Exile: "Exile target nonwhite attacking creature" is the keyword action, not the card (its name
     // followed by "target" is never the card).
@@ -4337,6 +4340,9 @@ function checkCastingLinks(out: CompiledCard) {
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
   if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
+  // "If the exiled card is a snow land" needs an activated ability's "Exile the top card of your library" cost.
+  const exIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"costExiledIs"');
+  if (exIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => exIn(ab) && ab.costs?.filter((c) => c.kind === "mill" && c.exile && c.n === 1).length !== 1)) bad = true;
   // Hisoka's "the same mana value as the discarded card": an activated ability's discard cost of one card.
   const mvDiscIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ifMvDiscarded":true');
   if (mvDiscIn(out.spell) || mvDiscIn(out.triggers) || mvDiscIn(out.statics) || out.activated.some((ab) => mvDiscIn(ab) && !ab.costs?.some((c) => c.kind === "discard" && c.n === 1))) bad = true;

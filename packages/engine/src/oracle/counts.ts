@@ -85,6 +85,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
   }
+  // Food Fight's granted "the number of permanents named Food Fight you control": the card's name, as written (compile
+  // keeps a quoted ability's own card name).
+  if ((m = /^the number of (permanents|creatures) named ([A-Z][\w'-]*(?: (?:[A-Z][\w'-]*|of|the|a))*) you control$/.exec(p))) {
+    const c = parseCount(`the number of ${m[1]} you control`, ctx);
+    if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
+    return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: m[2]!, text: `${c.count.filter.text} named ${m[2]}` } } };
+  }
   // Road Rage: "the number of Mounts and Vehicles you control": each permanent that's either, once.
   if ((m = /^the number of ([A-Z][a-z]+s) and ([A-Z][a-z]+s) you control$/.exec(p))) {
     const [a, b] = [parseCount(`the number of ${m[1]} you control`, ctx), parseCount(`the number of ${m[2]} you control`, ctx)];
@@ -525,8 +532,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^cards in all graveyards with the same name as (?:that|the) spell$/i.test(p) && ctx?.castSpell)
     return count({ kind: "cardsInGraveyard", who: { ref: "eachPlayer" }, sameNameAsCast: true });
   // "Cards named ~ in all graveyards" (Kindle), "for each card named ~ in each graveyard" (Rite of Flame), "in your graveyard".
-  if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
-    return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });
+  // Sound the Call's Wolf: "for each card named Sound the Call in each graveyard", another card's name (compile keeps it).
+  if ((m = /^[Cc]ards? named (~|[A-Z][\w'-]*(?: (?:[A-Z][\w'-]*|of|the|a))*) in (your|all|each) graveyards?$/.exec(p)))
+    return count({ kind: "cardsInGraveyard", who: { ref: m[2] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: m[1]!, text: `card named ${m[1]}` } });
   // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".

@@ -1397,6 +1397,10 @@ export function parseTargetPhrase(
       if (anyOf.some((f) => f?.kind !== "card")) return null;
       return { kind: "card", anyOf: anyOf.map((f) => ({ ...f!, owner: undefined })), ...(owner ? { owner } : {}), text };
     }
+    // Rekindling Phoenix's Elemental: "return target card named Rekindling Phoenix from your graveyard": that name (CR
+    // 201.2), another card's (compile keeps a quoted ability's own card name as written).
+    const namedCard = /^card named ([A-Z][\w'-]*(?:,? (?:[A-Z][\w'-]*|of|the|a))*)$/.exec(listed);
+    if (namedCard && !linkedExile && !Object.keys(extra).length) return { kind: "card", types: [], notTypes: [], notColors: [], named: namedCard[1]!, ...(owner ? { owner } : {}), text };
     // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
     if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".

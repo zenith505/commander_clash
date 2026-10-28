@@ -880,7 +880,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || (attach && st === "Aura"));
     // "Target artifact creature card" (Scarecrone): every one of its types (allTypes) is a permanent type.
     const types = spec?.types?.length ? spec.types : spec?.allTypes ?? [];
-    if (!what || !spec || (!artifactSub && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
+    // "Target card named Rekindling Phoenix" (its token's ability): the card that made the token, a permanent card.
+    const namedCard = !!spec?.named && !types.length && !spec.subtypes?.length;
+    if (!what || !spec || (!artifactSub && !namedCard && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
     if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
     // Aberrant Return: one, two, or three target cards, each "with an additional -1/-1 counter on it".

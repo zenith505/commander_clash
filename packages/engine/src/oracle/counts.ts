@@ -533,7 +533,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.spell && /^other spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", other: true });
   // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was
   // (rulings).
-  if (/^spells? you've cast this turn from anywhere other than your hand$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });
+  // Impending Flux: "the number of spells you've cast from anywhere other than your hand this turn" likewise.
+  if (/^spells? you've cast (?:this turn from anywhere other than your hand|from anywhere other than your hand this turn)$/i.test(p)) return count({ kind: "spellsCastThisTurn", notFromHand: true });
   // Rug of Smothering: "for each spell they've cast this turn", the player the trigger is about.
   if (ctx?.eventPlayer && /^spells? (?:they've|that player has) cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", eventPlayer: true });
   // Magebane Lizard: "the number of noncreature spells they've cast this turn", that one included (it's cast by now).

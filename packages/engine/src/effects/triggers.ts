@@ -1680,6 +1680,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       } else if (d.cascade && spell) {
         nextCastCascade = true;
         s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      } else if (d.storm) {
+        // "Has storm" (Crackling Spellslinger): likewise the spell's own storm ability (CR 702.40a).
+        if (spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: STORM_BODY, cause: ev.stackId });
       }
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}) });
     }

@@ -3,7 +3,7 @@
 import type { Effect, TokenSpec } from "../../abilities";
 import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
-import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES } from "../words";
+import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES, COLOR_WORDS } from "../words";
 import { parsePlayer, parseObject, parseKeywordList } from "../targets";
 import { parseSearchFilter } from "../search";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
@@ -161,6 +161,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(?:You )?[Cc]reate a (tapped )?Mutavault token$/.exec(s))) {
     const token: TokenSpec = { name: "Mutavault", named: true, colors: [], types: ["Land"], subtypes: [], keywords: [], abilities: "{T}: Add {C}.\n{1}: This token becomes a 2/2 creature with all creature types until end of turn. It's still a land." };
     return [{ type: "createToken", who: { ref: "you" }, n: 1, token, ...(m[1] ? { tapped: true } : {}) }];
+  }
+  // Mabel, Heir to Cragflame: "create Cragflame, a legendary colorless Equipment artifact token with "Equipped creature gets
+  // +1/+1 and has vigilance, trample, and haste" and equip {2}": a named legendary Equipment (CR 111.4, 205.4d, 702.6a).
+  if ((m = /^(?:You )?[Cc]reate ([A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (colorless|white|blue|black|red|green) Equipment artifact token with "([^"]+)" and equip (\{\d+\})$/.exec(s))) {
+    const text = m[3]!.replace(/^([^.]*[^.])$/, "$1.");
+    const colors = m[2] === "colorless" ? [] : [COLOR_WORDS[m[2]!]!];
+    const token: TokenSpec = { name: m[1]!, named: true, legendary: true, colors, types: ["Artifact"], subtypes: ["Equipment"], keywords: [], abilities: `${text}\nEquip ${m[4]!}` };
+    return compileQuoted(text) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
   }
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name

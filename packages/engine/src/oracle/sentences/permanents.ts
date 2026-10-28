@@ -716,6 +716,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, "another "), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
+  // Gatewatch Beacon: "you may move a loyalty counter from ~ onto that planeswalker": the one that entered (CR 122.5: none
+  // moves if ~ has none).
+  if ((m = new RegExp(`^Move (?:a|one) ${COUNTER} counter from ~ onto (it|that (?:planeswalker|creature|permanent))$`, "i").exec(s))) {
+    const to = parseObject(m[2]!, ctx);
+    return to?.ref === "subject" ? [{ type: "moveCounter", counter: counterKind(m[1]!), from: { ref: "self" }, to }] : null;
+  }
   // Scrounging Bandar: "you may move any number of +1/+1 counters from ~ onto another target creature": that kind only,
   // as many as you choose (none is choosing not to) as it resolves.
   if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto (another target .+)$`).exec(s))) {
@@ -811,12 +817,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Distribute up to X +1/+1 counters among any number of other target creatures, where X is ..." (Lathiel, rewritten in
   // triggers.ts): X worked out as the targets are chosen, then any number of them each getting at least 1, X in all at
   // most (rulings; CR 601.2d).
-  if ((m = /^[Dd]istribute up to X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures)$/.exec(s)) && ctx.whereX) {
-    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures$/, "creature"));
+  // Quirion Beastcaller: "When ~ dies, distribute X +1/+1 counters among any number of target creatures you control, where X
+  // is the number of +1/+1 counters on ~": all X, each target getting at least one, divided as it's put on the stack
+  // (rulings), X counted then (as ~ last existed).
+  if ((m = /^[Dd]istribute (up to )?X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures(?: you control)?)$/.exec(s)) && ctx.whereX) {
+    const upTo = !!m[1];
+    m.splice(1, 1);
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures/, "creature"));
     if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
     const first = ctx.targets.length;
     const x: AmountExpr = { count: { kind: "x" } };
-    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures$/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), atMost: true }, many: "any" });
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), ...(upTo ? { atMost: true as const } : {}) }, many: "any" });
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
     return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];

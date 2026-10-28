@@ -842,7 +842,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ownTrigger = item?.kind === "ability" && item.sourceId === sourceId && src.zone === "battlefield" && !!src.wasCast && src.enteredTurn === s.turn;
       // Hotheaded Giant: a permanent spell enters without a resolving item; it counts itself only if it was cast (rulings).
       const entering = !!cond.entering && !!src.wasCast && mine.some((c) => c.card === defOf(s, src).oracleId);
-      const itself = entering || (!!item && item.controller === you && (ownSpell || ownTrigger) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
+      // Sage of the Skies: "When you cast this spell, if you've cast another spell this turn": the spell on the stack, cast
+      // (not a copy), has counted itself, as it triggers and as the trigger resolves.
+      const castOnStack = src.zone === "stack" && s.stack.some((x) => x.kind === "spell" && !x.copy && x.objectId === sourceId && x.controller === you);
+      const itself = entering || ((castOnStack || (!!item && item.controller === you && (ownSpell || ownTrigger))) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
       return mine.length - (itself ? 1 : 0) > 0;
     }
     case "creatureDied":

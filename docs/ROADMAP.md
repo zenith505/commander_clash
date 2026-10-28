@@ -1,7 +1,7 @@
 # Roadmap
 
-26,962 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,941 of
+26,987 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,962 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -606,6 +606,26 @@ line blocks.
    way"), Expand the Sphere, Observed Stasis ("remove enchanted creature from combat"), Captain Howler, Ephara, God of
    the Polis ("if you had another creature enter ... last turn"), Cache Grab, Abundant Harvest, Endless Sands,
    Fumiko the Lowblood (bushido X), Historian's Boon ("the final chapter ability of a Saga you control triggers").
+   Round 195 went on from the top: "distribute X +1/+1 counters among any number of target creatures you control, where X
+   is the number of +1/+1 counters on ~" (Quirion Beastcaller, Undercity Upheaval), "If they can't, they lose 2 life and
+   you draw a card. Then repeat this process for an enchantment and a planeswalker" (Invoke Despair), "you may copy ~ and
+   may choose a new target for the copy" (Malicious Affliction), "copy this spell twice" (Bygone Marvels), a named
+   legendary Equipment token (Mabel), "put an instant, sorcery, or Faerie card from among the milled cards into your
+   hand" (Free the Fae, Speak Secrets, Silvan Rally), "move a loyalty counter from ~ onto that planeswalker" (Gatewatch
+   Beacon), bounty counters (Chevill, Termination Facilitator), "an instant or sorcery spell with mana value less than
+   or equal to ~'s power" from among the top seven (Velomachus Lorehold), "Whenever you scry, if ~ is tapped" (Legolas),
+   "Tap two other untapped Halflings you control" (Saradoc, Bladewheel Chariot), "mana value equal to the number of
+   charge counters on ~" (Chalice of the Void), "the next instant or sorcery spell you cast this turn has storm"
+   (Crackling Spellslinger, Storm, Force of Nature), Sage of the Skies (fix: "if you've cast another spell this turn"
+   counted itself), "spells you've cast from anywhere other than your hand this turn" (Impending Flux), "put it on the
+   bottom of its owner's library" (The Cauldron of Eternity), "for each legendary creature and planeswalker you control"
+   (Mobilized District) and "you may exile this card from your graveyard. If you do / When you do" as a spell is cast
+   (Kozilek's Return, Ugin's Binding).
+   Out after round 195 (looked at, not done): Tablet of the Guilds (two colors chosen), Puca's Covenant, Call of the
+   Death-Dweller ("put a deathtouch counter on either of them"), Myth Unbound (a trigger in the command zone), Siona,
+   Captain of the Pyleas ("becomes attached"), Soul Diviner (a chosen counter kind), Icingdeath, Frost Tyrant (its token
+   is named like part of it), Toggo, Goblin Weaponsmith (a quoted ability inside a quoted ability), Domineering Will,
+   Immerwolf, Frenzied Saddlebrute.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

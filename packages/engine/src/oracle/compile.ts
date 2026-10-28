@@ -455,7 +455,7 @@ function solveTrigger(d: CardDef, text: string): TriggeredAbility | null {
 
 /** The ability words (CR 207.2c), before a line of an instant or sorcery. */
 const SPELL_ABILITY_WORD = new RegExp(
-  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council"].join("|")}) — `,
+  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Corrupted", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council"].join("|")}) — `,
 );
 
 /** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
@@ -477,6 +477,7 @@ export function compile(d: CardDef): CompiledCard {
   let both: "teamwork" | "commander" | "kicked" | "control" | undefined;
   let kickedBoth = false;
   let bothIf: string | undefined;
+  let bothAny = false;
   // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
   let repeat = false;
   let cipher = false;
@@ -567,6 +568,15 @@ export function compile(d: CardDef): CompiledCard {
         if (other) {
           both = "control";
           bothIf = `?${other[1]}`;
+          return "Choose one —";
+        }
+        // Let's Play a Game: "Delirium — Choose one. If there are four or more card types among cards in your graveyard,
+        // choose one or more instead.": checked as the modes are chosen while it's cast (CR 601.2b), one to all of them.
+        const anyIf = isSpell ? /^(?:Delirium — )?Choose one\. If (there are four or more card types among cards in your graveyard), choose one or more instead\.$/.exec(l.trim()) : null;
+        if (anyIf) {
+          both = "control";
+          bothIf = `?${anyIf[1]}`;
+          bothAny = true;
           return "Choose one —";
         }
         if (!m) return l;
@@ -2495,6 +2505,15 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveSplitSecond ??= []).push(f);
       continue;
     }
+    // Soulfire Grand Master: "Instant and sorcery spells you control have lifelink"; Pestilent Spirit: "... have deathtouch".
+    // Damage those spells deal while it's on the battlefield (CR 702.15b, 702.2b).
+    const giveKw = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you control have (lifelink|deathtouch)\.$/.exec(line);
+    if (giveKw) {
+      const f = parseTargetPhrase(`${giveKw[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveKeywords ??= []).push({ filter: f, keyword: giveKw[2] === "lifelink" ? "Lifelink" : "Deathtouch" });
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;
@@ -3932,10 +3951,11 @@ export function compile(d: CardDef): CompiledCard {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
     const cond = bothIf !== undefined ? parseStaticCondition(bothIf.startsWith("?") ? bothIf.slice(1) : `you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
-    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended";
+    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended" || cond?.kind === "graveyardTypes";
     if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
       modal.both = both;
       modal.bothIf = cond!;
+      if (bothAny) modal.bothAny = true;
     } else if (both !== "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length === 2 && (both === "commander" || out.teamwork !== undefined)) modal.both = both;
     else if (out.spell) {
       delete out.spell;

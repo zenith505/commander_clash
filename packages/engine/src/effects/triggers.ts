@@ -2084,7 +2084,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.monarchsTurn || s.monarch === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
     fromEmblems(stepWatch);

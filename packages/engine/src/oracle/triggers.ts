@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
+import { allEffects, type AbilityBody, type BatchTrigger, type CounterKind, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
 import { COUNTER, differenceInHand, keywordOf, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
@@ -1129,6 +1129,16 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
   }
+  // Archivist of Gondor: "When your commander deals combat damage to a player, if there is no monarch, you become the
+  // monarch": the commander you own (CR 903.3), whoever controls it; an intervening "if" (CR 603.4).
+  const yourCmdr = /^When(?:ever)? your commander deals combat damage to a player, (?:if (there is no monarch|you're not the monarch), )?(.+)$/.exec(line);
+  if (yourCmdr) {
+    if (/\b(?:that player|defending player|that much|that many|it|its)\b/i.test(yourCmdr[2]!)) return "fail";
+    const body = parseBody(yourCmdr[2]!);
+    const ifCond = yourCmdr[1] ? parseStaticCondition(yourCmdr[1], { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    if (!body || ifCond === null) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: [], notTypes: [], notColors: [], commander: true, owner: "you", text: "your commander" }, anyone: true }, body, ...(ifCond ? { ifCond } : {}) };
+  }
   // Curse of Stalked Prey: "Whenever a creature deals combat damage to enchanted player, put a +1/+1 counter on that
   // creature": anyone's creature, the enchanted player's own too (rulings).
   const toEnch = /^Whenever a creature deals combat damage to enchanted player, (.+)$/.exec(line);
@@ -2177,6 +2187,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = cond && parseTrigger(`Whenever ~ ${attacksWhile[1]}, ${attacksWhile[3]}`);
     return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
   }
+  // Bristlebane Battler, Moonshadow: "Whenever ... while this creature has a -1/-1 counter on it, ...": a condition on the
+  // event, checked as it happens only (CR 603.2), not an intervening if (CR 603.4).
+  const whileCounter = /^(Whenever .+?) while ~ has an? ([+-]\d\/[+-]\d) counter on it, (.+)$/.exec(line);
+  if (whileCounter) {
+    const t = parseTrigger(`${whileCounter[1]}, ${whileCounter[3]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "selfCounter", counter: whileCounter[2] as CounterKind } } : "fail";
+  }
   // Wedding Ring: "Whenever an opponent who controls an artifact named ~ draws a card during their turn, you draw a card",
   // "... gains life during their turn, you gain that much life": any artifact with that name, not only the token copy
   // the first ability made (rulings); a trigger condition checked as the event happens (CR 603.2).
@@ -2474,7 +2491,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
   // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
   // Persistent Marshstalker: "... to the battlefield tapped and attacking" after "whenever you attack" (CR 508.4).
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
+  // Gate Colossus: "you may put ~ from your graveyard on top of your library", the same.
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?(?:return ~ from your graveyard to (?:your hand|the battlefield(?: tapped(?: and attacking)?(?: with a \+1\/\+1 counter on it)?| attached to that creature|, then attach it to that creature)?(?:\. It gains haste until end of turn)?)|put ~ from your graveyard on top of your library))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger;
   // so is "When enchanted land is put into a graveyard" (Genju of the Realm).
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted (?:creature|land|artifact|permanent) (?:dies|is put into a graveyard)$/.test(yard[1]!)) {
@@ -2709,6 +2727,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // Black Vise, The Rack: "At the beginning of the chosen player's upkeep, ..." of a permanent that chose a player as it
   // entered (CR 614.12): an "each upkeep" trigger only on that player's turn; "that player" and "their" are that player.
+  // Archivist of Gondor: "At the beginning of the monarch's end step, that player draws a card": an "each end step" trigger
+  // only on the turn of the player who's the monarch as it begins (CR 725), "that player" being them; no intervening "if"
+  // (CR 603.4), so it resolves whoever is the monarch by then.
+  const monarchStep = /^At the beginning of the monarch's end step, (.+)$/.exec(line);
+  if (monarchStep) {
+    const body = parseBody(monarchStep[1]!, { eventPlayer: true });
+    return body ? { event: "eachEndStep", body, monarchsTurn: true } : "fail";
+  }
   const chosenStep = /^At the beginning of the chosen player's upkeep, (.+)$/.exec(line);
   if (chosenStep) {
     const body = parseBody(chosenStep[1]!, { eventPlayer: true });

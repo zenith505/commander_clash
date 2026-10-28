@@ -86,7 +86,8 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   // Two to the power of it (Mathemagics); past 1024 the number can't matter, it's more than all the cards in the game.
   const v0 = a.pow2 ? 2 ** Math.min(Math.max(0, c), 10) : Math.floor(c / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
-  const n = a.signed ? v : Math.max(0, a.half ? (a.third || a.tenth ? ((d) => (a.half === "up" ? Math.ceil(v / d) : Math.floor(v / d)))(a.tenth ? 10 : 3) : halve(v, a.half)) : v);
+  const n0 = a.signed ? v : Math.max(0, a.half ? (a.third || a.tenth ? ((d) => (a.half === "up" ? Math.ceil(v / d) : Math.floor(v / d)))(a.tenth ? 10 : 3) : halve(v, a.half)) : v);
+  const n = a.max !== undefined ? Math.min(n0, a.max) : n0;
   return a.negate ? -n : n;
 }
 
@@ -265,6 +266,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     {
       // "For each card with the chosen name revealed this way" (Thought Hemorrhage): the name chosen as it resolves.
       const f = c.filter && bindChosen(c.filter, ctx.chosen);
+      if (c.differentManaValues) return new Set(refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.hand.map((id) => defMv(defOf(s, s.objects[id]!))))).size;
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.hand.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     }
     case "cardsInLibrary":
@@ -805,6 +807,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return colors.size;
     }
+    case "creatureTypesAmong": {
+      const types = new Set<string>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Creature")) continue;
+        if (ch.allCreatureTypes) return CREATURE_TYPES.size;
+        for (const t of ch.subtypes) if (CREATURE_TYPES.has(t)) types.add(t);
+      }
+      return types.size;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       const whose = c.whose ? refPlayers(s, c.whose, ctx) : [ctx.controller];
@@ -1055,6 +1067,8 @@ function describeCount(c: Count): string {
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";
+    case "creatureTypesAmong":
+      return "#creature types among your creatures";
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":

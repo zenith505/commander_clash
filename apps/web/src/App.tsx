@@ -1156,8 +1156,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (both && modal.both === "teamwork") return continueCast({ objectId: id, convoke, teamwork, modes: [0, 1], ...f });
         // "If this spell was kicked, choose any number instead": kicker is announced first, then the modes.
         if (modal.both === "kicked") return continueCast({ objectId: id, convoke, teamwork, ...f });
-        // "If you control a commander as you cast this spell, you may choose both instead."
-        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: 2 } } : body, convoke, teamwork, ...f });
+        // "If you control a commander as you cast this spell, you may choose both instead"; "choose one or more instead"
+        // (Let's Play a Game).
+        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: modal.bothAny ? modal.modes.length : 2 } } : body, convoke, teamwork, ...f });
       }
     }
     return continueCast({ objectId: id, convoke, teamwork, ...f });

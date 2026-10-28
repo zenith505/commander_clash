@@ -4163,6 +4163,14 @@ function spellCostFloor(s: GameState): number {
 /** Trinisphere is on the battlefield, untapped: a spell cast without paying its mana cost can still cost mana (costAtLeast). */
 export const costFloorInPlay = (s: GameState) => spellCostFloor(s) > 0;
 
+/** CR 205.4e: a legendary instant or sorcery can be cast only by a player who controls one of these. */
+const controlsLegendaryCreatureOrPlaneswalker = (s: GameState, pid: PlayerId) =>
+  s.battlefield.some((b) => {
+    const ob = obj(s, b);
+    const c = characteristics(s, ob);
+    return controllerOf(s, ob) === pid && c.supertypes.includes("Legendary") && (c.types.includes("Creature") || c.types.includes("Planeswalker"));
+  });
+
 export function castProblem(
   s: GameState,
   pid: PlayerId,
@@ -4366,6 +4374,9 @@ export function castProblem(
   // "Cast this spell only during combat" (CR 506.8, 601.3): also when it's cast during another's resolution (rulings).
   const only = compileCard(d).castOnly;
   if (only && !choices?.faceDown && !staticConditionNow(s, only, id, pid)) return `${d.name} can be cast only ${/Cast (?:this spell|~) only ([^.\n]+)\./.exec(d.oracleText ?? "")?.[1] ?? "at certain times"}`;
+  // A legendary instant or sorcery spell: only while you control a legendary creature or a legendary planeswalker (CR
+  // 205.4e), whatever lets you cast it; face down it's a creature spell with no supertypes (CR 708.2).
+  if (!choices?.faceDown && d.supertypes.includes("Legendary") && (isType(d, "Instant") || isType(d, "Sorcery")) && !controlsLegendaryCreatureOrPlaneswalker(s, pid)) return `you can cast ${d.name} only if you control a legendary creature or planeswalker`;
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).

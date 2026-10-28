@@ -312,6 +312,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Idol of False Gods: "it's a 0/0 creature in addition to its other types and it has annihilator 2".
   const itsA = /^it's (an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types)(?: and it (has .+))?$/.exec(statement);
   if (itsA) statement = `~ is ${itsA[1]}${itsA[2] ? ` and ${itsA[2]}` : ""}`;
+  // Weatherlight Compleated: "it's a Phyrexian creature in addition to its other types": a Vehicle, so with its printed
+  // power and toughness (CR 301.7c), keeping its other types (CR 205.1b).
+  const itsCreature = /^it's an? (?:([A-Z][a-z]+) )?creature in addition to its other types$/.exec(statement);
+  if (itsCreature && (!itsCreature[1] || CREATURE_TYPES.has(itsCreature[1])) && /^~ has [a-z]+ or more [a-z]+ counters on it$/.test(cond)) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: itsCreature[1] ? [itsCreature[1]] : [], supertypes: [] }], text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
   const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
@@ -397,6 +405,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if ((m = /^(Spells your opponents cast|Abilities your opponents activate) that target an? ([A-Za-z]+(?: or [a-z]+)?) you control cost \{(\d+)\} more to (cast|activate)$/.exec(text)) && (m[1]!.startsWith("Spells") === (m[4] === "cast"))) {
     const filter = parseTargetPhrase(m[2]!);
     return filter?.kind === "object" && !filter.controller ? { opponentsTargetTax: { n: Number(m[3]), filter: { ...filter, text: m[2]! }, ...(m[4] === "activate" ? { abilities: true as const } : {}) } } : "fail";
+  }
+  // Valiant Changeling: "This effect can't reduce the amount of mana this spell costs by more than {5}": the reduction is
+  // at most that much (CR 601.2f).
+  if ((m = /^(~ costs \{\d+\} less to cast for each .+)\. This effect can't reduce the amount of mana ~ costs by more than \{(\d+)\}$/.exec(text))) {
+    const base = parseCostChange(m[1]!);
+    return base && base !== "fail" && "less" in base && typeof base.less !== "number" ? { less: { ...base.less, max: Number(m[2]) } } : "fail";
   }
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
     const c = parseCount(m[2]!, null, true);

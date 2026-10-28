@@ -398,6 +398,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
   // if it's still there (CR 400.7).
   if (ctx.selfCard && !ctx.activated && /^[Pp]ut (?:it|~) onto the battlefield$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }];
+  // Gate Colossus: "Whenever a Gate you control enters, you may put ~ from your graveyard on top of your library": the card,
+  // if it's still there (CR 400.7).
+  if (ctx.selfCard && !ctx.activated && /^[Pp]ut ~ from your graveyard on top of your library$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }];
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.

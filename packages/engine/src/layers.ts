@@ -244,6 +244,8 @@ export interface Characteristics {
   /** Doran: assigns combat damage by its toughness, always or only while its toughness is greater than its power. */
   assignsToughness: boolean;
   assignsToughnessIfGreater: boolean;
+  /** Loot, the Anomaly: a negative power assigns that much combat damage as a positive number. */
+  assignsAbsPower: boolean;
   attackDespiteDefender: boolean;
   /** "Can attack as though it had haste" (Instill Energy, CR 302.6). */
   attackAsThoughHaste: boolean;
@@ -351,6 +353,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     mustBlock: false,
     assignsToughness: false,
     assignsToughnessIfGreater: false,
+    assignsAbsPower: false,
     attackDespiteDefender: false,
     attackAsThoughHaste: false,
     attackDespiteDefenderVs: false,
@@ -1631,6 +1634,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "assignsToughness":
       if (m.ifGreater) c.assignsToughnessIfGreater = true;
       else c.assignsToughness = true;
+      return;
+    case "assignsAbsPower":
+      c.assignsAbsPower = true;
       return;
     case "blockAdditional":
       c.extraBlocks += m.n;

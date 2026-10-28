@@ -1822,6 +1822,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       s.resolving!.revealedFromHand = shown.length;
+      if (!e.bottom) s.resolving!.revealedFromHandIds = shown;
       if (e.bottom) {
         // In the order picked, the first lowest (its owner orders them, CR 401.4).
         for (const id of [...shown].reverse()) moveObject(s, id, "library");
@@ -1879,10 +1880,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        if (e.until) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        // Face up (CR 406.3); "the exiled cards" of its leaves ability (Wormfang Behemoth).
+        if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       s.resolving!.exiledFromHand = ids.length;
-      log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand and may play them until the end of their next turn.` : `${p.name} has no cards in hand to exile.`);
+      log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand${e.until ? " and may play them until the end of their next turn" : ""}.` : `${p.name} has no cards in hand to exile.`);
       return;
     }
     case "putFromHand": {

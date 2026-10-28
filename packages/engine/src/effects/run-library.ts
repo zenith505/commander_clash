@@ -496,11 +496,33 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size });
       return;
     }
+    case "revealDrawn": {
+      // The card this ability just drew, as it is in the hand. If the draw was replaced, even by other draws, none of the
+      // rest applies (rulings on Sindbad).
+      const drawn = s.resolving!.drawReplaced ? [] : (s.resolving!.drawnThisWay ?? []).filter((id) => s.objects[id]?.zone === "hand");
+      const away: ObjectId[] = [];
+      for (const id of drawn) {
+        const o = obj(s, id);
+        log(s, `${player(s, o.owner).name} reveals ${defOf(s, o).name}.`);
+        if (!printedMatches(e.keep, defOf(s, o))) away.push(id);
+      }
+      for (const pid of new Set(away.map((id) => obj(s, id).owner))) discardCards(s, pid, away.filter((id) => obj(s, id).owner === pid), "", false, false, ctx.controller);
+      return;
+    }
     case "clash": {
       // CR 701.30b: "Choose an opponent. You and that opponent each clash." Both reveal at once, decide in APNAP order
       // whether to put their card on the bottom, then the cards move at the same time (701.30c).
       const r = s.resolving!;
       const c = ((r.scratch ??= {}).clash ??= {});
+      if (c.opp === undefined && e.with) {
+        // "Clash with defending player" (Marvo): that one, if they're still in the game.
+        const w = players(s, e.with, ctx).find((pid) => pid !== ctx.controller);
+        if (w === undefined) {
+          r.wonClash = false;
+          return;
+        }
+        c.opp = w;
+      }
       if (c.opp === undefined) {
         const opps = opponents(s, ctx.controller);
         if (!opps.length) {
@@ -545,7 +567,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const mine = c.revealed[ctx.controller];
       const theirs = c.revealed[c.opp];
       r.wonClash = !!mine && (!theirs || clashValue(s, mine) > clashValue(s, theirs));
+      r.clashOpp = c.opp;
       log(s, `${player(s, ctx.controller).name} ${r.wonClash ? "wins" : "doesn't win"} the clash.`);
+      // Both players clashed (CR 701.30b): "whenever you clash" triggers for each, and the opponent can win it too.
+      const oppWon = !!theirs && (!mine || clashValue(s, theirs) > clashValue(s, mine));
+      for (const pid of who) fireEvent(s, { type: "clashed", player: pid, won: pid === ctx.controller ? r.wonClash : oppWon });
+      // Done: another clash in this resolution (Hoarder's Greed) starts over.
+      delete r.scratch!.clash;
       return;
     }
     case "orderTop": {

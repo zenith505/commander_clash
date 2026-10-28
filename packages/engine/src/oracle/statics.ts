@@ -664,6 +664,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const [a, b] = [parseStaticCondition(m[1]!, st), parseStaticCondition(m[2]!, st)];
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
+  // Inventive Wingsmith: "if you haven't cast a spell from your hand this turn and ~ doesn't have a flying counter on it".
+  if ((m = /^(you haven't cast a spell from your hand this turn) and (~ doesn't have an? .+? counter on it)$/.exec(text))) {
+    const [a, b] = [parseStaticCondition(m[1]!, st), parseStaticCondition(m[2]!, st)];
+    return a && b ? { kind: "allOf", conds: [a, b] } : null;
+  }
   // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
   if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
@@ -951,12 +956,16 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^it attacked during your last turn$/.test(text) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", combat: "attackedLastTurn", text: "that attacked during your last turn" } };
   if (/^it attacked during its controller's last turn$/.test(text) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", combat: "attackedLastTurn", text: "that attacked during its controller's last turn" } };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  // Kjeldoran Home Guard: "if ~ attacked or blocked this combat".
+  if (/^~ attacked or blocked this combat$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisCombat" };
   // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
   if (/^it attacked this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackedThisTurn" };
   // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it
   // entered this turn" (Zurgo and Ojutai): about ~ itself.
   if (/^(?:~|it) attacked a battle this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackedBattleThisTurn" };
   if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
+  // Karakyk Guardian: "~ has hexproof as long as it hasn't dealt damage yet": since it became this object (CR 400.7).
+  if (/^(?:~|it) hasn't dealt damage yet$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "hasDealtDamage", not: true };
   // Cactuar: "if ~ didn't enter the battlefield this turn".
   if (/^~ didn't enter (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn", not: true };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come

@@ -368,6 +368,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!sc.drawQueue) {
         s.resolving!.drawnBefore = s.resolving!.drawnThisWay;
         s.resolving!.drawnThisWay = [];
+        s.resolving!.drawReplaced = undefined;
       }
       const queue = (sc.drawQueue ??= players(s, e.who, ctx));
       while (queue.length) {
@@ -395,6 +396,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const n = Number(sc.drawUpTo ?? 0);
         sc.drawUpTo = undefined;
         queue.shift();
+        // Truce: 2 life for each card fewer than two (a choice of fewer; drawing from an empty library still drew).
+        if (e.shortLife && n < e.n && !player(s, pid).lost) gainLife(s, pid, (e.n - n) * e.shortLife);
         if (n <= 0 || player(s, pid).lost) continue;
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
         if (!draw(s, pid, n)) return "paused";
@@ -605,10 +608,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
       log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);
       return;
-    case "cantBlockRule":
-      (s.cantBlockThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
-      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't block this turn.`);
+    case "cantBlockRule": {
+      // Eunuchs' Intrigues: the creatures that player controls now or later this turn, but the one they chose (a rule for
+      // the turn, not a change to the creatures there now, CR 611.2c).
+      const of = e.ofPlayer ? players(s, e.ofPlayer, ctx)[0] : undefined;
+      if (e.ofPlayer && of === undefined) return;
+      const chosen = e.exceptChosen ? objects(s, { ref: "created" }, ctx)[0] : undefined;
+      const filter = of !== undefined ? { ...e.filter, controlledBy: of } : e.filter;
+      (s.cantBlockThisTurn ??= []).push({ filter, controller: ctx.controller, ...(chosen ? { except: { id: chosen.id, zc: chosen.zoneChanges ?? 0 } } : {}) });
+      log(s, `${of !== undefined ? `${chosen ? "Other c" : "C"}reatures ${player(s, of).name} controls` : `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)}`} can't block this turn.`);
       return;
+    }
     case "cantBeBlockedRule":
       (s.cantBeBlockedThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't be blocked this turn.`);

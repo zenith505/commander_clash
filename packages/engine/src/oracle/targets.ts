@@ -178,6 +178,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (ctx.opponentsDiscarded && x === "each opponent who can't") return { ref: "opponentsNotDiscarded", filter: { kind: "card", text: "card" } };
   // "Choose an opponent. That player sacrifices a creature of their choice."
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
+  if (x === "that player" && ctx.clashOpp) return { ref: "clashOpponent" };
   // Stuffy Doll: "the chosen player" of "As ~ enters, choose a player" (compile checks there is one).
   if (x === "the chosen player") return { ref: "selfChosenPlayer" };
   // "~'s controller loses 2 life" (Xantcha): whoever controls the source, who may not be the ability's controller.
@@ -1456,8 +1457,10 @@ export function parseTargetPhrase(
     p = "creature";
   }
   // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
-  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you$/.test(p)) {
+  // Giant Trap Door Spider: "target creature without flying that's attacking you".
+  if (!inGraveyard && !extra.combat && /^creature (?:without flying )?(?:that's )?attacking you$/.test(p)) {
     extra.combat = "attackingYou";
+    if (/without flying/.test(p)) extra.notKeywords = [...(extra.notKeywords ?? []), "Flying"];
     p = "creature";
   }
   if (/ (an opponent controls|you don't control)$/.test(p)) {

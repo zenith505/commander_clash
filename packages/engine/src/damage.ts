@@ -112,6 +112,14 @@ export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal
  * Protection, shield counters and damage shields (prevention and redirection) are applied first, by
  * dealDamageBatch; `shielded` says the caller already did that.
  */
+/** The permanent dealing damage, if it's still the object it was, has now dealt damage (Karakyk Guardian). */
+function noteDealt(s: GameState, src: DamageSource) {
+  const o = src.id ? s.objects[src.id] : undefined;
+  if (!o || o.zone !== "battlefield" || o.hasDealtDamage || (src.ref?.object === o.id && src.ref.zc !== (o.zoneChanges ?? 0))) return;
+  o.hasDealtDamage = true;
+  invalidateCharacteristics(s);
+}
+
 export function dealDamage(
   s: GameState,
   src: DamageSource,
@@ -235,6 +243,7 @@ export function dealDamage(
       else fireEvent(s, ev);
     }
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n });
+    noteDealt(s, src);
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
@@ -270,6 +279,7 @@ export function dealDamage(
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
     fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n });
+    noteDealt(s, src);
     spellDealt(s, src, { player: p.id });
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;

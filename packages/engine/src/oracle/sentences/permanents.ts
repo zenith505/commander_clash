@@ -387,6 +387,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef | null = / this way$/.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
     return what ? [{ type: "exileIfDies", what }] : null;
   }
+  if (/^If a creature would die this turn, exile it instead$/.test(s)) return [{ type: "exileDyingThisTurn" }];
   // "Return target creature card from your graveyard to the battlefield. ... If it would leave the battlefield, exile it
   // instead of putting it anywhere else." (Whip of Erebos): a replacement effect for as long as it's that permanent (CR
   // 614.1a, 400.7), from the resolved ability, so it doesn't go away if the permanent loses its abilities.
@@ -426,6 +427,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const who = m[2] === "you control" ? { ref: "you" as const } : parsePlayer(m[2]!.replace(/ controls$/, ""), ctx);
     return who ? [{ type: "noUntapNext", who, types: m[1] === "Lands" ? ["Land"] : m[1] === "Creatures" ? ["Creature"] : ["Creature", "Land"] }] : null;
   }
+  // Pollen Lullaby: "If you win, creatures that player controls don't untap during the player's next untap step": the
+  // opponent clashed with, whatever creatures they control when that step comes, as for Misstep.
+  if (/^Creatures that player controls don't untap during the player's next untap step$/.test(s) && ctx.clashOpp) return [{ type: "noUntapNext", who: { ref: "clashOpponent" }, types: ["Creature"] }];
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -837,6 +841,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // Captivating Glance: "If you win, gain control of enchanted creature. Otherwise, that player gains control of enchanted
+  // creature.": the creature it's attached to as this resolves, for the rest of the game, even once the Aura is gone
+  // (rulings). Layer 2.
+  if ((m = /^(Gain|That player gains) control of enchanted creature$/.exec(s)) && !ctx.spell && (m[1] === "Gain" || ctx.clashOpp))
+    return [{ type: "continuous", what: { ref: "attached" }, mods: [{ kind: "control" }], duration: "game", ...(m[1] === "Gain" ? {} : { giveTo: { ref: "clashOpponent" as const } }) }];
   // Treasure Nabber: "gain control of that artifact until the end of your next turn", the trigger's subject; ends in the
   // cleanup step of your next turn (CR 514.2, 611.2a).
   if ((m = /^[Gg]ain control of it( until end of turn| until the end of your next turn)?$/.exec(s)) && ctx.subjectIt)

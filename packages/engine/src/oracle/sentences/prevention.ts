@@ -189,6 +189,33 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = m[3] ? protectedGroup(m[3]) : undefined;
     return by && to !== null ? rule({ ...(m[1] ? { combat: "only" as const } : {}), by: { filter: by }, ...(to ? { to } : {}) }) : null;
   }
+  // Mirrorwood Treefolk: "The next time damage would be dealt to ~ this turn, that damage is dealt to any target instead";
+  // Glarecaster: "... to ~ and/or you ...": the next damage event to either, from all its sources together (CR 615.8,
+  // rulings). If the new recipient is gone when the damage comes, ~ is dealt the damage (rulings, CR 614.9).
+  if ((m = /^The next time damage would be dealt to (~|~ and\/or you) this turn, that damage is dealt to (.+) instead$/.exec(s))) {
+    const redirect = destination(m[2]!, ctx);
+    return redirect ? rule({ to: { target: { ref: "self" }, ...(m[1] !== "~" ? { players: "you" as const } : {}) }, nextTime: true, redirect }) : null;
+  }
+  // Karona's Zealot: "all damage that would be dealt to it this turn is dealt to target creature instead" (it: ~, as it
+  // was turned face up); damage after the target is gone isn't redirected (rulings).
+  if ((m = /^[Aa]ll damage that would be dealt to (it|~) this turn is dealt to (target .+) instead$/.exec(s)) && (m[1] === "~" || !ctx.subjectIt)) {
+    const redirect = destination(m[2]!, ctx);
+    return redirect ? rule({ to: { target: { ref: "self" } }, redirect }) : null;
+  }
+  // Shimian Night Stalker: "All damage that would be dealt to you this turn by target attacking creature is dealt to ~
+  // instead" (from combat and abilities, rulings); Mirror Strike: "All combat damage ... by target unblocked creature is
+  // dealt to its controller instead": that creature as a source, for as long as it's that object (CR 609.7).
+  if ((m = /^All (combat )?damage that would be dealt to you this turn by target ((?:attacking|unblocked) creature) is dealt to (~|its controller) instead$/.exec(s))) {
+    const spec = parseTargetPhrase(m[2]!);
+    if (spec?.kind !== "object") return null;
+    const index = addTarget(ctx, spec);
+    const redirect: DamageRecipient = m[3] === "~" ? { ref: "self" } : { ref: "targetController", index };
+    return rule({ ...(m[1] ? { combat: "only" as const } : {}), to: { players: "you" }, by: { target: { ref: "target", index } }, redirect });
+  }
+  // Kjeldoran Royal Guard: "All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~
+  // instead": not if ~ has left the battlefield by then (rulings, CR 614.9).
+  if (/^All combat damage that would be dealt to you by unblocked creatures this turn is dealt to ~ instead$/.test(s))
+    return rule({ combat: "only", to: { players: "you" }, by: { filter: { kind: "object", types: ["Creature"], combat: "unblocked", text: "unblocked creatures" } }, redirect: { ref: "self" } });
   // "Prevent all damage target spell would deal this turn" (Hallow): that spell, and the permanent it becomes.
   if ((m = /^Prevent all damage target ((?:instant or sorcery )?spell) would deal this turn$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

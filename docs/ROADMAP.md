@@ -1,7 +1,7 @@
 # Roadmap
 
-26,816 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,862 of
+26,846 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,938 of 4,988 (98%), top 10,000: 8,867 of
 9,979 (88%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -1950,10 +1950,39 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   face-down creature" (Smoke Teller, Aven Soulgazer; only the looking player's log names it, CR 708.5). +32 (26,816 with rounds 188 and 189).
 - Skipped there, with reasons: Goblin Flotilla (a block trigger set up only for this combat by a pay-or-not); Infinite
   Authority (a delayed end step check on "if that creature was destroyed this way").
+- Round B22 (harder skipped cards, least played first): a color change on a spell (CR 112.4): "Target spell or
+  permanent becomes <color> / the color of your choice (until end of turn)" and "Target instant or sorcery spell
+  becomes ..." (Lifelace, Purelace, Chaoslace, Deathlace, Thoughtlace, Eight-and-a-Half-Tails, Blind Seer, Illusion //
+  Reality, Vodalian Mystic); the change rides the spell onto the battlefield as the permanent it becomes, with no end
+  for the Laces (CR 611.2a). Redirection shields (CR 614.9, 615.8): "The next 1/X damage that would be dealt to
+  enchanted creature / target legendary creature you control / target creature, planeswalker, or player ... is dealt
+  to any target / you / its owner / another target ... instead" (Ward of Piety, Vassal's Duty, Personal Incarnation,
+  Captain's Maneuver), "The next time damage would be dealt to ~ (and/or you) this turn, that damage is dealt to any
+  target instead" (Mirrorwood Treefolk, Glarecaster), "All (combat) damage that would be dealt to you this turn by
+  target attacking/unblocked creature / by unblocked creatures is dealt to ~ / its controller instead" (Shimian Night
+  Stalker, Mirror Strike, Kjeldoran Royal Guard) and "all damage that would be dealt to it this turn is dealt to target
+  creature instead" (Karona's Zealot). "Only ~'s owner may activate this ability" (CR 602.2; Personal Incarnation from
+  the owner's side while someone else controls it). Costs to block (CR 509.1c-e): "can't attack or block unless you
+  pay {2} / {1} for each +1/+1 counter on it / its controller pays {1} for each card in your hand" (Qal Sisma Behemoth,
+  Myr Prototype, Cowed by Wisdom); a block requirement never obliges paying (Lure), and the bot drops a block it can't
+  pay for. "Gains protection from the color of its controller's choice" (Pale Wayfarer, Wishmonger); "Another / Up to
+  one other target creature blocks it this turn if able" (Feral Contest, Monstrous Step); "until your next upkeep"
+  (Erhnam Djinn); "defending player chooses an untapped creature they control. That creature blocks ~ this turn if
+  able" (Crashing Boars); "that player reveals the top two cards of their library. You choose one of those cards and
+  put it into their graveyard" (Balshan Beguiler); "they lose 5 life and you sacrifice this enchantment" (Pillar Tombs
+  of Aku), with the world rule (CR 704.5k), which wasn't in the engine before. New browser tests: Qal Sisma Behemoth's
+  Block button, Personal Incarnation's owner-only ability on Ana's side, Pillar Tombs' choice. +30 (26,846 with rounds 188 and 189).
+- Skipped there, with reasons: Oppressive Rays and Gloom (an activation tax that also applies to mana abilities);
+  Gabriel Angelfire (rampage as a chosen ability); Goblin Sappers (one delayed trigger destroying two creatures);
+  Nissa's Defeat (its Nissa rider); Martyrdom (a granted ability with "Only you may activate"); Exalted Dragon,
+  Leviathan, Floodtide Serpent and Hollow Warrior (attack costs that aren't mana, which need a picker at declare
+  attackers); Premature Burial ("a creature that entered since your last turn ended"); Whipgrass Entangler and War
+  Cadence (not attempted yet). Known limit: the world rule can't see a tie, since two World permanents that enter at
+  once still get different timestamps (CR 704.5k puts both into the graveyard).
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid
-  Fire (a number chosen as a cost), Forethought Amulet; Exalted Dragon and Qal Sisma Behemoth (attack and block costs).
+  Fire (a number chosen as a cost), Forethought Amulet; Exalted Dragon (an attack cost that isn't mana).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
   cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Waxmane Baku (remove X ki counters), Storm Entity
@@ -1973,7 +2002,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch
   Paladin, Dragon's Disciple, Dream Salvage, Misinformation, Obscura Interceptor, Rewrite History, Wight, Frenzy Sliver,
   Mondo Gecko, Baru, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
-  Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Blind Seer, Lo and Li, Chisei,
+  Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Lo and Li, Chisei,
   Withercrown, Throne of Makindi, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
   Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
   Gomazoa, Mine Worker, Woolly Razorback, Information Dealer, Fractalize, Loxodon Lifechanter,

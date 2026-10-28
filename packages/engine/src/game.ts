@@ -549,7 +549,7 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && blocksMayCost(s, pd.player)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command" || costFloorInPlay(s)));
 }
 
 function requireNoPending(s: GameState) {
@@ -3115,6 +3115,13 @@ function beginStep(s: GameState, step: Step): void {
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
       (s.turnLog ??= {}).upkeeps = (s.turnLog.upkeeps ?? 0) + 1;
+      // "Until your next upkeep" (Erhnam Djinn): it ends as that player's next upkeep begins, before its triggers; for a
+      // player who left the game, at the next upkeep (CR 800.4m).
+      const ending = s.effects.filter((e) => e.duration === "yourNextUpkeep" && ((e.turnOf === ap && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)));
+      if (ending.length) {
+        s.effects = s.effects.filter((e) => !ending.includes(e));
+        invalidateCharacteristics(s);
+      }
       fireEvent(s, { type: "step", step: "upkeep", active: ap });
       break;
     }
@@ -6393,6 +6400,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Derevi: only from the command zone (rulings).
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
+  else if (ab.ownerOnly && o.owner !== pid) return `only ${d.name}'s owner may activate that ability`;
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   else if (ab.tap && characteristics(s, o).cantActivateTap) return `${d.name}'s activated abilities with {T} in their costs can't be activated`; // Serra Bestiary
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
@@ -8240,10 +8248,20 @@ export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: Pl
   return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : ownAttackTax(s, a.attacker);
 }
 
-/** What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d). */
-export function blockCost(s: GameState, n: number): string {
+/**
+ * What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d), and what
+ * blocking with each of `blockers` costs itself (Qal Sisma Behemoth, Cowed by Wisdom, CR 509.1d-e).
+ */
+export function blockCost(s: GameState, n: number, blockers: ObjectId[] = []): string {
   const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0);
-  return per && n ? `{${per * n}}` : "";
+  const own = blockers.reduce((t, id) => t + (s.objects[id]?.zone === "battlefield" ? characteristics(s, obj(s, id)).ownBlockTax : 0), 0);
+  const total = (n ? per * n : 0) + own;
+  return total ? `{${total}}` : "";
+}
+
+/** Could blocking cost `pid` mana now: every block (Archangel of Tithes), or one of their creatures' own (Qal Sisma Behemoth)? */
+export function blocksMayCost(s: GameState, pid: PlayerId): boolean {
+  return !!blockCost(s, 1) || creaturesOf(s, pid).some((o) => characteristics(s, o).ownBlockTax > 0);
 }
 
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
@@ -8740,7 +8758,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   const req = taxed || ((earlier + seen.size >= limit || mineEarlier + seen.size >= mineLimit) && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
-  const tax = blockCost(s, seen.size);
+  const tax = blockCost(s, seen.size, [...seen.keys()]);
   // Odric: the blocks' controller chooses whether to pay their cost; if they don't, another set must be proposed (rulings).
   if (tax && p.id !== chooser.id) {
     s.pending = {
@@ -8811,7 +8829,8 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
-  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
+  // One that has to pay to block (Qal Sisma Behemoth) is never obliged to (CR 509.1c).
+  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !characteristics(s, o).ownBlockTax && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
@@ -9299,6 +9318,19 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
           changed = true;
         }
       }
+    // World rule (704.5k): of two or more world permanents, all but the one that has been one for the shortest time go to
+    // the graveyard; on a tie, all of them. That time is read from when each entered (its timestamp).
+    const worlds = s.battlefield.filter((id) => characteristics(s, obj(s, id)).supertypes.includes("World"));
+    if (worlds.length > 1) {
+      const newest = Math.max(...worlds.map((id) => obj(s, id).timestamp));
+      const kept = worlds.filter((id) => obj(s, id).timestamp === newest);
+      for (const id of worlds) {
+        if (kept.length === 1 && id === kept[0]) continue;
+        log(s, `${characteristics(s, obj(s, id)).name} is put into the graveyard (world rule).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    }
     if (attachmentSBAs(s)) changed = true;
     if (battleSBAs(s)) changed = true; // 704.5v-y
     if (!s.pending && s.entersChoices?.length && askEntersChoice(s)) return;

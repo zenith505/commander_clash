@@ -14,6 +14,17 @@ import { parseGrants } from "../grants";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  let m: RegExpExecArray | null;
+  // The Laces: "Target spell or permanent becomes green": with no duration, for as long as it's that spell or that
+  // permanent (CR 611.2a, 105.3); a permanent spell's new color stays with the permanent it becomes (CR 112.4, 400.7a).
+  // Blind Seer, Eight-and-a-Half-Tails: "... becomes the color of your choice / white until end of turn" (rulings: the
+  // permanent a spell becomes keeps it until end of turn). Vodalian Mystic: "Target instant or sorcery spell becomes ...".
+  if ((m = /^[Tt]arget (spell or permanent|instant or sorcery spell) becomes (white|blue|black|red|green|the chosen color)( until end of turn)?$/.exec(s))) {
+    const perm = m[1] === "spell or permanent" ? parseTargetPhrase("permanent") : undefined;
+    const spell: TargetSpec | null = perm ? { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: "target spell or permanent" } : parseTargetPhrase(m[1]!);
+    const mods = parseBecomes(m[2]!);
+    return mods && spell?.kind === "spell" && (!perm || perm.kind === "object") ? [{ type: "continuous", what: { ref: "target", index: addTarget(ctx, spell) }, mods, duration: m[3] ? "endOfTurn" : "game" }] : null;
+  }
   // "Turn target face-down creature face up" (CR 708.8), "you may turn a face-down creature you control face up" (Ugin's
   // Mastery): chosen as it resolves (CR 608.2d), with no cost paid.
   let fu: RegExpExecArray | null;
@@ -57,7 +68,6 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const g = parseGroup(thisTurnTapped[1]!.charAt(0).toLowerCase() + thisTurnTapped[1]!.slice(1), true);
     return g && !g.other ? [{ type: "enterTappedUntil", filter: g.filter, thisTurn: true }] : null;
   }
-  let m: RegExpExecArray | null;
 
   // Maddening Hex: "Then attach ~ to another one of your opponents chosen at random."
   if (/^(?:[Tt]hen )?[Aa]ttach ~ to another one of your opponents chosen at random$/.test(s)) return [{ type: "attachToRandomOpponent" }];
@@ -374,6 +384,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject("target creature", ctx);
     const attacker = what && parseObject("target creature", ctx);
     return what?.ref === "target" && attacker?.ref === "target" ? [{ type: "mustBlockSource", what, attacker, thisTurn: true }] : null;
+  }
+  // Feral Contest: "Put a +1/+1 counter on target creature you control. Another target creature blocks it this turn if
+  // able"; Monstrous Step: "Up to one other target creature blocks it this turn if able": the target before as the
+  // attacker it must block if able (CR 509.1c), as for Rimehorn Aurochs.
+  if ((m = /^(Another|Up to one other) target creature blocks it this turn if able$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]!.optional) {
+    const prev = ctx.lastObjectTarget;
+    const spec = parseTargetPhrase("creature");
+    if (spec?.kind !== "object") return null;
+    const index = addTarget(ctx, { ...spec, distinctFrom: [prev], ...(m[1] !== "Another" ? { optional: true as const } : {}), text: `${m[1]!.toLowerCase()} target creature` });
+    return [{ type: "mustBlockSource", what: { ref: "target", index }, attacker: { ref: "target", index: prev }, thisTurn: true }];
   }
   // "Target creature blocks this turn if able": any attacking creature (CR 509.1c).
   if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s))) {
@@ -1113,10 +1133,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
   }
   // Thermal Flux: "Target snow permanent isn't snow until end of turn" (parseChanges).
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow) until (end of turn|your next turn)$/i.exec(s))) {
+  // Erhnam Djinn: "... gains forestwalk until your next upkeep": it ends as your next upkeep begins.
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+|isn't snow) until (end of turn|your next turn|your next upkeep)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
-    return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : m[3] === "your next upkeep" ? "yourNextUpkeep" : "yourNextTurn" }] : null;
   }
   // "Gain control of target artifact. Untap it. It gains haste." (Momo's Heist), "Create a token that's a copy of target
   // artifact. That token gains haste." (Cogwork Assembler), "Populate. The token created this way gains haste." (Determined

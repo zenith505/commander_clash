@@ -14,6 +14,7 @@ import {
   waitingOn,
   untapChoiceProblem,
   blockCost,
+  blocksMayCost,
   livingPlayers,
   abilityProblem,
   faceUpWays,
@@ -5379,13 +5380,15 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
  * left out, the last chosen first (the chump blocks and extras), with any attacker then left with too few blockers.
  */
 function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
-  if (a.type !== "declareBlockers" || !blockCost(s, 1)) return [a];
+  if (a.type !== "declareBlockers" || !blocksMayCost(s, pid)) return [a];
   let blocks = a.blocks;
   for (;;) {
     const blockers = [...new Set(blocks.map((b) => b.blocker))];
-    const taps = blockers.length ? planMana(s, pid, parseManaCost(blockCost(s, blockers.length))) : [];
+    const cost = blockCost(s, blockers.length, blockers);
+    const taps = cost ? planMana(s, pid, parseManaCost(cost)) : [];
     if (taps) return [...taps, { ...a, blocks }];
-    const drop = blockers[blockers.length - 1]!;
+    // Qal Sisma Behemoth: the last one chosen that costs something to block.
+    const drop = [...blockers].reverse().find((b) => !!blockCost(s, 1, [b]))!;
     blocks = blocks.filter((b) => b.blocker !== drop);
     blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);

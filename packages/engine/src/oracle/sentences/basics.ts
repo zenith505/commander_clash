@@ -1067,8 +1067,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Redirection shields (CR 614.9): "The next 1 damage that would be dealt to ~ this turn is dealt to target creature
   // you control instead" (the en-Kor), "... dealt this turn to target white creature you control is dealt to ~ instead".
   if ((m = new RegExp(`^The next ${NUMX} damage that would be dealt (this turn )?to (.+?)( this turn)? is dealt to (.+) instead$`, "i").exec(s)) && !m[2] !== !m[4]) {
-    const from = /^(~|any target|target .+)$/i.test(m[3]!) ? parseDamageRecipient(m[3]!, ctx) : null;
-    const to = from && /^(~|any target|any other target|another target|target .+|another target .+)$/i.test(m[5]!) ? parseDamageRecipient(m[5]!, ctx) : null;
+    // Ward of Piety: "... dealt to enchanted creature ..."; Vassal's Duty: "... is dealt to you instead"; Personal
+    // Incarnation: "... is dealt to its owner instead" (~'s owner, CR 108.3).
+    const from = /^(~|any target|target .+)$/i.test(m[3]!) ? parseDamageRecipient(m[3]!, ctx) : m[3] === "enchanted creature" && !ctx.spell ? parseObject(m[3], ctx) : null;
+    const to = !from ? null : /^(~|any target|any other target|another target|target .+|another target .+)$/i.test(m[5]!) ? parseDamageRecipient(m[5]!, ctx) : m[5] === "you" ? ({ ref: "you" } as const) : m[5] === "its owner" && m[3] === "~" ? ({ ref: "selfOwner" } as const) : null;
     return from && to ? [{ type: "redirectNext", n: amt(m[1]!), from, to }] : null;
   }
   // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.

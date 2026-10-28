@@ -69,6 +69,14 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     const spec: TargetSpec = { kind: "any", text: "any other target", ...(before.length ? { distinctFrom: before } : { notSource: true }) };
     return { ref: "anyTarget", index: addTarget(ctx, spec) };
   }
+  // Captain's Maneuver: "target creature, planeswalker, or player", "another target creature, planeswalker, or player": a
+  // player, creature or planeswalker (not a battle), the second one different from the first (CR 115.3).
+  const cpp = /^(another )?target creature, planeswalker, or player$/i.exec(p);
+  if (cpp) {
+    const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "player" ? [i] : []));
+    if (cpp[1] && !before.length) return null;
+    return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], text: p.toLowerCase(), ...(cpp[1] ? { distinctFrom: before } : {}) }) };
+  }
   // Lozhan, Dragons' Legacy: "any target that isn't a commander": any player, or a creature, planeswalker or battle that
   // isn't a commander (rulings).
   if (/^any target that isn't a commander$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", commander: false, text: p }) };

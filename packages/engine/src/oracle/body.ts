@@ -3066,10 +3066,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Each opponent may discard a card. If they don't, they lose 3 life." (Professor Onyx): a punisher, "loses 3 life
     // unless they discard a card".
     const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);
-    const mayLose = mayOut && new RegExp(`^If (?:they|that player|the player) (?:doesn't|don't), (?:they|that player|the player) loses? (\\d+) life$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Pillar Tombs of Aku: "... If that player doesn't, they lose 5 life and you sacrifice ~": your part after theirs.
+    const mayLose = mayOut && new RegExp(`^If (?:they|that player|the player) (?:doesn't|don't), (?:they|that player|the player) loses? (\\d+) life(?: and you (sacrifice ~))?$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (mayOut && mayLose) {
       const fx = parseOne(`${mayOut[1]!} loses ${mayLose[1]!} life unless they ${mayOut[2]!}s ${mayOut[3]!}`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "punisher") return null;
+      if (mayLose[2]) {
+        const more = parseOne(capital(mayLose[2]), ctx);
+        if (more?.length !== 1 || more[0]!.type !== "sacrifice") return null;
+        fx[0] = { ...fx[0]!, effects: [...fx[0]!.effects, ...more], penalty: `Lose ${mayLose[1]} life ({you} sacrifices ~)` };
+      }
       effects.push(...fx);
       si++;
       continue;
@@ -5380,6 +5386,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Balshan Beguiler: "that player reveals the top two cards of their library. You choose one of those cards and put it
+    // into their graveyard.": the player dealt the damage reveals them, you pick one, the other stays on top.
+    if (!dig && /^[Tt]hat player reveals the top two cards of their library$/.test(s) && /^You choose one of those cards and put it into their graveyard\.?$/.test(sentences[si + 1] ?? "") && ctx.eventPlayer && !ctx.spell) {
+      effects.push({ type: "dig", n: 2, count: 1, upTo: false, required: true, into: "graveyard", rest: "keep", reveal: true, library: { ref: "eventPlayer" } });
+      si++;
+      continue;
+    }
     // Eye Spy: "Look at the top card of target player's library. You may put that card into their graveyard.": you choose
     // (it's not surveil, CR 701.25, as only the controller of the library surveils).
     const oneLook = !dig && /^[Ll]ook at the top card of (target player|target opponent)'s library$/.exec(s);
@@ -6741,6 +6754,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "pick" || prev.action !== "choose" || prev.n !== 1 || prev.who.ref !== "target" || effects.length !== 1) return null;
       effects.push({ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], text: "other creatures they control" }, ofPlayer: prev.who, exceptChosen: true });
+      continue;
+    }
+    // Crashing Boars: "Whenever ~ attacks, defending player chooses an untapped creature they control. That creature blocks
+    // ~ this turn if able.": that player picks as it resolves (not targeted), and the one picked must block ~ if able (CR
+    // 509.1c).
+    if (/^[Dd]efending player chooses an untapped creature they control$/.test(s) && /^That creature blocks ~ this turn if able\.?$/.test(sentences[si + 1] ?? "") && ctx.defending && !ctx.spell && !effects.length) {
+      const filter = pickFilter("untapped creature");
+      if (!filter) return null;
+      effects.push({ type: "pick", who: { ref: "eventPlayer" }, filter, n: 1, action: "choose" }, { type: "mustBlockSource", what: { ref: "created" }, thisTurn: true });
+      si++;
       continue;
     }
     // Truce: "Each player may draw up to two cards. For each card less than two a player draws this way, that player gains 2
@@ -8447,6 +8470,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (effects.some((x) => x.type === "choose" && x.choice === "cardType")) return null;
       effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) });
       s = s.replace("the card type of your choice", "the chosen card type");
+    }
+    // Pale Wayfarer, Wishmonger: "Target creature gains protection from the color of its controller's choice until end of
+    // turn": that creature's controller chooses as it resolves (CR 608.2d), the target being the next one.
+    if (/^Target creature gains protection from the color of its controller's choice until end of turn$/.test(s) && !effects.some((x) => x.type === "choose")) {
+      effects.push({ type: "choose", choice: "color", who: { ref: "targetController", index: ctx.targets.length } });
+      s = s.replace("the color of its controller's choice", "the chosen color");
     }
     if (/ gains? protection from the color of your choice\b/.test(s)) {
       effects.push({ type: "choose", choice: "color" });

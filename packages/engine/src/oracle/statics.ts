@@ -2151,9 +2151,16 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // Brainwash: "Enchanted creature can't attack unless its controller pays {3}"; Phyrexian Marauder: "~ can't attack unless
   // you pay {1} for each +1/+1 counter on it": paid as attackers are declared, whoever it attacks (CR 508.1g-h).
-  const ownTax = /^(Enchanted creature|~) can't attack unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it)?$/.exec(text);
-  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) : / its controller pays /.test(text)))
-    return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n: Number(ownTax[2]), ...(ownTax[3] ? { perPlusOne: true as const } : {}) }], text: line };
+  // Qal Sisma Behemoth: "~ can't attack or block unless you pay {2}"; Oppressive Rays: "Enchanted creature can't attack or
+  // block unless its controller pays {3}"; Myr Prototype: "... {1} for each +1/+1 counter on it"; Cowed by Wisdom: "...
+  // {1} for each card in your hand" (the Aura's controller's hand, counted as the cost is worked out): blocking costs it
+  // too, paid as blockers are declared (CR 509.1d-e).
+  const ownTax = /^(Enchanted creature|~) can't attack( or block)? unless (?:its controller pays|you pay) \{(\d+)\}( for each \+1\/\+1 counter on it| for each card in your hand)?$/.exec(text);
+  if (ownTax && (ownTax[1] === "~" ? / you pay /.test(text) : / its controller pays /.test(text)) && (ownTax[4] !== " for each card in your hand" || ownTax[1] !== "~")) {
+    const per = ownTax[4] === " for each +1/+1 counter on it" ? { perPlusOne: true as const } : ownTax[4] ? { amount: { count: { kind: "cardsInHand", who: { ref: "you" } } } as Amount } : {};
+    const n = Number(ownTax[3]);
+    return { affects: { kind: ownTax[1] === "~" ? "self" : "attached" }, mods: [{ kind: "ownAttackTax", n, ...per }, ...(ownTax[2] ? [{ kind: "ownBlockTax" as const, n, ...per }] : [])], text: line };
+  }
   // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
   const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);
   if (counterTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, perCounter: true, ...(counterTax[1] ? { planeswalkers: true as const } : {}) }], text: line };

@@ -1,6 +1,6 @@
 # Roadmap
 
-27,007 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,025 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,943 of
 9,979 (89%).
 
@@ -2171,7 +2171,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   when one of those tied can be destroyed, rulings) and "~ deals 2 damage to the creature with the least toughness"
   (Purging Scythe): click one of those tied (browser test); bots pick an opponent's, the most valuable. "When there are
   no creatures on the battlefield, sacrifice ~" (CR 603.8; also Task Mage Assembly). Fixed: a discard of 0 cards no
-  longer asks for one. +18 (26,932 of 31,936).
+  longer asks for one. +18 (27,025 of 31,936 with Lane A round 194).
 - Known limit there: the "no creatures" state trigger is checked when a player would get priority, so a creature
   flickered in the middle of a resolution (rulings on Drop of Honey with Momentary Blink) doesn't make it trigger.
 - Round B27 (harder skipped cards, least played first): negative printed power and toughness (Char-Rumbler, Spinal

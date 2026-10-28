@@ -111,6 +111,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
   switch (c.kind) {
     case "x":
       return ctx.x ?? 0;
+    case "chosenNumber":
+      return ctx.chosen?.number ?? 0;
     case "eventAmount":
       return ctx.event?.amount ?? 0;
     case "castShortfall": {
@@ -379,6 +381,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.creaturesToYard ?? []).filter((d) => d.owner === ctx.controller && !(c.nontoken && d.token)).length;
     case "diedThisTurn":
       if (c.subtype) return (s.diedTypesThisTurn ?? []).filter((d) => (d.all || d.subtypes.includes(c.subtype!)) && (!c.yours || d.controller === ctx.controller)).length;
+      // A changeling is every creature type (CR 702.73a), so never "non-Skeleton".
+      if (c.notSubtype) return (s.diedTypesThisTurn ?? []).filter((d) => !(d.all || d.subtypes.includes(c.notSubtype!)) && (!c.yours || d.controller === ctx.controller)).length;
       return ((c.nontoken ? s.nontokenDiedThisTurn : s.diedThisTurn) ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "plusOnesPutThisTurn":
       return (s.turnLog?.plusOnes ?? [])
@@ -809,6 +813,8 @@ function describeCount(c: Count): string {
   switch (c.kind) {
     case "x":
       return "X";
+    case "chosenNumber":
+      return "the chosen number";
     case "permanents":
       return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":
@@ -933,7 +939,7 @@ function describeCount(c: Count): string {
     case "creaturesToYourGraveyard":
       return `#${c.nontoken ? "nontoken " : ""}creatures put into your graveyard from the battlefield this turn`;
     case "diedThisTurn":
-      return `#${c.nontoken ? "nontoken " : ""}${c.subtype ?? "creature"}s that died${c.yours ? " under your control" : ""} this turn`;
+      return `#${c.nontoken ? "nontoken " : ""}${c.notSubtype ? `non-${c.notSubtype} creature` : (c.subtype ?? "creature")}s that died${c.yours ? " under your control" : ""} this turn`;
     case "plusOnesPutThisTurn":
       return `#+1/+1 counters ${c.byYou ? "you've " : ""}put on ${c.self ? "~" : `${c.onYours ? "your " : ""}${c.creature ? "creatures" : "permanents"}`} this turn`;
     case "tokensCreatedThisTurn":

@@ -6942,7 +6942,7 @@ function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
   const pend = s.pending;
   if (pend?.kind !== "chooseModes" || pend.player !== p.id) throw new RulesError("no modes to choose");
   const t = s.triggerQueue[0]!;
-  const problem = modesProblem(s, triggerBody(s, t), modes, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), false, t.sourceId);
+  const problem = modesProblem(s, triggerBody(s, t), modes, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), !!t.both, t.sourceId);
   // Choosing no modes is allowed for "choose up to"; the ability is then removed (CR 603.3c).
   if (problem && !(modes.length === 0 && pend.min === 0)) throw new RulesError(problem);
   t.modes = modes;

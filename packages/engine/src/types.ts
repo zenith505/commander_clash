@@ -956,6 +956,8 @@ export interface DelayedTrigger {
   dies?: true;
   /** With `dies`: "When it dies under your control this turn" (Desperate Measures): only while `controller` controlled it as it died. */
   underControl?: true;
+  /** With `dies`: "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only one `controller` owns. */
+  ownedByController?: true;
   /**
    * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
    * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7). Also an Aura's
@@ -987,6 +989,8 @@ export interface PendingTrigger {
   index: number; // which of the card's triggered abilities
   sourceZc?: number; // the source's zoneChanges when it triggered
   modes?: number[]; // once chosen, for a modal trigger (CR 603.3c)
+  /** "If you control a commander, you may choose both instead" was true as it was put on the stack (AbilityBody.modal.bothIf). */
+  both?: true;
   cause?: string; // the stack item that triggered it, see StackItem.cause
   /** Firebender Ascension: this trigger's tag, and the tag of the trigger whose stack item becomes `cause` once it's put on the stack. */
   tag?: string;
@@ -1540,7 +1544,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true; /** It can be cast as though it had flash (Progenitor's Icon). */ flash?: true; /** The X of the spell that made it (Storm King's Thunder's "copy that spell X times"). */ x?: number }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made

@@ -1346,7 +1346,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
     m.set(e.src, (m.get(e.src) ?? 0) + e.dealt);
     bySource.set(e.to.object, m);
   }
-  for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller });
+  for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller, ...(src.id ? { srcId: src.id } : {}), ...(combat ? { combat: true as const } : {}) });
   const toPlayers = playerBatch;
   playerBatch = outer;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount, combat });

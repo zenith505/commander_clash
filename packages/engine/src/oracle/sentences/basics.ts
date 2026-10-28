@@ -193,8 +193,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Fertilid: "Target player searches their library for a basic land card, puts it onto the battlefield tapped, then
   // shuffles": that player searches, and must (CR 701.23).
   // Restorative Technique: "Target player gains 2 life, then searches ...": "That player searches ..." then.
-  if ((m = /^([Tt]arget player|[Tt]arget opponent|That player) searches their library for (.+?), puts (it|that card) onto the battlefield( tapped)?, then shuffles$/.exec(s))) {
-    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+  // Magmatic Hellkite: "destroy target nonbasic land an opponent controls. Its controller searches their library for a
+  // basic land card, puts it onto the battlefield tapped with a stun counter on it, then shuffles": that land's controller
+  // (as it last existed, CR 608.2h) must search (rulings).
+  if ((m = /^([Tt]arget player|[Tt]arget opponent|That player|Its controller) searches their library for (.+?), puts (it|that card) onto the battlefield( tapped(?: with a stun counter on it)?)?, then shuffles$/.exec(s))) {
+    const who = m[1] === "Its controller" ? (ctx.lastObjectTarget !== undefined && ctx.targets.length === 1 ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
     const fx = who && parseSearch(`Search your library for ${m[2]!}, put ${m[3]} onto the battlefield${m[4] ?? ""}, then shuffle`);
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ ...fx[0]!, who: who! }];

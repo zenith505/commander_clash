@@ -433,6 +433,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the amount of life you gained this turn or the amount of life you lost this turn, whichever is greater$/i.test(p)) return count({ kind: "greaterOf", of: [{ kind: "lifeGainedThisTurn" }, { kind: "lifeLostThisTurn", who: { ref: "you" } }] });
   // Children of Korlis: "the life you've lost this turn", all of it, whatever you gained (rulings).
   if (!each && /^the (?:total )?(?:amount of )?life you(?:'ve| have)? lost this turn$/i.test(p)) return count({ kind: "lifeLostThisTurn", who: { ref: "you" } });
+  // Tainted Sigil: "the total life lost by all players this turn": each player's (still in the game, CR 102.1), you too,
+  // however they lost it and whatever they gained (rulings).
+  if (!each && /^the total life lost by all players this turn$/i.test(p)) return count({ kind: "lifeLostThisTurn", who: { ref: "eachPlayer" } });
   if (!each && /^the total amount of noncombat damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsNoncombatDamage" });
   // Notorious Throng: all the damage dealt this turn to players who are your opponents, by any source (rulings).
   if (!each && /^the (?:total )?(?:amount of )?damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsDamage" });

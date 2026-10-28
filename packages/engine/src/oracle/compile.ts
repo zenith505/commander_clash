@@ -4337,7 +4337,8 @@ function joinModes(lines: string[]): string[] {
     if (!/^\s*•/.test(line)) close();
     const prev = out[out.length - 1];
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
-    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random)?\.$/i.test(prev);
+    // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
+    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
     else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /you may choose two\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);

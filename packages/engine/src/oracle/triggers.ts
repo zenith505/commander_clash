@@ -2703,6 +2703,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damagesYou) return damagesYou;
   const damages = parseDamagesCreatureTrigger(line);
   if (damages) return damages;
+  // Vraska the Unseen: "whenever a creature deals combat damage to ~, destroy that creature": once for each creature
+  // dealing it combat damage, which "that creature" means.
+  const damagedBy = /^Whenever a creature deals combat damage to ~, (.+)$/.exec(line);
+  if (damagedBy) {
+    const body = parseBody(damagedBy[1]!, { subjectIt: true });
+    return body ? { event: "creatureDealsCombatDamageToSelf", body } : "fail";
+  }
   const enters = parseEntersTrigger(line);
   if (enters) return enters;
   const dealt = parseIsDealtDamageTrigger(line);
@@ -2953,6 +2960,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // Elvish Mariner: "Whenever you scry, tap up to X target nonland permanents, where X is the number of cards looked at
   // while scrying this way": how many cards that scry looked at (CR 701.22a), known as it triggers, so it can count
   // targets (CR 601.2c, 603.3d; TriggeredAbility.eventX).
+  // Celeborn the Wise: "~ gets +1/+1 until end of turn for each card looked at while scrying this way": +X/+X, the same X.
+  const scryEach = /^Whenever you scry, ~ gets \+1\/\+1 until end of turn for each card looked at while scrying this way\.$/.test(line);
+  if (scryEach) return parseTrigger("Whenever you scry, ~ gets +X/+X until end of turn, where X is the number of cards looked at while scrying this way.");
   const scryX = /^Whenever you scry, (.+), where X is the number of cards looked at while scrying this way\.$/.exec(line);
   if (scryX) {
     const body = parseBody(`${scryX[1]}.`, { ownX: true });

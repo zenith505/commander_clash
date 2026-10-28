@@ -4,7 +4,7 @@ import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec,
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
-import { fitMany, withModes } from "../modes";
+import { fitMany, modeRange, withModes } from "../modes";
 import { compileCard, compileGranted } from "../oracle";
 import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
@@ -229,7 +229,7 @@ export type TriggerSourceEvent =
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number; /** Combat damage (a batch is all combat damage or none, CR 510.2). */ combat?: true }
   /** The damage one source dealt a permanent in one event (Phyrexian Obliterator), and that source's controller. */
-  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId }
+  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId; /** The permanent dealing it. */ srcId?: ObjectId; combat?: true }
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
@@ -717,6 +717,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.thisTurn !== undefined && d.thisTurn !== s.turn) continue;
       if (d.dies && !ev.wasCreature) continue;
       if (d.underControl && ev.controller !== d.controller) continue;
+      if (d.ownedByController && o.owner !== d.controller) continue;
       if (d.to?.includes(ev.to))
         s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
@@ -1569,6 +1570,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "dealtDamageBySource") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealtDamageBySource", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
+    // "Until your next turn, whenever a creature deals combat damage to ~, destroy that creature" (Vraska the Unseen): once
+    // for each creature dealing it combat damage (only creatures deal combat damage, CR 510.1), that creature the subject.
+    const dealer = ev.combat && ev.srcId ? s.objects[ev.srcId] : undefined;
+    if (o?.zone === "battlefield" && dealer) {
+      add(o, controllerOf(s, o), (e) => e === "creatureDealsCombatDamageToSelf", undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
+      fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "creatureDealsCombatDamageToSelf", triggers, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, player: ev.by }), o);
+    }
   } else if (ev.type === "combatDamageToPlayer" && ev.planeswalker) {
     // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
     const o = obj(s, ev.id);
@@ -1644,7 +1652,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         nextCastCascade = true;
         s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
       }
-      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId, ...(d.x ? { x: d.x } : {}) });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked, ev.manaSpent ? { manaSpent: ev.manaSpent } : undefined); // Prossh: the mana spent on it (CR 601.2h)
@@ -2064,13 +2072,19 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       // "Choose one that hasn't been chosen": not one this object has had chosen (rulings on Demonic Pact).
       const legal = legalModes(s, printed, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       const n = legal.filter(Boolean).length;
-      if (n === 0 || n < printed.modal.min) {
+      // "Choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program): checked now,
+      // as it's put on the stack (rulings on Prophetic Titan); kept for the answer (chooseTriggerModes).
+      if (printed.modal.bothIf && staticConditionNow(s, printed.modal.bothIf, t.sourceId, t.controller)) t.both = true;
+      const [min, max] = modeRange(printed, !!t.both);
+      // "Choose both instead": both, or the one that can be chosen (CR 603.3c).
+      if (t.both && printed.modal.bothExactly && n > 0) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
+      else if (n === 0 || n < min) {
         log(s, `${def.name}'s ability has no mode that can be chosen and is removed.`);
         s.triggerQueue.shift();
         continue;
       }
       // The only possible choice, unless choosing none is one too ("you may choose two").
-      if (n === printed.modal.min && !printed.modal.optional) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
+      else if (n === min && !printed.modal.optional) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
       else if (printed.modal.random) {
         // "Choose one at random": among the modes that can be chosen (rulings on Umaro), as it's put on the stack.
         const can = legal.flatMap((ok, i) => (ok ? [i] : []));
@@ -2078,7 +2092,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         log(s, `${def.name}'s ability chooses at random: ${printed.modal.modes[t.modes[0]!]!.text.replace(/~/g, def.name)}`);
       } else {
         const modes = printed.modal.modes.map((m) => m.text);
-        s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min: printed.modal.min, max: printed.modal.max, modes, legal, ...(printed.modal.optional ? { optional: true as const } : {}) };
+        s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min, max, modes, legal, ...(printed.modal.optional ? { optional: true as const } : {}) };
         return added;
       }
     }

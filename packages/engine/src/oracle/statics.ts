@@ -973,6 +973,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // White Glove Gourmand: "if another Human died under your control this turn": of that type as it last existed. "Another"
   // can't be the permanent with the ability, which hasn't died while it's on the battlefield.
   if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
+  // Cult Conscript: "if a non-Skeleton creature died under your control this turn": not of that type as it last existed,
+  // a token too (rulings).
+  if ((m = /^a non-([A-Z][a-z]+) creature died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, yours: true } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
@@ -1042,6 +1045,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Anya, Merciless Angel: "an opponent's life total is less than half their starting life total" (CR 903.7).
   if (/^an opponent's life total is less than half their starting life total$/.test(text)) return { kind: "life", max: Math.ceil(STARTING_LIFE / 2) - 1, opponent: true };
   if ((m = /^each player has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), everyone: true };
+  // Game Over: "if a player's life total is less than or equal to half their starting life total" (CR 903.7: 20).
+  if (/^a player's life total is less than or equal to half their starting life total$/.test(text)) return { kind: "life", max: Math.floor(STARTING_LIFE / 2), anyone: true };
   // Elenda, Saint of Dusk: "your life total is at least 10 greater than your starting life total".
   if ((m = /^(?:you have at least (\d+) life more than|your life total is at least (\d+) greater than) your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1] ?? m[2]) };
   if ((m = /^your life total is (greater than or equal to|greater than|less than or equal to|less than) (half )?your starting life total$/.exec(text))) {
@@ -1130,7 +1135,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^it has no ${COUNTER} counters on it$`).exec(text)) && st.affects.kind === "self") return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
-  if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
+  // Ayara's Oathsworn: "if it has fewer than four +1/+1 counters on it", "if it has exactly four +1/+1 counters on it".
+  if ((m = new RegExp(`^(?:~|it) has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
+  if ((m = new RegExp(`^(?:~|it) has exactly ${NUM} ${COUNTER} counters? on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")) && (num(m[1]!) === 1) === !/counters on/.test(text)) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!), max: num(m[1]!) };
   // Faithbound Judge: "if ~ has two or fewer judgment counters on it".
   if ((m = new RegExp(`^~ has ${NUM} or fewer ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) };
   // Warden of the Inner Sky: "as long as this creature has three or more counters on it": of every kind together.

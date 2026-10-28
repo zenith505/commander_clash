@@ -855,6 +855,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const fits = (life: number) => (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
       if (cond.opponent) return s.players.some((p) => p.id !== you && !p.lost && fits(p.life));
       if (cond.everyone) return s.players.every((p) => p.lost || fits(p.life));
+      if (cond.anyone) return s.players.some((p) => !p.lost && fits(p.life));
       return fits(s.players[you]?.life ?? 0);
     }
     case "scriedThisTurn":

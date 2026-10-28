@@ -2031,6 +2031,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "21695c70-f746-4d77-b6d3-e2713a5c929e",
+  "name": "Bogslither's Embrace",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, blight 1 or pay {3}. (To blight 1, put a -1/-1 counter on a creature you control.)\nExile target creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Blight"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2bd111bb-ce02-414c-b5b7-e0e037d8d96b",
   "name": "Bolas's Citadel",
   "manaCost": "{3}{B}{B}{B}",
@@ -3053,6 +3081,34 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "54421e69-d79e-4c2e-8ce6-96994d168835",
+  "name": "Cinder Strike",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may blight 1. (You may put a -1/-1 counter on a creature you control.)\nCinder Strike deals 2 damage to target creature. It deals 4 damage to that creature instead if this spell's additional cost was paid.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Blight"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "df2738fe-9cd1-4347-8808-105fcfde1190",
@@ -4721,6 +4777,32 @@
   "set": "5dn",
   "releasedAt": "2004-06-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "81338d64-8fc3-41ac-afc8-e2a79df1159b",
+  "name": "Dream Cache",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw three cards, then put two cards from your hand both on top of your library or both on the bottom of your library.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7952,6 +8034,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "56940b6c-90ab-491b-a88a-4cd4a8adfbdb",
+  "name": "Heavenly Blademaster",
+  "manaCost": "{5}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying, double strike\nWhen this creature enters, you may attach any number of Auras and Equipment you control to it.\nOther creatures you control get +1/+1 for each Aura and Equipment attached to this creature.",
+  "power": "3",
+  "toughness": "6",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8bcdb107-3827-4280-9e5e-7f1e771ef0c5",
   "name": "Helica Glider",
   "manaCost": "{2}{W}",
@@ -9421,6 +9536,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "69d6b906-5461-4eba-8667-dbb8c0ce3fcb",
+  "name": "Killing Wave",
+  "manaCost": "{X}{B}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each creature, its controller sacrifices it unless they pay X life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "inr",
+  "releasedAt": "2025-01-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "845d80ee-1cd5-437a-90a5-40dcc657d3aa",
   "name": "Kinsbaile Aspirant",
   "manaCost": "{W}",
@@ -10056,6 +10197,34 @@
   "set": "tmt",
   "releasedAt": "2026-03-06",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dd893746-e8bd-49fa-a1ce-755d5bd4f513",
+  "name": "Let's Play a Game",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Delirium — Choose one. If there are four or more card types among cards in your graveyard, choose one or more instead.\n• Creatures your opponents control get -1/-1 until end of turn.\n• Each opponent discards two cards.\n• Each opponent loses 3 life and you gain 3 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Delirium"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13135,6 +13304,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ea96fe35-88ed-432b-a495-08e787d23d0b",
+  "name": "Piercing Exhale",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may behold a Dragon. (You may choose a Dragon you control or reveal a Dragon card from your hand.)\nTarget creature you control deals damage equal to its power to target creature or planeswalker. If a Dragon was beheld, surveil 2.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Surveil",
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b8cdf79f-b247-4346-8122-9a2d7d23b3c3",
   "name": "Pillar Tombs of Aku",
   "manaCost": "{2}{B}{B}",
@@ -14670,6 +14868,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "71cb48e2-2328-471c-a04a-7b6461f378f4",
+  "name": "Sarkhan, Dragon Ascendant",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Human Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Druid"
+  ],
+  "oracleText": "When Sarkhan enters, you may behold a Dragon. If you do, create a Treasure token. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nWhenever a Dragon you control enters, put a +1/+1 counter on Sarkhan. Until end of turn, Sarkhan becomes a Dragon in addition to his other types and gains flying.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Behold",
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ed1d21ba-ddfe-4f82-9e37-93f9e2c7ba33",
   "name": "Satoru Umezawa",
   "manaCost": "{1}{U}{B}",
@@ -15493,6 +15727,38 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2021-11-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "711eea87-0fa3-46e0-a42b-fa5a86455f04",
+  "name": "Shivan Dragon",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\n{R}: This creature gets +1/+0 until end of turn.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-08-31",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -16609,6 +16875,39 @@
   "set": "dis",
   "releasedAt": "2006-05-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "945a4a4d-fdfd-4c39-9975-5b22d17a4e70",
+  "name": "Sting-Slinger",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warrior"
+  ],
+  "oracleText": "{1}{R}, {T}, Blight 1: This creature deals 2 damage to each opponent. (To blight 1, put a -1/-1 counter on a creature you control.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Blight"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

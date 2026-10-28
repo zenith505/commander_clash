@@ -252,6 +252,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[2]!.replace(/s$/, ""));
     return filter ? [{ type: "keepDestroyRest", filter: { ...filter, text: m[2]!.replace(/s$/, "") }, n: num(m[1]!) }] : null;
   }
+  // Last One Standing: "Choose a creature at random, then destroy the rest": any player's, not targeted (rulings).
+  if (/^Choose a creature at random, then destroy the rest$/.test(s)) return [{ type: "keepDestroyRest", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 1, random: true }];
   // Fight to the Death: "Destroy all blocking creatures and all blocked creatures": all of them at once (CR 701.8a), each
   // creature that's either one.
   if (/^Destroy all blocking creatures and all blocked creatures$/.test(s)) {
@@ -354,7 +356,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield", thisTurn: true, intoYourGraveyard: true }] : null;
   }
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
-  if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|the chosen creatures|enchanted \w+|equipped \w+)$/i.exec(s))) {
     let what = parseObject(m[2]!, ctx);
     if (!what) return null;
     // "Create a token that's a copy of it .... Then exile all other Nightmare tokens you control" (Abyssal Harvester): other
@@ -504,6 +506,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
   if (/^~'s base power and toughness become equal to that creature's power and toughness until end of turn$/.test(s) && ctx.subject && !ctx.subjectIt)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: { count: { kind: "toughness", of: { ref: "subject" } } } }], duration: "endOfTurn" }];
+  // Tanazir Quandrix: "the base power and toughness of other creatures you control become equal to ~'s power and toughness
+  // until end of turn": its actual power and toughness as this resolves, locked in then (rulings, CR 608.2h), in layer 7b
+  // (CR 613.4b), for the creatures there then (CR 611.2c).
+  if ((m = /^(?:have )?the base power and toughness of (other creatures you control) become equal to ~'s power and toughness until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref !== "each") return null;
+    return [{ type: "continuous", what, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "self" } } }, toughness: { count: { kind: "toughness", of: { ref: "self" } } } }], duration: "endOfTurn" }];
+  }
   // Dream Fighter: "Whenever ~ blocks or becomes blocked by a creature, ~ and that creature phase out": both, as it resolves.
   if (/^~ and that creature phase out$/.test(s) && ctx.subject && !ctx.subjectIt) return [{ type: "phaseOut", what: { ref: "self" } }, { type: "phaseOut", what: { ref: "subject" } }];
   if ((m = /^(.+?) phases? out$/i.exec(s))) {
@@ -1265,7 +1275,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Depthshaker Titan: "Any number of target noncreature artifacts you control become 3/3 artifact creatures": each of
   // them, as with one target (no duration: for as long as each stays on the battlefield, CR 611.2a).
-  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five)) target .+?) become (\d+\/\d+) ((?:[a-z]+ )*)creatures$/.exec(s))) {
+  // Nissa, Sage Animist: "Untap up to six target lands. They become 6/6 Elemental creatures. They're still lands." The same.
+  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five|six)) target .+?|They) become (\d+\/\d+) ((?:[a-z]+ |[A-Z][a-z]+ )*)creatures$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes a ${m[2]} ${m[3]}creature`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

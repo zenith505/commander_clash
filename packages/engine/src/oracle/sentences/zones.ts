@@ -31,6 +31,9 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | undefined {
+  // Breakthrough: "choose X cards in your hand and discard the rest": all but X of them, chosen as it resolves (none if
+  // X is at least the hand's size; all with X 0).
+  if (/^[Cc]hoose X cards in your hand and discard the rest$/.test(s0) && ctx.spell) return [{ type: "discard", who: { ref: "you" }, n: 0, keep: { count: { kind: "x" } } }];
   let m: RegExpExecArray | null;
   // "Return from your graveyard to the battlefield any number of target creature cards ..." (Agadeem's Awakening): the
   // same as "Return any number of target creature cards ... from your graveyard to the battlefield".
@@ -403,6 +406,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
   // if it's still there (CR 400.7).
   if (ctx.selfCard && !ctx.activated && /^[Pp]ut (?:it|~) onto the battlefield$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }];
+  // Gate Colossus: "Whenever a Gate you control enters, you may put ~ from your graveyard on top of your library": the card,
+  // if it's still there (CR 400.7).
+  if (ctx.selfCard && !ctx.activated && /^[Pp]ut ~ from your graveyard on top of your library$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }];
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
@@ -711,6 +717,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // Dream Cache: "put two cards from your hand both on top of your library or both on the bottom of your library": where
+  // is chosen as it resolves, then the cards.
+  if ((m = new RegExp(`^[Pp]ut (${NUM}) cards from your hand both on top of your library or both on the bottom of your library$`).exec(s))) {
+    const n = num(m[1]!);
+    return [{ type: "either", options: [[{ type: "handToTop", n }], [{ type: "handToTop", n, bottom: true }]], labels: [`Put ${m[1]} cards from your hand on top of your library`, `Put ${m[1]} cards from your hand on the bottom of your library`] }];
+  }
   // Chimney Imp: "target opponent puts a card from their hand on top of their library"; Sadistic Augermage: "each player
   // puts ..."; Stunted Growth: "Target player chooses three cards from their hand and puts them on top of their library in
   // any order": each from their own hand, chosen as it resolves.
@@ -838,7 +850,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : w === "your" ? { ref: "you" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return filter !== null && who ? [{ type: "exileGraveyard", who, ...(filter ? { filter } : {}), ...(flashback ? { withFlashback: true as const } : {}) }] : null;
   }
-  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?|up to twice X )?target .+ graveyards?(?: that was put there (?:from anywhere |from the battlefield )?this turn)?)$/i.exec(s))) {
     // "Creatures from the battlefield and/or creature cards from graveyards" (Angel of Serenity): permanents or cards.
     const what = parseObject(m[1]!, ctx, !/ from the battlefield and\/or /.test(m[1]!));
     return what ? [{ type: "exile", what }] : null;
@@ -1133,6 +1145,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: m[1]! });
     return [{ type: "attachAny", host }];
   }
+  // Heavenly Blademaster: "When ~ enters, you may attach any number of Auras and Equipment you control to it": to the
+  // source, chosen as it resolves; each only if it could be attached (rulings, CR 701.3a-b).
+  if (/^(?:you may )?attach any number of Auras and Equipment you control to (?:it|~)$/i.test(s) && !ctx.spell && (ctx.selfIt || ctx.selfCard) && !ctx.subjectIt && ctx.lastObjectTarget === undefined) return [{ type: "attachAny", host: -1, self: true }];
   // Stolen Uniform: "Attach it to the chosen creature": the target Equipment to the target creature (CR 701.3a); if
   // either is an illegal target, it doesn't move (rulings).
   if ((m = /^Attach (?:it|that Equipment) to (the chosen creature)$/.exec(s)) && ctx.spell) {
@@ -1174,6 +1189,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Cc]reatures( without flying| with power \d+ or less| with defender| with mana value of that quality)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`, { chosen: true });
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
+  }
+  // The Motherlode, Excavator: "creatures that player controls without flying can't block this turn" (that player being the
+  // defending player): a rule for the turn, so also creatures that lose flying or come under their control later
+  // (rulings).
+  if ((m = /^[Cc]reatures defending player controls( without flying)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
+    const of = parsePlayer("defending player", ctx);
+    return filter?.kind === "object" && of ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` }, ofPlayer: of }] : null;
   }
   // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.
   if ((m = /^([A-Z][a-z]+)s can't block this turn$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], text: `${m[1]}s` } }];
@@ -1294,6 +1317,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
   }
+  // Killing Wave: "For each creature, its controller sacrifices it unless they pay X life": each player chooses which of
+  // theirs to keep, paying X life for each, the active player first and each knowing the choices before theirs; then
+  // they all pay and sacrifice at the same time (rulings). No more than they can pay for (CR 119.4).
+  if ((m = /^For each creature, its controller sacrifices it unless they pay (X|\d+) life$/.exec(s))) {
+    const among: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+    return [{ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter: among, n: 0, upTo: true }], among, payLife: m[1] === "X" ? { count: { kind: "x" } } : Number(m[1]) }];
+  }
   // "Each player chooses from among the permanents they control an artifact, a creature, an enchantment, and a land,
   // then sacrifices the rest" (Cataclysm), "... an artifact, a creature, an enchantment, and a planeswalker from among the
   // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous
@@ -1384,12 +1414,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
   // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before
   // anyone chooses (rulings on Fraying Omnipotence, CR 107.1a).
-  if ((m = /^(?:(.+?) )?[Ss]acrifices? half the (.+?) (you|they|that player) controls?(?: of (?:their|his or her) choice)?(?:, rounded (up|down))?$/.exec(s))) {
+  // Legate Lanius: "each opponent sacrifices a tenth of the creatures they control of their choice, rounded up": one for
+  // one to ten creatures, two for eleven to twenty (rulings).
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? (half|a tenth of) the (.+?) (you|they|that player) controls?(?: of (?:their|his or her) choice)?(?:, rounded (up|down))?$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : ({ ref: "you" } as const);
-    const filter = pickFilter(m[2]!);
-    const half = roundOf(m[4], ctx);
-    if (!who || !filter || filter.kind !== "object" || !half || (who.ref === "you") !== (m[3] === "you")) return null;
-    return [{ type: "pick", who, filter, n: { count: { kind: "permanents", filter, whose: { ref: "eachOne" } }, half }, action: "sacrifice" }];
+    const filter = pickFilter(m[3]!);
+    const half = m[2] === "half" ? roundOf(m[5], ctx) : (m[5] as "up" | "down" | undefined);
+    if (!who || !filter || filter.kind !== "object" || !half || (who.ref === "you") !== (m[4] === "you")) return null;
+    return [{ type: "pick", who, filter, n: { count: { kind: "permanents", filter, whose: { ref: "eachOne" } }, half, ...(m[2] === "half" ? {} : { tenth: true as const }) }, action: "sacrifice" }];
   }
   // "Choose target player. Return half the creatures they control to their owner's hand, rounded up" (Split the Party):
   // half of that player's, which you choose as it resolves (rulings, CR 107.1a).

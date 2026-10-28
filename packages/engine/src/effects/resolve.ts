@@ -1,6 +1,6 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
-import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, uniqueMostPlayer } from "../layers";
 import { compileCard } from "../oracle";
@@ -12,10 +12,10 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
 import { COLOR_NAMES } from "./describe";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, sharingAColor, checkTotals, relatedOk, printedMatches, spellMatches } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runCoinEffect, runDiceEffect } from "./run-dice";
+import { runCoinEachEffect, runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -1228,6 +1228,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDiceEffect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
+    case "flipCoinEach":
+      return runCoinEachEffect(s, e, ctx, src);
     case "vote":
     case "eachChooses":
     case "controlFromEach":
@@ -1379,6 +1381,9 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   // A spell's reflexive trigger: its source is the spell, gone from the stack, so as it last existed there (CR 113.7a).
   // "That spell gains deathtouch and lifelink" (Judith): keywords it gained while on the stack.
   const gained = spell?.zone === "stack" ? (spell.spellGains ?? []).flatMap((g) => g.mods.flatMap((m) => (m.kind === "addKeywords" ? m.keywords : []))) : [];
+  // Soulfire Grand Master: "Instant and sorcery spells you control have lifelink", from a permanent its controller
+  // controls as the damage is dealt.
+  if (spell?.zone === "stack" && item) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === item.controller) for (const g of abilitiesOf(s, obj(s, id)).spellsHaveKeywords ?? []) if (spellMatches(s, g.filter, item)) gained.push(g.keyword);
   const base = cardSource(ctx.sourceDef, ctx.controller, ref);
   return { ...base, ...(gained.length ? { keywords: [...new Set([...base.keywords, ...gained])] } : {}), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
 }

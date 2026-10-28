@@ -322,7 +322,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
       // discards the rest (n is per player then).
       const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
-      const nFor = e.downToFewest ? {} : amountFor(s, e.n, ctx, who);
+      const keepN = e.keep !== undefined ? amountNow(s, e.keep, ctx) : 0;
+      const nFor = e.downToFewest ? {} : e.keep !== undefined ? Object.fromEntries(who.map((pid) => [pid, Math.max(0, player(s, pid).hand.length - keepN)])) : amountFor(s, e.n, ctx, who);
       if (e.random && !e.hand) {
         // Picked once, before anyone is asked about Library of Leng.
         const rp = (sc0.randomPicks ??= Object.fromEntries(
@@ -554,6 +555,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         let n = amountNow(s, e.n, ctx);
         // Enhanced Surveillance: more cards in a surveil of one or more (CR 701.25c: surveil 0 isn't surveilling).
         if (e.type === "surveil" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).surveilMore ?? 0;
+        // Kenessos, Priest of Thassa: a scry of one or more is a scry of one more, for each (CR 614.1a; scry 0 isn't a scry,
+        // 701.22b).
+        if (e.type === "scry" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).scryMore ?? 0;
         const cards = p.library.slice(0, n);
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).
@@ -890,10 +894,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (e.exchange) {
           // Morality Shift: both at once (CR 701.12a); the library's cards go to the graveyard together, so their owner
           // orders them when the order matters (CR 404.3, see graveyard.ts; rulings).
+          // Mordenkainen: "Exchange your hand and library": into the hand, not drawn (rulings).
           const lib = [...p.library];
           for (const id of ids) moveObject(s, id, "library");
-          for (const id of lib) moveObject(s, id, "graveyard");
-          log(s, `${p.name} exchanges their graveyard (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
+          for (const id of lib) moveObject(s, id, e.hand ? "hand" : "graveyard");
+          log(s, `${p.name} exchanges their ${e.hand ? "hand" : "graveyard"} (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
           continue;
         }
         if (e.bottom) {
@@ -1094,7 +1099,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.condDest && condNow ? e.condDest.dest : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.cardTo && printedMatches(e.cardTo.card, defOf(s, obj(s, id))) ? e.cardTo.dest : e.condDest && condNow ? e.condDest.dest : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).

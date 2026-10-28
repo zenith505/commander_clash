@@ -1337,8 +1337,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "attachAny": {
       // Ardenn: the Auras and Equipment are chosen as it resolves, and attached at once (rulings), each only if it could
       // be attached to the target (CR 701.3a-b). Nothing happens with an illegal target (CR 608.2b).
-      const t = ctx.targets[e.host];
-      if (!t || !ctx.legal[e.host]) return;
+      // Heavenly Blademaster: to the source, if it's still the same permanent (rulings).
+      const me = e.self && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (e.self && (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
+      const t = me ? ({ kind: "object", id: me.id } as const) : ctx.targets[e.host];
+      if (!t || (!me && !ctx.legal[e.host])) return;
       const host = t.kind === "object" ? s.objects[t.id] : undefined;
       if (t.kind === "object" && host?.zone !== "battlefield") return;
       const sc = (s.resolving!.scratch ??= {});

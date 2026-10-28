@@ -576,6 +576,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           for (const id of seen) moveObject(s, id, "hand");
           return;
         }
+        // Erratic Explosion: they stay in the library for now; "that card" is the nonland card (none if every card was a
+        // land: its mana value counts as 0, rulings).
+        if (e.then === "keep") {
+          s.resolving!.revealed = hit ? { id: hit, zc: obj(s, hit).zoneChanges ?? 0 } : undefined;
+          s.resolving!.revealedUntil = seen;
+          return;
+        }
         if (e.reveal) {
           // "Exile that card and put the rest on the bottom of your library in a random order" (Creative Technique).
           if (hit) moveObject(s, hit, "exile");
@@ -799,6 +806,19 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const mv = cost ? manaValue(cost) + (item!.x ?? 0) * xCount(cost) : 0;
         if (!item || item.kind !== "spell" || mv !== (ctx.x ?? 0)) {
           log(s, `${src} doesn't counter ${item?.description ?? "it"}: its mana value isn't ${ctx.x ?? 0}.`);
+          return;
+        }
+      }
+      // Hisoka, Minamo Sensei: the spell's mana value with its X (CR 202.3e) against the discarded card's, its X as 0 (CR
+      // 202.3e), as the ability resolves.
+      if (e.ifMvDiscarded) {
+        const item = s.stack.find((x) => x.id === t.id);
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        const cost = o && parseManaCost(defOf(s, o).manaCost);
+        const mv = cost ? manaValue(cost) + (item!.x ?? 0) * xCount(cost) : 0;
+        const discarded = (s.resolving?.item.costDiscarded ?? []).flatMap((k) => (s.cards[k] ? [defMv(s.cards[k]!)] : []));
+        if (!o || !discarded.length || discarded[0] !== mv) {
+          log(s, `${src} doesn't counter ${item?.description ?? "it"}: its mana value isn't the discarded card's.`);
           return;
         }
       }

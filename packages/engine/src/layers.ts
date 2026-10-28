@@ -147,6 +147,8 @@ export interface Characteristics {
   blockTax: number;
   /** Generic mana to attack with this creature, whoever it attacks (Brainwash, Phyrexian Marauder). */
   ownAttackTax: number;
+  /** Generic mana to block with this creature (Qal Sisma Behemoth, Oppressive Rays). */
+  ownBlockTax: number;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -197,6 +199,10 @@ export interface Characteristics {
   attackUnlessMore?: ("lands" | "creatures")[];
   /** "Can't attack unless a black or green creature also attacks" (Scarred Puma): another attacker fitting each. */
   attackOnlyWith?: TargetSpec[];
+  /** Orcish Conscripts: "can't attack unless at least two other creatures attack": that many other attackers. */
+  attackWithOthers?: number;
+  /** "... can't block unless at least two other creatures block": that many other blockers this combat. */
+  blockWithOthers?: number;
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -310,6 +316,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackTaxCountersPlaneswalkers: 0,
     blockTax: 0,
     ownAttackTax: 0,
+    ownBlockTax: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -1293,7 +1300,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "loseTypes":
       c.types = c.types.filter((t) => !m.types.includes(t));
-      c.supertypes = c.supertypes.filter((t) => !m.types.includes(t)); // "isn't legendary" (Aeve)
+      c.supertypes = c.supertypes.filter((t) => !m.types.includes(t)); // "isn't legendary" (Aeve), "is no longer snow" (Melting)
       c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? ""));
       // Planeswalker types (CR 205.3j) aren't in a list of their own: no longer a planeswalker, it has none (CR 205.3d).
       if (m.types.includes("Planeswalker") && !c.types.includes("Battle")) c.subtypes = c.subtypes.filter((st) => subtypeSet(st) !== null);
@@ -1449,9 +1456,14 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.blockTax += m.n;
       return;
     case "ownAttackTax":
-      // Phyrexian Marauder: {1} for each +1/+1 counter on it now (its counters invalidate the characteristics).
-      c.ownAttackTax += m.perPlusOne ? m.n * Math.max(0, s.objects[id]?.counters["+1/+1"] ?? 0) : m.n;
+    case "ownBlockTax": {
+      // Phyrexian Marauder, Myr Prototype: {1} for each +1/+1 counter on it now (its counters invalidate the
+      // characteristics); Cowed by Wisdom: {1} for each card in its controller's hand, counted now.
+      const n = m.amount !== undefined ? m.n * Math.max(0, num(m.amount)) : m.perPlusOne ? m.n * Math.max(0, s.objects[id]?.counters["+1/+1"] ?? 0) : m.n;
+      if (m.kind === "ownAttackTax") c.ownAttackTax += n;
+      else c.ownBlockTax += n;
       return;
+    }
     case "attackTax": {
       if (m.perCounter) {
         c.attackTaxCounters++;
@@ -1535,6 +1547,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantAttackUnlessAlso":
       c.attackOnlyWith = [...(c.attackOnlyWith ?? []), m.filter];
+      return;
+    case "cantAttackUnlessOthers":
+      c.attackWithOthers = Math.max(c.attackWithOthers ?? 0, m.n);
+      return;
+    case "cantBlockUnlessOthers":
+      c.blockWithOthers = Math.max(c.blockWithOthers ?? 0, m.n);
       return;
     case "cantAttackUnlessMore":
       if (!c.attackUnlessMore?.includes(m.what)) c.attackUnlessMore = [...(c.attackUnlessMore ?? []), m.what];
@@ -1954,15 +1972,21 @@ const coloredDefs = new Map<string, CardDef>();
 
 /**
  * `d`, the definition of `o` outside the battlefield, with the colors effects that apply to every card and spell there
- * give it (Mycosynth Lattice: colorless, CR 613.1e), the latest one last (CR 613.7). Anything else is `d` itself.
+ * give it (Mycosynth Lattice: colorless, CR 613.1e), and a spell the colors effects on it give it (Lifelace), the latest one
+ * last (CR 613.7). Anything else is `d` itself.
  */
 export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDef {
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return d;
-  const gs = offFieldGrants(s).filter((g) => g.everyone);
+  const gs: { timestamp: number; mods: Modification[] }[] = offFieldGrants(s).filter((g) => g.everyone);
+  // The Laces: "target spell becomes green", while it's that spell (CR 105.3, 613.1e).
+  if (o.zone === "stack") for (const g of o.spellGains ?? []) if (g.mods.some((m) => m.kind === "setColors" || m.kind === "addColors")) gs.push(g);
   if (!gs.length) return d;
   let colors = [...d.colors];
   for (const g of [...gs].sort((a, b) => a.timestamp - b.timestamp))
-    for (const m of g.mods) if (m.kind === "setColors") colors = [...m.colors];
+    for (const m of g.mods) {
+      if (m.kind === "setColors") colors = [...m.colors];
+      else if (m.kind === "addColors") colors = [...colors, ...m.colors.filter((c) => !colors.includes(c))];
+    }
   if (colors.length === d.colors.length && colors.every((c, i) => c === d.colors[i])) return d;
   const key = `${d.oracleId}|${d.name}|${d.subtypes.join(",")}|${d.everyCreatureType ?? ""}|${colors.join("")}`;
   let out = coloredDefs.get(key);

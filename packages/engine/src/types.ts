@@ -853,6 +853,8 @@ export interface StackItem {
   subject?: { id: ObjectId; zc: number };
   /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
   stateIndex?: number;
+  /** An activated ability whose text asks how many times "this ability has been activated this turn" (Dragon Whelp): its index. */
+  activatedIndex?: number;
   /** A Saga's chapter ability: while it's on the stack, the Saga isn't sacrificed (CR 714.4). */
   chapter?: true;
   /** A Saga's final chapter ability (its greatest chapter number): the Saga's mana value, for "whenever the final chapter ability of a Saga you control resolves" (Narci). */
@@ -1172,9 +1174,10 @@ export interface ContinuousEffect {
   /**
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
-   * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2).
+   * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2); "yourNextUpkeep" as
+   * the upkeep of `turnOf`'s next turn after `sinceTurn` begins.
    */
-  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
   sinceTurn?: number;
   /**
@@ -2006,6 +2009,8 @@ export interface Resolving {
   counteredSource?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
+  /** The cards "reveal cards from the top of your library until you reveal a nonland card" revealed, in order (Erratic Explosion). */
+  revealedUntil?: ObjectId[];
   /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */
   exiledTop?: { id: ObjectId; zc: number };
   /** The card a chooseFromGraveyard with a `chooser` moved, for "that card's mana value" (O-Kagachi Made Manifest). */

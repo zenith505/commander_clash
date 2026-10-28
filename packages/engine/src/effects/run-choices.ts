@@ -1101,6 +1101,7 @@ function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number
 
 /** The penalty, for its button: "Lose 3 life", "Ana may draw a card" (Rhystic Study). */
 function describePenalty(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: ResolveCtx): string {
+  if (e.penalty) return e.penalty.replace(/\{you\}/g, player(s, ctx.controller).name).replace(/~/g, ctx.sourceDef?.name ?? "it");
   if (e.thenText) return `${player(s, ctx.controller).name} ${e.thenText}`;
   const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
   if (typeof lose === "number") return `Lose ${lose} life`;

@@ -1168,9 +1168,10 @@ export interface ContinuousEffect {
   /**
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
-   * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2).
+   * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2); "yourNextUpkeep" as
+   * the upkeep of `turnOf`'s next turn after `sinceTurn` begins.
    */
-  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | /** "Until end of combat": it ends as the combat phase ends (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "yourNextUpkeep" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
   sinceTurn?: number;
   /**

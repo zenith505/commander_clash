@@ -1355,7 +1355,9 @@ export type Modification =
   /** "Creatures can't block unless their controller pays {1} for each of those creatures" (Archangel of Tithes, CR 509.1d). */
   | { kind: "blockTax"; n: number }
   /** "Enchanted creature can't attack unless its controller pays {3}" (Brainwash), "~ can't attack unless you pay {1} for each +1/+1 counter on it" (Phyrexian Marauder): what attacking with this creature costs, whoever it attacks (CR 508.1g-h). */
-  | { kind: "ownAttackTax"; n: number; perPlusOne?: true }
+  | { kind: "ownAttackTax"; n: number; perPlusOne?: true; /** "{1} for each card in your hand" (Cowed by Wisdom): counted as it applies, "your" being the source's controller. */ amount?: Amount }
+  /** "~ can't attack or block unless you pay {2}" (Qal Sisma Behemoth), "Enchanted creature can't attack or block unless its controller pays {3}" (Oppressive Rays): what blocking with this creature costs (CR 509.1d-e), as for ownAttackTax. */
+  | { kind: "ownBlockTax"; n: number; perPlusOne?: true; amount?: Amount }
   | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string; /** Nils, Discipline Enforcer: each creature with counters on it, {X} for it, X its number of counters (all kinds, rulings). */ perCounter?: true }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
@@ -2702,7 +2704,7 @@ export type Effect =
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | /** "Until end of combat" (CR 500.5a). */ "endOfCombat" | "game" | "yourNextTurn" | "endOfYourNextTurn" | /** "Until your next upkeep" (Erhnam Djinn). */ "yourNextUpkeep" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -3188,7 +3190,7 @@ export type Effect =
    * damage to them. If no one does, ..." once if no one did ("ifNone"). Each player still chooses in turn order, knowing
    * the earlier choices, and the chosen actions happen together (rulings on Clackbridge Troll and Vexing Devil).
    */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string }
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string; /** The penalty's button as it is ("Lose 5 life (Ann sacrifices Pillar Tombs of Aku)"), ~ its source. */ penalty?: string }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -4602,6 +4604,8 @@ export interface ActivatedAbility {
   oncePerTurn?: boolean;
   /** "Any player may activate this ability" (CR 602.2): not only its controller; the one who does controls it (CR 113.8). */
   anyPlayer?: true;
+  /** With `anyPlayer`: "Only ~'s owner may activate this ability" (Personal Incarnation): its owner, whoever controls it. */
+  ownerOnly?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */

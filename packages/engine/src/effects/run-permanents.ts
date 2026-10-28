@@ -1086,6 +1086,18 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "continuous": {
+      // The Laces: a target spell's color changes while it's that spell (CR 105.3); a permanent spell's change stays with
+      // the permanent it becomes, for as long as the effect lasts (CR 112.4, 400.7a).
+      const st = e.what.ref === "target" && ctx.legal[e.what.index] ? ctx.targets[e.what.index] : undefined;
+      if (st?.kind === "stack") {
+        const item = s.stack.find((x) => x.id === st.id);
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        if (!o || o.zone !== "stack") return;
+        const mods = fixMods(s, e.mods, ctx);
+        (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.duration === "game" ? { forever: true as const } : {}) });
+        log(s, `${defOf(s, o).name} ${describeMods(s, mods, ctx.controller, false)}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
+        return;
+      }
       // The affected set is locked in now (CR 611.2c).
       // Backup: "If that's another creature, it gains ..." (CR 702.165a).
       const affected = objects(s, e.what, ctx).map((o) => o.id).filter((id) => !(e.notSource && id === ctx.sourceId));
@@ -1142,7 +1154,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           sourceName: src,
           sourceId: ctx.sourceId,
           duration: e.duration,
-          ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" ? { turnOf: ctx.controller, sinceTurn: s.turn } : {}),
+          ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" || e.duration === "yourNextUpkeep" ? { turnOf: ctx.controller, sinceTurn: s.turn } : {}),
           ...(whileTapped ? { whileTapped } : {}),
           ...(whileControlled ? { whileControlled } : {}),
           ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
@@ -1150,7 +1162,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           mods: groupMods,
         });
         const names = group.map((id) => defOf(s, obj(s, id)).name);
-        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
+        log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, groupMods, giveTo ?? ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "endOfCombat" ? " until end of combat" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "yourNextUpkeep" ? ` until ${player(s, ctx.controller).name}'s next upkeep` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? (e.whileOnBattlefield ? ` for as long as ${src} remains on the battlefield` : ` for as long as ${player(s, ctx.controller).name} controls ${src}`) : ""}.`);
       }
       return;
     }

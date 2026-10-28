@@ -239,6 +239,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     anyPlayer = true;
     effectText = `${effectText.slice(0, anyone.index)}${anyone[1] ? ` Activate only ${anyone[1].replace(/\btheir\b/g, "your")}.` : ""}`;
   }
+  // Personal Incarnation: "Only ~'s owner may activate this ability": its owner, whoever controls it (CR 602.2); "you" in
+  // it is that player, who controls the ability (CR 113.8).
+  let ownerOnly = false;
+  if (!anyone && / Only ~'s owner may activate this ability\.$/.test(effectText)) {
+    anyPlayer = ownerOnly = true;
+    effectText = effectText.slice(0, effectText.length - " Only ~'s owner may activate this ability.".length);
+  }
   for (let found = true; found; ) {
     found = false;
     if (/ Activate only if ~ is in your graveyard\.$/.test(effectText) && !inYard && !keyword) {
@@ -410,6 +417,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (anyPlayer && (tap || untapSelf || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
   return {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
+    ...(ownerOnly ? { ownerOnly: true as const } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
     manaCost,
     ...(water ? { waterbend: water[1] === "X" ? ("X" as const) : Number(water[1]) } : {}),

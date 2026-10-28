@@ -1005,6 +1005,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
   // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
   if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };
+  // Dose of Dawnglow: "if it isn't your main phase": not your turn, or your turn but not a main phase.
+  if (text === "it isn't your main phase") return { kind: "phase", phase: "main", yours: true, not: true };
   if (text === "it's your end step") return { kind: "phase", phase: "end", yours: true };
   if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))

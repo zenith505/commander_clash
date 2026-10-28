@@ -1162,6 +1162,16 @@ export function parseTargetPhrase(
     extra.chosen = chosen[3] ? (chosen[1] ? "notTypesChosen" : "typesChosen") : chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
     p = (p.slice(0, chosen.index) + p.slice(chosen.index + chosen[0].length)).trim();
   }
+  // "With mana value of the chosen quality" after "choose odd or even" (Extinction Event), "with power of that quality"
+  // (Zimone's Hypothesis): zero is even.
+  // Ashling's Prerogative: "without mana value of the chosen quality", the other one.
+  const parityOf = / with(out)? (mana value|power) of (?:the chosen|that) quality\b/.exec(p);
+  if (parityOf) {
+    if (!opts.chosen || extra.chosen) return null;
+    extra.chosen = "parity";
+    extra.parity = { of: parityOf[2] === "power" ? "power" : "manaValue", ...(parityOf[1] ? { not: true as const } : {}) };
+    p = (p.slice(0, parityOf.index) + p.slice(parityOf.index + parityOf[0].length)).trim();
+  }
   // "Spell with the chosen name" (Declaration of Naught), "cards with that name" after "choose a card name" (CR 201.4).
   const withName = / with (?:the chosen|that) name\b/.exec(p);
   if (withName) {
@@ -1425,14 +1435,17 @@ export function parseTargetPhrase(
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");
-  } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
-    // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
+  } else if ((m = /(?:^| )(with|without) ([a-z ]+?|[a-z]+(?:, [a-z]+)+, and\/or [a-z]+)( you control| you don't control| an opponent controls)?$/.exec(p))) {
+    // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough. "With flying, deathtouch,
+    // and/or lifelink" (Henrika, Infernal Seer): any of them.
+    const listed = m[1] === "with" ? /^((?:[a-z]+, )+)and\/or ([a-z]+)$/.exec(m[2]!) : null;
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
     // "Creatures without flying or islandwalk" (Stormtide Leviathan): with neither.
     const neither = m[1] === "without" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
-    const kws = either ?? neither ? [(either ?? neither)![1]!, (either ?? neither)![2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
-    if (!kws || kws.some((k) => !k) || kws.length !== (either || neither ? 2 : 1)) return null;
-    if (either) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
+    const anyNames = listed ? [...listed[1]!.split(", ").filter(Boolean), listed[2]!] : either ? [either[1]!, either[2]!] : undefined;
+    const kws = anyNames ? anyNames.map((k) => keywordOf(k)) : neither ? [neither[1]!, neither[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
+    if (!kws || kws.some((k) => !k) || kws.length !== (anyNames ? anyNames.length : neither ? 2 : 1)) return null;
+    if (anyNames) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
     else if (m[1] === "with") extra.keywords = kws as string[];
     else extra.notKeywords = kws as string[];
     // "Creature without flying you don't control" (Street Spasm): whose it is, read below.

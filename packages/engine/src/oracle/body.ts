@@ -188,7 +188,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks"]);
+const FLOATING_EVENTS = new Set<string>(["creatureDealsCombatDamageToSelf", "permanentEnters", "youGainLife", "castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks", "permanentBecomesTapped", "creatureBlocks"]);
 const FLOATING_KEYS = new Set<string>(["event", "enters", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "tappedFilter", "subjectFilter", "body"]);
 
 /**
@@ -632,6 +632,13 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
   // "You may reveal it and put it into your hand" (Frost Augur): a card only looked at is revealed as it's put there.
   const shown = /^you may reveal it and put it into your hand$/.test(text);
   if (shown) return [{ type: "may", effects: [{ type: "revealRevealed" }, { type: "bounce", what: { ref: "revealed" } }], text: "reveal the revealed card and put it into your hand" }];
+  // Sapling of Colfenor: "you gain life equal to that card's toughness, lose life equal to its power, then put it into
+  // your hand": three events in turn (rulings), each read from the card as it is in the library.
+  const sapling = /^you gain life equal to that card's (power|toughness), lose life equal to its (power|toughness), then put it into your hand$/.exec(text);
+  if (sapling) {
+    const stat = (w: string) => ({ count: { kind: "revealedManaValue" as const, stat: w as "power" | "toughness" } });
+    return [{ type: "gainLife", who: { ref: "you" }, n: stat(sapling[1]!) }, { type: "loseLife", who: { ref: "you" }, n: stat(sapling[2]!) }, { type: "bounce", what: { ref: "revealed" } }];
+  }
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
     // Harsh Deceiver: "untap ~ and it gets +1/+1 until end of turn": "it" is ~, not the card.
@@ -755,6 +762,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
+  text = text.replace(/^[Cc]hoose (target creature you control)\. If damage would be dealt to that creature this turn, /, "If damage would be dealt to $1 this turn, ");
   // Fulgent Distraction: "Choose two target creatures. Tap those creatures, then ...": the same as "Tap two target creatures".
   text = text.replace(/^Choose two target creatures\. Tap those creatures, then /, "Tap two target creatures, then ");
   // Willowdusk, Essence Seer: "Choose another target creature. Put a number of +1/+1 counters on it equal to ...": the same.
@@ -796,6 +804,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const body = parseModal("two", mayTwo[1]!, text.trim(), opts);
     if (!body || !body.modal!.modes.every((m) => m.targets.length === 1 && m.targets[0]!.kind === "player")) return null;
     return { ...body, modal: { ...body.modal!, optional: true, distinctTargets: true } };
+  }
+  // A triggered ability's "choose one. If you control a commander, you may choose both instead." (SOLDIER Military
+  // Program), "If there are four or more card types among cards in your graveyard, choose both instead." (Prophetic
+  // Titan): the condition is checked as the ability is put on the stack, when its modes are chosen (CR 603.3c; rulings
+  // on Prophetic Titan).
+  const bothIf = /^[Cc]hoose one\. If (.+?), (you may )?choose both instead(?:\.| —)\s*((?:•[^•]+)+)$/.exec(text.trim());
+  if (bothIf && !opts.spell && !opts.activated) {
+    const cond = parseStaticCondition(bothIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    const body = cond && parseModal("one", bothIf[3]!, text.trim(), opts);
+    if (!body || body.modal!.modes.length !== 2) return null;
+    return { ...body, modal: { ...body.modal!, both: "control", bothIf: cond, ...(bothIf[2] ? {} : { bothExactly: true as const }) } };
   }
   const modal = MODAL.exec(text.trim());
   if (modal) {
@@ -987,6 +1006,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nibelheim Aflame: "Choose target creature you control. It deals damage equal to its power to each other creature.": the
   // target deals it (rulings), the same as "Target creature you control deals ...".
   text = text.replace(/(^|\. )Choose (target creature(?: you control)?)\. It deals damage equal to its power to /, (_, a: string, who: string) => `${a}${capital(who)} deals damage equal to its power to `);
+  // Moonlight Hunt: "Choose target creature you don't control. Each creature you control that's a Wolf or a Werewolf deals
+  // damage equal to its power to that creature.": each of them to that target, all at once.
+  text = text.replace(/^Choose (target creature you don't control)\. (Each creature you control that's an? [A-Z][a-z]+ or an? [A-Z][a-z]+) deals damage equal to its power to that creature\.$/, "$2 deals damage equal to its power to $1.");
   // Might of the Meek: "It also gets +1/+0 until end of turn if you control a Mouse": the condition read first, as it
   // resolves (CR 608.2c).
   text = text.replace(/(^|\. )(It|That creature) also gets ([^.]+?) until end of turn if (you control an? [A-Z][a-z]+)\./, (_, a: string, who: string, pt: string, cond: string) => `${a}If ${cond}, ${who.toLowerCase()} also gets ${pt} until end of turn.`);
@@ -7910,6 +7932,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [hostType[2]!], text: hostType[2]! } } }, effects: inner, otherwise: previous });
       continue;
     }
+    // By Invitation Only: "Choose a number between 0 and 13. Each player sacrifices that many creatures of their choice.": the
+    // number chosen as it resolves; a player with fewer sacrifices them all (rulings).
+    const sacThatMany = /^Each player sacrifices that many (creatures|artifacts|permanents) of their choice$/.exec(s);
+    const chose = effects[effects.length - 1];
+    if (sacThatMany && chose?.type === "choose" && chose.choice === "number") {
+      const fx = parseOne(`Each player sacrifices two ${sacThatMany[1]} of their choice`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "pick" || fx[0]!.n !== 2) return null;
+      effects.push({ ...fx[0]!, n: { count: { kind: "chosenNumber" } } });
+      continue;
+    }
     // Expel from Orazca: "Return target nonland permanent to its owner's hand. If you have the city's blessing, you may put
     // that permanent on top of its owner's library instead." With the blessing as it resolves (CR 702.131c), its
     // controller chooses where it goes.
@@ -7921,7 +7953,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     // Sphinx Sovereign: "If ~ is untapped, ...": ~ itself, as it resolves or as it last existed (rulings).
     const selfTapped = !!ifState && /^~ is (?:un)?tapped$/.test(ifState[1]!);
-    const stateCond = ifState && (selfTapped || !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // Ayara's Oathsworn: "Put a +1/+1 counter on it. Then if it has exactly four +1/+1 counters on it, ...": ~, which the
+    // counter was just put on, as it resolves (rulings: not if it has left the battlefield).
+    const justCounted = effects[effects.length - 1];
+    const selfCounted = !!ifState && !ctx.spell && /^(?:it|~) has .+ counters? on it$/.test(ifState[1]!) && justCounted?.type === "counters" && justCounted.what.ref === "self";
+    const stateCond = ifState && (selfTapped || selfCounted || !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;

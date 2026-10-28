@@ -35,6 +35,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Crackling Drake: "the total number of instant and sorcery cards you own in exile and in your graveyard".
   if (!each && /^the total number of instant and sorcery cards you own in exile and in your graveyard$/i.test(p)) return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, graveyardToo: true } };
+  // Slime Against Humanity: "the total number of cards you own in exile and in your graveyard that are Oozes or are named
+  // ~": face-up ones only (rulings), either kind counted once.
+  if (!each && (m = /^the total number of cards you own in exile and in your graveyard that are ([A-Z][a-z]+)s or are named ~$/.exec(p)) && CREATURE_TYPES.has(m[1]!)) {
+    const card = { kind: "card" as const, types: [], notTypes: [], notColors: [] };
+    return { count: { kind: "cardsInExile", who: { ref: "you" }, filter: { ...card, anyOf: [{ ...card, subtypes: [m[1]!], text: `${m[1]} card` }, { ...card, named: "~", text: "card named ~" }], text: `${m[1]} card or card named ~` }, graveyardToo: true } };
+  }
   // Eris, Roar of the Storm: "for each different mana value among instant and sorcery cards in your graveyard": each mana
   // value once (CR 202.3).
   if (each && (m = /^different mana value among (instant (?:and|or) sorcery) cards in your graveyard$/i.exec(p))) return { count: { kind: "graveyardManaValues", who: { ref: "you" }, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } };
@@ -432,6 +438,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the amount of life you gained this turn or the amount of life you lost this turn, whichever is greater$/i.test(p)) return count({ kind: "greaterOf", of: [{ kind: "lifeGainedThisTurn" }, { kind: "lifeLostThisTurn", who: { ref: "you" } }] });
   // Children of Korlis: "the life you've lost this turn", all of it, whatever you gained (rulings).
   if (!each && /^the (?:total )?(?:amount of )?life you(?:'ve| have)? lost this turn$/i.test(p)) return count({ kind: "lifeLostThisTurn", who: { ref: "you" } });
+  // Tainted Sigil: "the total life lost by all players this turn": each player's (still in the game, CR 102.1), you too,
+  // however they lost it and whatever they gained (rulings).
+  if (!each && /^the total life lost by all players this turn$/i.test(p)) return count({ kind: "lifeLostThisTurn", who: { ref: "eachPlayer" } });
   if (!each && /^the total amount of noncombat damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsNoncombatDamage" });
   // Notorious Throng: all the damage dealt this turn to players who are your opponents, by any source (rulings).
   if (!each && /^the (?:total )?(?:amount of )?damage dealt to your opponents this turn$/i.test(p)) return count({ kind: "opponentsDamage" });

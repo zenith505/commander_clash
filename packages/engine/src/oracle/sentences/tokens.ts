@@ -142,11 +142,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // deals 2 damage to any target" and "{T}: Add one mana of any color."": two abilities, entering tapped.
   // Blacksmith's Talent: "create a colorless Equipment artifact token named Sword with "Equipped creature gets +1/+1" and
   // equip {2}": an Equipment with the keyword too (CR 702.6a).
-  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (tapped )?colorless (snow )?(Equipment )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?(?: and equip (\\{\\d+\\}))?$`).exec(s))) {
-    const texts = [m[6]!, ...(m[7] ? [m[7]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
-    if (m[8] && !m[4]) return null;
-    const token: TokenSpec = { name: m[5]!, named: true, colors: [], types: ["Artifact"], subtypes: m[4] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[8] ? [`Equip ${m[8]}`] : [])].join("\n"), ...(m[3] ? { snow: true as const } : {}) };
-    return texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...(m[2] ? { tapped: true as const } : {}) }] : null;
+  // Kibo, Uktabi Prince: "Each player creates a colorless artifact token named Banana with "..."": each their own.
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped )?colorless (snow )?(Equipment )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?(?: and equip (\\{\\d+\\}))?$`).exec(s))) {
+    const texts = [m[7]!, ...(m[8] ? [m[8]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
+    if (m[9] && !m[5]) return null;
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const token: TokenSpec = { name: m[6]!, named: true, colors: [], types: ["Artifact"], subtypes: m[5] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[9] ? [`Equip ${m[9]}`] : [])].join("\n"), ...(m[4] ? { snow: true as const } : {}) };
+    return who && texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who, n: amt(m[2]!), token, ...(m[3] ? { tapped: true as const } : {}) }] : null;
   }
   // Overlord of the Hauntwoods: "create a tapped colorless land token named Everywhere that is every basic land type": a
   // Plains, Island, Swamp, Mountain and Forest, with each one's mana ability (CR 305.6), but not basic (rulings).

@@ -1240,6 +1240,14 @@ export function parseTargetPhrase(
     extra.enteredSinceYourLastTurn = true;
     p = p.slice(0, since.index);
   }
+  // Shaile, Dean of Radiance: "each creature that entered the battlefield under your control this turn": under yours as it
+  // entered, whoever controls it now.
+  const enteredYours = / that entered the battlefield under your control this turn$/.exec(p);
+  if (enteredYours) {
+    extra.enteredThisTurn = true;
+    extra.enteredUnderYou = true;
+    p = p.slice(0, enteredYours.index);
+  }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);
   if (entered) {

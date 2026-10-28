@@ -160,6 +160,20 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const token: TokenSpec = { name: m[6]!, named: true, colors: [], types: ["Artifact"], subtypes: m[5] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[9] ? [`Equip ${m[9]}`] : [])].join("\n"), ...(m[4] ? { snow: true as const } : {}) };
     return who && texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who, n: amt(m[2]!), token, ...(m[3] ? { tapped: true as const } : {}) }] : null;
   }
+  // Farid, Enterprising Salvager: "create a colorless artifact token named Scrap": its name and type only, no abilities
+  // (rulings, CR 111.4).
+  if ((m = /^(?:You )?[Cc]reate a colorless artifact token named ([A-Z][\w'-]*)$/.exec(s))) {
+    const token: TokenSpec = { name: m[1]!, named: true, colors: [], types: ["Artifact"], subtypes: [], keywords: [] };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token }];
+  }
+  // Setzer, Wandering Gambler: "create The Blackjack, a legendary 3/3 colorless Vehicle artifact token with flying and crew
+  // 2": a named legendary Vehicle (CR 111.4, 205.4d, 301.7, 702.122a).
+  if ((m = /^(?:You )?[Cc]reate ((?:The )?[A-Z][\w'-]*(?: [A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) colorless Vehicle artifact token with (?:([a-z, ]+?),? and )?crew (\d+)$/.exec(s))) {
+    const keywords = m[4] ? parseKeywordList(m[4]) : [];
+    if (!keywords) return null;
+    const token: TokenSpec = { name: m[1]!, named: true, legendary: true, power: Number(m[2]), toughness: Number(m[3]), colors: [], types: ["Artifact"], subtypes: ["Vehicle"], keywords, abilities: `Crew ${m[5]}` };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token }];
+  }
   // Overlord of the Hauntwoods: "create a tapped colorless land token named Everywhere that is every basic land type": a
   // Plains, Island, Swamp, Mountain and Forest, with each one's mana ability (CR 305.6), but not basic (rulings).
   if ((m = /^(?:You )?[Cc]reate a (tapped )?colorless land token named ([A-Z][\w'-]*) that is every basic land type$/.exec(s))) {

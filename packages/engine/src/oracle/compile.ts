@@ -3739,6 +3739,21 @@ export function compile(d: CardDef): CompiledCard {
       spellLines.push(line);
       continue;
     }
+    // Giott, King of the Dwarves: "Whenever ~ or another Dwarf you control enters and whenever an Equipment you control
+    // enters, ...": one ability, so a permanent that's both triggers it once (CR 603.2c); read as the Dwarf trigger and
+    // an Equipment trigger for an Equipment that isn't a Dwarf.
+    const dwarfOrGear = /^Whenever (~ or another ([A-Z][a-z]+) you control) enters and whenever an (Equipment|Aura|Vehicle) you control enters, (.+)$/.exec(line);
+    if (dwarfOrGear) {
+      const kin = parseTrigger(`Whenever ${dwarfOrGear[1]} enters, ${dwarfOrGear[4]}`);
+      const gear = parseTrigger(`Whenever an ${dwarfOrGear[3]} you control enters, ${dwarfOrGear[4]}`);
+      const f = gear && gear !== "fail" && gear.event === "permanentEnters" ? gear.enters?.filter : undefined;
+      if (!kin || kin === "fail" || !gear || gear === "fail" || f?.kind !== "object" || f.notSubtypes?.length) out.unsupported.push(raw);
+      else {
+        out.triggers.push(bindThisAbility(kin, line));
+        out.triggers.push(bindThisAbility({ ...gear, enters: { ...gear.enters!, filter: { ...f, notSubtypes: [dwarfOrGear[2]!] } } }, line));
+      }
+      continue;
+    }
     // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
     // "When ~ enters or dies, ...", "When ~ transforms into ~ or dies, ...", "When ~ enters and at the beginning of your upkeep, ...": one ability that triggers on
     // either event, which works like two with the same effect (CR 702.29c). The text is read for each event ("it" after it

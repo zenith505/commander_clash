@@ -345,6 +345,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "life", who });
   }
+  // Sengir, the Dark Baron: "that player's life total as the turn began".
+  if (ctx?.eventPlayer && /^that player's life total as the turn began$/i.test(p)) return count({ kind: "eventPlayerLifeAsTurnBegan" });
   // Malignus: "the highest life total among your opponents" (those still in the game).
   if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
   // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too); Sorin, Grim

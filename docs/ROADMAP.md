@@ -1,7 +1,7 @@
 # Roadmap
 
-27,212 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,040 of
+27,232 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,043 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -737,6 +737,30 @@ line blocks.
    the card discarded, in a reflexive trigger), Savage Summoning (flash and "can't be countered" for the next creature
    spell), Rocco, Street Chef, Grolnok, Golden Guardian. Still missing from CR 800.4a: a spell someone else owns on the
    stack under a leaving player's control is removed rather than exiled.
+   Round 202 went on from the top (ranks 6,000 to 12,000 not looked at before): "Whenever a creature you control
+   connives" (Iron Monger, Ultron; once the conniving is done, gone or not, CR 701.50f), "you may have it connive. Do this
+   only once each turn" (Baron Strucker), "Whenever ~ or another Dwarf you control enters and whenever an Equipment you
+   control enters" (Giott: one trigger for a permanent that's both, CR 603.2c), "copy the next spell you cast this turn
+   when you cast it" (Flamehold Grappler, Tzaangor Shaman), "copy it for each other instant and sorcery spell you've cast
+   this turn", counted as the trigger resolves (Show of Confidence), "a noncreature spell with one or more blue mana
+   symbols in its mana cost, create that many" (Namor), "a colorless artifact token named Scrap" (Farid), "create The
+   Blackjack, a legendary 3/3 colorless Vehicle artifact token with flying and crew 2" (Setzer), "one or more goaded
+   creatures deal combat damage to one of your opponents" (Puppet Master), "Whenever you activate an ability of a
+   creature", mana abilities too (Elrond), "Vehicles you control become artifact creatures ... Creatures you control get
+   +2/+0" (Start Your Engines), "When this token deals damage, sacrifice it" (Vrondiss), "each creature that entered the
+   battlefield under your control this turn" (Shaile), "Whenever you turn a permanent face up" (Growing Dread: the player
+   who turned it, by the special action or an effect), "can't cast instant or sorcery spells during that player's next
+   turn" (Azor, Sphinx's Decree), "Whenever an opponent becomes the monarch, if you were the monarch as the turn began"
+   (Knights of the Black Rose), "Whenever another player loses the game ... that player's life total as the turn began"
+   (Sengir). No new prompts.
+   Out after round 202 (looked at, not done): Masako the Humorless (tapped creatures blocking: every blocker check reads
+   untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
+   Assassin Lord (attacked this turn by an Assassin you controlled), Kros, Defense Contractor (no record of who put
+   counters on a creature), Visions of Phyrexia (no record of playing a card from exile), Glorious Purpose (the sixth
+   plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (remove any number of
+   counters), Bladegriff Prototype (a target the damaged player chooses), Bronze Bombshell, Zidane, Tantalus Thief ("an
+   opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
+   hand), Obeka, Splitter of Seconds (extra upkeep steps after this phase).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

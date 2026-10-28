@@ -940,6 +940,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you're not the monarch$/.test(text)) return { kind: "monarch", not: true };
+  // Knights of the Black Rose: "if you were the monarch as the turn began".
+  if (/^you were the monarch as the turn began$/.test(text)) return { kind: "monarch", asTurnBegan: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
   if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).

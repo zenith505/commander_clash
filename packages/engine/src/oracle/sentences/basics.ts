@@ -1087,6 +1087,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || (filter && filter.kind !== "spell")) return null;
     return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}), ...(m[3] !== "this turn" ? { untilYourNextTurnEnds: true as const } : {}) }];
   }
+  // Azor, the Lawbringer: "each opponent can't cast instant or sorcery spells during that player's next turn": each of
+  // them during the next turn they take, not before.
+  if ((m = /^each opponent can't cast (instant or sorcery|noncreature|creature) spells during that player's next turn$/i.exec(s))) {
+    const filter = parseTargetPhrase(`${m[1]!} spell`);
+    if (filter?.kind !== "spell") return null;
+    return [{ type: "cantCast", who: { ref: "eachOpponent" }, filter: { ...filter, text: `${m[1]!} spell` }, duringTheirNextTurn: true }];
+  }
   // Hope of Ghirapur: "Until your next turn, target player ... can't cast noncreature spells": until this effect's
   // controller's next turn begins (CR 611.2b).
   if ((m = /^Until your next turn, (.+?) can't cast (?:(noncreature) )?spells$/.exec(s))) {

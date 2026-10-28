@@ -218,7 +218,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       return;
     case "turnFaceUp":
-      for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src);
+      for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src, ctx.controller);
       return;
     case "tap":
     case "untap":
@@ -546,11 +546,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return;
       }
       const o = id ? s.objects[id] : undefined;
-      if (nonland && o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc) {
+      const here = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc;
+      if (nonland && here) {
         invalidateCharacteristics(s);
         putCounters(s, o, "+1/+1", nonland);
         log(s, `${defOf(s, o).name} gets ${nonland} +1/+1 counter${nonland > 1 ? "s" : ""}.`);
       }
+      // It has connived now, whatever could be done (CR 701.50f), gone or not (Toluz rulings): "whenever a creature you
+      // control connives" triggers for its controller as it last existed (CR 701.50b).
+      if (o) fireEvent(s, { type: "connived", id: o.id, controller: here ? controllerOf(s, o) : pid });
       return;
     }
     case "skipUntap":

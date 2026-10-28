@@ -402,6 +402,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "life":
       if (c.highest) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.life));
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
+    case "eventPlayerLifeAsTurnBegan": {
+      const pid = ctx.event?.player;
+      return pid === undefined ? 0 : (s.lifeAsTurnBegan?.[pid] ?? s.players[pid]?.life ?? 0);
+    }
     case "lifeBelowStart":
       return Math.max(0, STARTING_LIFE - (s.players[ctx.controller]?.life ?? STARTING_LIFE)); // CR 103.4: 40 in Commander (CR 903.7)
     case "experience":
@@ -513,6 +517,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
       return o?.zone === "stack" ? characteristics(s, o).colors.length : (item?.castColors?.length ?? 0);
+    }
+    case "castSpellManaSymbols": {
+      // Its mana cost as a spell (the half cast, for a split card); it doesn't change if the spell has left the stack.
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      const o = item?.objectId ? s.objects[item.objectId] : undefined;
+      return o ? manaSymbolsOf(defOf(s, o).manaCost, [c.color]) : 0;
     }
     case "castSpellCommanderCasts": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
@@ -1109,6 +1119,8 @@ function describeCount(c: Count): string {
       return "that spell's X";
     case "castSpellColors":
       return "that spell's colors";
+    case "castSpellManaSymbols":
+      return `that spell's ${c.color} mana symbols`;
     case "colorsOf":
       return "its colors";
     case "castSpellCommanderCasts":

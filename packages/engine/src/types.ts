@@ -1669,7 +1669,7 @@ export interface GameState {
   linkedFreeCasts?: { player: PlayerId; source: string; turn: number; sourceName: string; /** "A creature spell" (Idol of Endurance). */ filter?: TargetSpec }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
-  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId }[];
+  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId; /** With `untilEndOfTurnOf` that player: only during their next turn after `turn` (Azor, the Lawbringer). */ duringTheirNextTurn?: true }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
@@ -1775,6 +1775,10 @@ export interface GameState {
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
+  /** Who was the monarch as this turn began (Knights of the Black Rose: "if you were the monarch as the turn began"). */
+  monarchAsTurnBegan?: PlayerId;
+  /** Each player's life total as this turn began (Sengir, the Dark Baron), by player id. */
+  lifeAsTurnBegan?: number[];
   /** The emblems in the command zone (CR 114.1), in the order they were made: objects with `emblem`. */
   emblems?: ObjectId[];
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */

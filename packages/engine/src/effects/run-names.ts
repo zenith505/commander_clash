@@ -1,12 +1,12 @@
 import type { Effect } from "../abilities";
-import { defOf } from "../cards";
-import { creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
+import { defOf, isType, objIsType } from "../cards";
+import { attackingPermanentOf, creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
 import { currentName } from "../names";
 import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, printedMatches } from "./targeting";
-import { chooseAuraHosts } from "./run-zones";
+import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { cantSearch, searchBarred } from "./run-library";
 import type { AuraHost } from "../game";
 import { characteristics } from "../layers";
@@ -98,6 +98,15 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const stays = e.mayElseHand ? [] : unattached;
       const toHand = e.mayElseHand ? unattached : [];
       for (const id of [...stays, ...toHand]) hits.splice(hits.indexOf(id), 1);
+      // "Tapped and attacking" (Raph & Mikey, CR 508.4): during combat, attacking a player, planeswalker or battle its
+      // controller chooses as it enters (rulings), never declared as an attacker; outside combat only tapped (CR 506.3d).
+      // Asked before anything moves, so resuming reveals the same cards.
+      const attackOptions = e.attacking && found === "battlefield" && hits.some((id) => isType(defOf(s, obj(s, id)), "Creature")) ? attackChoices(s, p.id, ctx.sourceId) : [];
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${defOf(s, obj(s, hits.find((id) => isType(defOf(s, obj(s, id)), "Creature"))!)).name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
       const hit = hits[0];
       if (hit) s.resolving!.revealedUntilMv = characteristics(s, obj(s, hit)).manaValue;
       else delete s.resolving!.revealedUntilMv;
@@ -108,7 +117,18 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Old Stickfingers: all of them at once (CR 608.2c).
         for (const id of hits) moveObject(s, id, "graveyard");
         if (hits.length) log(s, `${p.name} puts ${hits.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
-      } else enterTogether(s, () => hits.forEach((id) => moveObject(s, id, found, { ...(e.tapped ? { tapped: true } : {}), ...(found === "battlefield" ? { controller: p.id, ...hosts.get(id) } : {}) })));
+      } else
+        enterTogether(s, () =>
+          hits.forEach((id) => {
+            moveObject(s, id, found, { ...(e.tapped ? { tapped: true } : {}), ...(found === "battlefield" ? { controller: p.id, ...hosts.get(id) } : {}) });
+            const o = obj(s, id);
+            if (attack && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
+              o.attacking = attack.player;
+              if (attack.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
+              log(s, `${defOf(s, o).name} is attacking ${attack.label}.`);
+            }
+          }),
+        );
       for (const id of toHand) {
         log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it goes into ${p.name}'s hand.`);
         moveObject(s, id, "hand");

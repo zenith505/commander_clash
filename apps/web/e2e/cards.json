@@ -2009,6 +2009,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "21695c70-f746-4d77-b6d3-e2713a5c929e",
+  "name": "Bogslither's Embrace",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, blight 1 or pay {3}. (To blight 1, put a -1/-1 counter on a creature you control.)\nExile target creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Blight"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2bd111bb-ce02-414c-b5b7-e0e037d8d96b",
   "name": "Bolas's Citadel",
   "manaCost": "{3}{B}{B}{B}",
@@ -3031,6 +3059,34 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "54421e69-d79e-4c2e-8ce6-96994d168835",
+  "name": "Cinder Strike",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may blight 1. (You may put a -1/-1 counter on a creature you control.)\nCinder Strike deals 2 damage to target creature. It deals 4 damage to that creature instead if this spell's additional cost was paid.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Blight"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "df2738fe-9cd1-4347-8808-105fcfde1190",
@@ -12878,6 +12934,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ea96fe35-88ed-432b-a495-08e787d23d0b",
+  "name": "Piercing Exhale",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may behold a Dragon. (You may choose a Dragon you control or reveal a Dragon card from your hand.)\nTarget creature you control deals damage equal to its power to target creature or planeswalker. If a Dragon was beheld, surveil 2.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Surveil",
+   "Behold"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b8cdf79f-b247-4346-8122-9a2d7d23b3c3",
   "name": "Pillar Tombs of Aku",
   "manaCost": "{2}{B}{B}",
@@ -15211,6 +15296,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "711eea87-0fa3-46e0-a42b-fa5a86455f04",
+  "name": "Shivan Dragon",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\n{R}: This creature gets +1/+0 until end of turn.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-08-31",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a9d288b8-cdc1-4e55-a0c9-d6edfc95e65d",
   "name": "Shock",
   "manaCost": "{R}",
@@ -16260,6 +16377,39 @@
   "set": "dis",
   "releasedAt": "2006-05-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "945a4a4d-fdfd-4c39-9975-5b22d17a4e70",
+  "name": "Sting-Slinger",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warrior"
+  ],
+  "oracleText": "{1}{R}, {T}, Blight 1: This creature deals 2 damage to each opponent. (To blight 1, put a -1/-1 counter on a creature you control.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Blight"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

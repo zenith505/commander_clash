@@ -2425,8 +2425,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "livingDeath": {
       const who = apnap(s, livingPlayers(s));
       const exiled: [ObjectId, number][] = [];
+      const type = e.cardType ?? "Creature";
       for (const pid of who) {
-        const cards = player(s, pid).graveyard.filter((id) => objIsType(s, obj(s, id), "Creature"));
+        const cards = player(s, pid).graveyard.filter((id) => objIsType(s, obj(s, id), type));
         if (cards.length) log(s, `${player(s, pid).name} exiles ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
         for (const id of cards) {
           moveObject(s, id, "exile");
@@ -2434,7 +2435,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
       }
       for (const pid of who) {
-        const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), type));
         if (mine.length) log(s, `${player(s, pid).name} sacrifices ${mine.map((id) => characteristics(s, obj(s, id)).name).join(", ")}.`);
         for (const id of mine) moveObject(s, id, "graveyard", { sacrificed: true });
       }

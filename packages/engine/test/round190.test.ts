@@ -82,8 +82,11 @@ const voldarenBloodcaster = scry("transform", [
   { name: "Voldaren Bloodcaster", mana_cost: "{1}{B}", type_line: "Creature — Vampire Wizard", power: "2", toughness: "1", oracle_text: "Flying\nWhenever this creature or another nontoken creature you control dies, create a Blood token. (It's an artifact with \"{1}, {T}, Discard a card, Sacrifice this token: Draw a card.\")\nWhenever you create a Blood token, if you control five or more Blood tokens, transform this creature." },
   { name: "Bloodbat Summoner", type_line: "Creature — Vampire Wizard", color_indicator: ["B"], power: "3", toughness: "3", oracle_text: "Flying\nAt the beginning of combat on your turn, up to one target Blood token you control becomes a 2/2 black Bat creature with flying and haste in addition to its other types." },
 ], { keywords: ["Flying", "Transform"] });
+const arcumDagsson = card("Arcum Dagsson", "Legendary Creature — Human Artificer", "{3}{U}", {"cmc":4,"power":"2","toughness":"2","oracleText":"{T}: Target artifact creature's controller sacrifices it. That player may search their library for a noncreature artifact card, put it onto the battlefield, then shuffle.","colors":["U"],"layout":"normal"});
+const scrapMastery = card("Scrap Mastery", "Sorcery", "{3}{R}{R}", {"cmc":5,"oracleText":"Each player exiles all artifact cards from their graveyard, then sacrifices all artifacts they control, then puts all cards they exiled this way onto the battlefield.","colors":["R"],"layout":"normal"});
+const oversimplify = card("Oversimplify", "Sorcery", "{3}{G}{U}", {"cmc":5,"oracleText":"Exile all creatures. Each player creates a 0/0 green and blue Fractal creature token and puts a number of +1/+1 counters on it equal to the total power of creatures they controlled that were exiled this way.","colors":["G","U"],"layout":"normal"});
 
-const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, sewerNemesis, voldarenBloodcaster];
+const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, sewerNemesis, voldarenBloodcaster, arcumDagsson, scrapMastery, oversimplify];
 
 describe("round 190", () => {
   it("all compile", () => supported(...ALL));
@@ -250,5 +253,49 @@ describe("round 190", () => {
     tapAllBut(s, ap, lands(s, ap));
     s = resolveAll(run(s, planCast(s, ap, mine)));
     expect(pt(s, nem)).toEqual([5, 5]);
+  });
+
+  it("Oversimplify: each player gets a Fractal with counters equal to the total power their exiled creatures had; none, it dies", () => {
+    let { s, ap, ids, opp } = setup([oversimplify]);
+    const third = next(s, ap, 2);
+    const a = putOnBattlefield(s, ap, creature("Test A", "Beast", 2));
+    const b = putOnBattlefield(s, opp, creature("Test B", "Beast", 3));
+    const c = putOnBattlefield(s, opp, creature("Test C", "Beast", 4));
+    // Pumped on the battlefield: its power as it last existed there counts (rulings).
+    s.objects[c]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect([a, b, c].map((id) => zone(s, id))).toEqual(["exile", "exile", "exile"]);
+    const fractal = (pid: PlayerId) => named(s, pid, "Fractal Token");
+    expect(fractal(ap).map((id) => counters(s, id))).toEqual([2]);
+    expect(fractal(opp).map((id) => counters(s, id))).toEqual([8]);
+    expect(fractal(third)).toHaveLength(0);
+  });
+
+  it("Arcum Dagsson: the artifact creature's controller sacrifices it and may search for a noncreature artifact card onto the battlefield", () => {
+    let { s, ap, opp } = setup([]);
+    const arcum = putOnBattlefield(s, ap, arcumDagsson);
+    const golem = putOnBattlefield(s, opp, card("Test Golem", "Artifact Creature — Golem", "{3}", { cmc: 3, power: "3", toughness: "3" }));
+    const relic = into(s, opp, card("Test Relic", "Artifact", "{2}", { cmc: 2 }), "library");
+    s = run(s, planActivate(s, ap, arcum, 0, [tgt(golem)]));
+    for (let i = 0; i < 10 && s.stack.length && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(zone(s, golem)).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: opp });
+    s = act(s, { type: "chooseMay", player: opp, yes: true });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: opp });
+    s = act(s, { type: "searchLibrary", player: opp, found: [relic] });
+    expect(zone(s, relic)).toBe("battlefield");
+    expect(controllerOf(s, s.objects[relic]!)).toBe(opp);
+  });
+
+  it("Scrap Mastery: artifact cards from graveyards come back after every artifact is sacrificed; the sacrificed ones stay", () => {
+    let { s, ap, ids, opp } = setup([scrapMastery]);
+    const mine = putOnBattlefield(s, ap, card("Test Mine", "Artifact", "{1}", { cmc: 1 }));
+    const theirs = putOnBattlefield(s, opp, card("Test Theirs", "Artifact Creature — Golem", "{2}", { cmc: 2, power: "2", toughness: "2" }));
+    const back = into(s, opp, card("Test Back", "Artifact", "{3}", { cmc: 3 }), "graveyard");
+    const bear0 = into(s, ap, bear(), "graveyard");
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect([zone(s, mine), zone(s, theirs), zone(s, back), zone(s, bear0)]).toEqual(["graveyard", "graveyard", "battlefield", "graveyard"]);
+    expect(controllerOf(s, s.objects[back]!)).toBe(opp);
   });
 });

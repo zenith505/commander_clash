@@ -666,7 +666,7 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
 
 /** Split text into sentences, keeping a quoted ability ('gains "Sacrifice ~. Draw a card."') whole. */
 /** Living Death's three parts, each for all players at once (Effect livingDeath): one instruction. */
-const LIVING_DEATH = /^Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then /;
+const LIVING_DEATH = /^Each player exiles all (creature|artifact) cards from their graveyard, then sacrifices all \1s they control, then /;
 
 /** Split `text` at each match of `re` (global) that isn't inside double quotes: a quoted ability is one piece. */
 function splitOutsideQuotes(text: string, re: RegExp): string[] {
@@ -7121,6 +7121,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.gainThatMany = true;
       continue;
     }
+    // Oversimplify: "Exile all creatures. Each player creates a 0/0 ... token and puts a number of +1/+1 counters on it equal
+    // to the total power of creatures they controlled that were exiled this way": each their own creatures' power as they
+    // last existed on the battlefield (rulings), put on the token as it's created (counters on a permanent as it enters
+    // count as put on it, CR 122.6).
+    const simplified = /^(Each player creates an? 0\/0 [^.]+? creature token) and puts a number of (\+1\/\+1) counters on it equal to the total power of creatures they controlled that were exiled this way$/.exec(s);
+    const exiledAll = effects[effects.length - 1];
+    if (simplified && exiledAll?.type === "exile" && exiledAll.what.ref === "each" && exiledAll.what.filter.types?.length === 1 && exiledAll.what.filter.types[0] === "Creature") {
+      const made = parseOne(simplified[1]!, ctx);
+      const e = made?.[0];
+      if (made?.length !== 1 || e?.type !== "createToken" || e.who.ref !== "eachPlayer" || e.n !== 1) return null;
+      effects.push({ ...e, counters: { counter: simplified[2]!, n: { count: { kind: "exiledPowerOf", who: { ref: "eachOne" } } } } });
+      continue;
+    }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
@@ -7681,6 +7694,23 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (what?.ref !== "target") return null;
       effects.push({ type: "sacrifice", what, byController: true });
       si++;
+      continue;
+    }
+    // Arcum Dagsson: "Target artifact creature's controller sacrifices it. That player may search their library for a
+    // noncreature artifact card, put it onto the battlefield, then shuffle.": the target's controller as it resolves; they
+    // search even if it isn't sacrificed, but not if the target is illegal, when nothing happens (rulings, CR 608.2b).
+    const sacTarget = /^Target ([a-z ]+)'s controller sacrifices it$/.exec(s);
+    if (sacTarget && !ctx.targets.length) {
+      const what = parseObject(`target ${sacTarget[1]}`, ctx);
+      if (what?.ref !== "target" || what.n || ctx.targets[what.index]?.kind !== "object") return null;
+      effects.push({ type: "sacrifice", what, byController: true });
+      const search = /^That player (may search their library for .+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      if (search) {
+        const inner = parseOne(`Its controller ${search[1]}`, ctx);
+        if (!inner) return null;
+        effects.push(...inner);
+        si++;
+      }
       continue;
     }
     // Unravel: "Counter target spell. If the amount of mana spent to cast that spell was less than its mana value, you draw a

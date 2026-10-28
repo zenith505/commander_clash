@@ -17,6 +17,8 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
   if (s === "Put all creatures on the bottom of their owners' libraries") return [{ type: "putAllOnBottom", filter: { kind: "object", types: ["Creature"], text: "creature" } }];
   // Living Death: each part for all players at once (rulings, Effect livingDeath).
   if (s === "Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath" }];
+  // Scrap Mastery: the same with artifacts (rulings: only the cards exiled by the first part come back).
+  if (s === "Each player exiles all artifact cards from their graveyard, then sacrifices all artifacts they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath", cardType: "Artifact" }];
   if (ctx.spell) return undefined;
   // Memory Jar: each player's hand, face down, then everyone draws seven (CR 608.2c); at the next end step, everyone
   // discards their hand and gets back the cards they exiled (only the same objects, CR 400.7).

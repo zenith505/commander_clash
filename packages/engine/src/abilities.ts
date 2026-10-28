@@ -2305,9 +2305,10 @@ export type Effect =
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
    * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
-   * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control.
+   * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control. Scrap Mastery:
+   * the same with artifacts (`cardType`).
    */
-  | { type: "livingDeath" }
+  | { type: "livingDeath"; cardType?: "Artifact" }
   /**
    * "Put all creatures on the bottom of their owners' libraries" (Terminus): all at once (rulings); each owner orders
    * their cards first, without revealing the order (CR 401.4).

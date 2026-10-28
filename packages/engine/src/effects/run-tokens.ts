@@ -429,7 +429,8 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     const { same: k, extra } = tokenBatch(s, pid, e.token, each ? amountNow(s, e.n, { ...ctx, eachOne: pid }) : n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
     const defender = e.attackingEvent ? eventDefender(s, ctx, pid) : e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
-    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
+    // Oversimplify: each player's own number of counters (PlayerRef eachOne).
+    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, JSON.stringify(e.counters.n).includes('"eachOne"') ? { ...ctx, eachOne: pid } : ctx) } : undefined;
     const blocking = e.blocking ? objects(s, e.blocking, ctx)[0] : undefined;
     const tapped = e.tapped || (e.attacking && !e.untapped);
     const opts = { tapped, attacking: defender, ...(counters ? { counters } : {}), ...(blocking ? { blocking } : {}) };

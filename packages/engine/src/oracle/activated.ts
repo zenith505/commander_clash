@@ -335,6 +335,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, effectText.length - " X can't be 0.".length);
       found = true;
     }
+    // In the Trenches: "Activate only as a sorcery and only once." Both (CR 602.5b), once for as long as it's that object.
+    if (/ Activate only as a sorcery and only once\.$/.test(effectText) && !onceEver && !sorcerySpeed && !keyword) {
+      onceEver = true;
+      sorcerySpeed = true;
+      effectText = effectText.slice(0, effectText.length - " Activate only as a sorcery and only once.".length);
+      found = true;
+    }
     // "Activate only once." (CR 602.5b): for as long as it's the same object (CR 400.7), like exhaust (702.177a).
     if (/ Activate only once\.$/.test(effectText) && !onceEver && !keyword) {
       onceEver = true;

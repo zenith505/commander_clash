@@ -71,6 +71,9 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // one of them (rulings), as Kiora's "and/or" (oneOfEach).
       const anyOf: TargetSpec[] = CARD_TYPES_IN_DECKS.map((t) => ({ kind: "card", types: [t], text: `${t.toLowerCase()} card` }));
       Object.assign(dig, { count: anyOf.length, upTo: true, filter: { kind: "card", anyOf, text: "card of each card type" }, oneOfEach: anyOf, into: "hand" });
+    } else if ((m = new RegExp(`^(?:Put|You may put) any number of (?:them|those cards) into your hand(?: and the rest ${REST})?$`).exec(s))) {
+      // Search for Blex: "You may put any number of them into your hand and the rest into your graveyard": none to all.
+      Object.assign(dig, { count: 99, upTo: true, into: "hand" }, m[1] ? restOf(m[1]) : {});
     } else if ((m = new RegExp(`^(?:Put|You may put) (any number of|up to two|up to three) ([^,]+? cards) from among them into your hand(?: and the rest(?: of the revealed cards)? ${REST})?$`).exec(s))) {
       // "Put any number of legendary cards from among them into your hand and the rest into your graveyard" (Dihada).
       // Kruphix's Insight: "Put up to three enchantment cards from among them into your hand and the rest of the revealed

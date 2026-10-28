@@ -1996,8 +1996,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.atNextEndStep) {
         // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step" (CR 603.7),
         // if it's still that card then.
-        const { atNextEndStep: _, ...later } = e;
-        for (const o of list) addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [{ ...later, what: { ref: "subjectCard" }, ...(watched ? { sacrificeOnLostControl: watched } : { sacrificeOnLostControl: undefined }) }], text: `Put ${defOf(s, o).name} onto the battlefield under your control.` }, ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o));
+        const { atNextEndStep: _, ifSourceHere, mayThen, ...later } = e;
+        // Shirei: "you may return that card ... if ~ is still on the battlefield": the source as the object it was when this
+        // ability triggered (CR 400.7, rulings), and the choice made as the delayed trigger resolves.
+        const here = ifSourceHere && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        for (const o of list) {
+          const put: Effect = { ...later, what: { ref: "subjectCard" }, ...(watched ? { sacrificeOnLostControl: watched } : { sacrificeOnLostControl: undefined }) };
+          const text = `${mayThen ? "you may put" : "Put"} ${defOf(s, o).name} onto the battlefield under your control`;
+          const may: Effect = mayThen ? { type: "may", effects: [put], text: `put ${defOf(s, o).name} onto the battlefield` } : put;
+          addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [ifSourceHere ? { type: "if", cond: { kind: "selfHere" }, effects: [may] } : may], text: `${ifSourceHere ? `If ${here ? defOf(s, here).name : "its source"} is still on the battlefield, ` : ""}${text}.`.replace(/^./, (c) => c.toUpperCase()) }, ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o));
+          if (ifSourceHere) s.delayed![s.delayed!.length - 1]!.source = here ? { id: here.id, zc: ctx.sourceZc ?? here.zoneChanges ?? 0 } : { id: "none", zc: 0 };
+        }
         return;
       }
       const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);

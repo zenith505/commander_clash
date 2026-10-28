@@ -407,8 +407,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponents? (?:that|who) (?:were|was) dealt damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, damaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
+  // Search for Blex: "You lose 3 life for each card you put into your hand this way", after its look at the top cards.
+  if (ctx?.dugToHand && each && /^card you put into your hand this way$/.test(p)) return { count: { kind: "dugToHand" } };
   // Reaper's Scythe: "for each player who lost life this turn", you too.
   if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
+  // The Master of Lake-town: "for each graveyard with seven or more cards in it": each player's graveyard (CR 404.1), of
+  // the players still in the game (a player who left takes their cards along, CR 800.4a).
+  if (each && (m = /^graveyard with (one|two|three|four|five|six|seven|eight|nine|ten) or more cards in it$/i.exec(p))) return count({ kind: "players", yardAtLeast: num(m[1]!) });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });

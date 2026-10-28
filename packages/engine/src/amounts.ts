@@ -345,6 +345,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.objects?.({ ref: c.subject ? "subject" : "self" })[0]?.blockedBy?.length ?? 0;
     case "itBlocks":
       return ctx.objects?.({ ref: "self" })[0]?.blocking?.length ?? 0;
+    case "dugToHand":
+      return s.resolving?.dugToHand ?? 0;
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
@@ -581,6 +583,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.lifeAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.life <= c.lifeAtMost!).length;
       if (c.lifeLessThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.life < (s.players[ctx.controller]?.life ?? 0)).length;
       if (c.handMoreThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length > (s.players[ctx.controller]?.hand.length ?? 0)).length;
+      if (c.yardAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && s.players[pid]!.graveyard.length >= c.yardAtLeast!).length;
       if (c.handAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length >= c.handAtLeast!).length;
       if (c.handAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length <= c.handAtMost!).length;
       // Smuggler's Share: players still in the game, by what they did this turn.
@@ -923,6 +926,8 @@ function describeCount(c: Count): string {
       return "#creatures blocking it";
     case "itBlocks":
       return "#creatures it's blocking";
+    case "dugToHand":
+      return "#cards put into your hand";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "milledManaValue":
@@ -1000,7 +1005,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":

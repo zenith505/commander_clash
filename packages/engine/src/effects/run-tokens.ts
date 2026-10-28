@@ -517,6 +517,7 @@ export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { t
   if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined) {
     o.blocking = [at.id];
     (at.blockedBy ??= []).push(o.id);
+    at.becameBlockedTurn = s.turn;
   }
   s.resolving?.created?.push(o.id);
   noteCreated(s, pid, o);

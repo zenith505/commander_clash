@@ -3022,6 +3022,11 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Stabilizer: "Players can't cycle cards." Typecycling too (CR 702.29f, rulings).
+    if (line === "Players can't cycle cards.") {
+      out.noCycling = true;
+      continue;
+    }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;
@@ -3093,16 +3098,19 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.
-    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped(?: and)?)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped(?: and)?)? with ${NUMX} ${COUNTER} counters? on (?:it|~)(?: for each (.+?)|, where X is (.+?)| if (.+?)| unless (you've cast another (?:white|blue|black|red|green) spell this turn))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
       // "~ enters tapped with three stun counters on it." "... if you attacked this turn" (raid), "... if a creature
       // died this turn" (morbid), "... if you cast it from your hand": checked as it enters.
-      const [, tapped, count, kind, each, where, ifText] = ewc;
+      // Hotheaded Giant: "... unless you've cast another red spell this turn", checked as it enters, not counting itself.
+      const [, tapped, count, kind, each, where, ifText, unlessText] = ewc;
       const fromHand = ifText === "you cast it from your hand";
       // "If you cast it" (Nine-Lives Familiar): it enters from the stack as the spell it was, not a copy (CR 601.2i).
       const ifCast = ifText === "you cast it";
-      const cond = ifText && !fromHand && !ifCast ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+      const parsed = unlessText ? parseStaticCondition(unlessText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+      const unless = parsed?.kind === "castAnother" ? { kind: "castAnother" as const, entering: true as const, ...(parsed.color ? { color: parsed.color } : {}) } : parsed;
+      const cond = unless ? { kind: "not" as const, cond: unless } : unless === null ? null : ifText && !fromHand && !ifCast ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
       const per = each ? parseCount(each, null, true) : null;
       const def = where ? parseCount(where, null) : null;
       const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);

@@ -42,6 +42,10 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter: CHOSEN_NAME }] : null;
   }
+  // Hint of Insanity: "Target player reveals their hand. That player discards all nonland cards with the same name as
+  // another card in their hand": every such card, no choice (CR 701.9b); two of a name both go.
+  if ((m = /^That player discards all nonland cards with the same name as another card in their hand$/.exec(s)) && ctx.lastPlayerTarget !== undefined)
+    return [{ type: "discard", who: { ref: "target", index: ctx.lastPlayerTarget }, n: 0, hand: true, filter: { kind: "card", notTypes: ["Land"], text: "nonland card" }, nameTwice: true }];
   // "Target player reveals their hand and discards all Trap cards" (Trapfinder's Trick): every card like that there.
   if ((m = /^(Target player|Target opponent) reveals their hand and discards all (.+?) cards$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

@@ -604,6 +604,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!n) return null;
     return [{ type: "may", effects: [], pay: { mana: m[2]! }, payTimes: n, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} for each ${m[3]} to keep ~` }];
   }
+  // Pendrell Flux, Disruption Aura, Essence Leak's granted "sacrifice ~ unless you pay its mana cost": ~'s, as it resolves.
+  if ((m = /^[Ss]acrifice (~|it) unless you pay its mana cost$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined)))
+    return [{ type: "may", effects: [], payManaCost: true, otherwise: [sacrificeSelf], keep: true, text: "Pay ~'s mana cost to keep it" }];
   // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const pay = parsePayCost(m[2]!);
@@ -622,11 +625,56 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "may", effects: [], payEnergy: n, otherwise: [{ type: "sacrifice", what }], keep: true, text: "Pay {E} equal to that creature's mana value to keep it" }];
   }
   // "Tap ~ unless you pay 1 life" (Carnophage): chosen as it resolves; paying while it's tapped is allowed and doesn't
-  // untap it (rulings).
-  if ((m = /^[Tt]ap ~ unless you pay (\d+ life)$/.exec(s))) {
-    const pay = parsePayCost(m[1]!);
+  // untap it (rulings). Morgul-Knife Wound's granted "exile ~ unless you pay 2 life": chosen by its controller as it
+  // resolves (rulings).
+  if ((m = /^([Tt]ap|[Ee]xile) ~ unless you pay (\d+ life)$/.exec(s))) {
+    const pay = parsePayCost(m[2]!);
     if (!pay) return null;
-    return [{ type: "may", effects: [], pay, otherwise: [{ type: "tap", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~ untapped` }];
+    const tap = /^t/i.test(m[1]!);
+    return [{ type: "may", effects: [], pay, otherwise: [tap ? { type: "tap", what: { ref: "self" } } : { type: "exile", what: { ref: "self" } }], keep: true, text: `Pay ${m[2]} to keep ~${tap ? " untapped" : ""}` }];
+  }
+  // Withercrown's granted "you lose 1 life unless you sacrifice ~": sacrificing it is the choice; once it's gone (or no
+  // longer yours), the life is lost.
+  if ((m = new RegExp(`^[Yy]ou lose ${NUM} life unless you sacrifice ~$`).exec(s)))
+    return [{ type: "may", effects: [sacrificeSelf], otherwise: [{ type: "loseLife", who: { ref: "you" }, n: num(m[1]!) }], keep: true, text: `Sacrifice ~ rather than lose ${m[1]} life` }];
+  // Mishra's War Machine: "~ deals 3 damage to you unless you discard a card"; Minion of Leshrac: "~ deals 5 damage to you
+  // unless you sacrifice a creature other than ~". The choice is made as it resolves; with no card to discard (no other
+  // creature), the damage is dealt (rulings).
+  if ((m = new RegExp(`^~ deals ${NUM} damage to you unless you (discard a card|sacrifice a creature other than ~|sacrifice another creature)$`).exec(s))) {
+    const dmg = parseSentence(`~ deals ${m[1]} damage to you`, ctx);
+    if (dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
+    const instead: Effect = /^discard/.test(m[2]!) ? { type: "discard", who: { ref: "you" }, n: 1 } : { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], notSource: true, text: "creature other than ~" }, n: 1, action: "sacrifice" };
+    return [{ type: "may", effects: [instead], otherwise: dmg, keep: true, text: `${capital(m[2]!.replace(/another creature$/, "a creature other than ~"))} so ~ deals you no damage` }];
+  }
+  // Elder Spawn: "unless you sacrifice an Island, sacrifice ~ and it deals 6 damage to you": with no Island, or choosing not
+  // to, both happen; the damage comes from ~ as it last existed (CR 113.7a).
+  if ((m = new RegExp(`^[Uu]nless you sacrifice (an? [A-Z][a-z]+|an? (?:land|creature|artifact|enchantment)), sacrifice ~ and it deals ${NUM} damage to you$`).exec(s))) {
+    const filter = pickFilter(m[1]!.replace(/^an? /, ""));
+    const dmg = parseSentence(`~ deals ${m[2]} damage to you`, ctx);
+    if (filter?.kind !== "object" || dmg?.length !== 1) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice" }], otherwise: [sacrificeSelf, ...dmg], keep: true, text: `Sacrifice ${m[1]} to keep ~` }];
+  }
+  // Tragic Lesson: "Then discard a card unless you return a land you control to its owner's hand"; Urza's Tome: "Then
+  // discard a card unless you exile a historic card from your graveyard". Chosen after the draw; discarding is allowed even
+  // with one to return or exile (rulings).
+  if ((m = /^(?:[Tt]hen )?[Dd]iscard a card unless you (return an? ([a-z]+) you control to its owner's hand|exile an? (.+? card) from your graveyard)$/.exec(s))) {
+    const discard: Effect = { type: "discard", who: { ref: "you" }, n: 1 };
+    if (m[2]) {
+      const filter = pickFilter(m[2]);
+      if (filter?.kind !== "object") return null;
+      return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce" }], otherwise: [discard], keep: true, text: `${capital(m[1]!)} rather than discard a card` }];
+    }
+    const filter = parseSearchFilter(m[3]!);
+    if (!filter) return null;
+    return [{ type: "may", effects: [{ type: "chooseFromGraveyard", n: 1, dest: "exile", filter }], otherwise: [discard], keep: true, text: `${capital(m[1]!)} rather than discard a card` }];
+  }
+  // Custody Battle's granted "target opponent gains control of ~ unless you sacrifice a land": sacrifice one to keep it;
+  // otherwise that opponent controls it for the rest of the game (layer 2).
+  if ((m = /^([Tt]arget opponent) gains control of ~ unless you sacrifice (an? (?:land|creature|artifact))$/.exec(s))) {
+    const filter = pickFilter(m[2]!.replace(/^an? /, ""));
+    const who = filter && parsePlayer("target opponent", ctx);
+    if (filter?.kind !== "object" || !who) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice" }], otherwise: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }], keep: true, text: `Sacrifice ${m[2]} to keep control of ~` }];
   }
   // Vaporous Djinn: "~ phases out unless you pay {U}{U}"; Force of Nature: "~ deals 8 damage to you unless you pay
   // {G}{G}{G}{G}"; Heavyweight Demolisher: "tap ~ unless you pay {3}": chosen as it resolves (rulings on Hasran Ogress).
@@ -708,7 +756,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Harvest Wurm: "unless you return a basic land card from your graveyard to your hand": with none there, it's sacrificed;
   // without ~, it can still be done (rulings).
-  if ((m = /^[Ss]acrifice (~|it) unless you (return an? .+? card from your graveyard to your hand)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+  // Rotting Giant, Treacherous Vampire: "unless you exile a card from your graveyard": likewise, with an empty graveyard
+  // it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you (return an? .+? card from your graveyard to your hand|exile an? card from your graveyard)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const back = parseSentence(capital(m[2]!), ctx);
     if (back?.length !== 1 || back[0]!.type !== "chooseFromGraveyard") return null;
     return [{ type: "may", effects: back, otherwise: [sacrificeSelf], keep: true, text: `${capital(m[2]!)} to keep ~` }];

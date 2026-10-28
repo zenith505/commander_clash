@@ -2531,7 +2531,8 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   const both = printed?.modal?.both;
   // Flame of Anor with a Wizard: the two best modes.
   if (both === "control" && bothModes(s, pid, printed!)) {
-    const two = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: 2 } }, false, id);
+    // Let's Play a Game with delirium: as many as are useful.
+    const two = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: printed!.modal!.bothAny ? printed!.modal!.modes.length : 2 } }, false, id);
     if (two && two.modes.length > 1) {
       const plan = castPlanWithModes(s, pid, id, free, x, via, alt, two.modes);
       if (plan) return plan;
@@ -3269,6 +3270,20 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // Assault Suit: "... gain control of equipped creature until end of turn": the same, the creature it equips can't attack us.
   if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && (e.effects[0]!.what.ref === "self" || e.effects[0]!.what.ref === "attached") && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
     return opponents(s, pid).filter((p) => p !== r.item.event?.player).length > 0;
+  // Tanazir Quandrix: "you may have the base power and toughness of other creatures you control become equal to ~'s
+  // power and toughness": only when that makes our other creatures bigger overall.
+  const setAll = e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "each" && e.effects[0]!.mods.length === 1 && e.effects[0]!.mods[0]!.kind === "setPT" ? e.effects[0]! : undefined;
+  if (setAll?.type === "continuous" && setAll.mods[0]!.kind === "setPT" && typeof setAll.mods[0]!.power === "object" && typeof setAll.mods[0]!.toughness === "object") {
+    const ctx = { controller: pid, sourceId: r.item.sourceId };
+    const [p, t] = [evalAmount(s, setAll.mods[0]!.power, ctx), evalAmount(s, setAll.mods[0]!.toughness, ctx)];
+    const mine = s.battlefield.filter((id) => id !== r.item.sourceId && controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    const base = (id: ObjectId) => {
+      const c = characteristics(s, obj(s, id));
+      const set = [...c.pt].reverse().find((x) => x.kind === "set");
+      return set ? set.power + set.toughness : c.printedPower + c.printedToughness;
+    };
+    return mine.reduce((n, id) => n + p + t - base(id), 0) > 0;
+  }
   // Scavenger's Talent: "you may sacrifice three other nonland permanents. If you do, return a creature card from your
   // graveyard to the battlefield": only when the best creature card there is worth more than the cheapest ones we'd give.
   const sacN = e.effects.length === 1 && e.effects[0]!.type === "pick" && e.effects[0]!.action === "sacrifice" && typeof e.effects[0]!.n === "number" && e.effects[0]!.n > 1 ? e.effects[0]! : undefined;

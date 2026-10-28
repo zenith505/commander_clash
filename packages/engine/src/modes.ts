@@ -34,7 +34,7 @@ export const pawprintsOf = (m: NonNullable<AbilityBody["modal"]>, modes: number[
 export function modeRange(body: AbilityBody, both = false): [number, number] {
   const m = body.modal!;
   if (!both || !m.both) return [m.min, m.max];
-  return m.both === "teamwork" || m.bothExactly ? [2, 2] : m.both === "kicked" ? [1, m.modes.length] : [1, 2]; // "commander", "control": one or two
+  return m.both === "teamwork" || m.bothExactly ? [2, 2] : m.both === "kicked" || m.bothAny ? [1, m.modes.length] : [1, 2]; // "commander", "control": one or two
 }
 
 /** All the modes of a spell with entwine were chosen, so it costs its entwine cost more (CR 702.42a). */
@@ -106,6 +106,10 @@ function shiftTargets<T>(x: T, offset: number): T {
   // References into the targets list: { ref: "target" | "targetController" | "anyTarget", index } and counterSpell's index.
   const refersToTarget = o.ref === "target" || o.ref === "targetController" || o.ref === "targetOwner" || o.ref === "anyTarget" || o.type === "counterSpell";
   if (refersToTarget && typeof o.index === "number") copy.index = o.index + offset;
+  // A damage effect's source that's one of the targets: "target creature you control deals damage equal to its power to
+  // any other target" (Special Move's third mode).
+  const by = o.by as { target?: unknown } | undefined;
+  if (by && typeof by === "object" && typeof by.target === "number") copy.by = { ...(copy.by as object), target: by.target + offset };
   return copy as T;
 }
 

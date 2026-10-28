@@ -1,7 +1,7 @@
 # Roadmap
 
-27,246 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,009 of
+27,288 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,021 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -687,6 +687,32 @@ line blocks.
    Out after round 199 (looked at, not done): Jaws, Relentless Predator (no "is sacrificed or destroyed" event),
    Iron Monger (no "whenever you connive" trigger). Bots answer Eternity Vessel's "you may" only when it raises their
    life.
+   Round 200 went on from the top: legendary instants and sorceries now need a legendary creature or planeswalker
+   (CR 205.4e; before, they could be cast without one), "the highest life total among all players" (Sorin, Grim
+   Nemesis), "if cards with at least six different mana values are revealed this way, that player loses the game"
+   (Atemsis), "they exile cards from their hand equal to the difference" (Isildur's Fateful Strike), "counter that spell
+   instead if its controller has three or more poison counters" (Bring the Ending), "can't reduce the amount of mana ~
+   costs by more than {5}" (Valiant Changeling), a Vehicle that's a Phyrexian creature with four or more phyresis
+   counters and "then draw a card if it has seven or more ... If it doesn't, scry 1" (Weatherlight Compleated), "exile
+   cards from the top of your library until you exile a land card" (Venture Forth), "if X is 4 or more" with X the mana
+   spent (Shantotto), "when your commander deals combat damage to a player" and "at the beginning of the monarch's end
+   step" (Archivist of Gondor), "whenever ... while ~ has a -1/-1 counter on it" (Bristlebane Battler, Moonshadow,
+   Reluctant Dounguard), "choose one or more instead" with delirium (Let's Play a Game, a new mode-menu range),
+   "target creature you control deals damage equal to its power to any other target. Then sacrifice it" (Special
+   Move, Burn Together; a modal mode's "deals damage" source now follows its target), "put it onto the battlefield if
+   its mana value is 2 or less" (Guidelight Pathmaker), "if a land was destroyed this way ... Otherwise" (Dire-Strain
+   Rampage), "the base power and toughness of other creatures you control become equal to ~'s" (Tanazir Quandrix; bots
+   say yes only when it makes their creatures bigger), "the rest on the bottom in a random order" (Planar Atlas), "you
+   may put ~ from your graveyard on top of your library" (Gate Colossus), "then if that creature has toughness 6 or
+   greater" (Dormant Grove), "instant and sorcery spells you control have lifelink / deathtouch" (Heartflame Duelist,
+   Pestilent Spirit). A browser test clicks through Let's Play a Game's mode menu with and without delirium.
+   Out after round 200 (looked at, not done): Thrasta (trample over planeswalkers isn't modeled), Enchanter's Bane (a
+   punisher whose option sacrifices the target), Faerie Slumber Party (no record of who controlled the creatures
+   returned this way), You Cannot Pass! (no record of which creatures blocked or were blocked by a legendary creature),
+   Candlekeep Inspiration (cards in exile and graveyard that "have an Adventure"), Convert to Slime (total mana value of
+   the permanents destroyed this way), Canoptek Wraith, Mishra's Command, Furygale Flocking, Sentinel Tower, Fishing
+   Gear, Phyrexian Dreadnought. Soulfire Grand Master, Radiant Scrollwielder and Lo and Li still miss another line;
+   Firesong and Sunspeaker's "red instant and sorcery spells" isn't read yet.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

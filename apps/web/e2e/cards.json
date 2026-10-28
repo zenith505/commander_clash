@@ -10201,6 +10201,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dd893746-e8bd-49fa-a1ce-755d5bd4f513",
+  "name": "Let's Play a Game",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Delirium — Choose one. If there are four or more card types among cards in your graveyard, choose one or more instead.\n• Creatures your opponents control get -1/-1 until end of turn.\n• Each opponent discards two cards.\n• Each opponent loses 3 life and you gain 3 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Delirium"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f92aaa00-6ece-4033-b3df-b2fc2c4718d9",
   "name": "Leyline Tyrant",
   "manaCost": "{2}{R}{R}",

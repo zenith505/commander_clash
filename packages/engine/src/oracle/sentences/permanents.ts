@@ -502,6 +502,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // trigger's creature's as it resolves, locked in then (layer 7b; rulings, CR 608.2h).
   if (/^~'s base power and toughness become equal to that creature's power and toughness until end of turn$/.test(s) && ctx.subject && !ctx.subjectIt)
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: { count: { kind: "toughness", of: { ref: "subject" } } } }], duration: "endOfTurn" }];
+  // Tanazir Quandrix: "the base power and toughness of other creatures you control become equal to ~'s power and toughness
+  // until end of turn": its actual power and toughness as this resolves, locked in then (rulings, CR 608.2h), in layer 7b
+  // (CR 613.4b), for the creatures there then (CR 611.2c).
+  if ((m = /^(?:have )?the base power and toughness of (other creatures you control) become equal to ~'s power and toughness until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref !== "each") return null;
+    return [{ type: "continuous", what, mods: [{ kind: "setPT", power: { count: { kind: "power", of: { ref: "self" } } }, toughness: { count: { kind: "toughness", of: { ref: "self" } } } }], duration: "endOfTurn" }];
+  }
   // Dream Fighter: "Whenever ~ blocks or becomes blocked by a creature, ~ and that creature phase out": both, as it resolves.
   if (/^~ and that creature phase out$/.test(s) && ctx.subject && !ctx.subjectIt) return [{ type: "phaseOut", what: { ref: "self" } }, { type: "phaseOut", what: { ref: "subject" } }];
   if ((m = /^(.+?) phases? out$/i.exec(s))) {

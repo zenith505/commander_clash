@@ -350,8 +350,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Malignus: "the highest life total among your opponents" (those still in the game).
   if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
-  // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too).
-  if (/^the highest life total among players$/i.test(p)) return count({ kind: "life", who: { ref: "eachPlayer" }, highest: true });
+  // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too); Sorin, Grim
+  // Nemesis: "among all players".
+  if (/^the highest life total among (?:all )?players$/i.test(p)) return count({ kind: "life", who: { ref: "eachPlayer" }, highest: true });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
@@ -567,6 +568,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
+  if (each && /^creature type among creatures you control$/i.test(p)) return count({ kind: "creatureTypesAmong" });
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });

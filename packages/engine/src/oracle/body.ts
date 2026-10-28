@@ -1811,6 +1811,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Marcus, Mutant Mayor: "draw a card if that creature has a +1/+1 counter on it. If it doesn't, put a +1/+1 counter
   // on it": one condition, checked as it resolves (CR 608.2c).
   text = text.replace(/^[Dd]raw a card if (that creature has an? [^.]+? counter on it)\. If it doesn't, ([^.]+)\.$/, "If $1, draw a card. Otherwise, $2.");
+  // Weatherlight Compleated: "put a phyresis counter on ~. Then draw a card if it has seven or more phyresis counters on it.
+  // If it doesn't, scry 1.": ~, checked as it resolves after the counter (or as it last existed, rulings).
+  text = text.replace(/(\bcounter on ~\. )Then draw a card if it has (\w+ or more [a-z]+ counters on it)\. If it doesn't, ([^.]+)\.$/, "$1Then if it has $2, draw a card. Otherwise, $3.");
   // Kathari Bomber: "create two 1/1 red Goblin creature tokens and sacrifice ~": two instructions, in order.
   text = text.replace(/^([Cc]reate [^.]+? tokens?) and sacrifice ~\.$/, "$1. Sacrifice ~.");
   // Swarm Surge: "Creatures you control get +2/+0 until end of turn. Colorless creatures you control also gain first strike
@@ -2165,6 +2168,45 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       s = `${s} that's tapped and attacking`;
     }
     if (!s) continue;
+    // Atemsis, All-Seeing: "you may reveal your hand. If cards with at least six different mana values are revealed this
+    // way, that player loses the game." Only a hand revealed counts, so the condition is part of the "you may"; the mana
+    // values are the cards' in your hand (CR 202.3), each counted once.
+    const handMvs = /^[Yy]ou may reveal your hand$/.test(s) ? /^If cards with at least (two|three|four|five|six|seven) different mana values are revealed this way, (.+)$/.exec(sentences[si + 1] ?? "") : null;
+    if (handMvs) {
+      const then = parseSentence(capital(handMvs[2]!), ctx);
+      if (!then) return null;
+      const amount = { count: { kind: "cardsInHand" as const, who: { ref: "you" as const }, differentManaValues: true as const } };
+      effects.push({ type: "may", text: `reveal your hand. ${sentences[si + 1]}`, effects: [{ type: "lookAtHand", who: { ref: "you" }, reveal: true }, { type: "if", cond: { kind: "state", cond: { kind: "amount", amount, min: num(handMvs[1]!) } }, effects: then }] });
+      si++;
+      continue;
+    }
+    // Isildur's Fateful Strike: "Destroy target creature. If its controller has more than four cards in hand, they exile
+    // cards from their hand equal to the difference." Its controller as it last existed (CR 608.2h) chooses the cards, as
+    // with "exiles a card from their hand"; with four or fewer the difference is nothing to exile.
+    const overHand = /^If its controller has more than (one|two|three|four|five|six|seven) cards in hand, they exile cards from their hand equal to the difference$/.exec(s);
+    if (overHand && last?.type === "destroy" && ctx.targets.length === 1 && JSON.stringify(last.what) === JSON.stringify({ ref: "target", index: 0 })) {
+      const who = { ref: "targetController" as const, index: 0 };
+      effects.push({ type: "discard", who, n: { count: { kind: "cardsInHand", who }, plus: -num(overHand[1]!) }, exile: true });
+      continue;
+    }
+    // Bring the Ending: "Counter target spell unless its controller pays {2}. Corrupted — Counter that spell instead if its
+    // controller has three or more poison counters." Its controller's poison counted as it resolves (CR 608.2h for a spell
+    // already gone), then one or the other.
+    const poisonInstead = /^Counter that spell instead if its controller has (two|three|four|five) or more poison counters$/.exec(s);
+    if (poisonInstead && last?.type === "counterSpell" && last.unless && effects.length === 1 && ctx.targets.length === 1) {
+      const { unless: _, ...plain } = last;
+      effects[0] = { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "poison", who: { ref: "targetController", index: last.index } } }, min: num(poisonInstead[1]!) }, effects: [plain], otherwise: [last] };
+      continue;
+    }
+    // Shantotto, Tactician Magician: "~ gets +X/+0 until end of turn, where X is the amount of mana spent to cast that
+    // spell. If X is 4 or more, draw a card." The same X, that spell's mana spent (the cast trigger's event amount).
+    const spentX = si > 0 && /, where X is the amount of mana spent to cast that spell\.?$/.test(sentences[si - 1]!) && ctx.castSpell ? /^If X is (\w+) or more, (.+)$/.exec(s) : null;
+    if (spentX) {
+      const then = parseSentence(capital(spentX[2]!), ctx);
+      if (!then || !JSON.stringify(effects).includes('"eventAmount"')) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "eventAmount" } }, min: num(spentX[1]!) }, effects: then });
+      continue;
+    }
     // Akroma, Vision of Ixidor: one instruction, before the conditions below read its "if it has" (sentences/permanents.ts).
     if (/^[Uu]ntil end of turn, each other creature you control gets \+1\/\+1 if it has flying, \+1\/\+1 if it has first strike, and so on for /.test(s)) {
       const akroma = parseSentence(capital(s), ctx);
@@ -2748,6 +2790,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
       effects.push({ ...fx[0]!, landTo: { zone: "battlefield", tapped: true } });
+      si += 3;
+      continue;
+    }
+    // Guidelight Pathmaker: "you may search your library for an artifact card and reveal it. Put it onto the battlefield if
+    // its mana value is 2 or less. Otherwise, put it into your hand. If you search your library this way, shuffle.": one
+    // search, the card's destination by its mana value; shuffled only if searched (rulings).
+    const mvTo = /^([Yy]ou may )?[Ss]earch your library for (an? [A-Za-z ]+? card) and reveal it$/.exec(s);
+    const mvIf = mvTo && /^Put it onto the battlefield if its mana value is (\d+) or less$/.exec(sentences[si + 1] ?? "");
+    if (mvTo && mvIf && sentences[si + 2] === "Otherwise, put it into your hand" && sentences[si + 3]?.replace(/\.$/, "") === "If you search your library this way, shuffle") {
+      const fx = parseOne(`Search your library for ${mvTo[2]}, reveal it, put it into your hand, then shuffle`, ctx);
+      const card = parseSearchFilter(`card with mana value ${mvIf[1]} or less`);
+      if (fx?.length !== 1 || fx[0]!.type !== "search" || !card) return null;
+      const search: Effect = { ...fx[0]!, cardTo: { card, dest: { zone: "battlefield" } } };
+      effects.push(mvTo[1] ? { type: "may", effects: [search], text: sentences.slice(si, si + 4).join(". ").replace(/^[Yy]ou may /, "") } : search);
       si += 3;
       continue;
     }
@@ -4773,11 +4829,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // among them, then put that card on top of your library and the rest on the bottom in any order." Not looking leaves
     // the library as it is.
     const mayLookTop = /^[Yy]ou may look at the top (two|three|four|five|six) cards of your library$/.exec(s);
-    const lookTopLand = mayLookTop && /^If you do, reveal up to one (.+? card) from among them, then put that card on top of your library and the rest on the bottom in any order$/.exec(sentences[si + 1] ?? "");
+    // Planar Atlas: "... and the rest on the bottom in a random order" (CR 401.4).
+    const lookTopLand = mayLookTop && /^If you do, reveal up to one (.+? card) from among them, then put that card on top of your library and the rest on the bottom in (any|a random) order$/.exec(sentences[si + 1] ?? "");
     if (lookTopLand) {
       const filter = parseSearchFilter(lookTopLand[1]!);
       if (!filter) return null;
-      effects.push({ type: "may", effects: [{ type: "dig", n: num(mayLookTop[1]!), count: 1, upTo: true, filter, into: "libraryTop", rest: "bottom", reveal: true }], text: `look at the top ${mayLookTop[1]} cards of your library` });
+      effects.push({ type: "may", effects: [{ type: "dig", n: num(mayLookTop[1]!), count: 1, upTo: true, filter, into: "libraryTop", rest: "bottom", ...(lookTopLand[2] === "a random" ? { random: true as const } : {}), reveal: true }], text: `look at the top ${mayLookTop[1]} cards of your library` });
       si++;
       continue;
     }
@@ -5543,6 +5600,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (drawIfPower && (drawAbout?.type === "continuous" || drawAbout?.type === "counters") && drawAbout.what.ref === "target" && !drawAbout.what.n && ctx.targets[drawAbout.what.index]?.kind === "object") {
       const index = (drawAbout.what as { index: number }).index;
       effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], power: { max: Number(drawIfPower[1]) }, text: `power ${drawIfPower[1]} or less` } }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] });
+      continue;
+    }
+    // Dormant Grove: "Put a +1/+1 counter on target creature you control. Then if that creature has toughness 6 or greater,
+    // transform ~.": its toughness after the counter, as this resolves (CR 608.2c).
+    const hasPT = /^(?:Then i|I)f that creature has (power|toughness) (\d+) or greater, (.+)$/.exec(s);
+    const hasAbout = effects[effects.length - 1];
+    if (hasPT && (hasAbout?.type === "continuous" || hasAbout?.type === "counters") && hasAbout.what.ref === "target" && !hasAbout.what.n && ctx.targets[hasAbout.what.index]?.kind === "object") {
+      const index = (hasAbout.what as { index: number }).index;
+      const inner = parseOne(capital(hasPT[3]!), ctx);
+      if (!inner || /\b(?:it|its|that creature)\b/.test(hasPT[3]!)) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: [], notTypes: [], notColors: [], [hasPT[1]!]: { min: Number(hasPT[2]) }, text: `${hasPT[1]} ${hasPT[2]} or greater` } }, effects: inner });
       continue;
     }
     // Compleat Devotion: "Target creature you control gets +2/+2 until end of turn. If that creature has toxic, draw a
@@ -7883,11 +7951,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
       // Wedding Announcement: "If you attacked with two or more creatures this turn, draw a card. Otherwise, create ...".
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "selfCounters" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped"))) || (prev?.type === "if" && prev.cond.kind === "amountsCompare" && effects.length === 1);
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse) || prev.otherwise) return null;
+      // Dire-Strain Rampage: "If a land was destroyed this way, ... Otherwise, ...": a target that wasn't destroyed (an
+      // indestructible one) or wasn't a land gets the second (rulings).
+      const destroyedElse = prev?.type === "if" && prev.cond.kind === "destroyedThisWay" && !!prev.cond.cardType;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse && !destroyedElse) || prev.otherwise) return null;
       // Captivating Glance: "Otherwise, that player gains control of enchanted creature": the opponent clashed with.
       if (prev.cond.kind === "wonClash" && !ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
       // Lily Bowen: after "... on ~ if its power is 16 or less", "it" is ~.
@@ -9088,6 +9159,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter || filter.kind !== "card" || filter.anyOf || (!aura && (!filter.types?.length || !filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Enchantment") || filter.subtypes?.length))) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", mayElseHand: true, rest: "bottom" });
       si += 3;
+      continue;
+    }
+    // Venture Forth: "Exile cards from the top of your library until you exile a land card. Put that card onto the
+    // battlefield and the rest on the bottom of your library in a random order." The same as revealing them, but exiled
+    // (CR 406.3), so the rest go to the bottom from exile; all of them if none is found (CR 701.20a does the same).
+    const exUntil = /^[Ee]xile cards from the top of your library until you exile an? ((?:land|creature|artifact) card)$/.exec(s);
+    const exPut = exUntil ? /^Put that card onto the battlefield( tapped)? and the rest on the bottom of your library in a random order$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (exUntil && exPut) {
+      const filter = parseSearchFilter(exUntil[1]!);
+      if (!filter || filter.kind !== "card") return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "bottom", exile: true, ...(exPut[1] ? { tapped: true as const } : {}) });
+      si++;
       continue;
     }
     // Hermit Druid: "Put that card into your hand and all other cards revealed this way into your graveyard."

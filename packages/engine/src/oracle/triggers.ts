@@ -538,9 +538,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 // "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
 // whose ability this is, so "another" changes nothing.
 // "An Aura, Equipment, or Vehicle spell" (Sram): a list, its commas before the spell's last word.
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
-const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted", "the chosen player": "chosen" } as const;
+const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
 
 /**
  * "When ~ becomes the target of a spell, sacrifice it", "Whenever ~ becomes the target of a spell or ability for the first

@@ -1,7 +1,10 @@
 // Round 190: more of the harder cards both lanes skipped, from the most played down: counters of any kind plus one on
 // any permanent you control (Pir, Imaginative Rascal), granted fabricate (Cayth, Famed Mechanist), "as long as it was
 // cast" (The Tarrasque), a revealed creature put onto the battlefield tapped and attacking (Raph & Mikey), "until you
-// reveal X land cards, where X is ..." (The Ring Goes South).
+// reveal X land cards, where X is ..." (The Ring Goes South), "another creature or an artifact" (Gut), "whenever you
+// create a Blood token" (Voldaren Bloodcaster), "remove all but one counter" (Lily Bowen), Fractals as big as the exiled
+// creatures (Oversimplify), "target artifact creature's controller sacrifices it" (Arcum Dagsson), Scrap Mastery,
+// Wedding Announcement, Hex Magic, "~ or equipped creature attacks" (Tanuki Transplanter) and Thada Adel.
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, commander, mountain, passUntil, putOnBattlefield, scry, setup, swamp } from "./helpers";
@@ -77,7 +80,6 @@ const ringGoesSouth = card("The Ring Goes South", "Sorcery", "{3}{G}", {"cmc":4,
 
 const gut = card("Gut, True Soul Zealot", "Legendary Creature — Goblin Shaman", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":["Choose a background"],"oracleText":"Whenever you attack, you may sacrifice another creature or an artifact. If you do, create a 4/1 black Skeleton creature token with menace that's tapped and attacking. (It can't be blocked except by two or more creatures.)\nChoose a Background (You can have a Background as a second commander.)","colors":["R"],"layout":"normal"});
 const lilyBowen = card("Lily Bowen, Raging Grandma", "Legendary Creature — Mutant Warrior", "{3}{G}", {"cmc":4,"power":"0","toughness":"0","keywords":["Vigilance","Double"],"oracleText":"Vigilance\nLily Bowen enters with two +1/+1 counters on it.\nAt the beginning of your upkeep, double the number of +1/+1 counters on Lily Bowen if its power is 16 or less. Otherwise, remove all but one +1/+1 counter from it, then you gain 1 life for each +1/+1 counter removed this way.","colors":["G"],"layout":"normal"});
-const sewerNemesis = card("Sewer Nemesis", "Creature — Horror", "{3}{B}", {"cmc":4,"power":"*","toughness":"*","keywords":["Mill"],"oracleText":"As this creature enters, choose a player.\nSewer Nemesis's power and toughness are each equal to the number of cards in the chosen player's graveyard.\nWhenever the chosen player casts a spell, that player mills a card.","colors":["B"],"layout":"normal"});
 const voldarenBloodcaster = scry("transform", [
   { name: "Voldaren Bloodcaster", mana_cost: "{1}{B}", type_line: "Creature — Vampire Wizard", power: "2", toughness: "1", oracle_text: "Flying\nWhenever this creature or another nontoken creature you control dies, create a Blood token. (It's an artifact with \"{1}, {T}, Discard a card, Sacrifice this token: Draw a card.\")\nWhenever you create a Blood token, if you control five or more Blood tokens, transform this creature." },
   { name: "Bloodbat Summoner", type_line: "Creature — Vampire Wizard", color_indicator: ["B"], power: "3", toughness: "3", oracle_text: "Flying\nAt the beginning of combat on your turn, up to one target Blood token you control becomes a 2/2 black Bat creature with flying and haste in addition to its other types." },
@@ -94,7 +96,7 @@ const hexMagic = card("Hex Magic", "Sorcery — Arcane", "{2}{R}", {"cmc":3,"ora
 const tanukiTransplanter = card("Tanuki Transplanter", "Artifact Creature — Equipment Dog", "{3}{G}", {"cmc":4,"power":"2","toughness":"4","keywords":["Reconfigure"],"oracleText":"Whenever this creature or equipped creature attacks, add an amount of {G} equal to its power. Until end of turn, you don't lose this mana as steps and phases end.\nReconfigure {3} ({3}: Attach to target creature you control; or unattach from a creature. Reconfigure only as a sorcery. While attached, this isn't a creature.)","colors":["G"],"layout":"normal"});
 const thadaAdel = card("Thada Adel, Acquisitor", "Legendary Creature — Merfolk Rogue", "{1}{U}{U}", {"cmc":3,"power":"2","toughness":"2","keywords":["Landwalk","Islandwalk"],"oracleText":"Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWhenever Thada Adel deals combat damage to a player, search that player's library for an artifact card and exile it. Then that player shuffles. Until end of turn, you may play that card.","colors":["U"],"layout":"normal"});
 
-const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, sewerNemesis, voldarenBloodcaster, arcumDagsson, scrapMastery, oversimplify, weddingAnnouncement, hexMagic, tanukiTransplanter, thadaAdel];
+const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, voldarenBloodcaster, arcumDagsson, scrapMastery, oversimplify, weddingAnnouncement, hexMagic, tanukiTransplanter, thadaAdel];
 
 describe("round 190", () => {
   it("all compile", () => supported(...ALL));
@@ -232,35 +234,6 @@ describe("round 190", () => {
     s = upkeep(s);
     expect(counters(s, lily)).toBe(1);
     expect(life(s, ap)).toBe(before + 31);
-  });
-
-  it("Sewer Nemesis counts the chosen player's graveyard, and that player mills a card for each spell they cast", () => {
-    let { s, ap, ids, opp } = setup([sewerNemesis]);
-    for (let i = 0; i < 2; i++) into(s, opp, bear(), "graveyard");
-    s = run(s, planCast(s, ap, ids[0]!));
-    for (let i = 0; i < 10 && s.stack.length && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
-    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "player" });
-    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: String(opp) }));
-    const nem = ids[0]!;
-    expect(pt(s, nem)).toEqual([2, 2]);
-    into(s, opp, bear(), "graveyard");
-    expect(pt(s, nem)).toEqual([3, 3]);
-    // The chosen player casting a spell mills them a card; another player's spell doesn't.
-    const spell = card("Test Spell", "Instant", "{1}", { cmc: 1, oracleText: "Draw a card." });
-    for (const id of lands(s, opp)) s.objects[id]!.tapped = false;
-    putOnBattlefield(s, opp, mountain);
-    putOnBattlefield(s, opp, mountain);
-    const theirs = into(s, opp, spell, "hand");
-    const lib = s.players[opp]!.library.length;
-    s = act(s, { type: "passPriority", player: ap });
-    expect(waitingOn(s)).toBe(opp);
-    s = resolveAll(run(s, planCast(s, opp, theirs)));
-    expect(s.players[opp]!.library.length).toBe(lib - 2); // a card milled, a card drawn
-    expect(pt(s, nem)).toEqual([5, 5]); // the milled card and the spell
-    const mine = into(s, ap, spell, "hand");
-    tapAllBut(s, ap, lands(s, ap));
-    s = resolveAll(run(s, planCast(s, ap, mine)));
-    expect(pt(s, nem)).toEqual([5, 5]);
   });
 
   it("Oversimplify: each player gets a Fractal with counters equal to the total power their exiled creatures had; none, it dies", () => {

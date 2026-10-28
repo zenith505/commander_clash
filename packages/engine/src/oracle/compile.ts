@@ -4159,8 +4159,6 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     if (o.ref === "selfChosenPlayer" && !out.entersChoosePlayer) bad = true;
-    // "Whenever the chosen player casts a spell" (Sewer Nemesis) likewise.
-    if (o.by === "chosen" && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     // Lobotomy: a card chosen from a revealed hand gives the name (Effect takeFromHand "name").
     if (o.type === "takeFromHand" && o.action === "name") choices.add("cardName");

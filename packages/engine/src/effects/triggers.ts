@@ -1693,7 +1693,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
-        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller) || (by === "chosen" && (o.zone !== "battlefield" || o.chosen?.player !== ev.controller))) return false;
+        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
         if (t.cast.yourTurn && you !== s.activePlayer) return false;
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;

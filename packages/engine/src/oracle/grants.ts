@@ -185,6 +185,13 @@ export function parseGrants(text: string): Modification[] | null {
       kws.push("Flanking");
       continue;
     }
+    // Rampage N the same (CR 702.23a, c): "gains rampage 2 until end of turn" (Rapid Fire), a keyword for "If it doesn't
+    // have rampage".
+    if (/^rampage \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Rampage ${/\d+/.exec(w)![0]}` });
+      kws.push("Rampage");
+      continue;
+    }
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
     if (/^(?:persist|undying)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });

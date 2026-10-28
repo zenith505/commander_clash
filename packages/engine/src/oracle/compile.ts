@@ -2513,6 +2513,11 @@ export function compile(d: CardDef): CompiledCard {
       out.unlockLess = (out.unlockLess ?? 0) + Number(unlockLess[1]);
       continue;
     }
+    const morphTax = /^All morph costs cost \{(\d+)\} more\.$/.exec(line);
+    if (morphTax) {
+      out.morphTax = (out.morphTax ?? 0) + Number(morphTax[1]);
+      continue;
+    }
     const plotLess = /^Plotting cards from your hand costs \{(\d+)\} less\.$/.exec(line);
     if (plotLess) {
       out.plotLess = (out.plotLess ?? 0) + Number(plotLess[1]);

@@ -993,11 +993,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "removeSelfCounter": {
       // Fading (CR 702.32a): "remove a fade counter from this permanent. If you can't, sacrifice the permanent."
       // Vanishing (CR 702.63a): removing the last time counter triggers its sacrifice ability.
+      // Cocoon: "remove a pupa counter from ~. If you can't, ...": whether one was removed (ResolvingInfo.did).
       const o = objects(s, { ref: "self" }, ctx)[0];
+      if (s.resolving) s.resolving.did = false;
       if (!o) return;
       const name = characteristics(s, o).name;
       const had = o.counters[e.counter] ?? 0;
       if (removableCounters(s, o, e.counter) > 0) {
+        if (s.resolving) s.resolving.did = true;
         o.counters[e.counter] = had - 1;
         log(s, `${name} loses a ${e.counter} counter (${had - 1} left).`);
         if (had === 1) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });

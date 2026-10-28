@@ -102,6 +102,8 @@ export type Count =
   | { kind: "chosenNumber" }
   /** "Whenever you cast a spell with {X} in its mana cost, put X +1/+1 counters on ~" (Nev, the Practical Dean): the X that cast spell was cast with (CR 107.3a). */
   | { kind: "castSpellX" }
+  /** "The number of times that spell was kicked" (Rumbling Aftershocks): its kicker costs paid as it was cast, multikicker's each time (CR 702.33d). */
+  | { kind: "castSpellKicked" }
   /** "Where X is the greatest power among creatures you controlled as you cast this spell" (Lifestream's Blessing): counted once, as it's cast (StackItem.asCast). */
   | { kind: "asCast"; of: Count }
   /**
@@ -567,6 +569,8 @@ export interface TargetSpec {
    * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
    */
   mvAtMostControllersGraveyard?: true;
+  /** "As long as that player controls three or fewer lands" (Sheltering Prayers): its controller controls at most this many lands. */
+  controllersLandsAtMost?: number;
   /**
    * `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1).
    * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
@@ -1298,7 +1302,7 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo" | /** "It deals 2 damage to you instead" (Forethought Amulet): `amount` instead, for damage of at least `atLeast`. */ "setTo";
   n?: number;
   amount?: Amount;
   up?: true;
@@ -1309,6 +1313,8 @@ export interface DamageMod {
   prevent?: true;
   /** Callous Giant: "If a source would deal 3 or less damage to ~": only to damage of at most this much. */
   atMost?: number;
+  /** Forethought Amulet: "If an instant or sorcery source would deal 3 or more damage to you": only to damage of at least this much. */
+  atLeast?: number;
   /**
    * What would deal the damage: any of `filters` (as it deals it, CR 609.7b); `self`: the permanent with the ability (for
    * an Aura or Equipment, the permanent it's attached to); `other`: not that permanent; `spell`: a spell, not a permanent.
@@ -1940,7 +1946,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true }
+  | { kind: "control"; /** "eventPlayer": the trigger's player ("unless they control two or more basic lands", Furnace Punisher). */ who: "you" | "opponent" | "defending" | "eventPlayer" | /** "Activate only during combat and only if defending player controls no snow lands" (Kjeldoran Guard): the player ~ is attacking, or else any one defending player, whom the ability's controller chooses (CR 508.5, 508.5a, 802.2). */ "anyDefending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "As long as no opponent controls a creature" (Vexing Beetle): every opponent, not any one. */ every?: true; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true; /** "Three or more lands with the same name" (Sceptre of Eternal Glory): the most that share one name. */ sameName?: true; /** "Three or more creatures that share a creature type" (Graxiplon): the most that share one creature type, changelings sharing every one (CR 702.73a). */ sameCreatureType?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**
@@ -2543,7 +2549,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -5871,6 +5877,8 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
   plotLess?: number;
+  /** Exiled Doomsayer: "All morph costs cost {2} more" (CR 118.7, 702.37b): more generic mana to turn any face-down permanent face up with its morph or megamorph cost, not a disguise cost or a manifested card's mana cost, nor casting it face down. */
+  morphTax?: number;
   /** Inquisitive Glimmer: "Unlock costs you pay cost {1} less" (CR 709.5e, 601.2f): less generic mana, for its controller's Rooms. */
   unlockLess?: number;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */

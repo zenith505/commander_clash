@@ -421,6 +421,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       ctx.targets[to.index] = { ...ctx.targets[to.index]!, notSourceHost: true, text: "any other target" };
       return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: "attached" }];
     }
+    // Consuming Ferocity: "it deals damage equal to its power to its controller", the enchanted creature, to whoever controls it.
+    if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^its controller$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "hostController" }, by: "attached" }];
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
     if (a?.ref === "target" && !a.n && /^any target$/i.test(m[2]!)) {
       const to = parseDamageRecipient(m[2]!, ctx);

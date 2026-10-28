@@ -80,6 +80,28 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseConditionalStatic(`~ can't be blocked as long as ${ifCast[1]}.`);
     return st && { ...st, text: line };
   }
+  // Graxiplon: "~ can't be blocked unless defending player controls three or more creatures that share a creature type":
+  // can't be blocked as long as at most two of that player's creatures share any one creature type.
+  const unlessShare = /^~ can't be blocked unless defending player controls (two|three|four|five) or more creatures that share a creature type\.$/.exec(line);
+  if (unlessShare) {
+    const st = parseConditionalStatic(`~ can't be blocked as long as defending player controls ${unlessShare[1]} or more creatures.`);
+    if (st?.condition?.kind !== "control" || st.condition.who !== "defending" || st.condition.min === undefined) return null;
+    return { ...st, condition: { kind: "control", who: "defending", filter: st.condition.filter, max: st.condition.min - 1, sameCreatureType: true }, text: line };
+  }
+  // Sheltering Prayers: "Basic lands each player controls have shroud as long as that player controls three or fewer
+  // lands": each land by its own controller's lands, counted with the layers so far.
+  const perController = /^Basic lands each player controls have ([a-z]+) as long as that player controls (one|two|three|four|five) or fewer lands\.$/.exec(line);
+  if (perController) {
+    const st = parseStatic(`Basic lands have ${perController[1]}.`);
+    if (st?.affects.kind !== "filter") return null;
+    return { ...st, affects: { ...st.affects, spec: { kind: "object" as const, ...st.affects.spec, controllersLandsAtMost: ["one", "two", "three", "four", "five"].indexOf(perController[2]!) + 1, text: "basic lands each player controls" } }, text: line };
+  }
+  // Cocoon: "Enchanted creature doesn't untap during your untap step if ~ has a pupa counter on it."
+  const auraCounter = /^Enchanted creature doesn't untap during your untap step if ~ has an? ([a-z]+) counter on it\.$/.exec(line);
+  if (auraCounter) {
+    const st = parseConditionalStatic(`As long as ~ has a ${auraCounter[1]} counter on it, enchanted creature doesn't untap during your untap step.`);
+    return st && { ...st, text: line };
+  }
   const ifCounter = /^~ doesn't untap during your untap step if it has an? ([a-z]+|\+1\/\+1) counter on it\.$/.exec(line);
   if (ifCounter) {
     const st = parseConditionalStatic(`As long as ~ has a ${ifCounter[1]} counter on it, it doesn't untap during your untap step.`);
@@ -87,8 +109,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // Goblin Rock Sled: "~ doesn't untap during your untap step if it attacked during your last turn", Giant Turtle: "~
   // can't attack if it attacked during your last turn", Tangle Kelp: "Enchanted creature doesn't untap during its
-  // controller's untap step if it attacked during its controller's last turn": "as long as" that's so.
-  const ifAttacked = /^(~ doesn't untap during your untap step|~ can't attack|Enchanted creature doesn't untap during its controller's untap step) if (it attacked during (?:your|its controller's) last turn)\.$/.exec(line);
+  // controller's untap step if it attacked during its controller's last turn": "as long as" that's so. Venarian Gold:
+  // "Enchanted creature doesn't untap during its controller's untap step if it has a sleep counter on it" the same.
+  const ifAttacked = /^(~ doesn't untap during your untap step|~ can't attack|Enchanted creature doesn't untap during its controller's untap step) if (it attacked during (?:your|its controller's) last turn|it has an? [a-z]+ counter on it)\.$/.exec(line);
   if (ifAttacked) {
     const st = parseConditionalStatic(`As long as ${ifAttacked[2]}, ${ifAttacked[1]!.replace(/^Enchanted/, "enchanted")}.`);
     return st && { ...st, text: line };
@@ -625,9 +648,14 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
   }
   // "If you've been attacked this step" means the declare attackers step it names (CR 508.1).
   if (conds.some((c) => c.kind === "attackedThisStep") && !conds.some((c) => c.kind === "during" && c.window === "declareAttackers")) return null;
-  // "During combat and only if defending player controls a snow land" (Arcum's Sleigh): the defending player of a
-  // combat the source isn't in, which a multiplayer game can have several of; not modeled.
-  if (conds.some((c) => c.kind === "during") && conds.some((c) => c.kind === "control" && c.who === "defending")) return null;
+  // "During combat and only if defending player controls a snow land" (Arcum's Sleigh), "... no snow lands" (Kjeldoran
+  // Guard): the player the source is attacking, or else one of the defending players, the ability's controller's choice
+  // (CR 508.5, 508.5a).
+  const anyDefending = conds.some((c) => c.kind === "during" && c.window === "combat");
+  for (const [i, c] of conds.entries()) if (c.kind === "control" && c.who === "defending") {
+    if (!anyDefending) return null;
+    conds[i] = { ...c, who: "anyDefending" };
+  }
   if (conds.length) out.cond = conds.length === 1 ? conds[0]! : { kind: "allOf", conds };
   return out;
 }
@@ -988,6 +1016,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // its controller's last turn", the enchanted creature.
   if (/^it attacked during your last turn$/.test(text) && st.affects.kind === "self") return { kind: "selfIs", filter: { kind: "object", combat: "attackedLastTurn", text: "that attacked during your last turn" } };
   if (/^it attacked during its controller's last turn$/.test(text) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", combat: "attackedLastTurn", text: "that attacked during its controller's last turn" } };
+  if ((m = /^it has an? ([a-z]+) counter on it$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", counter: m[1]!, text: `with a ${m[1]} counter on it` } };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // Kjeldoran Home Guard: "if ~ attacked or blocked this combat".
   if (/^~ attacked or blocked this combat$/.test(text)) return { kind: "self", is: "attackedOrBlockedThisCombat" };

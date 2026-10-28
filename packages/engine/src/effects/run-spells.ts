@@ -152,6 +152,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
+      if (e.when === "becomesBlocked") {
+        // Barreling Attack: "When that creature becomes blocked this turn, it gets ...": about that permanent as it is now
+        // (CR 603.7c, 400.7), each time it becomes blocked this turn (CR 603.7b); its source is the spell (603.7d).
+        for (const o of objects(s, e.of!, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          addDelayed(s, "becomesBlocked", ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+          s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
+        }
+        return;
+      }
       if (e.when === "lostControl") {
         // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
         for (const o of objects(s, e.of!, ctx)) {

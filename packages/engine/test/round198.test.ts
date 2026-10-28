@@ -6,7 +6,8 @@
 // or more collection counters on it, sacrifice it. If you do, draw a card, then you may search ..." (Charitable Levy),
 // "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant), a
 // mana ability that returns its source to hand, as a sorcery (Grinning Ignus), "Choose creature or land" for the cards
-// revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence).
+// revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence),
+// "up to twice X target cards" (Erebos's Intervention).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -52,7 +53,8 @@ const sarkhanDragonAscendant = card("Sarkhan, Dragon Ascendant", "Legendary Crea
 const grinningIgnus = card("Grinning Ignus", "Creature — Elemental", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":[],"oracleText":"{R}, Return this creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery.","colors":["R"],"colorIdentity":["R"]});
 const windingWay = card("Winding Way", "Sorcery", "{1}{G}", {"cmc":2,"keywords":[],"oracleText":"Choose creature or land. Reveal the top four cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard.","colors":["G"],"colorIdentity":["G"]});
 const vivisPersistence = card("Vivi's Persistence", "Instant", "{1}{R}", {"cmc":2,"keywords":[],"oracleText":"Create a 0/1 black Wizard creature token with \"Whenever you cast a noncreature spell, this token deals 1 damage to each opponent.\"\nWhenever your commander enters or attacks, you may pay {2}. If you do, return this card from your graveyard to your hand.","colors":["R"],"colorIdentity":["R"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence];
+const erebossIntervention = card("Erebos's Intervention", "Instant", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"Choose one —\n• Target creature gets -X/-X until end of turn. You gain X life.\n• Exile up to twice X target cards from graveyards.","colors":["B"],"colorIdentity":["B"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -444,5 +446,24 @@ describe("Round 198", () => {
     s = run(s, planCast(s, ap, cmd));
     s = resolveAll(s);
     expect(s.pending ?? undefined).toBeUndefined();
+  });
+
+  it("Erebos's Intervention: exile up to twice X target cards from graveyards, no more", () => {
+    const { s: s0, ap, opp, ids } = setup([erebossIntervention]);
+    const cards = [0, 1, 2, 3, 4].map((i) => into(s0, i % 2 ? opp : ap, creature(`Test Dead ${i}`, "Ox", 1), "graveyard"));
+    expect(planCast(s0, ap, ids[0]!, cards.map(tgt), [1], undefined, 2)).toBeNull();
+    let s = run(s0, planCast(s0, ap, ids[0]!, cards.slice(0, 4).map(tgt), [1], undefined, 2));
+    s = resolveAll(s);
+    expect(cards.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile", "exile", "graveyard"]);
+  });
+
+  it("Erebos's Intervention: or the creature gets -X/-X and you gain X life", () => {
+    const { s: s0, ap, opp, ids } = setup([erebossIntervention]);
+    const ox = putOnBattlefield(s0, opp, creature("Test Ox", "Ox", 4));
+    const life = s0.players[ap]!.life;
+    let s = run(s0, planCast(s0, ap, ids[0]!, [tgt(ox)], [0], undefined, 3));
+    s = resolveAll(s);
+    expect(pt(s, ox)).toEqual([1, 1]);
+    expect(s.players[ap]!.life).toBe(life + 3);
   });
 });

@@ -849,6 +849,8 @@ export interface TargetSpec {
    * the "where X is" is read.
    */
   manyCount?: AmountExpr;
+  /** With many "x": "up to twice X target cards" (Erebos's Intervention), X times this. */
+  manyTimes?: 2;
   manyWhere?: true;
   many?: "any" | "x" | "exactX" | /** "Another target for each time ~ was kicked" (Comet Storm): as many as times kicked, made so as it's cast (gateBody). */ "kicked";
   /**

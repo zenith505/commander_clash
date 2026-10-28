@@ -1005,6 +1005,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
   // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
   if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };
+  // Dose of Dawnglow: "if it isn't your main phase": not your turn, or your turn but not a main phase.
+  if (text === "it isn't your main phase") return { kind: "phase", phase: "main", yours: true, not: true };
   if (text === "it's your end step") return { kind: "phase", phase: "end", yours: true };
   if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
@@ -1164,8 +1166,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
   const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
-  if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
-    return { kind: "selfCounter", counter: counterKind(m[1]!) };
+  // Gatewatch Beacon: "if ~ has loyalty counters on it": one or more.
+  if ((m = new RegExp(`^(?:~|it) has (?:an? ${COUNTER} counter|${COUNTER} counters) on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
+    return { kind: "selfCounter", counter: counterKind((m[1] ?? m[2])!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
   if ((m = /^(?:it|~) has an? (even|odd) number of counters on it$/.exec(text))) return { kind: "selfCounters", counter: "*", min: 0, parity: m[1] as "even" | "odd" };
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
@@ -1240,6 +1243,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // Kezzerdrix: "if your opponents control no creatures": none of them controls one, as "no opponent controls a creature".
   if ((m = /^your opponents control no ([a-z]+)s$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]}`, st);
+  // Chevill, Bane of Monsters: "if your opponents control no permanents with bounty counters on them": any bounty counter,
+  // whoever put it there (rulings).
+  if ((m = /^your opponents control no ([a-z]+)s with ([a-z]+) counters on them$/.exec(text))) return parseStaticCondition(`no opponent controls a ${m[1]} with a ${m[2]} counter on it`, st);
   // Homicidal Seclusion, Demonic Rising: "as long as you control exactly one creature".
   if ((m = /^you control exactly one ([a-z]+)$/.exec(text))) {
     const c = parseStaticCondition(`you control a ${m[1]}`, st);

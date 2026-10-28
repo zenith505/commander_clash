@@ -523,6 +523,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "shuffleZones", who, graveyard: true, bottom: true }] : null;
   }
+  // Mordenkainen: "Exchange your hand and library, then shuffle": the cards that go into the hand aren't drawn (rulings).
+  if (/^Exchange your hand and library, then shuffle$/.test(s)) {
+    return [{ type: "shuffleZones", who: { ref: "you" }, hand: true, exchange: true }, { type: "shuffle", who: { ref: "you" } }];
+  }
   // Morality Shift: "Exchange your graveyard and library. Then shuffle your library."
   if (/^Exchange your graveyard and library$/.test(s)) {
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, exchange: true }];

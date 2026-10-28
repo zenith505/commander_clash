@@ -940,6 +940,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^((?:Put|Return) [^.]*target [^.]+ from [^.]*graveyards? (?:to|onto) the battlefield under your control)\. (?:Each of them|It) enters with an additional ([+-]1\/[+-]1) counter on it\./, "$1 with an additional $2 counter on it.");
   // Killian, Decisive Mentor: "tap up to one target creature and goad it": two instructions, in order.
   text = text.replace(/^([Tt]ap (?:up to one )?target creature) and goad it\./, "$1. Goad it.");
+  // Sauron, Lord of the Rings: "amass Orcs 5, mill five cards, then return a creature card from your graveyard to the
+  // battlefield": one instruction after another; the creature card may be one that was there before the mill (rulings).
+  text = text.replace(/^amass ([A-Z][a-z]+) (\d+), mill (\w+) cards, then /, "amass $1 $2. Mill $3 cards, then ");
+  // Daretti, Rocketeer Engineer: "choose target artifact card in your graveyard. You may sacrifice an artifact. If you do,
+  // return the chosen card to the battlefield." The card is targeted as the ability is put on the stack and the sacrifice
+  // chosen as it resolves (rulings): the same as "You may sacrifice an artifact. If you do, return target ...".
+  text = text.replace(/^[Cc]hoose target ([a-z]+ card) in your graveyard\. You may sacrifice (an? [a-z]+)\. If you do, return the chosen card to the battlefield\./, "You may sacrifice $2. If you do, return target $1 from your graveyard to the battlefield.");
+  // The Motherlode, Excavator: "destroy target nonbasic land defending player controls, and creatures that player controls
+  // without flying can't block this turn": two instructions, "that player" being the defending player.
+  text = text.replace(/\b([Dd]estroy target [a-z ]+ defending player controls), and creatures that player controls (without flying )?can't block this turn\./, "$1. Creatures defending player controls $2can't block this turn.");
+  // Dragon Turtle: "tap it and up to one target creature an opponent controls. They don't untap during their controllers'
+  // next untap steps." Both tapped, then neither untaps; with no target chosen, only ~ (rulings).
+  text = text.replace(/^[Tt]ap (?:it|~) and (up to one target creature an opponent controls)\. They don't untap during their controllers' next untap steps\./, "Tap ~. Tap $1. ~ doesn't untap during its controller's next untap step. That creature doesn't untap during its controller's next untap step.");
+  // Ebony Fly: "Roll a d6. Until end of turn, you may have ~ become an X/X Insect artifact creature with flying, where X is
+  // the result." Chosen as it resolves, after the roll (rulings): the same as "You may have ~ become ... until end of turn".
+  text = text.replace(/(^|\. )Until end of turn, you may have ~ become ([^.,]+), where X is the result\./, "$1You may have ~ become $2 until end of turn, where X is the result.");
+  // Nahiri, the Lithomancer: "Create a colorless Equipment artifact token named Stoneforged Blade. It has indestructible,
+  // "...," and equip {0}." One instruction: the token is created with them (see sentences/tokens.ts).
+  text = text.replace(/(^|\. )(Create a colorless Equipment artifact token named [A-Z][\w'-]*(?: [A-Z][\w'-]*)*)\. It has ([a-z]+), ("[^"]+") and (equip \{\d+\})\./, "$1$2 with $3, $4 and $5.");
+  // Nahiri, the Harbinger: "Search your library for an artifact or creature card, put it onto the battlefield, then shuffle.
+  // It gains haste. Return it to your hand at the beginning of the next end step." A delayed trigger about the permanent
+  // found (CR 603.7), the same as "At the beginning of the next end step, return it to its owner's hand" (yours: it came
+  // from your library).
+  text = text.replace(/(^|\. )(Search your library for [^.]+, put it onto the battlefield, then shuffle\. It gains haste\.) Return it to your hand at the beginning of the next end step\./, "$1$2 At the beginning of the next end step, return it to its owner's hand.");
   // Cruel Ultimatum: "Target opponent sacrifices a creature of their choice, discards three cards, then loses 5 life. You
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
@@ -1040,6 +1064,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
   // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
+  // Silvan Rally: "Mill four cards, then put up to two land cards from among them into your hand": up to two, none too.
+  text = text.replace(/^Mill (two|three|four|five) cards, then put up to (two|three) ([a-z]+) cards from among them into your hand\./, "Mill $1 cards. You may put up to $2 $3 cards from among them into your hand.");
   // Ana Battlemage: "tap target untapped creature and that creature deals damage equal to its power to its controller":
   // two instructions about the target, in order.
   text = text.replace(/^([Tt]ap target untapped creature) and (that creature deals damage equal to its power to its controller)\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
@@ -1215,6 +1241,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Invasive Maneuvers: "It deals 5 damage instead if you control a Spacecraft": the condition read first, as it
   // resolves (CR 608.2c), the same as "If you control a Spacecraft, it deals 5 damage instead".
   text = text.replace(/(\. )It deals (\d+) damage instead if (you control an? [A-Z][a-z]+)\.$/, "$1If $3, it deals $2 damage instead.");
+  // Cinder Strike: "It deals 4 damage to that creature instead if this spell's additional cost was paid" (read as kicked):
+  // the same as "If ~ was kicked, it deals 4 damage instead".
+  text = text.replace(/^(~ deals \d+ damage to target creature\. )It deals (\d+) damage to that creature instead if ~ was kicked\.$/, "$1If ~ was kicked, it deals $2 damage instead.");
   // Lithomantic Barrage: "It deals 5 damage instead if that target is white and/or blue": a permanent that's white, blue
   // or both, as it resolves (CR 608.2c), the same as Lightning Dart's "If that creature is white or blue".
   text = text.replace(/^(~ deals \d+ damage to target creature or planeswalker\. )It deals (\d+) damage instead if that target is (white|blue|black|red|green) and\/or (white|blue|black|red|green)\.$/, "$1If that permanent is $3 or $4, ~ deals $2 damage instead.");
@@ -1411,6 +1440,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());
   if (sylvan && sylvan[1] === sylvan[2])
     return { targets: [], effects: [{ type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: num(sylvan[1]!) }, { type: "drawnPayOrTop", n: num(sylvan[2]!), life: Number(sylvan[3]) }], text: `draw ${sylvan[1]} additional cards` }], text };
+  // Unlucky Cabbage Merchant: "you may search your library for a basic land card and put it onto the battlefield tapped. If
+  // you search your library this way, put ~ on the bottom of its owner's library, then shuffle." In that order: the shuffle
+  // comes after ~ goes to the bottom, and only if the library was searched (CR 701.23, 701.24).
+  const cabbage = /^[Yy]ou may search your library for (a basic land card) and put it onto the battlefield tapped\. If you search your library this way, put ~ on the bottom of its owner's library, then shuffle\.$/.exec(text.trim());
+  if (cabbage && !opts.spell) {
+    const found = parseBodyText(`Search your library for ${cabbage[1]}, put it onto the battlefield tapped, then shuffle.`, opts);
+    const search = found?.effects.length === 1 && found.effects[0]!.type === "search" ? found.effects[0] : undefined;
+    if (!search) return null;
+    return { targets: [], effects: [{ type: "may", effects: [{ ...search, noShuffle: true }, { type: "putInLibrary", what: { ref: "self" }, position: "bottom" }, { type: "shuffle", who: { ref: "you" } }], text: `search your library for ${cabbage[1]}` }], text };
+  }
   // Beseech the Mirror: "Search your library for a card, exile it face down, then shuffle. If ~ was bargained, you may cast
   // the exiled card without paying its mana cost if that spell's mana value is 4 or less. Put the exiled card into your
   // hand if it wasn't cast this way." Cast as it resolves (CR 608.2g); found (Opposition Agent) or not, nothing else.
@@ -2906,12 +2945,33 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Sacrifice a creature. If you can't, sacrifice ~." (Eldrazi Monument): you must if you can, so only when none was.
     // "That player sacrifices a creature of their choice. If the player can't, you create a ... token" (Wasitora): the
     // same, for that one player.
-    const sacCant = /^If (you|the player|that player) can't, (.+)$/.exec(s);
+    // Invoke Despair: "Target opponent sacrifices a creature of their choice. If they can't, they lose 2 life and you draw a
+    // card." ("they" is that player).
+    const sacCant = /^If (you|the player|that player|they) can't, (.+)$/.exec(s);
     const sacWho = sacPrev?.type === "pick" ? sacPrev.who : undefined;
-    if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && (sacCant[1] === "you" ? sacWho?.ref === "you" : sacWho?.ref === "eventPlayer" || (sacWho?.ref === "target" && !sacWho.n)) && sacPrev.n === 1 && !sacPrev.unless) {
+    if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && (sacCant[1] === "you" ? sacWho?.ref === "you" : sacWho?.ref === "eventPlayer" || (sacWho?.ref === "target" && !sacWho.n)) && sacPrev.n === 1 && !sacPrev.unless && !sacPrev.anyNumber && !sacPrev.upTo) {
       const before = ctx.targets.length;
-      const inner = parseOne(capital(sacCant[2]!), ctx);
+      const text = sacCant[1] === "they" ? sacCant[2]!.replace(/^they (lose|gain|draw|discard|mill)\b/, "that player $1s") : sacCant[2]!;
+      if (sacCant[1] === "they" && /\b(?:they|them|their)\b/.test(text)) return null;
+      const inner = parseOne(capital(text), ctx);
       if (!inner || ctx.targets.length !== before) return null;
+      // "Then repeat this process for an enchantment and a planeswalker": the same player sacrifices one of each in turn,
+      // each "if they can't" about that one alone (rulings), whether or not the ones before were sacrificed. Worked out
+      // here by how many have been sacrificed so far: after k of them, this one was if there are k + 1.
+      const again = /^Then repeat this process for (an? [a-z]+(?:, an? [a-z]+)*,? and an? [a-z]+)\.?$/.exec(sentences[si + 1] ?? "");
+      if (again) {
+        const kinds = again[1]!.split(/,? and |, /).map((w) => w.replace(/^an? /, ""));
+        const filters = kinds.map((w) => pickFilter(w));
+        if (filters.some((f) => !f)) return null;
+        const pickOf = (f: TargetSpec): Effect => ({ ...sacPrev, filter: f });
+        const steps = (rest: TargetSpec[], k: number): Effect[] => {
+          if (!rest.length) return [];
+          return [pickOf(rest[0]!), { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "sacrificedThisWayCount" } }, min: k + 1 }, effects: steps(rest.slice(1), k + 1), otherwise: [...inner, ...steps(rest.slice(1), k)] }];
+        };
+        effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: steps(filters as TargetSpec[], 1), otherwise: [...inner, ...steps(filters as TargetSpec[], 0)] });
+        si++;
+        continue;
+      }
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [], otherwise: inner });
       continue;
     }
@@ -3434,6 +3494,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       sentences[si + 2]?.replace(/\.$/, "") === "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost"
     ) {
       effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachPlayer" }, oneOf: true, life: true });
+      si += 2;
+      continue;
+    }
+    // Burning Curiosity: "Exile the top two cards of your library. If this spell's additional cost was paid, exile the top
+    // three cards instead. Until the end of your next turn, you may play those cards.": one impulse, of more cards when that
+    // cost was paid (read as kicked).
+    const kickedTop = exTop && exTop[1] && !impulseIf && !exEqual ? new RegExp(`^If ~ was kicked, exile the top ${NUM} cards instead\\.?$`).exec(sentences[si + 1] ?? "") : null;
+    if (kickedTop && /^Until the end of your next turn, you may play those cards\.?$/.test(sentences[si + 2] ?? "") && num(kickedTop[1]!) > num(exTop![1]!)) {
+      const base = num(exTop![1]!);
+      effects.push({ type: "impulse", n: { count: { kind: "wasKicked" }, times: num(kickedTop[1]!) - base, plus: base }, until: "nextTurn" });
       si += 2;
       continue;
     }
@@ -4092,11 +4162,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Cosmic Cube: "You may cast a spell from among them with mana value less than or equal to the greatest power among
     // attacking creatures you control without paying its mana cost": that bound worked out as it resolves.
-    const lookCastMv = lookCast && /^You may cast a spell from among them with mana value less than or equal to (.+) without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Velomachus Lorehold: "You may cast an instant or sorcery spell with mana value less than or equal to ~'s power from
+    // among them without paying its mana cost": only those, the power as it resolves.
+    const lookCastMv = lookCast && (/^You may cast a spell from among them with mana value less than or equal to (.+) without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") ?? /^You may cast an instant or sorcery spell with mana value less than or equal to (.+) from among them without paying its mana cost$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? ""));
     if (lookCast && lookCastMv && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       const x = parseCount(lookCastMv[1]!, ctx);
       if (!x) return null;
-      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" } });
+      const spells = / an instant or sorcery spell /.test(lookCastMv[0]) ? { filter: { kind: "card" as const, types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" } } : {};
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" }, ...spells });
       si += 2;
       continue;
     }
@@ -7600,7 +7673,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const fromMilled =
       /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
       // Lluwen, Imperfect Naturalist: "you may put a creature or land card from among the milled cards on top of your library".
-      /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s);
+      /^[Yy]ou may put (an? .+? card) from among (?:them|the milled cards) (on top of your library)$/.exec(s) ??
+      // Free the Fae: "Then put an instant, sorcery, or Faerie card from among the milled cards into your hand": one if any
+      // matches, not optional.
+      /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards) into your hand$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
@@ -8541,7 +8617,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // counter was just put on, as it resolves (rulings: not if it has left the battlefield).
     const justCounted = effects[effects.length - 1];
     const selfCounted = !!ifState && !ctx.spell && /^(?:it|~) has .+ counters? on it$/.test(ifState[1]!) && justCounted?.type === "counters" && justCounted.what.ref === "self";
-    const stateCond = ifState && (selfTapped || selfCounted || !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const stateCond = ifState && (selfTapped || selfCounted || !/^(it|~)\b(?!'s (?:your|not your|the first) | isn't your main phase$)/.test(ifState[1]!)) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
@@ -8849,6 +8925,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter) return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "graveyard", who: { ref: "eventPlayer" }, yours: true });
       si += 2;
+      continue;
+    }
+    // Rakdos, the Showstopper: "flip a coin for each creature that isn't a Demon, Devil, or Imp. Destroy each creature
+    // whose coin comes up tails." One coin for each, the losers destroyed together (rulings).
+    const flipEach = /^[Ff]lip a coin for each (creature[^.]*)$/.exec(s);
+    if (flipEach && sentences[si + 1]?.replace(/\.$/, "") === "Destroy each creature whose coin comes up tails") {
+      const each = parseObject(`each ${flipEach[1]}`, ctx);
+      if (each?.ref !== "each" || each.filter.kind !== "object") return null;
+      effects.push({ type: "flipCoinEach", filter: each.filter });
+      si++;
+      continue;
+    }
+    // Sméagol, Helpful Guide: "target opponent reveals cards from the top of their library until they reveal a land card.
+    // Put that card onto the battlefield tapped under your control and the rest into their graveyard." The same, the
+    // target's library and graveyard; with no land card, every card revealed goes to the graveyard (CR 701.20a).
+    const targetReveals = /^[Tt]arget (opponent|player) reveals cards from the top of their library until they reveal an? ([a-z]+ card)$/.exec(s);
+    const putYours = /^Put that card onto the battlefield( tapped)? under your control and the rest into their graveyard$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (targetReveals && putYours) {
+      const filter = parseSearchFilter(targetReveals[2]!);
+      const who = parsePlayer(`target ${targetReveals[1]}`, ctx);
+      if (!filter || filter.kind !== "card" || !filter.types?.length || !who) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "graveyard", who, yours: true, ...(putYours[1] ? { tapped: true as const } : {}) });
+      si++;
       continue;
     }
     const theirs = /^(Its controller|That creature's controller|That permanent's controller) reveals cards from the top of their library until they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?$/.exec(s);
@@ -9599,6 +9698,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;
     return { effects: [{ ...prev, amount: amt(more[1]!) }], instead };
+  }
+  // Dispelling Exhale: "Counter target spell unless its controller pays {2}. If a Dragon was beheld, counter that spell
+  // unless its controller pays {4} instead" (beheld read as kicked): the same counter, a bigger payment.
+  const morePay = instead ? /^Counter that spell unless its controller pays (\{\d+\})$/.exec(t) : null;
+  if (morePay) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "counterSpell" || !prev.unless || Object.keys(prev.unless).join() !== "cost") return null;
+    return { effects: [{ ...prev, unless: { cost: morePay[1]! } }], instead };
   }
   // Chocobo Kick: "Target creature you control deals damage equal to its power to target creature an opponent controls. If
   // ~ was kicked, the creature you control deals twice that much damage instead": the same bite, at twice its power.

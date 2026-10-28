@@ -824,7 +824,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "phase": {
       const combat = ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
       const now = cond.phase === "combat" ? combat : cond.phase === "end" ? s.step === "end" : s.step === "main1" || s.step === "main2";
-      return now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1);
+      return (now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1)) !== !!cond.not;
     }
     case "prowl": {
       // CR 702.76a: the spell's creature types as it's cast (a changeling has all of them, CR 702.73a), against the
@@ -848,7 +848,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ownTrigger = item?.kind === "ability" && item.sourceId === sourceId && src.zone === "battlefield" && !!src.wasCast && src.enteredTurn === s.turn;
       // Hotheaded Giant: a permanent spell enters without a resolving item; it counts itself only if it was cast (rulings).
       const entering = !!cond.entering && !!src.wasCast && mine.some((c) => c.card === defOf(s, src).oracleId);
-      const itself = entering || (!!item && item.controller === you && (ownSpell || ownTrigger) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
+      // Sage of the Skies: "When you cast this spell, if you've cast another spell this turn": the spell on the stack, cast
+      // (not a copy), has counted itself, as it triggers and as the trigger resolves.
+      const castOnStack = src.zone === "stack" && s.stack.some((x) => x.kind === "spell" && !x.copy && x.objectId === sourceId && x.controller === you);
+      const itself = entering || ((castOnStack || (!!item && item.controller === you && (ownSpell || ownTrigger))) && (!cond.color || mine.some((c) => c.card === defOf(s, src).oracleId)));
       return mine.length - (itself ? 1 : 0) > 0;
     }
     case "creatureDied":

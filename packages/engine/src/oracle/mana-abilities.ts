@@ -344,6 +344,13 @@ function parseManaProduced(text: string): ManaProduce | null {
     const n = parseCount(xAny[1]!, null);
     return n && { kind: "oneOf", options: ALL_COLORS, amount: 1, n };
   }
+  // "Add X {G} or X {W}, where X is the number of other creatures you control" (Brigid, Doun's Mind): X mana, all of the
+  // one color chosen (CR 605.3b, like "X mana of any one color").
+  const xEither = /^X \{([WUBRGC])\} or X \{([WUBRGC])\}, where X is (.+)$/.exec(text);
+  if (xEither && xEither[1] !== xEither[2]) {
+    const n = parseCount(xEither[3]!, null);
+    return n && { kind: "oneOf", options: [xEither[1] as ManaType, xEither[2] as ManaType], amount: 1, n };
+  }
   // "One mana of any color among legendary creatures and planeswalkers you control" (Mox Amber), "... among legendary
   // permanents you control" (Plaza of Heroes); "one mana of any of the exiled card's colors" (Chrome Mox: the card its
   // imprint ability exiled, linked in compile.ts); "... of the exiled cards' colors" (Pit of Offerings: the cards its

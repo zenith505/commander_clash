@@ -3,13 +3,14 @@
 import type { Effect, TokenSpec } from "../../abilities";
 import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
-import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES } from "../words";
+import { NUMX, X, amt, num, singularWord, isGroup, BASIC_TYPES, COLOR_WORDS } from "../words";
 import { parsePlayer, parseObject, parseKeywordList } from "../targets";
 import { parseSearchFilter } from "../search";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept, parseCountMod } from "../tokens";
 import { parseSentence } from "../sentence";
 import { halfX, parseCount } from "../counts";
 import type { Ctx } from "../body";
+import { canonicalKeyword, SUPPORTED_KEYWORDS } from "../../keywords";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -171,13 +172,32 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const token: TokenSpec = { name: "Mutavault", named: true, colors: [], types: ["Land"], subtypes: [], keywords: [], abilities: "{T}: Add {C}.\n{1}: This token becomes a 2/2 creature with all creature types until end of turn. It's still a land." };
     return [{ type: "createToken", who: { ref: "you" }, n: 1, token, ...(m[1] ? { tapped: true } : {}) }];
   }
+  // Mabel, Heir to Cragflame: "create Cragflame, a legendary colorless Equipment artifact token with "Equipped creature gets
+  // +1/+1 and has vigilance, trample, and haste" and equip {2}": a named legendary Equipment (CR 111.4, 205.4d, 702.6a).
+  if ((m = /^(?:You )?[Cc]reate ([A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (colorless|white|blue|black|red|green) Equipment artifact token with "([^"]+)" and equip (\{\d+\})$/.exec(s))) {
+    const text = m[3]!.replace(/^([^.]*[^.])$/, "$1.");
+    const colors = m[2] === "colorless" ? [] : [COLOR_WORDS[m[2]!]!];
+    const token: TokenSpec = { name: m[1]!, named: true, legendary: true, colors, types: ["Artifact"], subtypes: ["Equipment"], keywords: [], abilities: `${text}\nEquip ${m[4]!}` };
+    return compileQuoted(text) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
+  }
+  // Nahiri, the Lithomancer: "Create a colorless Equipment artifact token named Stoneforged Blade. It has indestructible,
+  // "Equipped creature gets +5/+5 and has double strike," and equip {0}." (joined into one sentence by parseBody): a named
+  // Equipment token with a keyword, a quoted ability and equip (CR 111.4, 702.6a).
+  if ((m = /^(?:You )?[Cc]reate a colorless Equipment artifact token named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) with ([a-z]+), "([^"]+?),?" and equip (\{\d+\})$/.exec(s))) {
+    const text = m[3]!.replace(/^([^.]*[^.])$/, "$1.");
+    const kw = canonicalKeyword(m[2]!);
+    if (!kw || !(SUPPORTED_KEYWORDS as readonly string[]).includes(kw)) return null;
+    const token: TokenSpec = { name: m[1]!, named: true, colors: [], types: ["Artifact"], subtypes: ["Equipment"], keywords: [kw], abilities: `${text}\nEquip ${m[4]!}` };
+    return compileQuoted(text) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token }] : null;
+  }
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name
   // means the token itself ("When Smaug dies, ...").
   // Bonny Pall: "create Beau, a legendary blue Ox creature token with "Beau's power and toughness are each equal to ..."":
   // no printed power and toughness, which its characteristic-defining ability sets (CR 604.3).
-  // Tolsimir, Friend to Wolves: "create Voja, Friend to Elves, a legendary 3/3 ... token": a name with a comma.
-  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*(?:, [A-Z][\w'-]*(?: (?:the |of the |of |to )?[A-Z][\w'-]*)*)?), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
+  // Tolsimir, Friend to Wolves: "create Voja, Friend to Elves, a legendary 3/3 ... token": a name with a comma; Nissa, Sage
+  // Animist's "Ashaya, the Awoken World" too.
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*(?:, (?:the )?[A-Z][\w'-]*(?: (?:the |of the |of |to )?[A-Z][\w'-]*)*)?), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+?))?( that's tapped and attacking)?$/.exec(s))) {
     if (m[3] === undefined && !/^"[^"]*'s power and toughness are each equal to [^"]+"$/.test(m[6] ?? "")) return null;
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

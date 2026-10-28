@@ -980,6 +980,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject("that card", ctx);
     return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: "top" }] : null;
   }
+  // The Cauldron of Eternity: "Whenever a creature you control dies, put it on the bottom of its owner's library": the card,
+  // if it's still in the graveyard (CR 400.7).
+  if ((m = /^[Pp]ut (it|that card) on (top|the bottom) of its owner's library$/.exec(s)) && ctx.subjectLeft) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "subjectCard" ? [{ type: "putInLibrary", what, position: m[2] === "top" ? "top" : "bottom" }] : null;
+  }
   // Tel-Jilad Stylus: "Put target permanent you own on the bottom of your library": its owner's library is yours.
   if ((m = /^Put (target [a-z ]+ you own) on (top|the bottom) of your library$/i.exec(s))) return parseSentence(`Put ${m[1]} on ${m[2]} of its owner's library`, ctx);
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
@@ -1147,6 +1153,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Cc]reatures( without flying| with power \d+ or less| with defender| with mana value of that quality)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(`creature${m[1] ?? ""}`, { chosen: true });
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` } }] : null;
+  }
+  // The Motherlode, Excavator: "creatures that player controls without flying can't block this turn" (that player being the
+  // defending player): a rule for the turn, so also creatures that lose flying or come under their control later
+  // (rulings).
+  if ((m = /^[Cc]reatures defending player controls( without flying)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(`creature${m[1] ?? ""}`);
+    const of = parsePlayer("defending player", ctx);
+    return filter?.kind === "object" && of ? [{ type: "cantBlockRule", filter: { ...filter, text: `creatures${m[1] ?? ""}` }, ofPlayer: of }] : null;
   }
   // Pyrophobia: "Cowards can't block this turn": each creature of that type as blockers are declared, those entering later too.
   if ((m = /^([A-Z][a-z]+)s can't block this turn$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) return [{ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], subtypes: [m[1]!], text: `${m[1]}s` } }];

@@ -763,7 +763,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (kickedM) what = "spell";
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
-  const parsed0 = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
+  // Chalice of the Void: "a spell with mana value equal to the number of charge counters on ~", as it's cast (rulings).
+  const parsed0 = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" || /^the number of [a-z]+ counters on ~$/.test(t) ? parseCount(t, null) : null) });
   // Firespitter Whelp: "a noncreature or Dragon spell": either kind (TargetSpec.anyOf).
   // Mindsparker: "a white or blue instant or sorcery spell": one of those colors and one of those types.
   const hueKind = !parsed0 ? /^((?:white|blue|black|red|green) or (?:white|blue|black|red|green)) (instant or sorcery)(?: spell)?$/.exec(what) : null;
@@ -827,11 +828,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
  */
 function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature is dealt damage, ~ deals that much damage to that creature's controller" (Repercussion): anyone's.
-  const m = /^Whenever an? (.+?) (?:(you control|an opponent controls) )?is dealt damage, (.+)$/.exec(line);
+  // Termination Facilitator: "Whenever a creature or planeswalker an opponent controls with a bounty counter on it is dealt
+  // damage, destroy it": one with that counter as it's dealt the damage.
+  const m = /^Whenever an? (.+?) (?:(you control|an opponent controls(?: with an? [a-z]+ counter on it)?) )?is dealt damage, (.+)$/.exec(line);
   if (!m) return null;
   const whose = m[2];
   if (!whose && m[1] !== "creature") return null;
   const filter = parseTargetPhrase(whose ? `${m[1]!} ${whose}` : m[1]!);
+  if (whose && / counter on it$/.test(whose) && (filter?.kind !== "object" || !filter.counter)) return "fail";
   if (filter?.kind !== "object") return "fail";
   const thatMuch = /\bthat much\b/.test(m[3]!);
   if (thatMuch && /\bX\b/.test(m[3]!)) return "fail";
@@ -1109,6 +1113,9 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature you control with a +1/+1 counter on it deals combat damage to a player" (Bred for the Hunt): the
   // counter is on it as it deals the damage.
   line = line.replace(/^Whenever (an?|another) (\w+) you control (with an? [^ ]+ counter on it) deals combat damage /, "Whenever $1 $2 $3 you control deals combat damage ");
+  // Subira, Tulzidi Caravanner: "whenever a creature you control with power 2 or less deals combat damage to a player":
+  // its power right after the damage is dealt (rulings), as the trigger event happens.
+  line = line.replace(/^Whenever (an?|another) creature you control (with (?:power|toughness) \d+ or (?:less|greater)) deals combat damage /, "Whenever $1 creature $2 you control deals combat damage ");
   // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);
@@ -2481,6 +2488,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
     return body ? { ...t, body, zone: "graveyard" } : "fail";
   }
+  // Kozilek's Return, Ugin's Binding: "Whenever you cast a colorless spell with mana value 7 or greater, you may exile
+  // ~ from your graveyard. If you do (When you do), ...": the cost moves the card out of the graveyard, so the ability
+  // works only there (CR 113.6m); it triggers only if the card is in your graveyard as you cast the spell (rulings).
+  const yardExile = /^((?:When|Whenever)\b.+?), (you may exile ~ from your graveyard\. (?:If|When) you do, .+)$/.exec(line);
+  if (yardExile && !/^(When|Whenever) ~ /.test(yardExile[1]!)) {
+    const t = parseTrigger(`${yardExile[1]}, draw a card.`);
+    if (!t || t === "fail" || t.event !== "castSpell" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length || t.host || t.zone || t.ifCond) return "fail";
+    const body = parseBody(`${yardExile[2]![0]!.toUpperCase()}${yardExile[2]!.slice(1)}`, { selfCard: true });
+    return body ? { ...t, body, zone: "graveyard" } : "fail";
+  }
   // "Whenever the Ring tempts you" (CR 701.54d). "If you chose a creature other than ~ as your Ring-bearer" is an
   // intervening if (CR 603.4) about the choice just made, so it can't change by the time it resolves.
   // Ringwraiths: "When the Ring tempts you" triggers each time, as "whenever" does (CR 603.2).
@@ -2642,7 +2659,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // So is every "it" of "sacrifice it" (Mad Dog) and "it deals 2 damage to you unless it came under your control this
     // turn" (Erg Raiders), with no target or other object in the text.
     // So is "it" after "if there are two or more ki counters on ~" (the Kamigawa flip cards).
-    if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && /^At /.test(intervening[1]!))
+    // Legolas, Counter of Kills: "Whenever you scry, if ~ is tapped, you may untap it": likewise, an event with no object.
+    if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && (/^At /.test(intervening[1]!) || /^Whenever you (?:scry|surveil|gain life|lose life)$/.test(intervening[1]!)))
       // "You may remove a +1/+1 counter from it" (Ingenious Prodigy) likewise.
       // Riders of the Mark: "return it to its owner's hand. If you do, create a number of ... tokens equal to its toughness":
       // ~ and ~'s (as it last existed, CR 608.2h).

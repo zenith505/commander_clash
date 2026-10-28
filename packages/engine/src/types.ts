@@ -1112,6 +1112,8 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
+  /** The permanent that gets the counter for "Put a -1/-1 counter on a creature you control" (Hatchet Bully, CR 602.2b). */
+  counterOn?: ObjectId[];
   /** Waterbend as an additional cost to cast it (CR 701.67a): untapped artifacts and creatures you control, each paying {1}. */
   waterbend?: ObjectId[];
   /** Cards in hand revealed for "reveal a Pirate card from your hand". */

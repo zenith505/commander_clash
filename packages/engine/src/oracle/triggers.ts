@@ -1994,6 +1994,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Instill Furor: "At the beginning of your end step, sacrifice ~ unless it attacked this turn": checked as it resolves;
+    // the same as an intervening "if ~ didn't attack this turn" (CR 603.4), since nothing attacks during the end step.
+    .replace(/^(At the beginning of your end step), sacrifice ~ unless it attacked this turn\.$/, "$1, if ~ didn't attack this turn, sacrifice it.")
     // Writ of Passage: "Whenever enchanted creature attacks, if its power is 2 or less, ...": "its" is the enchanted creature's.
     .replace(/^(Whenever enchanted creature attacks), if its (power|toughness) is /, "$1, if enchanted creature's $2 is ")
     // Electryte: "Whenever ~ deals combat damage to defending player": the only player an attacking creature can deal
@@ -2503,7 +2506,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
-  const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
+  // Urborg Stalker: "if that player controls a nonblack, nonland permanent", Chrome Replicator: "if you control two or more
+  // nonland, nontoken permanents with ...": each one both, the comma no clause break.
+  const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line.replace(/^((?:When|Whenever|At)\b[^,]*, if [^,]*\bnon[a-z]+), (?=non[a-z]+ (?:permanents?|creatures?)\b)/, "$1 "));
   // "If it's attacking" is about the source only in an ability about the source itself.
   const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$|'s not (?:their|that player's) turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
@@ -2948,7 +2953,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // The Millennium Calendar: "When there are 1,000 or more time counters on ~, sacrifice it and each opponent loses 1,000
   // life": "1,000" is a number.
   // Mazemind Tome: "When there are four or more page counters on ~, exile it. If you do, you gain 4 life."
-  const many = new RegExp(`^When there are (\\d{1,3}(?:,\\d{3})*|${NUM.replace(/^\(/, "(?:")}) or more ([a-z]+) counters on ~, (.+)$`).exec(line);
+  // Homarid: "Whenever there are four or more tide counters on ~, remove all tide counters from it": the same state
+  // trigger (CR 603.8), not again until it has left the stack.
+  const many = new RegExp(`^When(?:ever)? there are (\\d{1,3}(?:,\\d{3})*|${NUM.replace(/^\(/, "(?:")}) or more ([a-z]+) counters on ~, (.+)$`).exec(line);
   if (many) {
     const body = parseBody(many[3]!.replace(/\b(\d{1,3}),(\d{3})\b/g, "$1$2"), { selfIt: true });
     const min = /^[\d,]+$/.test(many[1]!) ? Number(many[1]!.replace(/,/g, "")) : num(many[1]!);

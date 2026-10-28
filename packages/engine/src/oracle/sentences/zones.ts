@@ -626,6 +626,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
   }
+  // Demigod of Revenge: "return all cards named ~ from your graveyard to the battlefield" (its cast trigger): the source's
+  // name (CR 201.5); the spell itself is on the stack, not there (rulings).
+  if (/^[Rr]eturn all cards named ~ from your graveyard to the battlefield$/.test(s)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", named: "~", text: "card named ~" } }];
+  }
   // "Return each Aura card from your graveyard to the battlefield" (Retether): its controller chooses what each enchants as
   // it enters (CR 303.4f); one with nothing to enchant stays in the graveyard (303.4g).
   if (/^[Rr]eturn each Aura card from your graveyard to the battlefield$/.test(s)) {

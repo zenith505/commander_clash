@@ -119,6 +119,12 @@ export function pickFilter(phrase: string): TargetSpec | null {
     const anyOf = [...list[1]!.split(", ").filter(Boolean), list[2]!].map((w) => pickFilter(w));
     return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
   }
+  // Jungle Patrol: "Sacrifice a token named Wood": a permanent with that name (CR 201.2), here the token it makes.
+  const named = /^(token|creature|artifact|permanent) named ([A-Z][A-Za-z' -]*)$/.exec(phrase.trim());
+  if (named) {
+    const noun = pickFilter(named[1]!);
+    return noun ? { ...noun, named: named[2]!, text: phrase.trim() } : null;
+  }
   // "Permanents you don't own" (Agent of Treachery): whose they are comes after the noun.
   const owned = / you (?:don't )?own$/.exec(phrase.trim().replace(/ you control$/i, ""))?.[0] ?? "";
   const words = phrase.trim().replace(/ you control$/i, "").slice(0, owned ? -owned.length : undefined).split(" ");

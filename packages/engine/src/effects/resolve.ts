@@ -522,6 +522,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
   switch (ref.ref) {
     case "you":
       return [ctx.controller];
+    case "linkedPlayer": {
+      // The leaves ability triggered after the source moved: its enters ability was the object before (CR 400.7).
+      const pid = s.linkedPlayer?.[`${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`];
+      return pid !== undefined && !player(s, pid).lost ? [pid] : [];
+    }
     case "eachOpponent":
       return opponents(s, ctx.controller);
     case "eachPlayer":

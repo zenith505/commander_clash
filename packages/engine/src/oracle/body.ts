@@ -39,6 +39,8 @@ export interface Ctx {
   exiledTop?: boolean;
   /** After "you may reveal the top card of your library. If you do": "that card" is the revealed card. */
   revealedTop?: boolean;
+  /** "Reveal the top ten cards of your library" kept them there: "the revealed cards" are those (Sanity Grinding). */
+  revealedTopN?: boolean;
   /** "Reveal cards ... until you reveal a nonland card" kept them in the library: "Put the revealed cards on the bottom of your library in any order" can follow (Erratic Explosion). */
   revealedUntil?: boolean;
   /** The instruction before exiled cards from the top of a library (face up): "for each blue card exiled this way" (Oona, Queen of the Fae). */
@@ -920,6 +922,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
   text = text.replace(/^((?:Each (?:player|opponent)|Target (?:player|opponent)) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
+  // Linessa, Zephyr Mage: "Target player returns a creature they control to its owner's hand, then repeats this process for
+  // an artifact, an enchantment, and a land": one after another, so an artifact creature returned first can't count as
+  // the artifact too (rulings).
+  text = text.replace(/^Target player returns a creature they control to its owner's hand, then repeats this process for an artifact, an enchantment, and a land\.$/, "Target player returns a creature they control to its owner's hand. That player returns an artifact they control to its owner's hand. That player returns an enchantment they control to its owner's hand. That player returns a land they control to its owner's hand.");
+  // Oriss, Samite Guardian: "Target player can't cast spells this turn, and creatures that player controls can't attack
+  // this turn": two instructions.
+  text = text.replace(/^(Target player can't cast spells this turn), and creatures that player controls can't attack this turn\.$/, "$1. Creatures that player controls can't attack this turn.");
   const effects: Effect[] = [];
   // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
@@ -1981,7 +1990,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     .flatMap((x) => {
       // Wormwood Dryad: "~ gains forestwalk until end of turn and deals 1 damage to you": the same.
       const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn|~ gains [a-z]+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
-      return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+      // Kookus: "~ deals 3 damage to you and attacks this turn if able": the same, in order.
+      const k = /^(~ deals \d+ damage to you) and (attacks this turn if able)$/.exec(x);
+      return m ? [m[1]!, `~ ${m[2]!}`] : k ? [k[1]!, `~ ${k[2]!}`] : [x];
     })
     .filter(Boolean);
   let prevStart = 0;
@@ -3664,6 +3675,50 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // graveyard." (Mulch, Wrenn and Seven): every matching card, no choice; the rest where they go (CR 401.4 for "any order").
     // "Put all creature and land cards revealed this way" (Lair Delve): each that's either. "The top X cards" (Enshrined
     // Memories): X as it was cast.
+    // Thought Hemorrhage: "Target player reveals their hand. ~ deals 3 damage to that player for each card with the chosen
+    // name revealed this way.": the cards with that name in the hand just revealed (nothing happens in between, rulings),
+    // dealt as one amount (rulings).
+    const perRevealed = /^~ deals (\d+) damage to that player for each card with the chosen name revealed this way$/.exec(s);
+    if (perRevealed) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      effects.push({ type: "damage", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } }, times: Number(perRevealed[1]) }, to: prev.who });
+      continue;
+    }
+    // Vigean Intuition: "Choose a card type, then reveal the top four cards of your library. Put all cards of the chosen type
+    // revealed this way into your hand and the rest into your graveyard." The type is chosen first, as it resolves (CR
+    // 608.2d): Mulch's dig with that type.
+    const typeThenReveal = /^Choose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
+    if (typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard$/.test(sentences[si + 2] ?? "")) {
+      const n = num(typeThenReveal[1]!);
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+      si += 2;
+      continue;
+    }
+    // Sanity Grinding: "Reveal the top ten cards of your library. For each blue mana symbol in the mana costs of the revealed
+    // cards, target opponent mills a card. Then put the cards you revealed this way on the bottom of your library in any
+    // order." Stomping Slabs: "Reveal the top seven cards of your library, then put those cards on the bottom of your library
+    // in any order. If a card named ~ was revealed this way, ~ deals 7 damage to any target." The cards stay on top while
+    // they're counted, then go to the bottom in the order you choose (all of them if there are fewer, rulings).
+    const revealKeep = new RegExp(`^Reveal the top ${NUM} cards of your library$`).exec(s);
+    const forEachRevealed = revealKeep && /^For each (white|blue|black|red|green) mana symbol in the mana costs of the revealed cards, (target opponent mills a card)$/.exec(sentences[si + 1] ?? "");
+    if (revealKeep && forEachRevealed && /^Then put the cards you revealed this way on the bottom of your library in any order$/.test(sentences[si + 2] ?? "")) {
+      ctx.revealedTopN = true;
+      const mill = parseOne(`${capital(forEachRevealed[2]!)} for each ${forEachRevealed[1]} mana symbol in the mana costs of the revealed cards`, ctx);
+      ctx.revealedTopN = false;
+      if (!mill) return null;
+      effects.push({ type: "revealTop", n: num(revealKeep[1]!) }, ...mill, { type: "revealedUntilToBottom" });
+      si += 2;
+      continue;
+    }
+    const namedRevealed = revealKeep && /^[Pp]ut those cards on the bottom of your library in any order$/.test(sentences[si + 1] ?? "") ? /^If a card named ~ was revealed this way, (.+)$/.exec(sentences[si + 2] ?? "") : null;
+    if (revealKeep && namedRevealed) {
+      const inner = parseOne(capital(namedRevealed[1]!), ctx);
+      if (!inner || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "revealTop", n: num(revealKeep[1]!) }, { type: "revealedUntilToBottom" }, { type: "if", cond: { kind: "revealedTopIs", filter: { kind: "card", types: [], notTypes: [], notColors: [], named: "~", text: "card named ~" } }, effects: inner });
+      si += 2;
+      continue;
+    }
     const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
     const putAll = revealN && /^Put all (.+?) cards revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (revealN && putAll) {
@@ -7289,7 +7344,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       let back = effects.length - 1;
       while (back >= 0 && effects[back]!.type === "if" && (effects[back] as { cond: SpellCondition }).cond.kind === "milledIs") back--;
       const prev = effects[back];
-      // Not "its mana value" (Lammastide Weave): which card that is isn't kept.
+      // Lammastide Weave: "you gain life equal to its mana value" after milling one card: that card.
+      if (filter && prev?.type === "mill" && prev.n === 1 && then === "you gain life equal to its mana value") {
+        effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "milledManaValue" } } }] });
+        continue;
+      }
       if (!filter || prev?.type !== "mill" || /\b(?:it|its)\b|\brepeat\b/.test(then)) return null;
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;

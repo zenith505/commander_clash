@@ -2255,7 +2255,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control"; Tenacious Hunter's "a creature has a -1/-1 counter on it"; Spellbane Centaur and Dense Foliage; Sanguine
   Praetor's "the same mana value as the sacrificed creature" and Endemic Plague's "share a creature type with the
   sacrificed creature"; Icy Prison's "unless any player pays {3}" (its controller's bot pays, the others don't). +34
-  (27,005 of 31,936).
+  (27,140 of 31,936 with rounds 194-196).
 - Known limits there: bots never use Urborg Panther's search (it sacrifices itself), Sanguine Praetor or Endemic Plague
   (no value for "the sacrificed creature's" group), and may use Riptide Mangler or Obelisk of Undoing without a good
   reason. Skipped there: Crucible of the Spirit Dragon, Haruspex and Petalmane Baku (mana abilities with an X counter

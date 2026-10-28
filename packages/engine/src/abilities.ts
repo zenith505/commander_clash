@@ -2241,7 +2241,9 @@ export type Effect =
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
    */
-  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand. */ n?: number; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" }
+  /** Primal Surge: "Exile the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you do, repeat this process." */
+  | { type: "surge" }
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand. */ n?: number; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" | /** Tersa Lightshatter: "exile a card at random from your graveyard. You may play that card this turn." */ "exilePlay" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
@@ -2344,7 +2346,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings). */ haste?: true; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep" | "yourNextUpkeep" | /** Legion's Initiative: "At the beginning of the next combat". */ "nextBeginCombat"; /** With `at`: "It gains haste" (Obzedat), for as long as it remains on the battlefield (rulings); "endOfTurn": "those creatures gain haste until end of turn" (Legion's Initiative). */ haste?: true | "endOfTurn"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /**
    * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
    * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
@@ -2357,7 +2359,7 @@ export type Effect =
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
   | { type: "blockLimitThisCombat"; who: PlayerRef; n: number }
-  | { type: "returnExiled"; under: "owner" | "you"; /** "It gains haste" (Obzedat): for as long as it remains on the battlefield. */ haste?: true; counter?: CounterKind; /** One of each of these as well (Gilraen). */ counters?: CounterKind[]; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
+  | { type: "returnExiled"; under: "owner" | "you"; /** "It gains haste" (Obzedat): for as long as it remains on the battlefield; "endOfTurn", until end of turn (Legion's Initiative). */ haste?: true | "endOfTurn"; counter?: CounterKind; /** One of each of these as well (Gilraen). */ counters?: CounterKind[]; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind }; /** Mechtitan Core: the permanents this activated ability's cost exiled (StackItem.costExiled), set as its delayed trigger is made. */ fromCost?: true }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -2642,6 +2644,8 @@ export type Effect =
       n?: Amount;
       /** Who reveals, and puts the card onto the battlefield under their control: "its controller" (Polymorph). Unset, you. */
       who?: PlayerRef;
+      /** With `who`: "Put that card onto the battlefield under your control" (Curse of Unbinding): the ability's controller's instead. */
+      yours?: true;
       /** "A permanent card that shares a card type with that permanent" (Wild Magic Surge): target `index` as it is, or last was on the battlefield (CR 608.2h). */
       sharesTypeWith?: number;
       /** "A creature card that shares a creature type with it" (Heirloom Blade): with the trigger's subject as it last existed (CR 608.2h). */
@@ -2734,7 +2738,7 @@ export type Effect =
    * "Attach any number of Auras and Equipment you control to target permanent or player" (Ardenn): chosen as it resolves
    * (rulings) among those that could be attached to target `host` (CR 701.3a-b), then attached to it.
    */
-  | { type: "attachAny"; host: number }
+  | { type: "attachAny"; host: number; /** "Attach any number of Equipment you control" (Beatrix, Loyal General): only Equipment, not Auras. */ equipment?: true }
   /** "Attach all Equipment you control to ~" (Balan, Wandering Knight): each of `filter` that could be attached to the source (CR 701.3a-b). */
   | { type: "attachAll"; filter: TargetSpec }
   /** Unbound Flourishing: "double the value of X" of the spell whose casting triggered this, if it's still on the stack. */
@@ -2950,6 +2954,8 @@ export type Effect =
       optional?: true;
       /** "For as long as that card remains exiled, its owner may play it. A spell cast this way costs {2} more to cast." */
       ownerMay?: { play?: true; more?: number };
+      /** "If you do, it becomes plotted" (Kellan Joins Up, CR 702.170c): its owner may cast it free on a later turn. */
+      plot?: true;
     }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
@@ -3301,7 +3307,7 @@ export type Effect =
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "It becomes night" (Unnatural Moonrise), "it becomes day" (CR 731.1): the daybound and nightbound permanents transform with it. */
-  | { type: "becomeDayNight"; v: "day" | "night" }
+  | { type: "becomeDayNight"; v: "day" | "night" | /** The Celestus: "If it's night, it becomes day. Otherwise, it becomes night." */ "switch" }
   /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
   | { type: "extraLandThisTurn"; n: Amount }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
@@ -4089,6 +4095,8 @@ export type TriggerEvent =
   | "youProliferate"
   /** "Whenever you become the monarch": only when you weren't already (CR 725.3; rulings on Custodi Lich). */
   | "youBecomeMonarch"
+  /** "Whenever day becomes night or night becomes day" (CR 731.1): not the first time it becomes either (rulings). */
+  | "dayNightChanges"
   /** "Whenever a spell or ability you control counters a spell" (Baral): once for each spell countered (CR 701.6a). */
   | "youCounterSpell"
   /** "Whenever you complete a dungeon" (CR 309.7). */
@@ -5214,6 +5222,8 @@ export interface CompiledCard {
   /** Daybreak Coronet: "Enchant creature with another Aura attached to it": an Aura other than this one (CR 303.4c, 704.5m). */
   enchantAnotherAura?: true;
   entersTapped: boolean;
+  /** "If it's neither day nor night, it becomes day as ~ enters" (Brimstone Vandal, CR 731.1). */
+  entersDay?: true;
   /** "As long as ~ isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types" (Grist): see defOf. */
   offFieldCreature?: { power: string; toughness: string; subtype: string };
   /** "If a creature dealt damage by ~ (by enchanted creature) this turn would die, exile it instead." (Kumano) */

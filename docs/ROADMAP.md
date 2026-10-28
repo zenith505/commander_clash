@@ -1,7 +1,7 @@
 # Roadmap
 
-26,915 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,909 of
+26,941 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,924 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -564,6 +564,28 @@ line blocks.
    Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
    graveyard"), Horde of Notions (playing a land card during resolution), Undead Alchemist, Auntie Ool (ward—blight),
    Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
+   Round 193 went on from the top: "whenever you cast a spell this turn" as a Saga chapter (Showdown of the Skalds,
+   Origin of Thor: "deals damage equal to its power to each opponent" too), "if you do, it becomes plotted" (Kellan
+   Joins Up, Jace Reawakened), "reveals cards until they reveal a creature card. Put that card onto the battlefield
+   under your control" (Curse of Unbinding), "exile a card at random from your graveyard. You may play that card this
+   turn" (Tersa Lightshatter), "until your next turn, creatures your opponents control attack each combat if able" and
+   "each tapped creature deals damage to itself" (The Akroan War), "each player chooses three nonland permanents they
+   control. Destroy all other nonland permanents" (Fall of the First Civilization), Primal Surge (repeat the process),
+   "cards of the chosen type" after "choose a creature type" (For the Ancestors), "when you next cast a spell with {X}
+   in its mana cost this turn ... half X life" (Brass Infiniscope), "unless target opponent has ~ deal 3 damage to them"
+   (Pia's Revolution), "attach any number of Equipment you control to target creature you control" (Beatrix, Loyal
+   General; Battlefield Improvisation's "if that creature is attacking"), "at the beginning of the next combat, return
+   those cards ... and those creatures gain haste until end of turn" (Legion's Initiative), and day and night:
+   "whenever day becomes night or night becomes day" (not when it first becomes day or night, rulings), "if it's
+   neither day nor night, it becomes day as this creature enters", The Celestus's switch (The Celestus, Vadrik, Brimstone
+   Vandal, Component Collector, Firmament Sage, Gavony Dawnguard, Obsessive Astronomer, Sunrise Cavalier, Sunstreak
+   Phoenix, Celestus Sanctifier), and "look at the top two cards of your library. Put one of them into your graveyard"
+   (Jace, the Living Guildpact). Rules fix: "half X, rounded down" where X is defined elsewhere (a spell's X) kept the
+   whole X.
+   Out after round 193 (looked at, not done): Shilgengar, Sire of Famine, Armed and Armored ("choose a Dwarf you
+   control. Attach any number of Equipment you control to it"), World War Hulk, Hatchery Sliver, Magus Lucea Kane, Make
+   Your Own Luck, Lilah, Undefeated Slickshot, Soulcipher Board ("remove an omen counter ... then if it has no omen
+   counters on it, transform it").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

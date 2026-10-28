@@ -940,7 +940,7 @@ export interface DelayedTrigger {
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
-  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
+  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -2130,6 +2130,8 @@ export interface Resolving {
     numbers?: { queue: PlayerId[]; chosen: Record<string, number>; pick?: number; step?: "discard" | "draw"; draws?: PlayerId[] };
     /** Tainted Pact: the names exiled so far, and the card the player is asked about. */
     pact?: { names: string[]; asking?: ObjectId };
+    /** Primal Surge: the permanent card just exiled, waiting for the answer to "you may put it onto the battlefield". */
+    surgeId?: ObjectId;
     /** "For each creature exiled this way, its controller searches ..." (Winds of Abandon): the players done so far. */
     forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)

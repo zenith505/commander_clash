@@ -1090,6 +1090,8 @@ function describeCount(c: Count): string {
 /** Replace X in an amount with what the text defines it as ("where X is ..."). */
 export function substituteX(a: Amount, x: AmountExpr): Amount {
   if (typeof a === "number" || a.count.kind !== "x") return a;
+  // "Half X life, rounded down" with X defined as a plain count (Brass Infiniscope's spell's X): halved all the same.
+  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
   if (t === 1 && !a.plus) return { ...x, ...(a.negate !== x.negate ? { negate: true } : { negate: undefined }) };

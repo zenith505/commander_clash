@@ -163,6 +163,8 @@ export type TriggerSourceEvent =
   | { type: "proliferated"; player: PlayerId }
   /** A player who wasn't the monarch became it (CR 725.3). */
   | { type: "becameMonarch"; player: PlayerId }
+  /** Day became night or night became day (CR 731.1), not the first time it became either. */
+  | { type: "dayNightChanged" }
   /** The final chapter ability of a Saga (`amount`: its mana value) finished resolving and left the stack; `player` controlled it. */
   | { type: "finalChapterResolved"; player: PlayerId; amount: number }
   /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
@@ -988,6 +990,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youInvestigate" && (!t.firstEachTurn || ev.first), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+  } else if (ev.type === "dayNightChanged") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      add(o, controllerOf(s, o), (e) => e === "dayNightChanges");
+    }
+    // Sunstreak Phoenix: "return this card from your graveyard to the battlefield": its owner's.
+    fromGraveyards((o, owner) => add(o, owner, (e) => e === "dayNightChanges"));
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated" || ev.type === "foretold" || ev.type === "becameMonarch") {
     const kind = ev.type === "proliferated" ? "youProliferate" : ev.type === "foretold" ? "youForetell" : ev.type === "becameMonarch" ? "youBecomeMonarch" : "youCollectEvidence";
     for (const id of s.battlefield) {
@@ -2012,6 +2021,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "beginCombat" && s.thatCombat === d.combat
           : d.when === "nextCleanup"
           ? ev.step === "cleanup"
+          : d.when === "nextBeginCombat"
+          ? ev.step === "beginCombat" && !(d.turn === s.turn && d.step === "beginCombat")
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "yourNextEndStep" || d.when === "playersNextEndStep"

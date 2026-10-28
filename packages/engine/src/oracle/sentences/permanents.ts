@@ -44,6 +44,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = each ? ({ ref: "created" } as ObjRef) : parseObject(fu[1]!, ctx);
     return what && (what.ref !== "target" || !what.n) && what.ref !== "each" ? [{ type: "attachEquipmentTo", what }] : null;
   }
+  // Beatrix, Loyal General: "you may attach any number of Equipment you control to target creature you control"; Battlefield
+  // Improvisation: "... to it". Only those that can be attached to it (rulings; CR 301.5c).
+  if ((fu = /^[Yy]ou may attach any number of Equipment you control to (target creature you control|it|that creature)$/.exec(s))) {
+    const what = parseObject(fu[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "attachAny", host: what.index, equipment: true }] : null;
+  }
   // Energybending: "Lands you control gain all basic land types until end of turn": added to their other types, each with
   // its mana ability (CR 305.6; rulings).
   if ((fu = /^(.+?) gains? all basic land types until end of turn$/.exec(s))) {
@@ -1315,6 +1321,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^[Uu]ntil your next turn, (creatures your opponents control|each creature) attacks? each combat if able and attacks? a player other than you if able$/.exec(s))) {
     const affects = parseAffected(m[1] === "each creature" ? "Each creature" : "Creatures your opponents control");
     return affects ? [{ type: "groupRules", affects, text: m[1]!, mods: [{ kind: "goad", notGoaded: true }], duration: "yourNextTurn" }] : null;
+  }
+  // The Akroan War: "Until your next turn, creatures your opponents control attack each combat if able": the same way,
+  // every creature in the group at any time (CR 611.2c is only for characteristics), unless it can't (rulings).
+  if (/^[Uu]ntil your next turn, creatures your opponents control attack each combat if able$/.test(s)) {
+    const affects = parseAffected("Creatures your opponents control");
+    return affects ? [{ type: "groupRules", affects, text: "creatures your opponents control", mods: [{ kind: "attacksIfAble" }], duration: "yourNextTurn" }] : null;
   }
   // Akroma, Vision of Ixidor: "until end of turn, each other creature you control gets +1/+1 if it has flying, +1/+1 if
   // it has first strike, and so on for double strike, ...": +1/+1 for each of those keywords it has as this resolves

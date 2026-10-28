@@ -29,6 +29,42 @@ function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "surge": {
+      // Primal Surge: exile the top card; a permanent card may be put onto the battlefield, and if it is, all of it again
+      // (repeating includes the repeat). It ends with a card that isn't a permanent card, one you don't put there, or one
+      // that can't go there, like an Aura with nothing to enchant; triggers wait until it's done (rulings).
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.surgeId === undefined) {
+        const top = p.library[0];
+        if (top === undefined) return;
+        const d = defOf(s, obj(s, top));
+        moveObject(s, top, "exile");
+        log(s, `${p.name} exiles ${d.name} from the top of their library.`);
+        if (!isPermanentCard(d) || obj(s, top).zone !== "exile") return;
+        sc.surgeId = top;
+        delete sc.may;
+      }
+      const o = obj(s, sc.surgeId);
+      if (o.zone !== "exile") return;
+      if (sc.may === undefined) {
+        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, o).name} onto the battlefield`, otherwise: "If you don't, Primal Surge is done.", source: src, card: o.id };
+        return "paused";
+      }
+      if (!sc.may) return;
+      const hosts = chooseAuraHosts(s, [{ o, under: p.id }], src);
+      if (hosts === "paused") return "paused";
+      if (defOf(s, o).subtypes.includes("Aura") && !hosts.has(o.id)) {
+        log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in exile.`);
+        return;
+      }
+      log(s, `${p.name} puts ${defOf(s, o).name} onto the battlefield.`);
+      moveObject(s, o.id, "battlefield", { controller: p.id, ...hosts.get(o.id) });
+      if (obj(s, o.id).zone !== "battlefield") return;
+      delete sc.surgeId;
+      delete sc.may;
+      return runLibraryEffect(s, e, ctx, src);
+    }
     case "nextDrawExile":
       // Urabrask, Heretic Praetor: a replacement effect for that player's next draw this turn (CR 614.1a), used up by the
       // draw it replaces (see draw in game.ts).
@@ -417,6 +453,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
           // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
           if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
+          // "It becomes plotted" (CR 702.170c): cast without paying its mana cost on a later turn (702.170d).
+          if (e.plot) {
+            o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
+            log(s, `${defOf(s, o).name} becomes plotted. ${player(s, o.owner).name} may cast it without paying its mana cost on a later turn.`);
+          }
           // Linked to the source as it was when the ability triggered (CR 607.2a), like an exile ability's.
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }

@@ -83,11 +83,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (!filter || / of the chosen /.test(m[1]!)) return null;
       Object.assign(dig, { count: 1, upTo: false, required: true, filter, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
-    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
+    } else if ((m = /^You may reveal (any number of|up to two|up to three) ([^,]+? cards|cards of the chosen type) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
       // Reality Heist: "You may reveal up to two artifact cards from among them and put them into your hand".
-      const filter = parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
-      if (!filter || / of the chosen /.test(m[2]!)) return null;
+      // For the Ancestors: "... any number of cards of the chosen type ..." after "Choose a creature type": any card with
+      // that creature type (CR 205.3m), a changeling's too (CR 702.73a).
+      const filter = ctx?.choseCreatureType && m[2] === "cards of the chosen type" ? ({ kind: "card", chosen: "type", text: "card of the chosen type" } as const) : parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
+      if (!filter || (/ of the chosen /.test(m[2]!) && !filter.chosen)) return null;
       Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand", reveal: true });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) into your hand$/.exec(s))) {
       // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
@@ -319,6 +321,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // "When that creature dies this turn, you draw a card" (A Good Day to Die): a delayed trigger (sentences/permanents.ts),
   // not a draw with a long subject.
   if (/^When that creature dies this turn, /.test(s)) return parsePermanentsSentence(s, ctx) ?? null;
+  // "When you next cast a spell with {X} in its mana cost this turn, you draw a card ..." (Brass Infiniscope): a delayed
+  // trigger (sentences/spells.ts), not a draw with a long subject.
+  if (/^When you next cast /.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   // "Target creature gets +3/+0 until end of turn. When it dies this turn, manifest dread." (Turn Inside Out): "it" is
   // that target creature.
   if (/^When it dies (?:under your control )?this turn, /.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && ctx.targets.length === 1)

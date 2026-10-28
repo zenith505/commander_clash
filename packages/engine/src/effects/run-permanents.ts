@@ -1331,13 +1331,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!sc.queue) {
         const options = s.battlefield.filter((id) => {
           const o = obj(s, id);
-          return controllerOf(s, o) === ctx.controller && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
+          return controllerOf(s, o) === ctx.controller && (!e.equipment || characteristics(s, o).subtypes.includes("Equipment")) && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
         });
         if (!options.length) return;
         sc.queue = [ctx.controller];
         sc.chosen = {};
         const to = host ? defOf(s, host).name : player(s, (t as { id: PlayerId }).id).name;
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true };
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
         return "paused";
       }
       const chosen = sc.chosen?.[ctx.controller] ?? [];

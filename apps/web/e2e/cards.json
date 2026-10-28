@@ -1414,6 +1414,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2f24637d-8d8e-49de-b229-4cdb97595ed7",
+  "name": "Beatrix, Loyal General",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "Vigilance (Attacking doesn't cause this creature to tap.)\nAt the beginning of combat on your turn, you may attach any number of Equipment you control to target creature you control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "74c9cc13-c03f-4322-82af-b7bce1f2a0d8",
   "name": "Beloved Beggar // Generous Soul",
   "manaCost": "{1}{W}",
@@ -13058,6 +13093,32 @@
   "set": "xln",
   "releasedAt": "2017-09-29",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "44b12ccc-81cb-4ec1-891e-4bf706e53aa4",
+  "name": "Primal Surge",
+  "manaCost": "{8}{G}{G}",
+  "cmc": 10,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you do, repeat this process.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

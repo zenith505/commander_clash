@@ -6,7 +6,7 @@ import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, faceDef, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
-import { checkDayNight, dayNightUntapCheck } from "./daynight";
+import { checkDayNight, dayNightUntapCheck, setDayNight } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
@@ -1231,6 +1231,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   const printed = characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
   if (!characteristics(s, o).hasPrintedAbilities) withCounters = undefined;
   if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
+  // Brimstone Vandal: day from the moment it enters, with neither (CR 731.1, 614.12).
+  if (printed.entersDay && !s.dayNight) setDayNight(s, "day");
   // "As a historic permanent you control enters, it becomes a 7/7 Dinosaur creature in addition to its other types"
   // (Displaced Dinosaurs): from permanents already on the battlefield, judged by the permanent as it would exist there
   // (CR 614.12, as for othersAddCounters); it's that from the moment it enters (rulings).

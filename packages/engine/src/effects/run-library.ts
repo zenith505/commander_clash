@@ -356,7 +356,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!cards.length || n <= 0) return;
         const kind = e.filter?.text ?? "card";
         const what = n > 1 ? `${e.upTo ? "up to " : ""}${n} ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-        const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : "to exile";
+        const to = e.action === "name" ? "whose name is chosen: all cards with that name are exiled" : e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : e.action === "shuffleIn" ? `for ${p.name} to shuffle into their library` : e.action === "libraryTop" ? `to put on top of ${p.name}'s library` : e.action === "libraryBottom" ? `for ${p.name} to reveal and put on the bottom of their library` : "to exile";
         s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional || e.upTo ? 0 : Math.min(n, cards.length), max: Math.min(n, cards.length), dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
@@ -383,6 +383,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of ids) {
           log(s, `${player(s, ctx.controller).name} puts a card from ${p.name}'s hand on top of their library.`);
           moveObject(s, id, "library", { top: true });
+        }
+      else if (e.action === "libraryBottom")
+        for (const id of ids) {
+          log(s, `${p.name} reveals ${defOf(s, obj(s, id)).name} and puts it on the bottom of their library.`);
+          moveObject(s, id, "library");
         }
       else if (e.action === "libraryThird")
         for (const id of ids) {
@@ -897,7 +902,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return "paused";
       }
       // Without a "may": no search (nothing found), but the library is still shuffled if the effect says to (rulings).
-      while (!e.orGraveyard && queue.length && barred(queue[0]!)) {
+      // Kassandra: barred from the library, the graveyard and hand are still searched (no shuffle).
+      if (e.andHand && queue.length && barred(queue[0]!) && sc.searchZones === undefined) sc.searchZones = "graveyard";
+      while (!e.orGraveyard && !e.andHand && queue.length && barred(queue[0]!)) {
         log(s, `${player(s, queue[0]!).name} can't search ${libOf(queue[0]!) === player(s, queue[0]!) ? "their" : "that"} library.`);
         searchedBy.push({ pid: queue.shift()!, found: [] });
       }
@@ -924,7 +931,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // still shuffled after, rulings); the same top cards for the whole search.
         const top = searchTop(s, p.id);
         const lib = libOf(p.id).library;
-        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard || e.andGraveyard ? p.graveyard : [])].filter(fits);
+        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard || e.andGraveyard ? p.graveyard : []), ...(e.andHand ? p.hand : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         if (e.totalMv !== undefined) cards = cards.filter((id) => defMv(defOf(s, obj(s, id))) <= e.totalMv!);
@@ -1012,7 +1019,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
-        const where = yardOnly ? `${whose} graveyard` : e.orGraveyard || e.andGraveyard ? `${whose} library and graveyard` : `${whose} library`;
+        const where = e.andHand ? (yardOnly ? `${whose} graveyard and hand` : `${whose} graveyard, hand, and library`) : yardOnly ? `${whose} graveyard` : e.orGraveyard || e.andGraveyard ? `${whose} library and graveyard` : `${whose} library`;
         log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}${exiledFor(pid) !== undefined ? ` and exiles ${found.length === 1 ? "it" : "them"} for ${player(s, exiledFor(pid)!).name} to play` : ""}` : " and finds nothing"}${(searchers.length > 1 && e.dest.zone !== "libraryTop") || yardOnly || e.noShuffle ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
         // "And exile the rest" (Doomsday): every other card in the library and graveyard, before the chosen cards move.

@@ -44,10 +44,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
   }
   if (dig.into === undefined) {
     // Stargaze: "Put X cards from among them into your hand", the X it was cast with.
-    if ((m = new RegExp(`^Put (one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
-      if (m[1] === "X" && !ctx?.spell) return null;
-      Object.assign(dig, m[1] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[1]!), upTo: false, into: "hand" });
-      if (m[2]) Object.assign(dig, restOf(m[2]));
+    // Thassa's Intervention: "Put up to two of them into your hand and the rest on the bottom ...": none to two.
+    if ((m = new RegExp(`^Put (up to )?(one|two|three|X) (?:of (?:them|those cards)|cards? from among them) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
+      if (m[2] === "X" && (!ctx?.spell || m[1])) return null;
+      Object.assign(dig, m[2] === "X" ? { count: 0, countX: true, upTo: false, into: "hand" } : { count: num(m[2]!), upTo: !!m[1], into: "hand" });
+      if (m[3]) Object.assign(dig, restOf(m[3]));
     } else if ((m = /^You may (?:reveal (an? [^,]+? card) and\/or (an? [^,]+? card) from among them and put (?:them|the revealed cards)|put (an? [^,]+? card) and\/or (an? [^,]+? card) from among them) into your hand$/.exec(s))) {
       // "You may put a creature card and/or a land card from among them into your hand" (Kiora, Master of the Depths): up
       // to one card for each, a card that's both being either one (as Krosan Verge's search, oneOfEach).

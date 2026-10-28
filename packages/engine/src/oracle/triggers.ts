@@ -1134,7 +1134,8 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a creature you control with deathtouch deals combat damage to a player" (Fynn, the Fangbearer): the
   // keyword as it deals the damage.
   // "Whenever a creature you control with a counter on it deals combat damage to a player" (Ray Fillet): any kind.
-  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+|with a counter on it) (deals combat damage to .+)$/.exec(line);
+  // Kassandra, Eagle Bearer: "with a legendary Equipment attached to it", as it deals the damage.
+  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+|with a counter on it|with a legendary Equipment attached to it) (deals combat damage to .+)$/.exec(line);
   // Samut, Vizier of Naktamun: "..., if that creature entered this turn, draw a card": an intervening if (CR 603.4) that
   // stays true once it is, so it's the same as a creature that entered this turn dealing the damage.
   const enteredIf = /^(Whenever (?:another|an?) .+? you control deals combat damage to a player), if that creature entered this turn, (.+)$/.exec(line);
@@ -1389,7 +1390,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever one or more creatures you control with power 4 or greater attack" (The Earth King): the same group.
   line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater) attack, /, "$1 $3 $2 attack, ");
-  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more (.+?)|you attack), (.+)$/.exec(line))) {
+  if ((m = /^Whenever one or more (creatures that are enchanted by an Aura you control) attack, (.+)$/.exec(line))) {
+    // Killian, Decisive Mentor: whoever attacks with them (the Aura yours, the creature anyone's), once for each
+    // declaration of attackers (CR 508.1, 603.2c).
+    event = "creaturesYouControlAttack";
+    phrase = m[1];
+    bodyText = m[2]!;
+    anyone = true;
+  } else if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
     bodyText = m[4]!;
@@ -1516,7 +1524,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     // Haliya, Ascendant Cadet: "creatures you control with +1/+1 counters on them".
     const counters = / with (\+1\/\+1 )?counters on them$/.exec(phrase);
     const words = counters ? phrase.slice(0, counters.index) : phrase;
-    const spec = parseTargetPhrase(words.split(/\s+/).map(singularWord).join(" ") + (counters ? ` with ${counters[1] ? "a +1/+1 counter" : "counters"} on it` : ""));
+    const spec = parseTargetPhrase(phrase === "creatures that are enchanted by an Aura you control" ? "aura-yours-enchanted creature" : words.split(/\s+/).map(singularWord).join(" ") + (counters ? ` with ${counters[1] ? "a +1/+1 counter" : "counters"} on it` : ""));
     if (!spec || spec.kind !== "object") return "fail";
     group = { ...spec, text: phrase };
   }
@@ -1524,13 +1532,15 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Draw that many cards" (The Ur-Dragon), "search your library for up to that many basic land cards" (The Earth King):
   // how many of the matching creatures attacked, as they were declared.
   const thatMuch = (event === "creaturesYouControlDealCombatDamageToPlayer" || (event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander)) && (/\bthat (?:much|many)\b/.test(text) || damageX);
+  // Fangorn, Tree Shepherd: "add twice that much {G}": two for each of them.
+  const twice = thatMuch && !damageX && /^add twice that much \{[WUBRGC]\}\.?$/.test(text);
   if (thatMuch && !damageX) {
     if (/\bX\b/.test(text)) return "fail";
-    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    text = text.replace(twice ? /\btwice that much\b/g : /\bthat (?:much|many)\b/g, "X");
   }
   let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" || perPlayer, ...(those ? { eventGroup: true as const } : {}) });
   if (!body) return "fail";
-  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: shownText ?? (damageX ? body.text : unX(body.text, bodyText)) };
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" }, ...(twice ? { times: 2 } : {}) }), text: shownText ?? (damageX ? body.text : twice ? bodyText : unX(body.text, bodyText)) };
   if (toOpponent) {
     const said = (b: AbilityBody): AbilityBody => ({ ...withOtherOpponents(b), text: withOtherOpponents(b).text.replaceAll("that player", "that opponent"), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map(said) } } : {}) });
     body = said(body);
@@ -2216,7 +2226,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (once) {
     // "Whenever a counter is put on a creature you control, ..." (Hollowmurk Siege): once for each counter, but only the
     // first of them each turn does anything, so it's the same as "one or more counters".
-    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, "));
+    // Mikey & Leo, Chaos & Order: "Whenever you put a counter on a creature you control, ...": the same.
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, ").replace(/^Whenever you put a counter on (a creature you control|another creature you control), /, "Whenever you put one or more counters on $1, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // Suki, Courageous Rescuer: "Whenever another permanent you control leaves the battlefield during your turn, ...": only

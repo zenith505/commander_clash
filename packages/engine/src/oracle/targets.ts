@@ -1296,6 +1296,13 @@ export function parseTargetPhrase(
     extra.notCounter = counterKind(without[1]!);
     p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();
   }
+  // Kassandra, Eagle Bearer: "a creature you control with a legendary Equipment attached to it" (CR 301.5a).
+  const legendaryEquipped = / with a legendary equipment attached to it$/i.exec(p);
+  if (legendaryEquipped) {
+    if (extra.status) return null;
+    extra.status = "legendaryEquipped";
+    p = p.slice(0, legendaryEquipped.index);
+  }
   // Due Diligence: "target creature you control other than enchanted creature": not the one the source is attached to.
   const notHost = / other than enchanted creature$/.exec(p);
   if (notHost) {

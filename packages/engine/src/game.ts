@@ -1236,7 +1236,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // (CR 614.12, as for othersAddCounters); it's that from the moment it enters (rulings).
   othersChangeIt(s, o);
   // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
-  const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
+  // Nissa, Steward of Elements: loyalty X, the X it was cast with, 0 if it wasn't cast (CR 107.3m, 306.5b).
+  const loyalty = isType(defOf(s, o), "Planeswalker") ? (defOf(s, o).loyalty === "X" ? (opts.x ?? 0) : Number.parseInt(defOf(s, o).loyalty ?? "", 10)) : NaN;
   // The counters it enters with arrive at once (CR 614.1c): its own "enters with", a spell's "additional" ones (opts),
   // and others' "enters with an additional" (Renata). Each kind is one placement, so Hardened Scales adds one, and its
   // controller orders those replacement effects (CR 616.1) the way that gives the most.

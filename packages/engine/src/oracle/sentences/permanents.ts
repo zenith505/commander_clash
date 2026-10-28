@@ -639,6 +639,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter("creature")!;
     return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
   }
+  // Lily Bowen: "remove all but one +1/+1 counter from it, then you gain 1 life for each +1/+1 counter removed this way":
+  // the life is for the counters actually removed (ResolvingState.countersRemoved).
+  if ((m = /^Remove all but one (\+1\/\+1) counter from (~|it)(?:, then you gain 1 life for each \+1\/\+1 counter removed this way)?$/i.exec(s))) {
+    const what = parseObject(m[2]!, ctx);
+    if (!what || isGroup(what)) return null;
+    return [{ type: "removeCounters", what, counter: m[1]!, n: "allButOne" }, ...(/gain 1 life/.test(s) ? [{ type: "gainLife" as const, who: { ref: "you" as const }, n: { count: { kind: "countersRemovedThisWay" as const } } }] : [])];
+  }
   // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
   if ((m = /^Remove all counters from (~|it|that creature|target .+|up to one target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

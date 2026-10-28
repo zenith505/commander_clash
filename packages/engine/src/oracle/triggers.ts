@@ -536,9 +536,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 // "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
 // whose ability this is, so "another" changes nothing.
 // "An Aura, Equipment, or Vehicle spell" (Sram): a list, its commas before the spell's last word.
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
-const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
+const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted", "the chosen player": "chosen" } as const;
 
 /**
  * "When ~ becomes the target of a spell, sacrifice it", "Whenever ~ becomes the target of a spell or ability for the first
@@ -1972,6 +1972,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (expend) {
     const t = parseTrigger(`Whenever you proliferate, ${expend[2]}`);
     return t && t !== "fail" && t.event === "youProliferate" && Object.keys(t).every((k) => k === "event" || k === "body") ? { ...t, event: "youExpend", expend: Number(expend[1]) } : "fail";
+  }
+  // Voldaren Bloodcaster: "Whenever you create a Blood token, ...": once for each token of that kind you create (CR 111.2).
+  const createdKind = /^Whenever you create an? ([A-Z][a-z]+) token, (.+)$/.exec(line);
+  if (createdKind) {
+    const filter = pickFilter(createdKind[1]!);
+    const t = parseTrigger(`Whenever you create a token, ${createdKind[2]}`);
+    if (!filter || filter.kind !== "object" || !filter.subtypes?.length || filter.types?.length) return "fail";
+    return t && t !== "fail" && t.event === "youCreateToken" ? { ...t, createdFilter: { ...filter, text: `${createdKind[1]} token` } } : "fail";
   }
   // Marshal's Anthem: "When ~ enters, return up to X target creature cards from your graveyard to the battlefield, where X
   // is the number of times ~ was kicked": X is known as the ability is put on the stack, when its targets are chosen

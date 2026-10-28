@@ -75,7 +75,15 @@ const pir = card("Pir, Imaginative Rascal", "Legendary Creature — Human", "{2}
 const raphAndMikey = card("Raph & Mikey, Troublemakers", "Legendary Creature — Mutant Ninja Turtle", "{5}{R/G}{R/G}", {"cmc":7,"power":"7","toughness":"7","keywords":["Haste","Trample"],"oracleText":"Trample, haste\nWhenever Raph & Mikey attack, reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield tapped and attacking and the rest on the bottom of your library in a random order.","colors":["G","R"],"layout":"normal"});
 const ringGoesSouth = card("The Ring Goes South", "Sorcery", "{3}{G}", {"cmc":4,"oracleText":"The Ring tempts you. Then reveal cards from the top of your library until you reveal X land cards, where X is the number of legendary creatures you control. Put those land cards onto the battlefield tapped and the rest on the bottom of your library in a random order.","colors":["G"],"layout":"normal"});
 
-const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth];
+const gut = card("Gut, True Soul Zealot", "Legendary Creature — Goblin Shaman", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":["Choose a background"],"oracleText":"Whenever you attack, you may sacrifice another creature or an artifact. If you do, create a 4/1 black Skeleton creature token with menace that's tapped and attacking. (It can't be blocked except by two or more creatures.)\nChoose a Background (You can have a Background as a second commander.)","colors":["R"],"layout":"normal"});
+const lilyBowen = card("Lily Bowen, Raging Grandma", "Legendary Creature — Mutant Warrior", "{3}{G}", {"cmc":4,"power":"0","toughness":"0","keywords":["Vigilance","Double"],"oracleText":"Vigilance\nLily Bowen enters with two +1/+1 counters on it.\nAt the beginning of your upkeep, double the number of +1/+1 counters on Lily Bowen if its power is 16 or less. Otherwise, remove all but one +1/+1 counter from it, then you gain 1 life for each +1/+1 counter removed this way.","colors":["G"],"layout":"normal"});
+const sewerNemesis = card("Sewer Nemesis", "Creature — Horror", "{3}{B}", {"cmc":4,"power":"*","toughness":"*","keywords":["Mill"],"oracleText":"As this creature enters, choose a player.\nSewer Nemesis's power and toughness are each equal to the number of cards in the chosen player's graveyard.\nWhenever the chosen player casts a spell, that player mills a card.","colors":["B"],"layout":"normal"});
+const voldarenBloodcaster = scry("transform", [
+  { name: "Voldaren Bloodcaster", mana_cost: "{1}{B}", type_line: "Creature — Vampire Wizard", power: "2", toughness: "1", oracle_text: "Flying\nWhenever this creature or another nontoken creature you control dies, create a Blood token. (It's an artifact with \"{1}, {T}, Discard a card, Sacrifice this token: Draw a card.\")\nWhenever you create a Blood token, if you control five or more Blood tokens, transform this creature." },
+  { name: "Bloodbat Summoner", type_line: "Creature — Vampire Wizard", color_indicator: ["B"], power: "3", toughness: "3", oracle_text: "Flying\nAt the beginning of combat on your turn, up to one target Blood token you control becomes a 2/2 black Bat creature with flying and haste in addition to its other types." },
+], { keywords: ["Flying", "Transform"] });
+
+const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, sewerNemesis, voldarenBloodcaster];
 
 describe("round 190", () => {
   it("all compile", () => supported(...ALL));
@@ -155,5 +163,92 @@ describe("round 190", () => {
     const fresh = lands(s, ap).filter((id) => !before.includes(id));
     expect(fresh).toHaveLength(2);
     expect(fresh.every((id) => s.objects[id]!.tapped)).toBe(true);
+  });
+
+  it("Gut: sacrifice another creature or an artifact (Gut too while it's an artifact) for a 4/1 Skeleton tapped and attacking", () => {
+    let { s, ap, opp } = setup([]);
+    const g = putOnBattlefield(s, ap, gut);
+    const relic = putOnBattlefield(s, ap, card("Test Relic", "Artifact", "{1}", { cmc: 1 }));
+    const attacker = putOnBattlefield(s, ap, creature("Test Attacker", "Beast", 2));
+    s = attack(s, ap, [{ attacker, defender: opp }]);
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    // The other creature or the artifact; not Gut, which isn't an artifact.
+    expect(s.pending).toMatchObject({ kind: "pickPermanents" });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options).toContain(relic);
+    expect(options).toContain(attacker);
+    expect(options).not.toContain(g);
+    s = act(s, { type: "pickPermanents", player: ap, ids: [relic] });
+    if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    expect(zone(s, relic)).toBe("graveyard");
+    const skel = named(s, ap, "Skeleton Token");
+    expect(skel).toHaveLength(1);
+    expect(s.objects[skel[0]!]!.tapped).toBe(true);
+    expect(s.objects[skel[0]!]!.attacking).toBe(opp);
+    expect(pt(s, skel[0]!)).toEqual([4, 1]);
+  });
+
+  it("Voldaren Bloodcaster transforms when you create a Blood token with five or more Blood tokens, not for another token", () => {
+    let { s, ap } = setup([]);
+    const blood = card("Test Blood", "Instant", "{1}", { cmc: 1, oracleText: "Create a Blood token." });
+    const treasure = card("Test Treasure", "Instant", "{1}", { cmc: 1, oracleText: "Create a Treasure token." });
+    for (let i = 0; i < 4; i++) {
+      tapAllBut(s, ap, lands(s, ap));
+      s = resolveAll(run(s, planCast(s, ap, into(s, ap, blood, "hand"))));
+    }
+    const v = putOnBattlefield(s, ap, voldarenBloodcaster);
+    // Four Blood tokens: the fifth is created, then it checks (five as it triggers and as it resolves).
+    s = resolveAll(run(s, planCast(s, ap, into(s, ap, treasure, "hand"))));
+    expect(characteristics(s, s.objects[v]!).name).toBe("Voldaren Bloodcaster");
+    tapAllBut(s, ap, lands(s, ap));
+    s = resolveAll(run(s, planCast(s, ap, into(s, ap, blood, "hand"))));
+    expect(named(s, ap, "Blood Token")).toHaveLength(5);
+    expect(characteristics(s, s.objects[v]!).name).toBe("Bloodbat Summoner");
+  });
+
+  it("Lily Bowen doubles her +1/+1 counters at 16 power or less; above that, down to one counter and a life for each removed", () => {
+    let { s, ap } = setup([]);
+    const lily = putOnBattlefield(s, ap, lilyBowen);
+    s.objects[lily]!.counters["+1/+1"] = 8;
+    invalidateCharacteristics(s);
+    const upkeep = (s: GameState) => resolveAll(passUntil(s.step === "upkeep" ? passUntil(s, "draw", ap) : s, "upkeep", ap));
+    s = upkeep(s);
+    expect(counters(s, lily)).toBe(16);
+    const before = life(s, ap);
+    s = upkeep(s);
+    expect(counters(s, lily)).toBe(32);
+    s = upkeep(s);
+    expect(counters(s, lily)).toBe(1);
+    expect(life(s, ap)).toBe(before + 31);
+  });
+
+  it("Sewer Nemesis counts the chosen player's graveyard, and that player mills a card for each spell they cast", () => {
+    let { s, ap, ids, opp } = setup([sewerNemesis]);
+    for (let i = 0; i < 2; i++) into(s, opp, bear(), "graveyard");
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 10 && s.stack.length && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "player" });
+    s = resolveAll(act(s, { type: "chooseOption", player: ap, choice: String(opp) }));
+    const nem = ids[0]!;
+    expect(pt(s, nem)).toEqual([2, 2]);
+    into(s, opp, bear(), "graveyard");
+    expect(pt(s, nem)).toEqual([3, 3]);
+    // The chosen player casting a spell mills them a card; another player's spell doesn't.
+    const spell = card("Test Spell", "Instant", "{1}", { cmc: 1, oracleText: "Draw a card." });
+    for (const id of lands(s, opp)) s.objects[id]!.tapped = false;
+    putOnBattlefield(s, opp, mountain);
+    putOnBattlefield(s, opp, mountain);
+    const theirs = into(s, opp, spell, "hand");
+    const lib = s.players[opp]!.library.length;
+    s = act(s, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(opp);
+    s = resolveAll(run(s, planCast(s, opp, theirs)));
+    expect(s.players[opp]!.library.length).toBe(lib - 2); // a card milled, a card drawn
+    expect(pt(s, nem)).toEqual([5, 5]); // the milled card and the spell
+    const mine = into(s, ap, spell, "hand");
+    tapAllBut(s, ap, lands(s, ap));
+    s = resolveAll(run(s, planCast(s, ap, mine)));
+    expect(pt(s, nem)).toEqual([5, 5]);
   });
 });

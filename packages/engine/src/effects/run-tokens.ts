@@ -1,6 +1,6 @@
 import type { Effect, ObjRef, TokenSpec } from "../abilities";
 import { defOf, isPermanentCard, isType, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, obj, opponents, player } from "../game";
+import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, fireOnceEntered, livingPlayers, log, moveObject, nameOf, newObject, obj, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
 import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -543,7 +543,7 @@ function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
   ((s.turnLog ??= {}).tokensCreated ??= []).push({ player: pid, subtypes: [...defOf(s, o).subtypes] });
   (s.zoneBatch ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, to: "battlefield", owner: o.owner, notCard: true, card: o.cardId, createdBy: pid });
   // "Whenever you create a token" (not a copy of a permanent spell becoming one, CR 111.12).
-  fireEvent(s, { type: "tokenCreated", player: pid, id: o.id });
+  fireOnceEntered(s, { type: "tokenCreated", player: pid, id: o.id });
 }
 
 /** "All attack ...": the answer for every token still to be asked about, at once (an option with several tokens left). */

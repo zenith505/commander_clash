@@ -1853,7 +1853,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
     // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
-    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^(?:Then i|I)f [^,]+, /.test(x) || /^Otherwise, remove all but one [^,]+, then you gain 1 life for each [^,]+ removed this way\.?$/.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) || /^[Ee]ach player reveals the top card of their library, loses life equal to that card's mana value, then puts it into their hand\.?$/.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -7131,14 +7131,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // choice": whether a creature died, not whether a card was drawn (rulings).
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse) || prev.otherwise) return null;
       // Captivating Glance: "Otherwise, that player gains control of enchanted creature": the opponent clashed with.
       if (prev.cond.kind === "wonClash" && !ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
-      const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
+      // Lily Bowen: after "... on ~ if its power is 16 or less", "it" is ~.
+      const otherText = prev.cond.kind === "state" && prev.cond.cond.kind === "selfPT" ? otherwise[1]!.replace(/("[^"]*")|\bit\b/g, (w, q) => q ?? "~") : otherwise[1]!;
+      const inner = parseOne(otherText.charAt(0).toUpperCase() + otherText.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
       continue;
@@ -7761,7 +7763,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is (?:${NUM} or (greater|less)|exactly ${NUM})$`).exec(s) : null;
     const leadPT = !ctx.spell && !ctx.subjectIt && !trailPT ? new RegExp(`^If (~'s|its) (power|toughness) is ${NUM} or (greater|less), (.+)$`).exec(s) : null;
     const selfPTIf = trailPT ? { then: trailPT[1]!, whose: trailPT[2]!, stat: trailPT[3]!, n: trailPT[4] ?? trailPT[6]!, cmp: trailPT[5] ?? "exactly" } : leadPT ? { then: leadPT[5]!, whose: leadPT[1]!, stat: leadPT[2]!, n: leadPT[3]!, cmp: leadPT[4]! } : null;
-    if (selfPTIf && (selfPTIf.whose === "~'s" || ctx.selfIt) && !/\binstead$/.test(selfPTIf.then)) {
+    // Lily Bowen: "double the number of +1/+1 counters on ~ if its power is 16 or less": "its" is the ~ just named, when
+    // nothing else is.
+    const namesSelfOnly = !!selfPTIf && /~/.test(selfPTIf.then) && !/\b(?:target|that|those|it|them|another|each|all)\b/.test(selfPTIf.then);
+    if (selfPTIf && (selfPTIf.whose === "~'s" || ctx.selfIt || namesSelfOnly) && !/\binstead$/.test(selfPTIf.then)) {
       const inner = parseOne(capital(selfPTIf.then), ctx);
       if (!inner) return null;
       const n = num(selfPTIf.n);

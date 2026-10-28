@@ -1336,6 +1336,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (among?.ref !== "target" || !filter || filter.kind !== "object" || !half) return null;
     return [{ type: "pick", who: { ref: "you" }, among, filter, n: { count: { kind: "permanents", filter, whose: among }, half }, action: "bounce" }];
   }
+  // Gut, True Soul Zealot: "you may sacrifice another creature or an artifact": an artifact or a creature other than the
+  // source, and the source too while it's an artifact (rulings).
+  if ((m = /^[Ss]acrifice another creature or an artifact$/.exec(s)) && !ctx.spell) {
+    const filter = pickFilter("artifact or creature");
+    return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, notSourceUnlessArtifact: true, text: "other creature or an artifact" }, n: 1, action: "sacrifice" }] : null;
+  }
   // "You may sacrifice another creature" (Cavalier of Night): one other than the source (a permanent's ability).
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {
     const filter = pickFilter(m[1]!);

@@ -1019,7 +1019,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "tokenCreated") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCreateToken");
+      const made = s.objects[ev.id];
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youCreateToken" && (!t.createdFilter || (!!made && objectMatches(s, t.createdFilter, made, ev.player, false))));
     }
   } else if (ev.type === "lifeLost") {
     // Every other player is an opponent (CR 102.3); "that player" is the one who lost life, "that much" how much.
@@ -1690,7 +1691,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
-        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
+        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller) || (by === "chosen" && (o.zone !== "battlefield" || o.chosen?.player !== ev.controller))) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
         if (t.cast.yourTurn && you !== s.activePlayer) return false;
         if (t.cast.selfAttacking && (o.zone !== "battlefield" || o.attacking === undefined)) return false;

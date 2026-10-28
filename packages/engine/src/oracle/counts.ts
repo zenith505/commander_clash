@@ -484,7 +484,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
-  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents') graveyards?$/i.exec(p))) {
+  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);
     if (!who) return null;
     const kinds = m[1]!.trim().replace(/ and /g, " or ");
@@ -738,6 +738,8 @@ export function parseBoundCount(text: string, ctx: Ctx): AmountExpr | null {
 function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   const x = w.toLowerCase();
   if (x === "your") return { ref: "you" };
+  // Sewer Nemesis: "the chosen player's graveyard", the player chosen as it entered (compile checks there is one).
+  if (x === "the chosen player's") return { ref: "selfChosenPlayer" };
   if (!ctx) return null;
   if (x === "target player's" || x === "target opponent's") {
     const i = addTarget(ctx, { kind: "player", opponent: x === "target opponent's", text: x.replace(/'s$/, "") });

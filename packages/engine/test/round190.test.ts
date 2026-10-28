@@ -86,7 +86,15 @@ const arcumDagsson = card("Arcum Dagsson", "Legendary Creature — Human Artific
 const scrapMastery = card("Scrap Mastery", "Sorcery", "{3}{R}{R}", {"cmc":5,"oracleText":"Each player exiles all artifact cards from their graveyard, then sacrifices all artifacts they control, then puts all cards they exiled this way onto the battlefield.","colors":["R"],"layout":"normal"});
 const oversimplify = card("Oversimplify", "Sorcery", "{3}{G}{U}", {"cmc":5,"oracleText":"Exile all creatures. Each player creates a 0/0 green and blue Fractal creature token and puts a number of +1/+1 counters on it equal to the total power of creatures they controlled that were exiled this way.","colors":["G","U"],"layout":"normal"});
 
-const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, sewerNemesis, voldarenBloodcaster, arcumDagsson, scrapMastery, oversimplify];
+const weddingAnnouncement = scry("transform", [
+  { name: "Wedding Announcement", type_line: "Enchantment", mana_cost: "{2}{W}", oracle_text: "At the beginning of your end step, put an invitation counter on this enchantment. If you attacked with two or more creatures this turn, draw a card. Otherwise, create a 1/1 white Human creature token. Then if this enchantment has three or more invitation counters on it, transform it." },
+  { name: "Wedding Festivity", type_line: "Enchantment", color_indicator: ["W"], oracle_text: "Creatures you control get +1/+1." },
+], { keywords: ["Transform"] });
+const hexMagic = card("Hex Magic", "Sorcery — Arcane", "{2}{R}", {"cmc":3,"oracleText":"Exile all the cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled this way.","colors":["R"],"layout":"normal"});
+const tanukiTransplanter = card("Tanuki Transplanter", "Artifact Creature — Equipment Dog", "{3}{G}", {"cmc":4,"power":"2","toughness":"4","keywords":["Reconfigure"],"oracleText":"Whenever this creature or equipped creature attacks, add an amount of {G} equal to its power. Until end of turn, you don't lose this mana as steps and phases end.\nReconfigure {3} ({3}: Attach to target creature you control; or unattach from a creature. Reconfigure only as a sorcery. While attached, this isn't a creature.)","colors":["G"],"layout":"normal"});
+const thadaAdel = card("Thada Adel, Acquisitor", "Legendary Creature — Merfolk Rogue", "{1}{U}{U}", {"cmc":3,"power":"2","toughness":"2","keywords":["Landwalk","Islandwalk"],"oracleText":"Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nWhenever Thada Adel deals combat damage to a player, search that player's library for an artifact card and exile it. Then that player shuffles. Until end of turn, you may play that card.","colors":["U"],"layout":"normal"});
+
+const ALL = [cayth, tarrasque, pir, raphAndMikey, ringGoesSouth, gut, lilyBowen, sewerNemesis, voldarenBloodcaster, arcumDagsson, scrapMastery, oversimplify, weddingAnnouncement, hexMagic, tanukiTransplanter, thadaAdel];
 
 describe("round 190", () => {
   it("all compile", () => supported(...ALL));
@@ -297,5 +305,82 @@ describe("round 190", () => {
     s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
     expect([zone(s, mine), zone(s, theirs), zone(s, back), zone(s, bear0)]).toEqual(["graveyard", "graveyard", "battlefield", "graveyard"]);
     expect(controllerOf(s, s.objects[back]!)).toBe(opp);
+  });
+  it("Wedding Announcement: a Human without two attackers, a card with them; at three invitation counters it transforms", () => {
+    let { s, ap } = setup([]);
+    const wa = putOnBattlefield(s, ap, weddingAnnouncement);
+    s = toStep(s, "end", ap);
+    expect(counters(s, wa, "invitation")).toBe(1);
+    expect(named(s, ap, "Human Token")).toHaveLength(1);
+    expect(s.objects[wa]!.face).toBeUndefined();
+    // Next turn: two creatures attack (one dies in combat; it still attacked this turn), so a card instead of a Human.
+    s = toStep(s, "main1", ap);
+    const a = putOnBattlefield(s, ap, creature("Test A", "Beast", 2));
+    const b = putOnBattlefield(s, ap, creature("Test B", "Beast", 2));
+    s.objects[wa]!.counters["invitation"] = 2;
+    s = attack(s, ap, [{ attacker: a, defender: next(s, ap) }, { attacker: b, defender: next(s, ap) }]);
+    s = toStep(s, "main2", ap);
+    s.objects[b]!.zone = "graveyard";
+    s.battlefield.splice(s.battlefield.indexOf(b), 1);
+    invalidateCharacteristics(s);
+    const hand = s.players[ap]!.hand.length;
+    s = toStep(s, "end", ap);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(named(s, ap, "Human Token")).toHaveLength(1);
+    expect(counters(s, wa, "invitation")).toBe(3);
+    expect(s.objects[wa]!.face).toBe(1);
+    expect(pt(s, a)).toEqual([3, 3]);
+  });
+
+  it("Hex Magic exiles the whole hand, draws that many, and those cards may be played until the end of your next turn", () => {
+    let { s, ap, ids } = setup([hexMagic]);
+    const x = into(s, ap, creature("Test X", "Beast", 1), "hand");
+    const y = into(s, ap, mountain, "hand");
+    const n = s.players[ap]!.hand.length - 1;
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect([zone(s, x), zone(s, y)]).toEqual(["exile", "exile"]);
+    expect(s.players[ap]!.hand.length).toBe(n);
+    expect(s.objects[x]!.mayPlay).toMatchObject({ player: ap });
+    s = run(s, planCast(s, ap, x));
+    s = resolveAll(s);
+    expect(zone(s, x)).toBe("battlefield");
+  });
+
+  it("Tanuki Transplanter adds {G} equal to the attacking creature's power, kept through the steps of the turn", () => {
+    let { s, ap, opp } = setup([]);
+    const tanuki = putOnBattlefield(s, ap, tanukiTransplanter);
+    s = attack(s, ap, [{ attacker: tanuki, defender: opp }]);
+    s = resolveAll(s);
+    expect(s.players[ap]!.manaPool.G).toBe(2);
+    s = toStep(s, "main2", ap);
+    expect(s.players[ap]!.manaPool.G).toBe(2);
+    // Attached: the equipped creature's power.
+    let t = setup([]);
+    const big = putOnBattlefield(t.s, t.ap, creature("Test Big", "Beast", 5));
+    const eq = putOnBattlefield(t.s, t.ap, tanukiTransplanter);
+    t.s.objects[eq]!.attachedTo = big;
+    invalidateCharacteristics(t.s);
+    let s2 = resolveAll(attack(t.s, t.ap, [{ attacker: big, defender: t.opp }]));
+    expect(s2.players[t.ap]!.manaPool.G).toBe(5);
+  });
+
+  it("Thada Adel: combat damage to a player, you search their library for an artifact card, exile it and may play it this turn", () => {
+    let { s, ap, opp } = setup([]);
+    const thada = putOnBattlefield(s, ap, thadaAdel);
+    const relic = into(s, opp, card("Test Relic", "Artifact", "{2}", { cmc: 2 }), "library");
+    s = attack(s, ap, [{ attacker: thada, defender: opp }]);
+    for (let i = 0; i < 30 && s.pending?.kind !== "searchLibrary"; i++) {
+      if (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    s = act(s, { type: "searchLibrary", player: ap, found: [relic] });
+    s = resolveAll(s);
+    expect(zone(s, relic)).toBe("exile");
+    expect(s.objects[relic]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn" });
+    s = toStep(s, "main2", ap);
+    s = resolveAll(run(s, planCast(s, ap, relic)));
+    expect(zone(s, relic)).toBe("battlefield");
+    expect(controllerOf(s, s.objects[relic]!)).toBe(ap);
   });
 });

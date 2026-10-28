@@ -1590,7 +1590,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // the point counters on ~, then the player its trigger is about (checked only as it resolves, rulings).
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more ([a-z]+) counters on it, )remove them all and (that player loses the game)\./g, "$1remove all $2 counters from ~, then $3.");
   // The Emperor of Palamecia: "Then if it has three or more +1/+1 counters on it, transform it": ~, as it is then.
+  // Wedding Announcement: "Then if ~ has three or more invitation counters on it, transform it" after other instructions.
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\./g, "$1transform ~.");
+  text = text.replace(/(\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\.$/, "$1transform ~.");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
@@ -3461,7 +3463,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "Exile all cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled
-    // this way." (Invasion of Kaldheim): face up (CR 406.3), each card's permission its own (CR 400.7).
+    // this way." (Invasion of Kaldheim; Hex Magic's "all the cards"): face up (CR 406.3), each card's permission its own
+    // (CR 400.7).
     // "Put any number of cards from your hand on the bottom of your library, then draw that many cards plus one" (Valakut
     // Awakening, Into the Fire).
     // "Discard any number of cards, then draw that many cards plus one" (Celes, Brass's Tunnel-Grinder), "You may discard
@@ -3519,7 +3522,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // By now split at ", then".
-    if (/^[Ee]xile all cards from your hand$/.test(s) && /^Draw that many cards$/.test(sentences[si + 1] ?? "") && /^Until the end of your next turn, you may play cards exiled this way$/.test(sentences[si + 2] ?? "")) {
+    if (/^[Ee]xile all (?:the )?cards from your hand$/.test(s) && /^Draw that many cards$/.test(sentences[si + 1] ?? "") && /^Until the end of your next turn, you may play cards exiled this way$/.test(sentences[si + 2] ?? "")) {
       effects.push({ type: "exileHand", until: "nextTurn" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "exiledFromHandThisWay" } } });
       si += 2;
       continue;
@@ -7144,7 +7147,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // choice": whether a creature died, not whether a card was drawn (rulings).
       // "Then if a graveyard has twenty or more cards in it, you draw three cards. Otherwise, you draw a card." (Jace, the
       // Perfected Mind): counted after the mill before it.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
+      // Wedding Announcement: "If you attacked with two or more creatures this turn, draw a card. Otherwise, create ...".
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "selfPT" || prev.cond.cond.kind === "attackedWith" || prev.cond.cond.kind === "subjectCounter" || prev.cond.cond.kind === "controlGreatest" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life" || prev.cond.cond.kind === "control" || prev.cond.cond.kind === "eventPlayerNoRad" || prev.cond.cond.kind === "creatureDied" || prev.cond.cond.kind === "opponentGraveyard" || prev.cond.cond.kind === "amount" || (prev.cond.cond.kind === "self" && (prev.cond.cond.is === "tapped" || prev.cond.cond.is === "untapped")));
       // Insatiable Appetite: "You may sacrifice a Food. If you do, target creature gets +5/+5 until end of turn. Otherwise,
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
@@ -8120,6 +8124,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Search target player's graveyard, hand, and library for ... Then that player shuffles" (Memoricide).
       if (prev?.type === "exileNamed") continue;
       return null;
+    }
+    // Thada Adel: "search that player's library for an artifact card and exile it. Then that player shuffles. Until end
+    // of turn, you may play that card": the one card exiled face up, by whoever searched (CR 701.23a).
+    if (/^Until end of turn, you may play that card$/.test(s) && /\bthat player shuffles\.?$/i.test(sentences[si - 1] ?? "")) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "search" || !prev.library || prev.dest.zone !== "exile" || prev.dest.faceDown || prev.dest.play || prev.n !== 1) return null;
+      effects[effects.length - 1] = { ...prev, dest: { ...prev.dest, play: { until: "thisTurn" } } };
+      continue;
     }
     // "Choose a nonland card name. Target player reveals their hand and discards all cards with that name." (Cabal
     // Therapy): the name is chosen as it resolves (CR 201.4, 608.2d; rulings), and "that name" or "the chosen name" after

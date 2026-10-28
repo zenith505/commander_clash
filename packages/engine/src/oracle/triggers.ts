@@ -246,7 +246,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm). Simian Sling:
     // "Whenever ~ or equipped creature becomes blocked, it deals 1 damage to defending player": whichever became blocked
     // (rulings), the subject either way.
-    const whichever = !!m[1] && event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text);
+    // Tanuki Transplanter: "Whenever ~ or equipped creature attacks, add an amount of {G} equal to its power": the power of
+    // whichever attacked, as the ability resolves or as it last existed (rulings).
+    const whichever = !!m[1] && ((event === "selfBecomesBlocked" && /^it deals \d+ damage to defending player\.?$/.test(text)) || (event === "selfAttacks" && /^add an amount of \{[WUBRGC]\} equal to its power\. Until end of turn, you don't lose this mana as steps and phases end\.?$/.test(text)));
     if (m[1] && /\b(it|its|that creature)\b/i.test(text) && !whichever) return "fail";
     if (o.creature) {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?

@@ -109,6 +109,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.revealedFromHand = true;
     return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
   }
+  // "Reveal a creature card in your hand" (Assembly Hall), "Reveal a card from your hand" (Infernal Tutor): one, chosen as
+  // it resolves, if you have one (not a "may"); "that card" is it for the search after ("with the same name as that card").
+  if ((m = /^[Rr]eveal an? (?:(.+?) )?card (?:in|from) your hand$/.exec(s)) && !ctx.revealedFromHand) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (m[1] && !filter)) return null;
+    ctx.revealedFromHand = true;
+    return [{ type: "revealFromHand", ...(filter ? { filter } : {}), one: true, must: true }];
+  }
   // Parley: "Each player reveals the top card of their library." Then "For each nonland card revealed this way, you create
   // a Treasure token" is "create a Treasure token for each nonland card revealed this way" (Selvala's "add {G} and you gain
   // 1 life" is split in parseBody).
@@ -805,6 +813,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Exile all creature cards from target player's graveyard" (Crypt Incursion), "... from all graveyards" (Honor the Fallen),
   // "... from your graveyard" (Zombie Mob). Tombfire: "Target player exiles all cards with flashback from their
   // graveyard": the same, that player doing it.
+  // Haunting Echoes: "Exile all cards from target player's graveyard other than basic land cards".
+  const butBasics = /^Exile all cards from (target player's|target opponent's) graveyard other than basic land cards$/.exec(s);
+  if (butBasics) {
+    const who = parsePlayer(butBasics[1]!.replace(/'s$/, ""), ctx);
+    const filter = parseSearchFilter("card other than a basic land card");
+    return who && filter ? [{ type: "exileGraveyard", who, filter }] : null;
+  }
   const theirs = /^(Target player|Target opponent) exiles all (.+?) from their graveyard$/.exec(s);
   const all = theirs ? { what: theirs[2]!, whose: `${theirs[1]!.toLowerCase()}'s` } : (m = /^[Ee]xile all (.+?) from (target player's|target opponent's|each opponent's|your|all) graveyards?$/.exec(s)) && { what: m[1]!, whose: m[2]! };
   if (all) {

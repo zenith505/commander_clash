@@ -351,7 +351,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     }
-    if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // Revealing from the hand: a card with another copy left in our library first (Assembly Hall, Infernal Tutor then
+    // search for its name), then the costliest.
+    if (pend.kind === "searchLibrary" && pend.fromHand) {
+      const copies = (id: ObjectId) => libraryCopies(s, pid, defOf(s, obj(s, id)).name);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(copies(b) > 0) - Number(copies(a) > 0) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    }
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
     if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];
     // Dauthi Voidwalker: the most expensive spell, to cast for free now (a land only if that's all there is).
@@ -1473,6 +1478,12 @@ const botSource = (s: GameState, id: ObjectId) => (s.objects[id] && s.objects[id
  * they'd kill or the biggest threat), helpful ones at our own stuff. Returns null when
  * there's no sensible choice. With `forced`, always returns some legal choice.
  */
+/** How many cards in `pid`'s library have this name (and fit `filter`, its own name left aside): what a search for it can find. */
+function libraryCopies(s: GameState, pid: PlayerId, name: string, filter?: TargetSpec): number {
+  const f = filter && { ...filter, namedAny: undefined };
+  return player(s, pid).library.filter((id) => { const d = defOf(s, obj(s, id)); return sameName(d.name, name) && (!f || printedMatches(f, d)); }).length;
+}
+
 /** "Target creature cards with different names": `t` has the name of one of the group already chosen. */
 function namedLike(s: GameState, spec: TargetSpec, out: TargetChoice[], t: TargetChoice): boolean {
   if (t.kind !== "object" || !spec.differentNameFrom) return false;
@@ -1605,6 +1616,19 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     };
     const picks = all.filter((t) => rank(t) >= 0).sort((a, b) => rank(b) - rank(a)).slice(0, body.targets.length);
     return body.targets.map((_, i) => picks[i] ?? { kind: "none" });
+  }
+  // "Search your library for a card with the same name as target creature" (Bifurcate, Pack Hunt, Secret Salvage): the
+  // target whose name the most cards left in our library have (that the search can find); with none, not worth casting.
+  const sameNamed = body.targets.length === 1 ? body.effects.find((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && !!e.sameName && "target" in e.sameName && e.sameName.target === 0 && !e.library && !e.who) : undefined;
+  if (sameNamed) {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const hits = (t: TargetChoice) => {
+      const o = t.kind === "object" ? s.objects[t.id] : undefined;
+      if (!o || o.faceDown) return 0;
+      return libraryCopies(s, pid, o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name, sameNamed.filter);
+    };
+    const pick = [...all].sort((a, b) => hits(b) - hits(a))[0];
+    return pick && hits(pick) > 0 ? [pick] : forced && all[0] ? [all[0]] : null;
   }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];

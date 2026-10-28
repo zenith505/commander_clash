@@ -8876,6 +8876,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         si++;
         continue;
       }
+      // Winding Way: "Choose creature or land. Reveal the top four cards of your library. Put all cards of the chosen type
+      // revealed this way into your hand and the rest into your graveyard." (see the reveal "Put all" below).
+      const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(sentences[si + 1]!.replace(/\.$/, ""));
+      if (revealN && revealN[1] !== "X" && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard\.?$/.test(sentences[si + 2] ?? "")) {
+        const n = num(revealN[1]!);
+        if (!Number.isInteger(n)) return null;
+        effects.push({ type: "choose", choice: "cardType", options }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+        si += 2;
+        continue;
+      }
       const next = attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx));
       if (!next || !JSON.stringify(next).includes('"chosen":"type"')) return null;
       effects.push({ type: "choose", choice: "cardType", options }, ...(asCardType(next) as Effect[]));

@@ -5,7 +5,8 @@
 // Hydra), "For each creature, its controller sacrifices it unless they pay X life" (Killing Wave), "Then if there are three
 // or more collection counters on it, sacrifice it. If you do, draw a card, then you may search ..." (Charitable Levy),
 // "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant), a
-// mana ability that returns its source to hand, as a sorcery (Grinning Ignus).
+// mana ability that returns its source to hand, as a sorcery (Grinning Ignus), "Choose creature or land" for the cards
+// revealed (Winding Way).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -49,7 +50,8 @@ const charitableLevy = card("Charitable Levy", "Enchantment", "{1}{W}", {"cmc":2
 const edeaPossessedSorceress = card("Edea, Possessed Sorceress", "Legendary Creature — Human Warlock", "{2}{U}{B}{R}", {"cmc":5,"power":"2","toughness":"5","keywords":["Ward"],"oracleText":"Ward {2}\nAt the beginning of combat on your turn, gain control of target creature an opponent controls until end of turn. Untap that creature. It gains haste until end of turn.\nWhenever a creature you control but don't own dies, return it to the battlefield under its owner's control and you draw a card.","colors":["B","R","U"],"colorIdentity":["B","R","U"]});
 const sarkhanDragonAscendant = card("Sarkhan, Dragon Ascendant", "Legendary Creature — Human Druid", "{1}{R}", {"cmc":2,"power":"2","toughness":"2","keywords":["Behold","Treasure"],"oracleText":"When Sarkhan enters, you may behold a Dragon. If you do, create a Treasure token. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nWhenever a Dragon you control enters, put a +1/+1 counter on Sarkhan. Until end of turn, Sarkhan becomes a Dragon in addition to his other types and gains flying.","colors":["R"],"colorIdentity":["R"]});
 const grinningIgnus = card("Grinning Ignus", "Creature — Elemental", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":[],"oracleText":"{R}, Return this creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery.","colors":["R"],"colorIdentity":["R"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus];
+const windingWay = card("Winding Way", "Sorcery", "{1}{G}", {"cmc":2,"keywords":[],"oracleText":"Choose creature or land. Reveal the top four cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard.","colors":["G"],"colorIdentity":["G"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -392,5 +394,21 @@ describe("Round 198", () => {
     for (const id of s1.battlefield) if (s1.objects[id]!.controller === ap && id !== ignus) s1.objects[id]!.tapped = true;
     s1.objects[s1.battlefield.find((id) => s1.objects[id]!.controller === ap && defOf(s1, s1.objects[id]!).name === "Mountain")!]!.tapped = false;
     expect(planCast(s1, ap, ids[1]!)).toBeNull();
+  });
+
+  it("Winding Way: the card type is chosen as it resolves; all revealed cards of that type go to hand, the rest to the graveyard", () => {
+    for (const [pick, want] of [["Creature", ["Test Elf", "Test Ox"]], ["Land", ["Test Land"]]] as const) {
+      const { s: s0, ap, ids } = setup([windingWay]);
+      const top = [creature("Test Elf", "Elf", 1), card("Test Land", "Land", "", { cmc: 0 }), creature("Test Ox", "Ox", 2), card("Test Bolt", "Instant", "{R}", { cmc: 1 })];
+      const tops = [...top].reverse().map((d) => into(s0, ap, d, "library")).reverse();
+      let s = run(s0, planCast(s0, ap, ids[0]!));
+      s = resolveAll(s);
+      expect(s.pending?.kind === "chooseOption" && s.pending.options).toEqual(["Creature", "Land"]);
+      s = act(s, { type: "chooseOption", player: ap, choice: pick });
+      s = resolveAll(s);
+      expect(s.pending ?? undefined).toBeUndefined();
+      const zone = (n: string) => s.objects[tops[top.findIndex((d) => d.name === n)]!]!.zone;
+      for (const d of top) expect(zone(d.name), `${pick}: ${d.name}`).toBe((want as readonly string[]).includes(d.name) ? "hand" : "graveyard");
+    }
   });
 });

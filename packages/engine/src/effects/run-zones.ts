@@ -1791,16 +1791,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.found) {
         const filter = e.filter && bindChosen(e.filter, ctx.chosen);
         const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        // Behold: or choose a permanent you control with that quality (CR 701.4a).
+        if (e.orControl && filter) cards.push(...s.battlefield.filter((id) => objectMatches(s, { ...filter, kind: "object", controller: "you" }, obj(s, id), p.id, false)));
         s.resolving!.revealedFromHand = 0;
         if (!cards.length) {
           log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : `${p.name} reveals no cards.`);
           return;
         }
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }) };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.one ? `${/^[aeiou]/i.test(e.filter?.text ?? "card") ? "an" : "a"} ${e.filter?.text ?? "card"}` : `any number of ${e.filter?.text ?? "card"}s`, cards, min: 0, max: e.one ? 1 : cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }), ...(e.orControl ? { behold: true as const } : {}) };
         return "paused";
       }
+      const chosen = sc.found.filter((id) => e.orControl && s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === p.id);
       const shown = sc.found.filter((id) => p.hand.includes(id));
       sc.found = undefined;
+      if (chosen.length) {
+        s.resolving!.revealedFromHand = chosen.length;
+        log(s, `${p.name} beholds ${chosen.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+        return;
+      }
       s.resolving!.revealedFromHand = shown.length;
       if (e.bottom) {
         // In the order picked, the first lowest (its owner orders them, CR 401.4).
@@ -1808,7 +1816,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${p.name} puts ${shown.length === 1 ? "a card" : `${shown.length} cards`} from their hand on the bottom of their library.`);
         return;
       }
-      log(s, shown.length ? `${p.name} reveals ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} reveals no cards.`);
+      log(s, shown.length ? `${p.name} ${e.orControl ? "beholds" : "reveals"} ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} ${e.orControl ? "beholds nothing" : "reveals no cards"}.`);
       return;
     }
     case "castNow": {

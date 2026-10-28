@@ -2203,7 +2203,7 @@ export type Effect =
    * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
    * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
    */
-  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true }
+  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; until: "nextTurn" }
   /**

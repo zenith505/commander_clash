@@ -1709,6 +1709,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Wedding Announcement: "Then if ~ has three or more invitation counters on it, transform it" after other instructions.
   text = text.replace(/(\bcounters? on ~\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\./g, "$1transform ~.");
   text = text.replace(/(\. Then if ~ has \w+ or more [a-z+\/0-9-]+ counters on it, )transform it\.$/, "$1transform ~.");
+  // Sarkhan, Dragon Ascendant: "~ becomes a Dragon in addition to his other types" ("~'s other types" by now): its own.
+  text = text.replace(/(~ becomes [^.]+? in addition to) ~'s other types\b/g, "$1 its other types");
   // Charitable Levy: "put a collection counter on ~. Then if there are three or more collection counters on it, sacrifice
   // it. If you do, ...": the counters on ~, then ~ itself.
   text = text.replace(/(\bcounters? on ~\. Then if) there are (\w+ or more [a-z]+ counters) on (?:it|~), sacrifice it\./g, "$1 ~ has $2 on it, sacrifice ~.");
@@ -2555,14 +2557,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Priest of the Wakening Sun: "You may reveal a Dinosaur card from your hand. If you do, you gain 2 life.": one card or
     // none, chosen as it resolves (CR 701.20a); the rest only if one was revealed.
-    const revealOne = /^[Yy]ou may reveal an? ([A-Z][a-z]+|[a-z]+) card from your hand$/.exec(s);
+    // Sarkhan, Dragon Ascendant: "You may behold a Dragon. If you do, ...": a Dragon you control or a Dragon card revealed
+    // from your hand (CR 701.4a), chosen as it resolves.
+    const revealOne = /^[Yy]ou may (?:reveal an? ([A-Z][a-z]+|[a-z]+) card from your hand|behold an? ([A-Z][a-z]+))$/.exec(s);
     const revealDo = revealOne && /^If you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
-    if (revealOne && revealDo) {
-      const filter = parseSearchFilter(`${revealOne[1]} card`);
+    if (revealOne && revealDo && (!revealOne[2] || CREATURE_TYPES.has(revealOne[2]))) {
+      const filter = parseSearchFilter(`${revealOne[1] ?? revealOne[2]} card`);
       const before = ctx.targets.length;
       const fx = filter ? parseOne(capital(revealDo[1]!), ctx) : null;
       if (!filter || !fx?.length || ctx.targets.length !== before) return null;
-      effects.push({ type: "revealFromHand", filter, one: true }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
+      effects.push({ type: "revealFromHand", filter, one: true, ...(revealOne[2] ? { orControl: true as const } : {}) }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
       si++;
       continue;
     }

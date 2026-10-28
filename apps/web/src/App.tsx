@@ -3911,6 +3911,8 @@ function LibrarySearch({
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
+              : pending.behold
+                ? `${pending.source}: you may behold ${pending.what} (reveal one from your hand or choose one you control)`
               : pending.reveal
                 ? `${pending.source}: you may reveal ${pending.what} from your hand`
                 : pending.bottom
@@ -3967,7 +3969,7 @@ function LibrarySearch({
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.behold ? (found.length ? "Behold" : "Behold nothing") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">
@@ -4007,7 +4009,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.behold ? "Your hand and permanents" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {

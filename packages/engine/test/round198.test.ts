@@ -4,11 +4,11 @@
 // be blocked as long as its power is 3 or less" (Thieves' Tools), "As ~ enters, roll X d6" for its counters (Neverwinter
 // Hydra), "For each creature, its controller sacrifices it unless they pay X life" (Killing Wave), "Then if there are three
 // or more collection counters on it, sacrifice it. If you do, draw a card, then you may search ..." (Charitable Levy),
-// "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress).
+// "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, characteristics, invalidateCharacteristics, objHasKeyword, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -46,7 +46,8 @@ const neverwinterHydra = card("Neverwinter Hydra", "Creature — Hydra", "{X}{X}
 const killingWave = card("Killing Wave", "Sorcery", "{X}{B}", {"cmc":1,"keywords":[],"oracleText":"For each creature, its controller sacrifices it unless they pay X life.","colors":["B"],"colorIdentity":["B"]});
 const charitableLevy = card("Charitable Levy", "Enchantment", "{1}{W}", {"cmc":2,"keywords":[],"oracleText":"Noncreature spells cost {1} more to cast.\nWhenever a player casts a noncreature spell, put a collection counter on this enchantment. Then if there are three or more collection counters on it, sacrifice it. If you do, draw a card, then you may search your library for a Plains card, put it onto the battlefield tapped, then shuffle.","colors":["W"],"colorIdentity":["W"]});
 const edeaPossessedSorceress = card("Edea, Possessed Sorceress", "Legendary Creature — Human Warlock", "{2}{U}{B}{R}", {"cmc":5,"power":"2","toughness":"5","keywords":["Ward"],"oracleText":"Ward {2}\nAt the beginning of combat on your turn, gain control of target creature an opponent controls until end of turn. Untap that creature. It gains haste until end of turn.\nWhenever a creature you control but don't own dies, return it to the battlefield under its owner's control and you draw a card.","colors":["B","R","U"],"colorIdentity":["B","R","U"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress];
+const sarkhanDragonAscendant = card("Sarkhan, Dragon Ascendant", "Legendary Creature — Human Druid", "{1}{R}", {"cmc":2,"power":"2","toughness":"2","keywords":["Behold","Treasure"],"oracleText":"When Sarkhan enters, you may behold a Dragon. If you do, create a Treasure token. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nWhenever a Dragon you control enters, put a +1/+1 counter on Sarkhan. Until end of turn, Sarkhan becomes a Dragon in addition to his other types and gains flying.","colors":["R"],"colorIdentity":["R"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -300,5 +301,63 @@ describe("Round 198", () => {
     expect(s.objects[stolen]!.controller).toBe(opp);
     expect(s.objects[mine]!.zone).toBe("graveyard");
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+
+  const treasures = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid && characteristics(s, s.objects[id]!).subtypes.includes("Treasure")).length;
+  const castSarkhan = (behold: (s: GameState, ap: PlayerId) => ObjectId | undefined) => {
+    const { s: s0, ap, ids } = setup([sarkhanDragonAscendant]);
+    const pick = behold(s0, ap);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(s);
+    return { s, ap, sarkhan: ids[0]!, pick };
+  };
+
+  it("Sarkhan, Dragon Ascendant: behold by revealing a Dragon card from your hand (CR 701.4a); the card stays there", () => {
+    const { s: s1, ap, pick } = castSarkhan((s, ap) => into(s, ap, creature("Test Dragon", "Dragon", 4, 4, "{4}{R}"), "hand"));
+    expect(s1.pending?.kind === "searchLibrary" && s1.pending.behold && s1.pending.cards).toEqual([pick]);
+    const s = act(s1, { type: "searchLibrary", player: ap, found: [pick!] });
+    expect(treasures(s, ap)).toBe(1);
+    expect(s.objects[pick!]!.zone).toBe("hand");
+    expect(s.log.some((l) => /beholds Test Dragon from their hand/.test(typeof l === "string" ? l : JSON.stringify(l)))).toBe(true);
+  });
+
+  it("Sarkhan, Dragon Ascendant: or by choosing a Dragon you control; an opponent's Dragon or a Goblin card can't be beheld", () => {
+    const { s: s1, ap, pick } = castSarkhan((s, ap) => {
+      putOnBattlefield(s, s.players.find((p) => p.id !== ap)!.id, creature("Test Their Dragon", "Dragon", 4));
+      into(s, ap, creature("Test Goblin", "Goblin", 1), "hand");
+      return putOnBattlefield(s, ap, creature("Test Dragon", "Dragon", 4));
+    });
+    expect(s1.pending?.kind === "searchLibrary" && s1.pending.cards).toEqual([pick]);
+    const s = act(s1, { type: "searchLibrary", player: ap, found: [pick!] });
+    expect(treasures(s, ap)).toBe(1);
+    expect(s.objects[pick!]!.zone).toBe("battlefield");
+  });
+
+  it("Sarkhan, Dragon Ascendant: beholding nothing makes no Treasure, and with no Dragon there's no question", () => {
+    const { s: s1, ap } = castSarkhan((s, ap) => into(s, ap, creature("Test Dragon", "Dragon", 4), "hand"));
+    const s = act(s1, { type: "searchLibrary", player: ap, found: [] });
+    expect(treasures(s, ap)).toBe(0);
+    const { s: s2, ap: ap2 } = castSarkhan(() => undefined);
+    expect(s2.pending ?? undefined).toBeUndefined();
+    expect(treasures(s2, ap2)).toBe(0);
+  });
+
+  it("Sarkhan, Dragon Ascendant: a Dragon you control entering gives him a +1/+1 counter, and he's a flying Dragon this turn", () => {
+    const { s: s0, ap, ids } = setup([creature("Test Dragon", "Dragon", 4, 4, "{R}")]);
+    const sarkhan = putOnBattlefield(s0, ap, sarkhanDragonAscendant);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = resolveAll(s);
+    const o = s.objects[sarkhan]!;
+    expect(pt(s, sarkhan)).toEqual([3, 3]);
+    expect(characteristics(s, o).subtypes).toEqual(expect.arrayContaining(["Human", "Druid", "Dragon"]));
+    expect(objHasKeyword(s, o, "Flying")).toBe(true);
+  });
+
+  it("Sarkhan, Dragon Ascendant: a bot beholds when it can", () => {
+    const { s: s1, ap, pick } = castSarkhan((s, ap) => putOnBattlefield(s, ap, creature("Test Dragon", "Dragon", 4)));
+    let s = s1;
+    for (const a of botActions(s, ap)) s = act(s, a);
+    expect(treasures(s, ap)).toBe(1);
+    expect(s.objects[pick!]!.zone).toBe("battlefield");
   });
 });

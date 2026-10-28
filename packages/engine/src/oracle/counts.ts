@@ -220,6 +220,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object" || spec.controller !== "you") return null;
     return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: `${m[1]!} you controlled` } } };
   }
+  // Reign of Terror: "for each creature that died this way": those the destroy put into a graveyard (CR 700.4).
+  if (each && (m = /^([a-z]+) that died this way$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[1]!, { chosen: true });
+    return spec?.kind === "object" ? { count: { kind: "destroyedThisWay", filter: { ...spec, text: m[1]! }, died: true } } : null;
+  }
   if ((m = /^(?:the number of )?(.+?) (destroyed|exiled) this way$/i.exec(p)) && !/\b(you|your|that|they|their|cards?)\b/i.test(m[1]!)) {
     const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
     if (spec?.kind !== "object") return null;

@@ -197,6 +197,10 @@ export interface Characteristics {
   attackUnlessMore?: ("lands" | "creatures")[];
   /** "Can't attack unless a black or green creature also attacks" (Scarred Puma): another attacker fitting each. */
   attackOnlyWith?: TargetSpec[];
+  /** Orcish Conscripts: "can't attack unless at least two other creatures attack": that many other attackers. */
+  attackWithOthers?: number;
+  /** "... can't block unless at least two other creatures block": that many other blockers this combat. */
+  blockWithOthers?: number;
   cantBeBlockedByLesserPower: boolean;
   /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
   cantBeBlockedByLesserPowerThan: ObjectId[];
@@ -1530,6 +1534,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantAttackUnlessAlso":
       c.attackOnlyWith = [...(c.attackOnlyWith ?? []), m.filter];
+      return;
+    case "cantAttackUnlessOthers":
+      c.attackWithOthers = Math.max(c.attackWithOthers ?? 0, m.n);
+      return;
+    case "cantBlockUnlessOthers":
+      c.blockWithOthers = Math.max(c.blockWithOthers ?? 0, m.n);
       return;
     case "cantAttackUnlessMore":
       if (!c.attackUnlessMore?.includes(m.what)) c.attackUnlessMore = [...(c.attackUnlessMore ?? []), m.what];

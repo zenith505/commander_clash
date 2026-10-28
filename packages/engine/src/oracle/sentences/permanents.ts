@@ -410,7 +410,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
   // Disarm: "Unattach all Equipment from target creature": they stay on the battlefield, attached to nothing (CR 701.3d).
-  if ((m = /^Unattach all Equipment from (target creature)$/.exec(s))) {
+  // Fulgent Distraction: "Tap two target creatures, then unattach all Equipment from them": from both.
+  if ((m = /^Unattach all Equipment from (target creature|them)$/.exec(s))) {
     const what = parseObject(`all Equipment attached to ${m[1]}`, ctx);
     return what ? [{ type: "unattach", what }] : null;
   }

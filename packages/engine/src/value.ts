@@ -69,6 +69,17 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     }
     return top;
   }
+  // Reign of Terror: "Destroy all green creatures or all white creatures": the better of the two for us.
+  const ei = body.effects.findIndex((e) => e.type === "either" && e.options.every((o) => o.every((x) => x.type === "destroy" || x.type === "damage")));
+  const either = body.effects[ei];
+  if (either?.type === "either") {
+    let best: number | null = null;
+    for (const o of either.options) {
+      const val = groupValue(s, pid, { ...body, effects: [...body.effects.slice(0, ei), ...o, ...body.effects.slice(ei + 1)] }, chosen, sourceId);
+      if (val !== null && (best === null || val > best)) best = val;
+    }
+    return best;
+  }
   let v: number | null = null;
   const group = (r: ObjRef) => {
     if (r.ref !== "each") return [];

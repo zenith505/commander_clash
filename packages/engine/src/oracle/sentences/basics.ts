@@ -483,9 +483,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, exchange: true }];
   }
   // "Shuffle all creature cards from your graveyard into your library" (Rooting Kavu, Barishi): those cards only.
-  if ((m = /^[Ss]huffle all (?:(.+?) )?cards from your graveyard into your library$/.exec(s))) {
-    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
-    if (filter === null || /\bthat\b/.test(m[1] ?? "")) return null;
+  // Elvish Soultiller: "Shuffle all creature cards of the chosen type ..." (after "choose a creature type"): that type.
+  if ((m = /^[Ss]huffle all (?:(.+?) )?cards( of the chosen type)? from your graveyard into your library$/.exec(s))) {
+    const base = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (base === null || /\bthat\b/.test(m[1] ?? "") || (m[2] && !base)) return null;
+    const filter = base && m[2] ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base;
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, ...(filter ? { filter } : {}) }];
   }
   // Repopulate: "Shuffle all creature cards from target player's graveyard into that player's library": theirs.
@@ -914,6 +916,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Each player chooses a creature type$/.test(s)) return [{ type: "choose", choice: "creatureType", each: true }];
   // "Choose a number between 0 and 10." (Expel the Interlopers): as it resolves, kept for the rest (CR 608.2d).
   if ((m = /^Choose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
+  // Terraformer: "Choose a basic land type. Each land you control becomes that type until end of turn."
+  if (/^Choose a basic land type$/.test(s)) return [{ type: "choose", choice: "basicLandType" }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
     return [{ type: "choose", choice: m[1]!.toLowerCase() === "color" ? "color" : "creatureType", ...(m[2] ? { except: m[2] } : {}) }];
 
@@ -1021,6 +1025,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // two target creatures this turn".
   // Kurbis, Harvest Celebrant: "... this turn to another target creature with a +1/+1 counter on it".
   s = s.replace(/^(Prevent all (?:combat )?damage that would be dealt) this turn to (up to (?:one|two|three) target creatures?|(?:another )?target creature(?: with an? \S+ counter on it)?)$/i, "$1 to $2 this turn");
+  // Songstitcher: "Prevent all combat damage that would be dealt this turn by target attacking creature with flying".
+  s = s.replace(/^(Prevent all combat damage that would be dealt) this turn by (target attacking creature with flying)$/i, "$1 by $2 this turn");
   const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
   if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };

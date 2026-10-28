@@ -1879,12 +1879,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   base toughness or added then removed); Lava Storm (old "X or Y" wording with no mode choice); Eternal Flame and
   Banshee ("half X, rounded up/down" to two recipients); Homarid and Tidal Influence (tide counters and the "four or
   more" state trigger); Clockwork Beast, Avian and Swarm ("up to X counters", capped in total).
-- Next for Lane B, least played first, with what blocks each: Cylian Sunsinger ("each other creature with the same
-  name"), Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
+- Round B20 (harder skipped cards, least played first): forecast (CR 702.57: from your hand, only during your upkeep and
+  once each turn, the card stays revealed in hand; the bot uses it in its upkeep and the page stops there for it):
+  Govern the Guildless, Piercing Rays, Plumes of Peace, Pride of the Clouds, Proclamation of Rebirth, Sky Hussar
+  ("tap two untapped white and/or blue creatures"), Skyscribing, Spirit en-Dal, Steeling Stance, Writ of Passage;
+  "becomes that type" after "choose a creature type (other than Wall)" replaces its creature types (Imagecrafter,
+  Mistform Mutant, Mistform Wakecaster, Standardize, Unnatural Selection) and after "choose a basic land type" its land
+  types (Terraformer, Elsewhere Flask); "creatures/creature cards of that type" (Tsabo's Decree, Elvish Soultiller);
+  old "destroy all X creatures or all Y creatures" / "deals N damage to each X creature or ... each Y creature" as a
+  choice on resolution (Reign of Terror, with "for each creature that died this way", CR 700.4; Lava Storm); "can't
+  attack/block unless at least two other creatures attack/block" (Orcish Conscripts, CR 508.1c, 509.1b; the Block
+  button says so); "for each other attacking Aurochs" (a creature type, not the card's name, CR 205.3m); "attacking
+  creatures with flanking" (Telim'Tor) and "Other creatures you control with flanking" (Cavalry Master); "~ and each
+  other creature with the same name as it" (Cylian Sunsinger); Chaos Harlequin; Harsh Deceiver; Homarid Warrior;
+  Disappear; Domineer; Fulgent Distraction; Songstitcher; Viscerid Drone ("sacrifice a creature and a (snow) Swamp").
+  New browser tests: forecast from the hand menu in your upkeep, and Orcish Conscripts' block button. +34 (26,743 with
+  round 187).
+- Skipped there, with reasons: Paladin of Prahv (forecast making a delayed "whenever target creature deals damage this
+  turn" trigger); Peer Pressure ("controls more creatures of the chosen type than each other player"); Illusionary
+  Presence and Talara's Bane (a landwalk / a creature card's toughness chosen from a revealed hand); Flay and Venarian
+  Gold (old "discard a card at random. If you can't" / "X sleep counters" wordings); the Clockwork creatures (as in
+  B19).
+- Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature), Melting and Sheltering Prayers (a land's
   supertype, shroud by land count), Durkwood Tracker, Graxiplon (creatures sharing a type), Exiled Doomsayer (morph cost tax), Sawtooth Ogre, Selfless Exorcist (a card in a graveyard dealing damage), Cut
   the Tethers, Mammoth Harness, Liquid Fire (a number chosen as a cost), Tribal Golem, Forethought
-  Amulet; Reign of Terror ("for each creature that died this way"), Steeling
-  Stance (forecast), Exalted Dragon, Qal Sisma Behemoth, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
+  Amulet; Exalted Dragon, Qal Sisma Behemoth, Treefolk Mystic and Dream Fighter ("that creature" after a block trigger), Smoke Teller
   and Aven Soulgazer (look at a face-down creature).
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
@@ -1895,7 +1914,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame
   Discharge (modified creatures as you cast it), Rayami, Touch of Moonglove, Library of Lat-Nam, Carrion Rats,
   Shifting Loyalties, Madcap Experiment, Wall of Resurgence, Silhana Wayfinder, Resolute Strike, Forgestoker Dragon,
-  Aven Shrine, Piercing Rays (forecast), Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
+  Aven Shrine, Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
   Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Martyr of Frost, Haunted Plate
   Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Porphyry Nodes, Gnarlbark Elm, Time to Feed,
   Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,

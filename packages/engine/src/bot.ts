@@ -37,6 +37,7 @@ import {
   provokerOf,
   lureBinds,
   withoutCompany,
+  blockWithoutCompany,
   tapCostCandidates,
   craftCandidates,
   untapViaMana,
@@ -710,6 +711,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const t = s.resolving?.item.targets?.[0];
       return [{ type: "chooseOption", player: pid, choice: t?.kind === "player" && t.id === pid ? "1" : "0" }];
     }
+    // Reign of Terror, Lava Storm: what costs the opponents most, net of what we'd lose.
+    const either = pend.kind === "chooseOption" && pend.what === "either" && s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "either" && pend.options.every((o, i) => e.labels[Number(o)] === pend.labels?.[i])) : undefined;
+    if (pend.kind === "chooseOption" && either?.type === "either" && either.options.every((o) => o.every((e) => e.type === "destroy" || e.type === "damage"))) {
+      const v = (o: string) => groupValue(s, pid, { targets: [], effects: either.options[Number(o)]!, text: "" }) ?? 0;
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => v(b) - v(a))[0]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -894,7 +901,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseForecast(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -5062,6 +5069,29 @@ function chooseManifest(s: GameState, pid: PlayerId, cards: string[], max: numbe
 }
 
 /** Cycle (CR 702.29a) lands we don't need and spells we're far from casting, or use their channel abilities and the like. */
+/**
+ * Forecast (CR 702.57): during our own upkeep, with the stack empty, reveal a card from our hand for its ability when it
+ * does something and has a good target. The card stays in hand; "only once each turn" is checked by the rules.
+ */
+function chooseForecast(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer !== pid || s.step !== "upkeep" || s.stack.length) return null;
+  for (const id of player(s, pid).hand) {
+    const abilities = abilitiesOf(s, obj(s, id)).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.keyword !== "Forecast" || doesNothingNow(s, id, ab.body)) continue;
+      const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
+      if (ab.body.targets.length && !targets) continue;
+      // Sky Hussar: "Tap two untapped white and/or blue creatures you control".
+      const costs = abilityCosts(s, pid, obj(s, id), ab, targets ?? []);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, targets ?? undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
 function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
   const lands = s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
   for (const id of player(s, pid).hand) {
@@ -5320,6 +5350,18 @@ function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
     blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
     if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks = [];
+    blocks = withCompany(s, blocks);
+  }
+}
+
+/** Orcish Conscripts: leave out blockers without enough other blockers with them, until the rest are legal (CR 509.1b). */
+function withCompany<B extends { blocker: ObjectId; attacker: ObjectId }>(s: GameState, blocks: B[]): B[] {
+  const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  for (let out = blocks; ; ) {
+    if (!blockWithoutCompany(s, out, earlier)) return out;
+    const lonely = out.find((b) => (characteristics(s, obj(s, b.blocker)).blockWithOthers ?? 0) > earlier + new Set(out.map((x) => x.blocker)).size - 1)!;
+    out = out.filter((b) => b.blocker !== lonely.blocker);
+    out = out.filter((b) => out.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
   }
 }
 
@@ -5423,7 +5465,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // One that can't block alone doesn't block by itself (CR 506.5).
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
   if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks.length = 0;
-  return { type: "declareBlockers", player: pid, blocks };
+  const kept = withCompany(s, blocks);
+  return { type: "declareBlockers", player: pid, blocks: kept };
 }
 
 const LAND_COLOR: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };

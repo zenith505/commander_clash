@@ -795,7 +795,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const shuffled: [PlayerId, number][] = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // "Of the chosen type" (Elvish Soultiller): the type chosen as it resolved.
+        const filter = e.filter && bindChosen(e.filter, ctx.chosen);
+        const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         if (e.exchange) {
           // Morality Shift: both at once (CR 701.12a); the library's cards go to the graveyard together, so their owner
           // orders them when the order matters (CR 404.3, see graveyard.ts; rulings).

@@ -278,7 +278,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "destroyedThisWay":
     case "exiledThisWay":
       // As they last existed on the battlefield (CR 608.2h).
-      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
+      return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter((x) => (c.kind !== "destroyedThisWay" || !c.died || ("died" in x && x.died)) && objectMatches(s, c.filter, x.o, ctx.controller, false, undefined, x.ch)).length;
     case "discardedThisWay": {
       if (c.filter) return (s.resolving?.discardedAll ?? []).filter((id) => !!s.objects[id] && printedMatches(c.filter!, defOf(s, s.objects[id]!))).length;
       const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
@@ -895,7 +895,7 @@ function describeCount(c: Count): string {
     case "discoveredBelow":
       return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":
-      return `#${c.filter.text} destroyed`;
+      return `#${c.filter.text} ${c.died ? "that died" : "destroyed"}`;
     case "exiledThisWay":
       return `#${c.filter.text} exiled`;
     case "cardsInGraveyard":

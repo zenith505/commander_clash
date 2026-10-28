@@ -342,7 +342,9 @@ export function normalizeSelf(d: CardDef): string {
     // The card named Exile: "Exile target nonwhite attacking creature" is the keyword action, not the card (its name
     // followed by "target" is never the card).
     const verb = /^[A-Z][a-z]+$/.test(full) ? "(?! target\\b)" : "";
-    t = t.replace(new RegExp(esc(full) + verb, "g"), "~");
+    // Aurochs: "for each other attacking Aurochs" is the creature type that is also its name (CR 205.3m), not the card.
+    const typed = CREATURE_TYPES.has(full) ? "(?<!attacking )" : "";
+    t = t.replace(new RegExp(typed + esc(full) + verb, "g"), "~");
   }
   // Shortened names (CR 201.5c): "Gylwain" for "Gylwain, Casting Director", and for a legendary card with no comma,
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token

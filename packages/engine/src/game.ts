@@ -8275,8 +8275,23 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
  */
 export function withoutCompany(s: GameState, id: ObjectId, attacks: { attacker: ObjectId }[]): string | null {
   const o = obj(s, id);
+  const others = characteristics(s, o).attackWithOthers;
+  if (others && new Set(attacks.filter((a) => a.attacker !== id).map((a) => a.attacker)).size < others) return `${nameOf(s, id)} can't attack unless at least ${others} other creatures attack`;
   for (const f of characteristics(s, o).attackOnlyWith ?? [])
     if (!attacks.some((a) => a.attacker !== id && objectMatches(s, f, obj(s, a.attacker), controllerOf(s, o), false))) return `${nameOf(s, id)} can't attack unless ${f.text} also attacks`;
+  return null;
+}
+
+/**
+ * Orcish Conscripts: "can't block unless at least two other creatures block": the creatures blocking this combat, these
+ * blocks and those other defending players declared before (`earlier`), not counting it (CR 509.1b).
+ */
+export function blockWithoutCompany(s: GameState, blocks: { blocker: ObjectId }[], earlier: number): string | null {
+  const ids = [...new Set(blocks.map((b) => b.blocker))];
+  for (const id of ids) {
+    const others = characteristics(s, obj(s, id)).blockWithOthers;
+    if (others && earlier + ids.length - 1 < others) return `${nameOf(s, id)} can't block unless at least ${others} other creatures block`;
+  }
   return null;
 }
 
@@ -8674,6 +8689,8 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
   const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
   if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
+  const unaccompanied = blockWithoutCompany(s, blocks, earlier);
+  if (unaccompanied) throw new RulesError(unaccompanied);
   // "No more than one creature can block each combat" (Silent Arbiter), counting every defending player's blockers
   // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
   const limit = combatLimit(s, "block");

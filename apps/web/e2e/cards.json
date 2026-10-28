@@ -11848,6 +11848,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d99e1d08-32ca-49c5-97cc-e064d661202f",
+  "name": "Orcish Conscripts",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Orc",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orc"
+  ],
+  "oracleText": "This creature can't attack unless at least two other creatures attack.\nThis creature can't block unless at least two other creatures block.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "61eacaab-625b-499c-8602-f37ad5dda138",
   "name": "Orim's Cure",
   "manaCost": "{1}{W}",
@@ -15698,6 +15728,34 @@
   "set": "ths",
   "releasedAt": "2013-09-27",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c454d5af-5617-4ddf-a9be-dd7d154b55ad",
+  "name": "Steeling Stance",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Creatures you control get +1/+1 until end of turn.\nForecast — {W}, Reveal this card from your hand: Target creature gets +1/+1 until end of turn. (Activate only during your upkeep and only once each turn.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Forecast"
+  ],
+  "commanderLegal": "legal",
+  "set": "dis",
+  "releasedAt": "2006-05-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

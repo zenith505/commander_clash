@@ -1156,6 +1156,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealedUntilToBottom":
     case "parleyReveal":
     case "revealRevealed":
+    case "spellToHand":
     case "discard":
     case "takeFromHand":
     case "scry":
@@ -1271,9 +1272,10 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     }
     return;
   }
-  if (o.buyback) {
+  if (o.buyback || o.toHandOnResolve) {
+    const how = o.buyback ? " (buyback)" : "";
     moveObject(s, id, "hand");
-    if (o.zone === "hand") log(s, `${d.name} returns to ${player(s, o.owner).name}'s hand (buyback).`);
+    if (o.zone === "hand") log(s, `${d.name} returns to ${player(s, o.owner).name}'s hand${how}.`);
     return;
   }
   moveObject(s, id, "graveyard");

@@ -2037,6 +2037,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     return { affects: { kind: "self" }, mods: [{ kind: "linkedCreature", part: "types" }, { kind: "linkedCreature", part: "pt" }], text: line };
   // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
   // chosen as it entered, added in the type-changing layer (CR 613.1d).
+  // "This creature is the chosen color. (It's still an artifact.)" (Alloy Golem), "Enchanted land is the chosen color"
+  // (Shimmerwilds Growth): the color chosen as it entered replaces its colors (layer 5, CR 105.3, 613.1e).
+  const chosenColor = /^(~|Enchanted land) is the chosen color$/.exec(text);
+  if (chosenColor) return { affects: chosenColor[1] === "~" ? { kind: "self" } : { kind: "attached" }, mods: [{ kind: "setColors", colors: [], chosen: true }], text: line };
   if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
   // Opalescence: "Each other non-Aura enchantment is a creature in addition to its other types and has base power and base
   // toughness each equal to its mana value" (Starfield of Nyx: "... you control"); March of the Machines: "Each

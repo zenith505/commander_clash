@@ -236,6 +236,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.parley = counts;
       return;
     }
+    case "spellToHand": {
+      // Cerebral Eruption: the spell itself, still on the stack as it resolves (rulings), returns to its owner's hand as it
+      // finishes resolving. A copy isn't a card and ceases to exist instead (CR 707.10a).
+      const o = s.resolving?.item.objectId ? s.objects[s.resolving.item.objectId] : undefined;
+      if (o?.zone === "stack" && !o.spellCopy) o.toHandOnResolve = true;
+      return;
+    }
     case "revealRevealed": {
       const rv = s.resolving?.revealed;
       const o = rv && s.objects[rv.id];

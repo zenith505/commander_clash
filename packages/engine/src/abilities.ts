@@ -367,6 +367,8 @@ export type Count =
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** "The life paid as it entered" (Minion of the Wastes, Phyrexian Processor): the source's GameObject.lifePaidAsEntered. */
+  | { kind: "lifePaidAsEntered" }
   /** "For each Aura you controlled that was attached to it" (Hateful Eidolon): the dead creature's, as it last existed (CR 603.10a). */
   | { kind: "aurasYouControlledAttached" }
   /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
@@ -564,6 +566,8 @@ export interface TargetSpec {
   attackingWhom?: "eventPlayer" | PlayerId;
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
+  /** "That entered since your last turn ended" (Premature Burial): it entered after the last turn of the spell's controller ended (in a turn after it). */
+  enteredSinceYourLastTurn?: true;
   /** "All Curses attached to you" (Witchbane Orb): Auras enchanting the player whose ability or spell this is (CR 303.4). */
   attachedToYou?: true;
   /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
@@ -2834,6 +2838,8 @@ export type Effect =
       pt?: Amount;
       /** "An X/1 ... token": `pt` is its power only; its toughness is the token's own. */
       ptPowerOnly?: true;
+      /** "Its toughness is equal to that creature's toughness" (Broken Visage): with `pt` for its power, its toughness. */
+      ptToughness?: Amount;
       /**
        * An Aura token "attached to" this object (a Role, CR 303.7): one for each object it means. It isn't created if it
        * couldn't legally enchant that object (rulings on Roles).
@@ -2925,6 +2931,8 @@ export type Effect =
    */
   | { type: "revealedUntilToBottom"; hand?: true }
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
+  /** "Return ~ to its owner's hand" as the spell resolves (Cerebral Eruption): it goes there, not to the graveyard, as it finishes resolving (GameObject.toHandOnResolve). */
+  | { type: "spellToHand" }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
   | { type: "revealRevealed" }
   /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */
@@ -3613,7 +3621,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -3755,6 +3763,8 @@ export type SpellCondition =
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "If another permanent with the same name is on the battlefield" (Winnow): as target `index`, checked as it resolves. */
+  | { kind: "targetSharesName"; index: number }
   /** "Destroy target creature if no other creature has greater power" (Getaway Glamer): that creature as it is now, still a legal target, against every other creature on the battlefield. */
   | { kind: "targetGreatestPower"; index: number }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
@@ -5395,11 +5405,27 @@ export interface CompiledCard {
   /** Amplify N (CR 702.38a): as it enters, reveal cards from your hand that share a creature type with it; N +1/+1 counters for each. */
   amplify?: number;
   /**
+   * "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a +1/+1 counter on it
+   * for each card revealed this way." (Arsenal Thresher): amplify 1's choice, of these cards instead of ones sharing a
+   * creature type with it.
+   */
+  amplifyFilter?: TargetSpec;
+  /**
    * Devour N (CR 702.82a, c): "As this object enters, you may sacrifice any number of [creatures]. This permanent
    * enters with N +1/+1 counters on it for each [one] sacrificed this way." `n: "devoured"`: Thromok's "Devour X,
    * where X is the number of creatures devoured this way".
+   * "As ~ enters, sacrifice any number of untapped Forests / permanents / creatures" (CR 614.1c, 614.12) is the same
+   * choice: Shimatsu's "enters with that many +1/+1 counters" is n 1; with `defines` there are no counters (n 0), and
+   * its power and toughness come from what was sacrificed: "count", Wood Elemental's "equal to the number of Forests
+   * sacrificed as it entered" (its CDA reads GameObject.devoured); "total", Dracoplasm's "power becomes the total
+   * power of those creatures and its toughness becomes their total toughness" (a layer 7b effect from then on).
    */
-  devour?: { n: number | "devoured"; filter: TargetSpec };
+  devour?: { n: number | "devoured"; filter: TargetSpec; defines?: "count" | "total" };
+  /**
+   * "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor; CR 614.12, 119.4): the amount, kept
+   * as GameObject.lifePaidAsEntered. `max`: Nameless Race's "The amount you pay can't be more than ...".
+   */
+  entersPayLife?: { max?: Amount };
   /**
    * "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." (Phantom Centaur): every bit
    * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.

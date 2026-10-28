@@ -497,6 +497,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
     }
+    // "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor): up to 7, keeping 12 life, and at
+    // least 1 while we can spare it (a 0/0 Minion dies at once).
+    if (pend.kind === "chooseOption" && pend.what === "lifeAsEnters") {
+      const life = player(s, pid).life;
+      const max = pend.numberRange?.max ?? 0;
+      const n = Math.max(Math.min(max, life > 5 ? 1 : 0), Math.min(max, life - 12, 7));
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
+    }
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
       const best = [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
@@ -2978,7 +2986,18 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
 function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "pickPermanents" }>): ObjectId[] {
   const ok = pend.options.map((id) => obj(s, id)).filter((o) => !o.isCommander && !objIsType(s, o, "Land"));
   if (pend.objectId) {
-    const n = compileCard(defOf(s, obj(s, pend.objectId))).devour?.n;
+    const devour = compileCard(defOf(s, obj(s, pend.objectId))).devour;
+    // Wood Elemental's P/T is the number of untapped Forests sacrificed: those beyond the four lands we keep, at least one.
+    if (devour?.defines === "count") {
+      const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+      return pend.options.slice(0, Math.max(Math.min(1, pend.options.length), lands - 4));
+    }
+    // Dracoplasm's is their total: the cheap tokens, or else the least worth creature, since a 0/0 dies at once.
+    if (devour?.defines === "total") {
+      const tokens = ok.filter((o) => o.isToken && worth(s, pid, o) <= 4).map((o) => o.id);
+      return tokens.length ? tokens.slice(0, pend.count) : [...ok].sort((a, b) => worth(s, pid, a) - worth(s, pid, b)).slice(0, 1).map((o) => o.id);
+    }
+    const n = devour?.n;
     const per = typeof n === "number" ? n : 2;
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);
   }

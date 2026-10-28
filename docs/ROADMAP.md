@@ -1,7 +1,7 @@
 # Roadmap
 
-26,941 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,924 of
+26,959 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,926 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2082,6 +2082,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   colors); Wolf of Devil's Breach (pay and discard in an attack trigger); Dralnu's Pet (a kicker that discards a
   creature card, counters by its mana value); Bribe Taker (a counter for each kind of counter). Known bot gap: bots
   don't activate the Martyrs.
+- Round B24 (harder skipped cards, least played first): "As ~ enters, sacrifice any number of untapped Forests /
+  permanents / creatures" as devour's choice before it's on the battlefield (CR 614.1c, 614.12; rulings on Shimatsu and
+  Wood Elemental): Wood Elemental's P/T is how many were sacrificed (a CDA, CR 604.3), Shimatsu enters with that many
+  +1/+1 counters, Dracoplasm's power and toughness become their totals as they last existed (a layer 7b effect from
+  then on); bots keep four lands and sacrifice cheap tokens. "As ~ enters, pay any amount of life" (CR 119.4; Minion
+  of the Wastes, Phyrexian Processor's X/X Minions, Nameless Race with its cap of white nontoken permanents opponents
+  control plus white cards in their graveyards), the number picker at once, nothing asked when only 0 can be paid;
+  bots pay up to 7 and keep 12 life. Tokens "Its power is equal to that creature's power and its toughness is equal to
+  that creature's toughness", fixed as created, from the creature as it last existed on the battlefield or the card in
+  the graveyard (Broken Visage, Kalitas, Bloodchief of Ghet, Ritual of the Returned). "Target player/opponent reveals
+  the top card of their library" (Aven Windreader; Cerebral Eruption, whose "return ~ to its owner's hand" puts the
+  spell there as it finishes resolving, rulings); "Target player chooses a card name, then reveals the top card of
+  their library" (Petra Sphinx, Vexing Arcanix: an empty library does nothing, rulings; bots name their most common
+  card). "~ / Enchanted land is the chosen color" (Alloy Golem, Shimmerwilds Growth; layer 5); Winnow's "if another
+  permanent with the same name is on the battlefield", checked as it resolves; Premature Burial's "that entered since
+  your last turn ended"; Arsenal Thresher's "reveal any number of other artifact cards from your hand" (amplify's
+  choice). New browser tests: Minion of the Wastes's life, Wood Elemental's Forests, Arsenal Thresher's reveal. +18 (26,959 of 31,936 with Lane A rounds 190 to 193).
+- Skipped there, with reasons: Angelic Aberration ("each with base power or toughness 1 or less": no base P/T filter);
+  Vizkopa Confessor (the opponent reveals that many cards of their choice); Plague of Vermin (paying life in turns
+  until no one pays); Kamahl's Summons (each player reveals from their own hand); Gate to the Aether (a "may" the
+  upkeep's player answers); Game Preserve and Dakra Mystic (each player's revealed card acted on together); Naya
+  Soulbeast (a cast trigger setting how it enters); Paroxysm ("that creature" in an upkeep trigger of enchanted
+  creature's controller, as Lingering Death); Conundrum Sphinx and Sphinx Ambassador (each player or another player
+  naming a card about their own reveal or your search). Known bot gap: bots may cast Winnow on a permanent with no
+  namesake (it still draws).
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),
   Sheltering Prayers (shroud by each player's land count), Durkwood Tracker, Graxiplon (creatures sharing a type),
   Exiled Doomsayer (morph cost tax), Selfless Exorcist (a card in a graveyard dealing damage), Cut the Tethers, Liquid

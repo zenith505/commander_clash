@@ -1,6 +1,6 @@
 # Roadmap
 
-27,050 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,089 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 8,964 of
 9,979 (89%).
 
@@ -2213,12 +2213,11 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   N life" (Soul Scourge, Laquatus's Champion: the target of the enters trigger, rulings), Wormfang Behemoth's "exile all
   cards from your hand ... return the exiled cards", Saprazzan Bailiff. Also "named" tokens and creatures as costs
   (Jungle Patrol's Wood, Bubbling Cauldron's Festering Newt, Kyscu Drake) and Kookus ("Keeper of Kookus" keeps its
-  name; "deals 3 damage to you and attacks this turn if able"). +39 (26,971 of 31,936).
+  name; "deals 3 damage to you and attacks this turn if able"). +39 (27,089 of 31,936 with Lane A round 195).
 - Skipped there: Hypnox and Realm Razer (an enters exile and a leaves return, close to Wormfang Behemoth's, left for a
   round that checks "if you cast it from your hand" and "under their owners' control"), Gravegouger, Wormfang Newt and
-  Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Morbid Bloom and Scour the
-  Desert ("the exiled card's toughness" after a targeted exile, not a cost), Phyrexian Devourer (a power state
-  trigger), Detention Sphere (left to Lane A, near the top). Known limit: a "*" creature card's power outside the
+  Wormfang Turtle (one exile ability the return can't be linked to), Goblin Ski Patrol, Phyrexian Devourer (a power
+  state trigger), Detention Sphere (left to Lane A, near the top). Known limit: a "*" creature card's power outside the
   battlefield is read from its characteristic-defining ability only where a rule asks for it (cost payments, spells on
   the stack); characteristics() still shows it as 0 there.
 - Next for Lane B, least played first, with what blocks each: Mtenda Lion and Heroism (a pay-or-prevent per creature),

@@ -1817,6 +1817,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Ajani Goldmane: "Create a white Avatar creature token. It has "This creature's power and toughness are each equal to
   // your life total."": the token is created with that ability.
   text = text.replace(/(^|\. )(Create an? [^."]+? creature token)\. It has ("(?:This creature|~)'s power and toughness are each equal to [^"]+")\.?$/, "$1$2 with $3.");
+  // Broken Visage, Kalitas, Ritual of the Returned: "Create a black Spirit creature token. Its power is equal to that
+  // creature's power and its toughness is equal to that creature's toughness": one instruction (tokens.ts).
+  text = text.replace(/(^|\. |, )([Cc]reate) an? ([a-z]+ [A-Z][a-z]+ creature token)\. Its power is equal to (that creature|that card)'s power and its toughness is equal to \4's toughness\./, "$1$2 a 0/0 $3 with power and toughness equal to $4's.");
   // Inspired Ultimatum: "Target player gains 5 life, ~ deals 5 damage to any target, then you draw five cards": three
   // instructions, each with its own subject, in order.
   text = text.replace(/^Target player gains (\w+) life, ~ deals (\w+) damage to any target, then you draw (\w+) cards\./, "Target player gains $1 life. ~ deals $2 damage to any target. You draw $3 cards.");

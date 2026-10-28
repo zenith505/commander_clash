@@ -2823,6 +2823,8 @@ export type Effect =
       pt?: Amount;
       /** "An X/1 ... token": `pt` is its power only; its toughness is the token's own. */
       ptPowerOnly?: true;
+      /** "Its toughness is equal to that creature's toughness" (Broken Visage): with `pt` for its power, its toughness. */
+      ptToughness?: Amount;
       /**
        * An Aura token "attached to" this object (a Role, CR 303.7): one for each object it means. It isn't created if it
        * couldn't legally enchant that object (rulings on Roles).

@@ -396,7 +396,8 @@ function eventDefender(s: GameState, ctx: ResolveCtx, pid: PlayerId): PlayerId |
 function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string, /** What each attacking one attacks, as chosen (attackChoices). */ attackAt?: ReturnType<typeof attackChoices>) {
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
-  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: e0.ptPowerOnly ? e0.token.toughness : xx } } : e0;
+  const t = e0.ptToughness !== undefined ? amountNow(s, e0.ptToughness, ctx) : undefined;
+  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: t ?? (e0.ptPowerOnly ? e0.token.toughness : xx) } } : e0;
   // One group for each opponent, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
   if (e.attackingEach) {
     const pid = ctx.controller;

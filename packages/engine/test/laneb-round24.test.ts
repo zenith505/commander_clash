@@ -1,7 +1,7 @@
 // Lane B, round 24: the cards the earlier rounds skipped, least played first (`npm run popular -- --least`).
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
+import { act, addEffect, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { applyAction, botActions, invalidateCharacteristics, isFullySupported, objIsType, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type CostChoices, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -49,6 +49,16 @@ const pool = (s: GameState, pid: PlayerId, mana: Partial<Record<"W" | "U" | "B" 
 };
 const castNow = (s: GameState, pid: PlayerId, id: string, targets: TargetChoice[] = [], choices: CostChoices = {}) => run(s, planCast(s, pid, id, targets, undefined, "auto", undefined, choices));
 const activateNow = (s: GameState, pid: PlayerId, id: string, index: number, targets: TargetChoice[] = [], x?: number, costs?: CostChoices) => run(s, planActivate(s, pid, id, index, targets, undefined, undefined, x, costs));
+/** Passes priority (empty stack) until `pid` has it. */
+const priorityTo = (s: GameState, pid: PlayerId) => {
+  for (let i = 0; i < 8 && waitingOn(s) !== pid; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+/** Passes to the declare attackers step of the active player's turn and declares `attackers` at `defender`. */
+const attackWith = (s: GameState, attackers: string[], defender: PlayerId) => {
+  for (let i = 0; i < 50 && s.pending?.kind !== "declareAttackers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return settle(act(s, { type: "declareAttackers", player: s.activePlayer, attacks: attackers.map((attacker) => ({ attacker, defender })) }));
+};
 const mine = (s: GameState, pid: PlayerId, name: string) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === name);
 
 // Real oracle text (Scryfall).
@@ -58,10 +68,13 @@ const shimatsuTheBloodcloaked = card("Shimatsu the Bloodcloaked", "Legendary Cre
 const minionOfTheWastes = card("Minion of the Wastes", "Creature — Minion", "{3}{B}{B}{B}", {"cmc":6,"power":"*","toughness":"*","keywords":["Trample"],"oracleText":"Trample\nAs this creature enters, pay any amount of life.\nMinion of the Wastes's power and toughness are each equal to the life paid as it entered."});
 const namelessRace = card("Nameless Race", "Creature", "{3}{B}", {"cmc":4,"power":"*","toughness":"*","keywords":["Trample"],"oracleText":"Trample\nAs this creature enters, pay any amount of life. The amount you pay can't be more than the total number of white nontoken permanents your opponents control plus the total number of white cards in their graveyards.\nNameless Race's power and toughness are each equal to the life paid as it entered."});
 const phyrexianProcessor = card("Phyrexian Processor", "Artifact", "{4}", {"cmc":4,"oracleText":"As this artifact enters, pay any amount of life.\n{4}, {T}: Create an X/X black Phyrexian Minion creature token, where X is the life paid as this artifact entered."});
+const brokenVisage = card("Broken Visage", "Instant", "{4}{B}", {"cmc":5,"oracleText":"Destroy target nonartifact attacking creature. It can't be regenerated. Create a black Spirit creature token. Its power is equal to that creature's power and its toughness is equal to that creature's toughness. Sacrifice the token at the beginning of the next end step."});
+const kalitasBloodchiefOfGhet = card("Kalitas, Bloodchief of Ghet", "Legendary Creature — Vampire Warrior", "{5}{B}{B}", {"cmc":7,"power":"5","toughness":"5","oracleText":"{B}{B}{B}, {T}: Destroy target creature. If that creature dies this way, create a black Vampire creature token. Its power is equal to that creature's power and its toughness is equal to that creature's toughness."});
+const ritualOfTheReturned = card("Ritual of the Returned", "Instant", "{3}{B}", {"cmc":4,"oracleText":"Exile target creature card from your graveyard. Create a black Zombie creature token. Its power is equal to that card's power and its toughness is equal to that card's toughness."});
 
 describe("Lane B round 24", () => {
   it("supports every card of the round", () => {
-    supported(woodElemental, dracoplasm, shimatsuTheBloodcloaked, minionOfTheWastes, namelessRace, phyrexianProcessor);
+    supported(woodElemental, dracoplasm, shimatsuTheBloodcloaked, minionOfTheWastes, namelessRace, phyrexianProcessor, brokenVisage, kalitasBloodchiefOfGhet, ritualOfTheReturned);
   });
 
   it("Wood Elemental: only untapped Forests can be sacrificed as it enters, and its P/T is how many were (rulings)", () => {
@@ -177,5 +190,54 @@ describe("Lane B round 24", () => {
     const minion = mine(s, ap, "Phyrexian Minion Token").concat(mine(s, ap, "Phyrexian Minion"));
     expect(minion.length).toBe(1);
     expect(pt(s, minion[0]!)).toBe("5/5");
+  });
+  it("Broken Visage: the Spirit token has the attacking creature's P/T as it last existed, goes to you, and is sacrificed at the next end step", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const beast = putOnBattlefield(s0, ap, bigBeast());
+    addEffect(s0, ap, [beast], [{ kind: "modifyPT", power: 2, toughness: 1 }]);
+    const visage = into(s0, opp, brokenVisage);
+    let s = attackWith(s0, [beast], opp);
+    s = priorityTo(s, opp);
+    pool(s, opp, { B: 1, C: 4 });
+    s = settle(castNow(s, opp, visage, [tgt(beast)]));
+    expect(zone(s, beast)).toBe("graveyard");
+    const spirit = mine(s, opp, "Spirit Token").concat(mine(s, opp, "Spirit"));
+    expect(spirit.length).toBe(1);
+    expect(pt(s, spirit[0]!)).toBe("6/6");
+    s = passUntil(s, "end");
+    s = settle(s);
+    expect(zone(s, spirit[0]!)).not.toBe("battlefield");
+  });
+
+  it("Kalitas makes a Vampire with the destroyed creature's P/T, but none if it didn't die (rulings)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const kalitas = putOnBattlefield(s0, ap, kalitasBloodchiefOfGhet);
+    const beast = putOnBattlefield(s0, opp, bigBeast());
+    pool(s0, ap, { B: 3 });
+    let s = settle(activateNow(s0, ap, kalitas, 0, [tgt(beast)]));
+    expect(zone(s, beast)).toBe("graveyard");
+    const vampire = mine(s, ap, "Vampire Token").concat(mine(s, ap, "Vampire"));
+    expect(vampire.length).toBe(1);
+    expect(pt(s, vampire[0]!)).toBe("4/5");
+    // An indestructible creature doesn't die: no token.
+    const { s: s1, ap: ap1, opp: opp1 } = setup([]);
+    const k1 = putOnBattlefield(s1, ap1, kalitasBloodchiefOfGhet);
+    const wall = putOnBattlefield(s1, opp1, bigBeast());
+    addEffect(s1, opp1, [wall], [{ kind: "addKeywords", keywords: ["Indestructible"] }]);
+    pool(s1, ap1, { B: 3 });
+    const t = settle(activateNow(s1, ap1, k1, 0, [tgt(wall)]));
+    expect(zone(t, wall)).toBe("battlefield");
+    expect(mine(t, ap1, "Vampire Token").concat(mine(t, ap1, "Vampire")).length).toBe(0);
+  });
+
+  it("Ritual of the Returned exiles the creature card and makes a Zombie with its power and toughness", () => {
+    const { s: s0, ap, ids } = setup([ritualOfTheReturned]);
+    const beast = into(s0, ap, bigBeast(), "graveyard");
+    pool(s0, ap, { B: 1, C: 3 });
+    const s = settle(castNow(s0, ap, ids[0]!, [tgt(beast)]));
+    expect(zone(s, beast)).toBe("exile");
+    const zombie = mine(s, ap, "Zombie Token").concat(mine(s, ap, "Zombie"));
+    expect(zombie.length).toBe(1);
+    expect(pt(s, zombie[0]!)).toBe("4/5");
   });
 });

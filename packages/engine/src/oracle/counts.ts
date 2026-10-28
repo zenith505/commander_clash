@@ -76,6 +76,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
   // Guardian of the Gateless: "Whenever ~ blocks, it gets +1/+1 until end of turn for each creature it's blocking".
   if (each && /^creature (?:it's|~ is) blocking$/.test(p) && (ctx?.selfIt || /~/.test(p))) return { count: { kind: "itBlocks" } };
+  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3).
+  if (each && p === "permanent you control but don't own") {
+    const filter = parseTargetPhrase(p);
+    return filter?.kind === "object" ? { count: { kind: "permanents", filter: { ...filter, text: p } } } : null;
+  }
   // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
   // battlefield named ~", any player's.
   if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);
@@ -110,6 +115,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Iridescent Hornbeetle: "for each +1/+1 counter you've put on creatures under your control this turn", as they were
   // put, even on creatures that have left since (rulings).
   if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
+  // Vault 12: The Necropolis: "the total number of rad counters among players" (CR 728, 122.1), every player's together.
+  if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis

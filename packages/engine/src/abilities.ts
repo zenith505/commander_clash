@@ -52,7 +52,7 @@ export interface PayCost {
  * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
  * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
  */
-export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { damage: number };
+export type PunisherOption = { discard: number; /** "Unless they discard a nonland card" (Bandit's Talent): only cards like this. */ filter?: TargetSpec } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { /** "Equal to ~'s power" (Combustion Man): worked out as the punisher starts. */ damage: Amount };
 
 export interface UnlessPays {
   cost: string;
@@ -863,6 +863,8 @@ export interface TargetSpec {
    * the "where X is" is read.
    */
   manyCount?: AmountExpr;
+  /** With many "x": "up to twice X target cards" (Erebos's Intervention), X times this. */
+  manyTimes?: 2;
   manyWhere?: true;
   many?: "any" | "x" | "exactX" | /** "Another target for each time ~ was kicked" (Comet Storm): as many as times kicked, made so as it's cast (gateBody). */ "kicked";
   /**
@@ -1234,9 +1236,12 @@ export interface DamageRuleSpec {
 export const refCovers = (r: object, i: number): boolean =>
   "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
 
+/** Is it kicker (CR 702.33), so a spell cast paying it is "kicked" for other cards, not replicate, waterbend and the like? */
+export const isRealKicker = (k: CompiledCard["kicker"]): boolean => !!k && (kickerName(k) === "kicker" || kickerName(k) === "multikicker");
+
 /** What a card's kicker-like cost is called (see CompiledCard.kicker). */
-export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" | "waterbend" =>
-  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.waterbend !== undefined ? "waterbend" : k.multi ? "multikicker" : "kicker";
+export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" | "waterbend" | "additional cost" =>
+  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.waterbend !== undefined ? "waterbend" : k.optional ? "additional cost" : k.multi ? "multikicker" : "kicker";
 
 export interface TokenSpec {
   name: string;
@@ -1908,7 +1913,7 @@ export type StaticCondition =
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
    */
-  | { kind: "phase"; phase: "main" | "combat" | "end"; yours?: true; first?: true }
+  | { kind: "phase"; phase: "main" | "combat" | "end"; yours?: true; first?: true; /** "If it isn't your main phase" (Dose of Dawnglow). */ not?: true }
   /** "If it's attacking the player with the most life or tied for most life" (Scourge of the Throne; dethrone's test, CR 702.105a). */
   | { kind: "attackingMostLife" }
   /** "While you have the most life or are tied for most life" (Preacher of the Schism). */
@@ -2209,6 +2214,8 @@ export type Effect =
       destroy?: true;
       /** Consuming Tide: "Return all nonland permanents not chosen this way to their owners' hands": returned instead. */
       bounce?: true;
+      /** Killing Wave: "sacrifices it unless they pay X life": any number kept, this much life paid for each (as many as they can pay for). */
+      payLife?: Amount;
     }
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
   | { type: "keepDestroyRest"; filter: TargetSpec; n: number }
@@ -2237,7 +2244,7 @@ export type Effect =
    * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
    * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
    */
-  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
+  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; until?: "nextTurn"; /** Wormfang Behemoth: "When ~ leaves the battlefield, return the exiled cards to their owner's hand" (CR 607.2a; set by compile). */ linked?: boolean }
   /**
@@ -3042,6 +3049,12 @@ export type Effect =
    * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
    * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
    */
+  /**
+   * "Flip a coin for each creature that isn't a Demon, Devil, or Imp. Destroy each creature whose coin comes up tails."
+   * (Rakdos, the Showstopper): one coin for each permanent that fits as it resolves, which only comes up heads or tails
+   * (no one wins or loses it, CR 705.2); those that come up tails are destroyed at the same time (rulings).
+   */
+  | { type: "flipCoinEach"; filter: TargetSpec }
   | { type: "flipCoin"; untilLose?: true; /** "Flip three coins" (Goblin Traprunner): that many flips, the wins counted. */ n?: number; /** "For each coin that comes up heads" (Ral Zarek): no one calls these flips, so no one wins or loses them (CR 705.2, rulings); the heads are counted. */ uncalled?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
@@ -3125,7 +3138,7 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef; /** "Into your library": yours is shuffled even if no card is put into it. */ yours?: true; /** "Target player shuffles ... into their library" (Memory's Journey): that player's is, the same way. */ who?: PlayerRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
-  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). */ exchange?: true }
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). With `hand`, "exchange your hand and library" (Mordenkainen): to the hand. */ exchange?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens
@@ -4905,6 +4918,10 @@ export interface ManaAbility {
   discardHand?: true;
   /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
   instantOnly?: true;
+  /** "Activate only as a sorcery" (Grinning Ignus): only when its controller could cast a sorcery (CR 307.1), so never while paying. */
+  sorceryOnly?: true;
+  /** "Return ~ to its owner's hand" as part of the cost (Grinning Ignus): never used by automatic payment. */
+  returnSelf?: true;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
@@ -5156,7 +5173,7 @@ export type AdditionalCost =
    * matches, chosen as it's paid (CR 602.2b, 601.2h; CostChoices.counterOn), the source too. Not payable on one counters
    * can't be put on (rulings on Solemnity).
    */
-  | { kind: "putCounter"; counter: CounterKind; n: number; filter: TargetSpec }
+  | { kind: "putCounter"; counter: CounterKind; n: number; filter: TargetSpec; /** Blight N (CR 701.68a): `n` -1/-1 counters on one creature you control. */ blight?: true }
   /**
    * Craft's materials (CR 702.167a-b): "Exile [materials] from among permanents you control and/or cards in your
    * graveyard", `n` objects that match `filter` (a permanent by its characteristics, a card by its printed ones), any mix
@@ -5450,7 +5467,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; /** Vizier of Many Faces: "except if ~ was embalmed, the token has no mana cost, it's white, and it's a Zombie in addition to its other types" (CR 702.128b). */ ifEmbalmed?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**
@@ -5959,6 +5976,8 @@ export interface CompiledCard {
    * reduce the mana in that cost to less than one mana." Any such ability its controller activates, from any zone (rulings).
    */
   youActivateLess?: { n: number; atLeastOne?: true };
+  /** Fluctuator: "Cycling abilities you activate cost {2} less to activate", from any zone (CR 702.29f: typecycling too). */
+  cyclingLess?: number;
   /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two
@@ -6226,6 +6245,12 @@ export interface CompiledCard {
      */
     extraCosts?: AdditionalCost[];
     text?: string;
+    /**
+     * "As an additional cost to cast this spell, you may blight 1", "you may behold a Dragon" (CR 601.2b): an optional
+     * additional cost that isn't kicker, its one cost `extraCosts[0]`, chosen and paid the same way. "If this spell's
+     * additional cost was paid", "if a Dragon was beheld" read as kicked. Not "kicked" for other cards.
+     */
+    optional?: true;
   };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];

@@ -1,4 +1,4 @@
-import type { AbilityBody, Effect, Modification, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
+import { isRealKicker, type AbilityBody, type Effect, type Modification, type SpellCondition, type TargetChoice, type TargetSpec, type UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -826,7 +826,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Ertai's Trickery: kicked as it was cast (CR 702.33d); a copy of a kicked spell is kicked too (CR 707.10).
       if (e.ifKicked) {
         const item = s.stack.find((x) => x.id === t.id);
-        if (!item || item.kind !== "spell" || !item.kicked?.length) {
+        // An optional cost paid like kicker isn't kicker ("you may blight 1", replicate).
+        const real = !item?.objectId || !s.objects[item.objectId] || isRealKicker(compileCard(defOf(s, s.objects[item.objectId]!)).kicker);
+        if (!item || item.kind !== "spell" || !item.kicked?.length || !real) {
           log(s, `${src} doesn't counter ${item?.description ?? "it"}: it wasn't kicked.`);
           return;
         }

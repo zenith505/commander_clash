@@ -824,7 +824,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "phase": {
       const combat = ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
       const now = cond.phase === "combat" ? combat : cond.phase === "end" ? s.step === "end" : s.step === "main1" || s.step === "main2";
-      return now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1);
+      return (now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1)) !== !!cond.not;
     }
     case "prowl": {
       // CR 702.76a: the spell's creature types as it's cast (a changeling has all of them, CR 702.73a), against the

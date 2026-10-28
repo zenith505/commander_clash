@@ -1430,11 +1430,9 @@ export function parseAffected(subject: string): Affects | null {
     return { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", anyOf, text: `artifact creature or ${sub}` } };
   }
   // Thorin Oakenshield: "Artifacts and creatures you control": permanents of either card type, an artifact creature once.
-  const cardTypes = /^(other )?(artifacts|creatures|enchantments|lands|planeswalkers) and (artifacts|creatures|enchantments|lands|planeswalkers) you control$/i.exec(x);
-  if (cardTypes && cardTypes[2]!.toLowerCase() !== cardTypes[3]!.toLowerCase()) {
-    const [a, b] = [cardTypes[2]!.toLowerCase().slice(0, -1), cardTypes[3]!.toLowerCase().slice(0, -1)];
-    return { kind: "filter", types: [], controller: "you", other: !!cardTypes[1], spec: { kind: "object", types: [capital(a), capital(b)], text: `${a} or ${b}` } };
-  }
+  // Only that pair: the general path takes the other "X and Y you control" pairs.
+  const artCre = /^(other )?(?:artifacts and creatures|creatures and artifacts) you control$/i.exec(x);
+  if (artCre) return { kind: "filter", types: [], controller: "you", other: !!artCre[1], spec: { kind: "object", types: ["Artifact", "Creature"], text: "artifact or creature" } };
   // Serpent of Yawning Depths: "Krakens, Leviathans, Octopuses, and Serpents you control": creatures of any of those types.
   const typeList = /^((?:[A-Z][a-z]+, )+and [A-Z][a-z]+) you control$/.exec(x);
   if (typeList) {

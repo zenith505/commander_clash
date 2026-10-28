@@ -2351,7 +2351,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control on top of its owner's library" (Nulltread Gargantuan; browser test), Fold into Aether's "If that spell is
   countered this way", Painbringer's "Exile any number of cards from your graveyard" cost counted as X (X can be 0; browser
   test), Threshold's "is black/white and has ..." (Wayward Angel, Repentant Vampire), Infernal Caretaker's "return all
-  Zombie cards from all graveyards", Durkwood Tracker's bite of an attacking creature. +19 (27,242 of 31,936 with main and Lane A round 198).
+  Zombie cards from all graveyards", Durkwood Tracker's bite of an attacking creature. +19 (27,265 of 31,936 with main and Lane A round 199).
 - Known limits there: bots don't activate Painbringer (an X cost they skip) and may value Baki's Curse at 0.
 - Out after round B31: Ekundu Cyclops (an attack requirement that depends on the declaration itself, like Viashino
   Bey), Taste of Paradise (optional additional costs, Lane A's round 197 template; left to it), Liquid Fire (a number

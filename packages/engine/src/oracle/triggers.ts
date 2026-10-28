@@ -85,6 +85,10 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
+  // CR 701.30: "Whenever you clash" is any clash you take part in, started by you or an opponent (rulings).
+  [/^Whenever you clash and win, (.+)$/, "youWinClash"],
+  [/^Whenever you win a clash, (.+)$/, "youWinClash"],
+  [/^Whenever you clash, (.+)$/, "youClash"],
   [/^Whenever you scry or surveil, (.+)$/, "youScryOrSurveil"],
   [/^Whenever you scry, (.+)$/, "youScry"],
   [/^Whenever you surveil, (.+)$/, "youSurveil"],
@@ -2499,7 +2503,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const kwCond: StaticCondition | null = kwIf && kw ? { kind: "selfIs", filter: { kind: "object", ...(kwIf[1] === "has" ? { keywords: [kw] } : { notKeywords: [kw] }), text: `${kwIf[1] === "has" ? "with" : "without"} ${kwIf[2]}` } } : null;
   // Wall of Resistance: "At the beginning of each end step, if ~ was dealt damage this turn, ...": as it triggers and
   // resolves (CR 603.4); only a trigger reads it, so no static ability's cache depends on it.
-  const dmgCond: StaticCondition | null = intervening && /^At the beginning of /.test(intervening[1]!) && /^~ was dealt damage this turn$/.test(intervening[2]!) ? { kind: "self", is: "dealtDamageThisTurn" } : null;
+  const dmgCond: StaticCondition | null = intervening && /^At the beginning of /.test(intervening[1]!) && /^~ was dealt damage this turn$/.test(intervening[2]!) ? { kind: "self", is: "dealtDamageThisTurn" } : intervening && /^At the beginning of /.test(intervening[1]!) && /^~ dealt damage to an opponent this turn$/.test(intervening[2]!) ? { kind: "self", is: "dealtDamageToOpponentThisTurn" } : null;
   // Skizzik: "At the beginning of the end step, if ~ wasn't kicked, sacrifice it": as it was cast (CR 702.33d), kept by
   // the permanent; a copy or one put onto the battlefield wasn't (rulings).
   const kickCond: StaticCondition | null = intervening && /^At the beginning of /.test(intervening[1]!) && /^~ wasn't kicked$/.test(intervening[2]!) ? { kind: "self", is: "kicked", not: true } : null;
@@ -2552,6 +2556,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Riders of the Mark: "return it to its owner's hand. If you do, create a number of ... tokens equal to its toughness":
       // ~ and ~'s (as it last existed, CR 608.2h).
       rest = /^return it to its owner's hand\. If you do, create a number of [^.]+ equal to its (?:power|toughness)\.$/.test(rest) ? rest.replace(/^return it/, "return ~").replace(/ equal to its /, " equal to ~'s ") : /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.").replace(/^(you may remove an? \S+ counter from) it\./, "$1 ~.") : rest.replace(/\bit\b/g, "~");
+    // Inventive Wingsmith: "if you haven't cast a spell from your hand this turn and ~ doesn't have a flying counter on it,
+    // put a flying counter on it": ~, the only object named.
+    if (/ and ~ doesn't have an? [a-z]+ counter on it$/.test(intervening[2]!) && /^At /.test(intervening[1]!)) rest = rest.replace(/^put an? ([a-z]+) counter on it\.$/, "put a $1 counter on ~.");
     if (typeIf && !/^(?:When|Whenever) ~ /.test(intervening[1]!)) rest = rest.replace(/^it becomes /, "~ becomes ");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     if (!t || t === "fail" || t.ifCond) return "fail";
@@ -3198,7 +3205,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line)) text = text.replace(/^((?:you may )?)return it to your hand\.$/, "$1return ~ to its owner's hand.");
       const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
       if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {
         const [tg, ...more] = body.targets;

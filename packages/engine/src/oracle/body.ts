@@ -119,6 +119,10 @@ export interface Ctx {
   exiledCards?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** "Whenever you clash": "If you won, ..." is about that clash (TriggerEventInfo.wonClash). */
+  clashed?: boolean;
+  /** After "Clash with an opponent. If you win, ...": "that player" is the opponent clashed with (PlayerRef clashOpponent). */
+  clashOpp?: boolean;
   /** While counting for "each player ... that player controls" (Price of Progress): "that player" is each of them in turn (PlayerRef eachOne). */
   eachOne?: boolean;
   /** "Choose an opponent." came before: "that player" is the one chosen. */
@@ -697,7 +701,7 @@ const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
 /** One ability's text to its targets and effects, or null if any of it can't be compiled. */
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
   // Increasing Ambition: "Search your library for a card and put that card into your hand. If ~ was cast from a graveyard,
@@ -738,9 +742,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
-  text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
+  text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
+    // Yawgmoth Demon: "tap ~ and it deals 2 damage to you": the same.
+    .replace(/\b([Tt]ap ~ and) it (deals \d+ damage to you)\b/g, "$1 ~ $2")
+    // Touch of the Eternal: "count the number of permanents you control. Your life total becomes that number.": the number
+    // counted as it resolves (CR 119.5).
+    .replace(/^count the number of permanents you control\. Your life total becomes that number\.$/, "Your life total becomes the number of permanents you control.");
   // Scavenged Brawler: "Choose target creature. Put four +1/+1 counters, a flying counter, ... on that creature.": the
   // counters on that target.
   text = text.replace(/^Choose (target creature)\. (Put [^.]+?) on that creature\.$/, "$2 on $1.");
@@ -836,6 +845,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.revealedFromHand ? { revealedFromHand: true } : {}),
     ...(opts.tappedThisWay ? { tappedThisWay: true } : {}),
     ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
+    ...(opts.clashed ? { clashed: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -2591,6 +2601,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "state", cond }, effects: [{ ...lastSearch, n: NUMBER_WORDS[moreIf[2]!]! }], otherwise: [lastSearch] };
       continue;
     }
+    // Charnel Troll: "exile a creature card from your graveyard. If you do, put a +1/+1 counter on ~. Otherwise, sacrifice
+    // it.": you must exile one if you can (rulings), so it's done exactly when there's one there as it resolves; "it" is ~,
+    // the only permanent named.
+    const yardDo = /^[Ee]xile an? ([a-z]+ card) from your graveyard$/.exec(s);
+    const yardThen = yardDo && /^If you do, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    const yardElse = yardThen && /^Otherwise, sacrifice (?:it|~)\.?$/.test(sentences[si + 2] ?? "");
+    if (yardDo && yardThen && yardElse) {
+      const fx = parseOne(s, ctx);
+      const n = parseCount(`the number of ${yardDo[1]}s in your graveyard`, ctx);
+      const then = parseOne(capital(yardThen[1]!), ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "chooseFromGraveyard" || !n || typeof n !== "object" || !then) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: n, min: 1 }, effects: [...fx, ...then], otherwise: [{ type: "sacrifice", what: { ref: "self" } }] });
+      si += 2;
+      continue;
+    }
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
     const sacDo = /^If you do, (.+)$/.exec(s);
     const sacPrev = effects[effects.length - 1];
@@ -4078,6 +4103,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "draw", who: prevDiscard.who, n: { count: { kind: "discardedThisWay" } } });
       continue;
     }
+    // Skullknocker Ogre: "that player discards a card at random. If the player does, they draw a card.": only if a card was
+    // discarded (rulings: with one card in hand, it's discarded and they draw).
+    if (/^If the player does, they draw a card$/.test(s) && prevDiscard?.type === "discard" && prevDiscard.who.ref === "eventPlayer" && prevDiscard.n === 1 && !prevDiscard.upTo) {
+      effects.push({ type: "draw", who: prevDiscard.who, n: { count: { kind: "discardedThisWay" } } });
+      continue;
+    }
     // Gerrard's Verdict: "Target player discards two cards. You gain 3 life for each land card discarded this way."
     const gainPer = /^You gain (\d+) life for each (land|creature|nonland) card discarded this way$/.exec(s);
     if (gainPer && effects[effects.length - 1]?.type === "discard") {
@@ -4747,14 +4778,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // target land. If that land was nonbasic, ~ deals 2 damage to the land's controller.", Liliana's Defeat: "If that
     // permanent was a Liliana planeswalker, her controller loses 3 life.": the same, as it last existed.
     const destroyWas = /^[Dd]estroy target (?:creature|creature with [a-z]+|artifact or enchantment|black creature or black planeswalker)$/.test(s)
-      ? /^If (?:that creature|that permanent|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+)(?: planeswalker)?)|wasn't attacking|had an? (\+1\/\+1) counter on it), (.+?)\.?$/.exec(sentences[si + 1] ?? "")
+      ? /^If (?:that creature|that permanent|it) (was (?:(white|blue|black|red|green) or (white|blue|black|red|green)|an? ([A-Z][a-z]+)(?: planeswalker)?)|was a legendary enchantment|wasn't attacking|had an? (\+1\/\+1) counter on it), (.+?)\.?$/.exec(sentences[si + 1] ?? "")
       : /^[Dd]estroy target (?:land|non-Swamp land)$/.test(s) ? /^If that land (was a snow land|was nonbasic)(), ()()()(.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
     const planeswalkerWas = destroyWas && / planeswalker,/.test(sentences[si + 1] ?? "");
     if (destroyWas && (!destroyWas[4] || planeswalkerWas || CREATURE_TYPES.has(destroyWas[4]))) {
       const before = ctx.targets.length;
       const fx = parseOne(s, ctx);
       if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "destroy") return null;
-      const filter: TargetSpec = destroyWas[1] === "was a snow land"
+      // Budding Insurgent: "If that permanent was a legendary enchantment, draw a card."
+      const filter: TargetSpec = destroyWas[1] === "was a legendary enchantment"
+        ? { kind: "object", types: ["Enchantment"], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "a legendary enchantment" }
+        : destroyWas[1] === "was a snow land"
         ? { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Snow"], text: "snow" }
         : destroyWas[1] === "was nonbasic"
         ? { kind: "object", types: [], notTypes: [], notColors: [], notSupertypes: ["Basic"], text: "nonbasic" }
@@ -6657,10 +6691,79 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // "Clash with an opponent. If you win, ... Otherwise, ...": decided by that clash (CR 701.30d).
-    const ifWin = /^If you win, (.+)$/.exec(s);
+    // Eunuchs' Intrigues: "Target opponent chooses a creature they control. Other creatures they control can't block this
+    // turn.": all but the one chosen, for the turn.
+    if (/^Other creatures they control can't block this turn$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "pick" || prev.action !== "choose" || prev.n !== 1 || prev.who.ref !== "target" || effects.length !== 1) return null;
+      effects.push({ type: "cantBlockRule", filter: { kind: "object", types: ["Creature"], text: "other creatures they control" }, ofPlayer: prev.who, exceptChosen: true });
+      continue;
+    }
+    // Truce: "Each player may draw up to two cards. For each card less than two a player draws this way, that player gains 2
+    // life.": each chooses how many, and gains life for the ones not chosen.
+    const truce = /^Each player may draw up to two cards$/.test(s) ? /^For each card less than two a player draws this way, that player gains (\d+) life\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (truce) {
+      effects.push({ type: "drawUpTo", who: { ref: "eachPlayer" }, n: 2, shortLife: Number(truce[1]) });
+      si++;
+      continue;
+    }
+    // Sindbad, Fa'adiyah Seer: "Draw a card and reveal it. If it isn't a land card, discard it.": the card drawn (none if the
+    // draw was replaced), revealed, and discarded unless it's a land card.
+    if (/^Draw a card and reveal it$/.test(s)) {
+      const unless = /^If it isn't an? ([a-z]+ card), discard it\.?$/.exec(sentences[si + 1] ?? "");
+      const keep = unless && parseSearchFilter(unless[1]!);
+      if (!keep) return null;
+      effects.push({ type: "draw", who: { ref: "you" }, n: 1 }, { type: "revealDrawn", keep });
+      si++;
+      continue;
+    }
+    // Hoarder's Greed: "You lose 2 life and draw two cards, then clash with an opponent. If you win, repeat this process.":
+    // all of it again, until a clash isn't won (rulings).
+    if (/^If you win, repeat this process$/.test(s)) {
+      if (effects[effects.length - 1]?.type !== "clash" || effects.some((e, i) => i < effects.length - 1 && pauses(e)) || si + 1 !== sentences.length) return null;
+      effects.splice(0, effects.length, { type: "repeatIf", effects: [...effects], cond: { kind: "wonClash" }, then: [] });
+      continue;
+    }
+    // Whirlpool Whelm: "Clash with an opponent, then return target creature to its owner's hand. If you win, you may put
+    // that creature on top of its owner's library instead.": one move or the other, chosen after the clash (rulings).
+    if (/^If you win, you may put that creature on top of its owner's library instead$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "bounce" || prev.what.ref !== "target" || !effects.some((e) => e.type === "clash")) return null;
+      const top: Effect = { type: "putInLibrary", what: prev.what, position: "top" };
+      effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "wonClash" }, effects: [{ type: "may", effects: [top], text: "put that creature on top of its owner's library", otherwise: [prev] }], otherwise: [prev] });
+      continue;
+    }
+    // Gore Vassal: "Put a -1/-1 counter on target creature. Then if that creature's toughness is 1 or greater, regenerate
+    // it.": its toughness with that counter, as it resolves (rulings: the shield lasts the turn or until used).
+    const gorePrev = effects[effects.length - 1];
+    if (/^If that creature's toughness is 1 or greater, regenerate it$/.test(s) && gorePrev?.type === "counters" && gorePrev.what.ref === "target" && gorePrev.counter === "-1/-1") {
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "toughness", of: gorePrev.what } }, min: 1 }, effects: [{ type: "regenerate", what: gorePrev.what }] });
+      continue;
+    }
+    // Ether Well: "Put target creature on top of its owner's library. If that creature is red, you may put it on the bottom
+    // of its owner's library instead.": its color and the choice as it resolves (rulings).
+    const wellColor = /^If that creature is (white|blue|black|red|green), you may put it on the bottom of its owner's library instead$/.exec(s);
+    const wellPrev = effects[effects.length - 1];
+    if (wellColor && wellPrev?.type === "putInLibrary" && wellPrev.position === "top" && wellPrev.what.ref === "target" && Object.keys(wellPrev).length === 3) {
+      const bottom: Effect = { type: "putInLibrary", what: wellPrev.what, position: "bottom" };
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[wellColor[1]!]!], text: wellColor[1]! };
+      effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "targetIs", index: wellPrev.what.index, filter }, effects: [{ type: "may", effects: [bottom], text: "put it on the bottom of its owner's library", otherwise: [wellPrev] }], otherwise: [wellPrev] });
+      continue;
+    }
+    // "Whenever you clash, ... If you won, ...": the clash the trigger is about (Entangling Trap, Rebellion of the Flamekin).
+    const ifWin = /^If you win, (.+)$/.exec(s) ?? (ctx.clashed ? /^If you won, (.+)$/.exec(s) : null);
     if (ifWin) {
+      // "If you win, creatures that player controls don't untap ..." (Pollen Lullaby): that player is the one clashed with.
+      // Not when it names a player of its own: "If you win, target player discards two cards. Otherwise, that player
+      // discards a card." (Pulling Teeth): that target.
+      if (!ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && !/\btarget (?:player|opponent)\b/.test(ifWin[1]!) && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
       const clashed = (es: Effect[]): boolean => es.some((e) => e.type === "clash" || (e.type === "may" && clashed(e.effects)));
-      const inner = clashed(effects) && parseOne(ifWin[1]!.charAt(0).toUpperCase() + ifWin[1]!.slice(1), ctx);
+      // Fistful of Force: "that creature gets an additional +2/+2": another +2/+2, on top of the first.
+      // Gilt-Leaf Ambush: "Create two 1/1 ... creature tokens. Clash with an opponent. If you win, those creatures gain
+      // deathtouch": the tokens just made.
+      const made = effects[effects.length - 2];
+      const winText = ifWin[1]!.replace(/^(that creature|it) gets an additional /, "$1 gets ").replace(/^those creatures (?=gain )/, made?.type === "createToken" && typeof made.n === "number" && made.n > 1 && made.token.types.includes("Creature") && effects[effects.length - 1]?.type === "clash" ? "those tokens " : "those creatures ");
+      const inner = (ctx.clashed ? !effects.some((e) => e.type === "clash") : clashed(effects)) && parseOne(winText.charAt(0).toUpperCase() + winText.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "wonClash" }, effects: inner });
       continue;
@@ -7033,6 +7136,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // that creature gets +3/+3 until end of turn.": whether it was done (CR 608.2c).
       const didElse = prev?.type === "if" && prev.cond.kind === "youDid" && effects[effects.length - 2]?.type === "may" && !(effects[effects.length - 2] as Extract<Effect, { type: "may" }>).otherwise;
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse && !didElse) || prev.otherwise) return null;
+      // Captivating Glance: "Otherwise, that player gains control of enchanted creature": the opponent clashed with.
+      if (prev.cond.kind === "wonClash" && !ctx.clashed && !ctx.eventPlayer && !ctx.chosenOpponent && ctx.lastPlayerTarget === undefined && effects.some((e) => e.type === "clash" && !e.with)) ctx.clashOpp = true;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
@@ -9108,6 +9213,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
   // "Create a 2/2 red Mutant creature token. It gains haste until end of turn. Destroy it at the beginning of the next end
   // step" (Old Hob): an instruction about the tokens just created leaves "it" meaning them.
   if (last && "what" in last && (last.what as ObjRef).ref === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
+  // A clash moves no permanents: "those creatures" after it are still the tokens before it (Gilt-Leaf Ambush).
+  if (last?.type === "clash") return;
   {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");

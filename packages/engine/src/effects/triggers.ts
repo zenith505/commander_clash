@@ -169,6 +169,8 @@ export type TriggerSourceEvent =
   | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
   | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number }
+  /** A player clashed (CR 701.30a), whether or not they started it; `won`, whether they won it (701.30d). */
+  | { type: "clashed"; player: PlayerId; won: boolean }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
   | { type: "spellCountered"; by: PlayerId }
   /** `from`: the zone it was played from. */
@@ -1002,6 +1004,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.player) watch(obj(s, id));
     // "Whenever you surveil, if ~ is in your graveyard" (Blood Operative): its owner's.
     fromGraveyards((o, owner) => owner === ev.player && watch(o));
+  } else if (ev.type === "clashed") {
+    // "Whenever you clash" triggers on a clash an opponent's spell started too (rulings on Entangling Trap); "If you
+    // won" is about that clash (TriggerEventInfo.wonClash).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youClash" || (ev.won && e === "youWinClash"), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, wonClash: ev.won });
+    }
   } else if (ev.type === "spellCountered") {
     for (const id of s.battlefield) {
       const o = obj(s, id);

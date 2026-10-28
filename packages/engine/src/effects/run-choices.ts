@@ -196,17 +196,25 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Grist: each pass, its instructions in order, then if the card milled qualifies, `then` and another pass; it ends
       // when one misses (an empty library mills nothing). Even with ~ gone, the process goes on (rulings).
       const sc = (s.resolving!.scratch ??= {});
+      // What its instructions keep while they run (a draw's progress) starts over each pass, as for "repeat".
+      const keep = (sc.repeatKeep ??= Object.keys(sc));
       for (let pass = 0; pass < 1000; pass++) {
         for (sc.repeatStep ??= 0; sc.repeatStep < e.effects.length; sc.repeatStep++) if (runEffect(s, e.effects[sc.repeatStep]!, ctx) === "paused") return "paused";
         sc.repeatStep = undefined;
+        for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (k !== "repeatKeep" && !keep.includes(k)) delete sc[k];
         const milled = (s.resolving!.milled ?? []).map(({ id }) => defOf(s, s.objects[id]!));
         const cond = e.cond;
         // Sphinx's Tutelage: both cards nonland with a color in common, as they are in the graveyard (colorless isn't a color, rulings).
-        const hit = cond.kind === "milledIs" ? milled.some((d) => printedMatches(cond.filter, d)) : milled.length === 2 && milled.every((d) => !isType(d, "Land")) && milled[0]!.colors.some((c) => milled[1]!.colors.includes(c));
-        if (!hit) return;
+        // Hoarder's Greed: until a clash isn't won (rulings).
+        const hit = cond.kind === "wonClash" ? !!s.resolving!.wonClash : cond.kind === "milledIs" ? milled.some((d) => printedMatches(cond.filter, d)) : milled.length === 2 && milled.every((d) => !isType(d, "Land")) && milled[0]!.colors.some((c) => milled[1]!.colors.includes(c));
+        if (!hit) {
+          sc.repeatKeep = undefined;
+          return;
+        }
         for (const inner of e.then) runEffect(s, inner, ctx);
         log(s, `${src} repeats the process.`);
       }
+      sc.repeatKeep = undefined;
       return;
     }
     case "rollAgain": {
@@ -553,7 +561,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           : e.cond.kind === "resolvedNth"
           ? e.cond.n.includes(s.resolving!.nth ?? 0) !== !!e.cond.not
           : e.cond.kind === "wonClash"
-            ? !!s.resolving!.wonClash
+            ? !!(s.resolving!.wonClash ?? ctx.event?.wonClash)
             : e.cond.kind === "wonFlip"
             ? !!s.resolving!.flipped && s.resolving!.flipped.won !== !!e.cond.lost
             : e.cond.kind === "destroyedThisWay"

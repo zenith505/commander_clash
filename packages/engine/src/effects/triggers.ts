@@ -1477,7 +1477,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.by !== undefined)
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
     // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
     // controller that player is an opponent of, once for each source (rulings).
@@ -2346,6 +2346,9 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).
     ...((t.transformsAt ?? s.objects[t.sourceId]?.transforms) ? { sourceTransforms: t.transformsAt ?? s.objects[t.sourceId]!.transforms } : {}),
   });
+  // Soul Scourge: the player targeted is remembered as it's put on the stack (rulings on Laquatus's Champion).
+  const linking = t.index >= 0 && triggerOf(s, t)?.linksTarget ? targets.find((x) => x.kind === "player") : undefined;
+  if (linking?.kind === "player") (s.linkedPlayer ??= {})[`${t.sourceId}@${t.sourceZc ?? 0}`] = linking.id;
   // Firebender Ascension's trigger is about this one, now on the stack.
   if (t.tag) for (const q of s.triggerQueue) if (q.causeTag === t.tag) q.cause = s.stack[s.stack.length - 1]!.id;
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);

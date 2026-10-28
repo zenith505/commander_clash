@@ -299,6 +299,26 @@ function convokerTypes(s: GameState, ctx: ResolveCtx): (Set<string> | "all")[] {
   });
 }
 
+/**
+ * What the Aura or Equipment an ability came from is attached to, while it's still that object (CR 400.7); if it's
+ * gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h). `here`: that
+ * permanent is still on the battlefield as the same object.
+ */
+function attachedHost(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number; here: boolean } | undefined {
+  const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (!me) return undefined;
+  const same = ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc;
+  let was: { id: ObjectId; zc: number } | undefined;
+  if (me.zone === "battlefield" && same) was = me.attachedTo ? { id: me.attachedTo, zc: s.objects[me.attachedTo]?.zoneChanges ?? 0 } : undefined;
+  else {
+    const lk = s.lastKnown?.[me.id];
+    was = lk && lk.zc === ctx.sourceZc ? lk.attachedTo : undefined;
+  }
+  if (!was) return undefined;
+  const o = s.objects[was.id];
+  return { ...was, here: o?.zone === "battlefield" && (o.zoneChanges ?? 0) === was.zc };
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "ringBearer") {
@@ -448,19 +468,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
-    // What the Aura or Equipment is attached to, while it's still the object the ability came from (CR 400.7).
-    // If it's gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h).
-    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    if (!me) return [];
-    const same = ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc;
-    let host: GameObject | undefined;
-    if (me.zone === "battlefield" && same) host = me.attachedTo ? s.objects[me.attachedTo] : undefined;
-    else {
-      const lk = s.lastKnown?.[me.id];
-      const was = lk && lk.zc === ctx.sourceZc ? lk.attachedTo : undefined;
-      host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
-    }
-    return host?.zone === "battlefield" ? [host] : [];
+    const host = attachedHost(s, ctx);
+    return host?.here ? [s.objects[host.id]!] : [];
   }
   if (ref.ref === "targetHost") {
     // Unforge: the permanent the target Equipment is attached to, or was attached to as it was destroyed (rulings).
@@ -482,6 +491,16 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
   }
+  if (ref.ref === "each" && ref.andAttached) {
+    // Crown of Vigor: the creature it enchanted (or as it last existed, CR 608.2h) and the others sharing a type with it.
+    const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
+    const host = attachedHost(s, ctx);
+    const h = host && s.objects[host.id];
+    const lk = host && !host.here ? s.lastKnown?.[host.id] : undefined;
+    const types = host?.here ? creatureTypesOf(s, h!) : lk?.zc === host?.zc && lk?.creatureTypes ? (lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes)) : undefined;
+    const others = !types ? [] : s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== host!.id && objectMatches(s, filter, o, ctx.controller, false) && shareCreatureType(types, creatureTypesOf(s, o)));
+    return host?.here ? [h!, ...others] : others;
+  }
   if (ref.ref === "each" && ref.andSubject) {
     const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
     const subj = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -495,7 +514,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const filter0 = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
     // "Named ~" (Gruff Triplets): its name now, or as it last existed (CR 201.5, 608.2h).
     const me0 = filter0.named === "~" && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    const filter = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
+    const filter1 = filter0.named === "~" ? { ...filter0, named: me0?.zone === "battlefield" ? characteristics(s, me0).name : ctx.sourceDef.name } : filter0;
+    // Sanguine Praetor, Endemic Plague: the sacrificed creature as it last existed; none matches without one.
+    const sacked = ref.sacrificedKin ? (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1)) : undefined;
+    if (ref.sacrificedKin && !sacked) return [];
+    const filter = ref.sacrificedKin === "manaValue" ? { ...filter1, manaValue: { min: sacked!.manaValue ?? 0, max: sacked!.manaValue ?? 0 } } : filter1;
+    const sackedTypes = ref.sacrificedKin === "creatureType" ? (sacked!.allCreatureTypes ? ("all" as const) : new Set((sacked!.subtypes ?? []).filter((x) => CREATURE_TYPES.has(x)))) : undefined;
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : ref.otherThanSubject ? ctx.subject?.id : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
@@ -503,7 +527,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
     const spared = ref.spareConvokerTypes ? convokerTypes(s, ctx) : [];
     const spare = (o: GameObject) => spared.length > 0 && objIsType(s, o, "Creature") && !objIsType(s, o, "Artifact") && !objIsType(s, o, "Enchantment") && spared.some((t) => shareCreatureType(t, creatureTypesOf(s, o)));
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && !spare(o));
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(ref.ofOwner ? o.owner : controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))) && (!sackedTypes || shareCreatureType(sackedTypes, creatureTypesOf(s, o))) && !spare(o));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
@@ -522,6 +546,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
   switch (ref.ref) {
     case "you":
       return [ctx.controller];
+    case "linkedPlayer": {
+      // The leaves ability triggered after the source moved: its enters ability was the object before (CR 400.7).
+      const pid = s.linkedPlayer?.[`${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`];
+      return pid !== undefined && !player(s, pid).lost ? [pid] : [];
+    }
     case "eachOpponent":
       return opponents(s, ctx.controller);
     case "eachPlayer":

@@ -10,7 +10,7 @@ import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
-import { STARTING_LIFE, type Chosen, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
+import { STARTING_LIFE, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ObjectId, type PlayerId, type TriggerEventInfo } from "./types";
 import { defMv, sameName } from "./faces";
 import { creatureTypesOf, shareCreatureType } from "./game";
 import { CREATURE_TYPES } from "./keywords";
@@ -69,6 +69,17 @@ export interface AmountCtx {
 export const isFixed = (a: Amount): a is number => typeof a === "number";
 
 /** The value of `a` right now. */
+/** The mana symbols of these colors in a mana cost, a hybrid symbol of two of them counting once (CR 700.5; chroma's rulings). */
+export function manaSymbolsOf(cost: string | undefined, colors: readonly Color[]): number {
+  let n = 0;
+  if (!cost) return 0;
+  for (const sym of parseManaCost(cost).symbols) {
+    if (sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid") n += colors.includes(sym.color as never) ? 1 : 0;
+    else if (sym.kind === "hybrid") n += sym.options.some((x) => colors.includes(x)) ? 1 : 0;
+  }
+  return n;
+}
+
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
   const c = evalCount(s, a.count, ctx);
@@ -251,7 +262,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.discards ?? []).reduce((n, d) => n + (who.includes(d.player) ? d.cards.length : 0), 0);
     }
     case "cardsInHand":
-      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (c.filter ? s.players[pid]!.hand.filter((id) => printedMatches(c.filter!, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
+    {
+      // "For each card with the chosen name revealed this way" (Thought Hemorrhage): the name chosen as it resolves.
+      const f = c.filter && bindChosen(c.filter, ctx.chosen);
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.hand.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
+    }
     case "cardsInLibrary":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
     case "handMoreThanYou": {
@@ -320,6 +335,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "bouncedThisWayCount":
+      return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "preventedByRule":
+      return s.preventedTally?.[c.rule] ?? 0;
     case "sacrificedThisWayGreatestPower":
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
     case "putThisWay":
@@ -609,7 +628,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const st = ctx.stationed;
       const o = st && s.objects[st.id];
       if (!st) return 0;
-      return Math.max(0, o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc ? characteristics(s, o).power : st.power);
+      if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc) return Math.max(0, characteristics(s, o).power);
+      // As it last existed on the battlefield (CR 608.2h), if that's recorded; else as it was tapped.
+      const lk = s.lastKnown?.[st.id];
+      return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
     }
     case "power":
     case "toughness":
@@ -679,10 +701,20 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (view(o)?.controller !== ctx.controller) continue;
-        for (const sym of parseManaCost(defOf(s, o).manaCost).symbols) {
-          if (sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid") n += c.colors.includes(sym.color as never) ? 1 : 0;
-          else if (sym.kind === "hybrid") n += sym.options.some((x) => c.colors.includes(x)) ? 1 : 0;
-        }
+        n += manaSymbolsOf(defOf(s, o).manaCost, c.colors);
+      }
+      return n;
+    }
+    case "manaSymbols": {
+      // Chroma: only mana costs count, not symbols in rules text (rulings).
+      const r = s.resolving;
+      const ids: ObjectId[] =
+        c.in === "graveyard" ? (s.players[ctx.controller]?.graveyard ?? []) : c.in === "affected" ? (ctx.affected !== undefined ? [ctx.affected] : []) : c.in === "revealedFromHand" ? (r?.revealedFromHandIds ?? []) : c.in === "revealed" ? (r?.revealedUntil ?? []) : [];
+      let n = ids.reduce((t, id) => t + (s.objects[id] ? manaSymbolsOf(defOf(s, s.objects[id]!).manaCost, [c.color]) : 0), 0);
+      // What was sacrificed, as it last existed (CR 608.2h): a token that isn't a copy has no mana cost.
+      if (c.of?.ref === "sacrificed") {
+        const key = (ctx.sacrificed?.[0] ?? r?.sacrificedThisWay?.at(-1))?.copyKey;
+        n += key && s.cards[key] ? manaSymbolsOf(s.cards[key]!.manaCost, [c.color]) : 0;
       }
       return n;
     }
@@ -878,6 +910,10 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "bouncedThisWayCount":
+      return "#returned";
+    case "preventedByRule":
+      return "#damage prevented";
     case "sacrificedThisWayGreatestPower":
       return "the greatest power sacrificed";
     case "putThisWay":
@@ -1022,6 +1058,8 @@ function describeCount(c: Count): string {
       return "life lost this turn";
     case "devotion":
       return "devotion";
+    case "manaSymbols":
+      return `#${c.color} mana symbols`;
     case "attachedToSelf":
     case "attachedToAffected":
     case "attachedToHost":

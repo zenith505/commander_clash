@@ -52,6 +52,10 @@ export interface DamageRule {
   millSelf?: number;
   /** Nine Lives: a counter of this kind on that permanent for each source whose damage it would prevent, even damage that can't be prevented (rulings, CR 615.12). */
   counterOn?: { id: ObjectId; kind: string };
+  /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
+  countersOn?: { counter: string; tally?: true };
+  /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
+  dealTo?: { object: ObjectId; zc: number } | { player: PlayerId };
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -1553,6 +1557,8 @@ export interface GameState {
   resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  /** Soul Scourge, Laquatus's Champion: the player its enters ability targeted, by "sourceId@zc", for "that player" in its leaves ability (rulings). */
+  linkedPlayer?: Record<string, PlayerId>;
   /**
    * Animate Dead: the creature an Aura with "enchant creature card in a graveyard" put onto the battlefield, by
    * `${Aura id}@${its zone changes}` (its "enchant creature put onto the battlefield with ~", and "that creature" of its
@@ -1777,6 +1783,8 @@ export interface GameState {
   emblems?: ObjectId[];
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */
   dayNight?: "day" | "night";
+  /** How much damage each damage rule with a tallied `countersOn` has prevented (Sacred Boon), by rule id. */
+  preventedTally?: Record<string, number>;
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
   lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
@@ -2047,6 +2055,8 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** The cards it revealed, for "each green mana symbol in those cards' mana costs" (Phosphorescent Feast). */
+  revealedFromHandIds?: ObjectId[];
   /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
   parley?: { land: number; nonland: number };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
@@ -2108,7 +2118,7 @@ export interface Resolving {
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
-  bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
+  bouncedThisWay?: { id: ObjectId; subtypes: string[]; /** It went to a hand (Count bouncedThisWayCount). */ returned?: true }[];
   /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */
   returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
@@ -2223,6 +2233,8 @@ export interface Resolving {
       discards?: number;
       /** Or that this permanent is destroyed (Combustion Man's "destroy target permanent unless ..."). */
       destroys?: ObjectId;
+      /** Or that its controller sacrifices the source (Icy Prison's "sacrifice ~ unless any player pays {3}"). */
+      losesSource?: true;
       /** "If a player does" / "If no one does" (see the punisher effect). */
       mode?: "ifAny" | "ifNone";
     };

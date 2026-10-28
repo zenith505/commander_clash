@@ -652,9 +652,10 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     return filter === null ? null : { kind: "exileFromHand", n: num(m[1]!), ...(filter ? { filter } : {}) };
   }
   // "Tap an untapped creature you control" (Lashknife), "tap four untapped creatures you control with flying" (Sephara).
-  if ((m = new RegExp(`^tap ${NUM} untapped (.+?) you control( with .+)?$`, "i").exec(text))) {
+  // "Tap an untapped red creature you control other than ~" (Impelled Giant): not the source.
+  if ((m = new RegExp(`^tap ${NUM} untapped (.+?) you control( with .+?)?( other than ~)?$`, "i").exec(text))) {
     const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? m[2]!.split(" ").map(singularWord).join(" ") : m[2]}${m[3] ?? ""}`);
-    return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}` }, n: num(m[1]!) } : null;
+    return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}${m[4] ? " other than ~" : ""}` }, n: num(m[1]!), ...(m[4] ? { other: true } : {}) } : null;
   }
   // "Collect evidence 3" (CR 701.59a): exile cards from your graveyard with total mana value 3 or more.
   if ((m = /^collect evidence (\d+)$/i.exec(text))) return { kind: "collectEvidence", n: Number(m[1]) };
@@ -698,6 +699,12 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const filter = parseSearchFilter(n > 1 ? m[2]!.replace(/cards$/, "card") : m[2]!);
     if (filter === null) return null;
     return { kind: "exileFromGraveyard", n, top: true, ...(filter ? { filter } : {}) };
+  }
+  // Gallia, Tragic Host: "Exile another creature card from your graveyard": not the card whose ability it is, which never
+  // pays for itself anyway (see game.ts's candidates).
+  if ((m = /^exile another (.+? card) from your graveyard$/i.exec(text))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? { kind: "exileFromGraveyard", n: 1, filter } : null;
   }
   if ((m = new RegExp(`^exile (${NUM.slice(1, -1)}|X) (.+?) from your graveyard$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
     const filter = parseSearchFilter(m[1] === "X" ? m[2]!.replace(/cards$/, "card") : m[2]!);

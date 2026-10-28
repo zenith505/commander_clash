@@ -230,7 +230,8 @@ export function isFullySupported(d: CardDef): boolean {
   // Creatures, and Vehicles that can become creatures (CR 301.7a), need numbers for power and toughness,
   // or a characteristic-defining ability that says what a "*" is (CR 604.3).
   const defined = c.statics.flatMap((st) => st.mods).find((x) => x.kind === "definePT");
-  const ptOk = (v: string | undefined, key: "power" | "toughness") => /^\d+$/.test(v ?? "") || (/\*/.test(v ?? "") && defined?.kind === "definePT" && defined[key] !== undefined);
+  // A printed negative number is a number (Char-Rumbler's -1, Spinal Parasite's -1/-1).
+  const ptOk = (v: string | undefined, key: "power" | "toughness") => /^-?\d+$/.test(v ?? "") || (/\*/.test(v ?? "") && defined?.kind === "definePT" && defined[key] !== undefined);
   if ((d.types.includes("Creature") || d.subtypes.includes("Vehicle")) && (!ptOk(d.power, "power") || !ptOk(d.toughness, "toughness"))) return false;
   if (c.unsupported.length) return false;
   if ((d.types.includes("Instant") || d.types.includes("Sorcery")) && !c.spell) return false;
@@ -340,6 +341,9 @@ export function normalizeSelf(d: CardDef): string {
   // creature token named Kobolds of Kher Keep").
   const tokenNames: string[] = [];
   t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
+  // Kookus: "a creature named Keeper of Kookus" is another card's name with its name in it.
+  const otherNames: string[] = [];
+  if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
   if (full) {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
     // The card named Exile: "Exile target nonwhite attacking creature" is the keyword action, not the card (its name
@@ -371,6 +375,7 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(re, "~");
   }
   t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
+  t = t.replace(/\u0002(\d+)\u0002/g, (_, i: string) => otherNames[Number(i)]!);
   // A card named for two characters ("Aang and La, Ocean's Fury", "Bebop & Rocksteady") takes plural verbs: "Whenever
   // Aang and La attack", "Whenever ~ enter or attack". It's still one object (CR 201.5), read as "~ attacks".
   // A plural name ("The Sackville-Bagginses", "The Notary Hobbits") too.
@@ -587,6 +592,8 @@ export function compile(d: CardDef): CompiledCard {
   // Pawprints (CR 700.2i): "Choose up to five {P} worth of modes. You may choose the same mode more than once." and a
   // "{P}{P} — [effect]" line for each mode.
   let paws: { budget: number; costs: number[]; texts: string[]; lines: string[] } | undefined;
+  // Devouring Rage: what its additional cost sacrifices any number of, the number sacrificed its X.
+  let costSacrificedX: string | undefined;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
@@ -1550,6 +1557,19 @@ export function compile(d: CardDef): CompiledCard {
       else {
         (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacLess[1]!) }, n: 0, x: true, optional: true });
         out.sacrificedReduction = Number(sacLess[2]);
+      }
+      continue;
+    }
+    // Devouring Rage: "As an additional cost to cast this spell, you may sacrifice any number of Spirits." then "For each
+    // Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.": an additional cost with an X
+    // of 0 or more (CR 601.2b, 107.3a), the number sacrificed; the spell's text counts it as X.
+    const sacFor = /^As an additional cost to cast ~, you may sacrifice any number of ([A-Z][a-z]+)\.$/.exec(line);
+    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `))) {
+      const spec = parseTargetPhrase(singularWord(sacFor[1]!));
+      if (spec?.kind !== "object" || !spec.subtypes?.length) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacFor[1]!) }, n: 0, x: true, optional: true });
+        costSacrificedX = singularWord(sacFor[1]!);
       }
       continue;
     }
@@ -3540,6 +3560,20 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Soul Scourge, Laquatus's Champion: "When ~ enters, target player loses 3 life. When ~ leaves the battlefield, that
+    // player gains 3 life.": the player its enters ability targeted, even if that ability is still on the stack (rulings).
+    const thatPlayerLeaves = /^When ~ leaves the battlefield, that player gains (\d+) life\.$/.exec(line);
+    const linkedEnters = out.triggers.filter((t) => t.event === "selfEnters");
+    if (thatPlayerLeaves && linkedEnters.length === 1 && linkedEnters[0]!.body.targets.length === 1 && linkedEnters[0]!.body.targets[0]!.kind === "player") {
+      linkedEnters[0]!.linksTarget = true;
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "gainLife", who: { ref: "linkedPlayer" }, n: Number(thatPlayerLeaves[1]) }], text: `That player gains ${thatPlayerLeaves[1]} life.` } });
+      continue;
+    }
+    // Loot, the Anomaly: how much combat damage it assigns, not its power (rulings; CR 510.1a).
+    if (line === "If ~'s power is negative, ~ assigns combat damage as though ~'s power were positive.") {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "assignsAbsPower" }], text: line });
+      continue;
+    }
     // Noble Quarry (bestow): "All creatures able to block ~ or enchanted creature do so": itself while it's a creature, the
     // creature it enchants while it's an Aura (CR 509.1c, 702.103).
     if (line === "All creatures able to block ~ or enchanted creature do so.") {
@@ -3846,7 +3880,7 @@ export function compile(d: CardDef): CompiledCard {
     // graveyard to the battlefield ..." (Blood on the Snow): the paragraph after the modes is done whichever mode was
     // chosen, after it (CR 700.2, 608.2c). With one mode chosen, that's the same as the end of each mode.
     const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
-    const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
+    const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
@@ -3971,6 +4005,10 @@ export function compile(d: CardDef): CompiledCard {
   if (out.entersWithCounters?.escaped !== undefined && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   if (out.entersCounterChoice?.escaped && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
+  // Grandeur's "Discard another card named ~": the card's own name (a copy has it too, CR 707.2).
+  for (const ab of out.activated)
+    if (ab.costs?.some((c) => c.kind === "discard" && c.filter?.named === "~"))
+      ab.costs = ab.costs.map((c) => (c.kind === "discard" && c.filter?.named === "~" ? { ...c, filter: { ...c.filter, named: d.name, text: `card named ${d.name}` } } : c));
   // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
   const overload = out.altCosts?.find((a) => a.kind === "overload");
   if (overload && !d.oracleId.endsWith("|overloaded")) {
@@ -4213,7 +4251,7 @@ function linkExile(out: CompiledCard) {
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;
   // "When this creature is turned face up, exile ..." (Aurelia's Vindicator) is one of its exile abilities too (CR 607.2a).
-  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile)) && !("until" in e && e.until);
+  const exiling = (e: Effect): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" | "exileHand" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile) || e.type === "exileHand") && !("until" in e && e.until);
   const exiles0 = [...out.triggers.filter((t) => t.event === "selfEnters" || t.event === "selfTurnedFaceUp").map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter(exiling);
   // "Landfall — Whenever a land you control enters, you may exile target nonland permanent other than ~" (Admonition
   // Angel): with no exile as it enters or in an activated ability, its one other triggered ability that exiles.
@@ -4283,7 +4321,7 @@ function checkCastingLinks(out: CompiledCard) {
       return;
     }
     if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype") && !canSac) bad = true;
-    if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
+    if (o.ref === "sacrificed" && o.exiledCost && !exileCost && !yardExile) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
@@ -4306,14 +4344,19 @@ function checkCastingLinks(out: CompiledCard) {
   const needs = new Set<ChoiceKind>();
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
-  let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
+  // "The exiled card's power" (Corpse Lunge): the one card an "exile a creature card from your graveyard" cost exiled,
+  // with nothing sacrificed to share the record.
+  const yardExileOne = (costs: AdditionalCost[] | undefined) => costs?.filter((c) => c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && c.n === 1).length === 1 && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage" || c.kind === "craft");
+  let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice") || yardExileOne(out.additionalCosts);
   let exileCost = false;
+  let yardExile = yardExileOne(out.additionalCosts);
   let handExileCost = false;
   const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
   let revealCost = oneReveal(out.additionalCosts);
   visit([out.spell, out.triggers, out.statics, out.mana]);
   for (const ab of out.activated) {
-    canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
+    yardExile = yardExileOne(ab.costs);
+    canSac = !!ab.costs?.some((c) => c.kind === "sacrifice") || yardExile;
     exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
     handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
     revealCost = oneReveal(ab.costs);
@@ -4321,6 +4364,7 @@ function checkCastingLinks(out: CompiledCard) {
   }
   revealCost = false;
   exileCost = false;
+  yardExile = false;
   handExileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
@@ -4331,6 +4375,9 @@ function checkCastingLinks(out: CompiledCard) {
   // "The chosen player's upkeep", "whenever the chosen player casts" (Black Vise, Sewer Nemesis): the player its
   // "As ~ enters, choose a player" chose.
   if (out.triggers.some((tr) => tr.chosenPlayersTurn || tr.cast?.by === "chosen") && !out.entersChoosePlayer) bad = true;
+  // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
+  const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
+  if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
@@ -4613,4 +4660,10 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     return of && of.every((x) => x.filter.controller === "you") ? { of } : null;
   }
   return null;
+}
+
+/** Devouring Rage: "For each Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn" is "That creature gets +3/+0 until end of turn for each Spirit sacrificed this way". */
+function spellBodyText(text: string, costSacrificedX: string | undefined): string {
+  if (!costSacrificedX) return text;
+  return text.replace(new RegExp(`For each ${costSacrificedX} sacrificed this way, that creature gets an additional ([+-]\\d+/[+-]\\d+) until end of turn\\.`), `That creature gets $1 until end of turn for each ${costSacrificedX} sacrificed this way.`);
 }

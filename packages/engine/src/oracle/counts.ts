@@ -25,6 +25,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
   // modified creatures you control".
   p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
+  // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
+  if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
   // Superior Numbers: "the number of creatures you control in excess of the number of creatures target opponent controls":
   // the first less the second, 0 if it's not more (CR 107.1b).
@@ -192,10 +194,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
   // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.
-  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
+  // Impetuous Protege: "the greatest power among tapped creatures your opponents control" (0 with none, rulings).
+  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking |tapped )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls|your opponents control)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
     const words = m[3]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[4]!;
-    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : ""}`, { chosen: true });
+    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : who === "your opponents control" ? " an opponent controls" : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
     const theirs = /^(?:they|that player|target player|target opponent) control/.test(who);
     const whose = theirs ? whosePlayer(who === "they control" ? "their" : who.replace(/ controls$/, "'s"), ctx) : undefined;
@@ -312,6 +315,21 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (nb) return parseCount(nb[1]!, ctx, true);
   }
   const count = (c: Count): AmountExpr => ({ count: c });
+  // Chroma: "the number of red mana symbols in the mana costs of permanents you control" counts as devotion does (hybrid
+  // symbols of that color count, rulings; CR 700.5); "of cards in your graveyard" (Umbra Stalker), "in its mana cost" in
+  // a static ability (Light from Within: each permanent's own), "in the sacrificed creature's mana cost" (Fiery
+  // Bombardment), "in those cards' mana costs" after revealing cards from your hand (Phosphorescent Feast).
+  if (each && (m = /^(white|blue|black|red|green) mana symbols? in (.+)$/i.exec(p))) {
+    const color = COLOR_WORDS[m[1]!.toLowerCase()]!;
+    const where = m[2]!;
+    if (/^the mana costs of permanents you control$/i.test(where)) return count({ kind: "devotion", colors: [color] });
+    if (/^the mana costs of cards in your graveyard$/i.test(where)) return count({ kind: "manaSymbols", color, in: "graveyard" });
+    if (/^its mana cost$/i.test(where) && ctx === null) return count({ kind: "manaSymbols", color, in: "affected" });
+    if (/^the sacrificed creature's mana cost$/i.test(where) && ctx) return count({ kind: "manaSymbols", color, of: { ref: "sacrificed" } });
+    if (/^those cards' mana costs$/i.test(where) && ctx?.revealedFromHand) return count({ kind: "manaSymbols", color, in: "revealedFromHand" });
+    if (/^the mana costs of the revealed cards$/i.test(where) && ctx?.revealedTopN) return count({ kind: "manaSymbols", color, in: "revealed" });
+    return null;
+  }
   // "Draw cards equal to the result", "where X is the result" (CR 706.2), "the total of those results" (Neverwinter Hydra).
   if (!each && /^(?:the result|the total of those results)$/i.test(p)) return count({ kind: "rollResult" });
   // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
@@ -350,6 +368,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.excessDamage && /^(?:the )?(?:amount of )?excess damage dealt(?: to (?:that creature|that permanent))? this way$|^that excess damage$/i.test(p)) return { count: { kind: "excessThisWay" } };
   // "For each creature tapped this way", "the number of creatures tapped this way" after "tap any number of untapped
   // creatures you control" (Harmony of Nature), or in its reflexive trigger (Teferi Akosa of Zhalfir).
+  // Keldon Battlewagon: "Tap an untapped creature you control: ~ gets +X/+0 until end of turn, where X is the power of the
+  // creature tapped this way"; Unerring Sling: "the tapped creature's power". compile() checks the ability has that cost.
+  if (ctx?.activated && /^(?:the power of the creature tapped this way|the tapped creature's power)$/i.test(p)) return { count: { kind: "stationPower" } };
   if (ctx?.tappedThisWay && /^(?:the number of )?(?:[A-Z][a-z]+ )?(?:creatures?|artifacts?|Gates?|Humans?|permanents?) tapped this way$/.test(p)) return { count: { kind: "tappedThisWay" } };
   // "For each card manifested this way" (Kozilek, the Broken Reality), after its manifest-from-hand instruction.
   if (ctx?.manifested && each && /^card manifested this way$/i.test(p)) return { count: { kind: "manifestedThisWay" } };
@@ -398,6 +419,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Sweep (Plow Through Reito): "for each Plains returned this way", "the number of Mountains returned this way".
+  if (ctx?.bouncedAny && (m = /^(?:the number of )?([A-Z][a-z]+) returned this way$/.exec(p)) && (each || p.startsWith("the number")) && singularWord(m[1]!) === singularWord(ctx.bouncedAny))
+    return count({ kind: "bouncedThisWayCount" });
+  // Devouring Rage: "For each Spirit sacrificed this way" is its X, the number its additional cost sacrificed (CR 107.3a).
+  if (each && ctx?.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) return count({ kind: "x" });
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
   if (each && ctx?.afterYourDiscard && /^card discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".
@@ -820,6 +846,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
   // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
   if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
+  // Corpse Lunge: "the exiled card's power" after an "exile a creature card from your graveyard" cost, with no card
+  // targeted (Lobelia's, below); compile() checks it has that cost.
+  if (x === "the exiled card's" && !ctx.targets.some((t) => t.kind === "card")) return { ref: "sacrificed", exiledCost: true };
   if (x === "that card's" && ctx.revealedTop) return { ref: "revealed" };
   if (x === "that card's" && ctx.chosenFromYard) return { ref: "chosenFromYard" };
   // Pyretic Rebirth: "... ~ deals damage equal to that card's mana value to up to one target creature": the one card targeted.

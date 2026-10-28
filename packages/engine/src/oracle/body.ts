@@ -1,5 +1,5 @@
 import { parseFromTop } from "./compile";
-import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification } from "../abilities";
+import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, THAT_PLAYER_PROTECTION } from "../keywords";
@@ -39,6 +39,8 @@ export interface Ctx {
   exiledTop?: boolean;
   /** After "you may reveal the top card of your library. If you do": "that card" is the revealed card. */
   revealedTop?: boolean;
+  /** "Reveal the top ten cards of your library" kept them there: "the revealed cards" are those (Sanity Grinding). */
+  revealedTopN?: boolean;
   /** "Reveal cards ... until you reveal a nonland card" kept them in the library: "Put the revealed cards on the bottom of your library in any order" can follow (Erratic Explosion). */
   revealedUntil?: boolean;
   /** The instruction before exiled cards from the top of a library (face up): "for each blue card exiled this way" (Oona, Queen of the Fae). */
@@ -55,6 +57,10 @@ export interface Ctx {
   excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
   tappedThisWay?: boolean;
+  /** Sweep: "Return any number of Plains you control to their owner's hand" came before: "for each Plains returned this way". */
+  bouncedAny?: string;
+  /** Devouring Rage: its additional cost sacrifices any number of these, the number its X: "for each Spirit sacrificed this way". */
+  costSacrificedX?: string;
   /** "Each opponent discards a card" came just before: "for each opponent who can't". */
   opponentsDiscarded?: boolean;
   /** A "manifest N cards from their hands" instruction came before: "for each card manifested this way". */
@@ -737,7 +743,24 @@ const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
 /** One ability's text to its targets and effects, or null if any of it can't be compiled. */
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
+
+/**
+ * A prevention shield on a target or you as a damage rule (CR 615.7), so an additional effect after it can be part of it
+ * (CR 615.5): "Prevent the next N damage that would be dealt to target creature this turn" (not divided), or "Prevent all
+ * damage that would be dealt to target creature this turn". Undefined for anything else.
+ */
+function prevAsDamageRule(e: Effect | undefined): Extract<Effect, { type: "damageRule" }> | undefined {
+  if (e?.type === "preventNext" && !e.divided && (e.to.ref === "you" || ("index" in e.to && (e.to.ref === "target" || e.to.ref === "anyTarget"))))
+    return { type: "damageRule", rule: { to: { target: e.to }, n: e.n } };
+  if (e?.type === "continuous" && e.duration === "endOfTurn" && e.what.ref === "target" && !("n" in e.what) && e.mods.length === 1) {
+    const m = e.mods[0]!;
+    if (m.kind === "preventDamage" && m.to && Object.keys(m).every((k) => k === "kind" || k === "to") && Object.keys(e).every((k) => ["type", "what", "mods", "duration"].includes(k)))
+      return { type: "damageRule", rule: { to: { target: { ref: "target", index: e.what.index } } } };
+  }
+  return undefined;
+}
+
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
   // Dazzling Denial: "Counter target spell unless its controller pays {2}. If you control a Bird, counter that spell unless
   // its controller pays {4} instead." One counter, with the cost the condition sets as it resolves (CR 608.2c).
   // Increasing Ambition: "Search your library for a card and put that card into your hand. If ~ was cast from a graveyard,
@@ -778,7 +801,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   return body;
 }
 
-function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; selfEntered?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; costSacrificedX?: string; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true; eventRecipient?: true; clashed?: boolean } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~")
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
@@ -893,6 +916,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     ...(opts.amassed ? { amassed: true } : {}),
     ...(opts.revealedFromHand ? { revealedFromHand: true } : {}),
     ...(opts.tappedThisWay ? { tappedThisWay: true } : {}),
+    ...(opts.costSacrificedX ? { costSacrificedX: opts.costSacrificedX } : {}),
     ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
     ...(opts.clashed ? { clashed: true } : {}),
   };
@@ -944,6 +968,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // return a creature card from your graveyard to your hand, draw three cards, then gain 5 life." The same, in order.
   text = text.replace(/\. You return a creature card from your graveyard to your hand, draw three cards, then gain 5 life\.$/, ". Return a creature card from your graveyard to your hand. Draw three cards. You gain 5 life.");
   text = text.replace(/^((?:Each (?:player|opponent)|Target (?:player|opponent)) (?:loses|discards|sacrifices|draws|mills) [^,.]+)((?:, (?:loses|discards|sacrifices|draws|mills) [^,.]+)+), then ((?:loses|discards|sacrifices|draws|mills) [^,.]+)\./, (_, a: string, mid: string, last: string) => `${a}${mid.replace(/, /g, ", then ")}, then ${last}.`);
+  // Linessa, Zephyr Mage: "Target player returns a creature they control to its owner's hand, then repeats this process for
+  // an artifact, an enchantment, and a land": one after another, so an artifact creature returned first can't count as
+  // the artifact too (rulings).
+  text = text.replace(/^Target player returns a creature they control to its owner's hand, then repeats this process for an artifact, an enchantment, and a land\.$/, "Target player returns a creature they control to its owner's hand. That player returns an artifact they control to its owner's hand. That player returns an enchantment they control to its owner's hand. That player returns a land they control to its owner's hand.");
+  // Oriss, Samite Guardian: "Target player can't cast spells this turn, and creatures that player controls can't attack
+  // this turn": two instructions.
+  text = text.replace(/^(Target player can't cast spells this turn), and creatures that player controls can't attack this turn\.$/, "$1. Creatures that player controls can't attack this turn.");
   const effects: Effect[] = [];
   // Cosmic Rebirth: "Choose target permanent card in your graveyard. If it has mana value 3 or less, you may put it onto the
   // battlefield. If you don't put it onto the battlefield, put it into your hand.": one instruction after the target.
@@ -2023,7 +2054,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     .flatMap((x) => {
       // Wormwood Dryad: "~ gains forestwalk until end of turn and deals 1 damage to you": the same.
       const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn|~ gains [a-z]+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
-      return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+      // Kookus: "~ deals 3 damage to you and attacks this turn if able": the same, in order.
+      const k = /^(~ deals \d+ damage to you) and (attacks this turn if able)$/.exec(x);
+      return m ? [m[1]!, `~ ${m[2]!}`] : k ? [k[1]!, `~ ${k[2]!}`] : [x];
     })
     .filter(Boolean);
   let prevStart = 0;
@@ -2242,7 +2275,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Reign of Terror: "Destroy all green creatures or all white creatures"; Lava Storm: "~ deals 2 damage to each attacking
     // creature or ~ deals 2 damage to each blocking creature": one or the other, chosen as it resolves (CR 608.2d).
-    const orAll = /^(Destroy all (?:[a-z]+ )?creatures) or all ((?:[a-z]+ )?creatures)$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
+    // Essence Filter: "Destroy all enchantments or all nonwhite enchantments".
+    const orAll = /^(Destroy all (?:[a-z]+ )?(?:creatures|enchantments)) or all ((?:[a-z]+ )?(?:creatures|enchantments))$/.exec(s) ?? /^(~ deals \d+ damage to each [a-z]+ creature) or (~ deals \d+ damage to each [a-z]+ creature)$/.exec(s);
     if (orAll) {
       const halves = [orAll[1]!, /^Destroy/.test(orAll[1]!) ? `Destroy all ${orAll[2]}` : orAll[2]!];
       const options = halves.map((h) => parseOne(h, ctx));
@@ -2530,6 +2564,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Clockwork Beast: "Put up to X +1/+0 counters on ~. This ability can't cause the total number of +1/+0 counters on ~ to
+    // be greater than seven." With X chosen as it's activated, "up to X" is any number from 0 to X (rulings), the same as
+    // X itself as far as the counters go; none past the total (rulings).
+    const capped = new RegExp(`^Put up to X ${COUNTER} counters on ~$`).exec(s);
+    const cap = capped && new RegExp(`^This ability can't cause the total number of ${COUNTER} counters on ~ to be greater than (one|two|three|four|five|six|seven|eight|nine|ten)$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (capped && cap && cap[1] === capped[1] && ctx.activated) {
+      effects.push({ type: "counters", what: { ref: "self" }, counter: capped[1]!, n: X, maxTotal: num(cap[2]!) });
+      si++;
+      continue;
+    }
     // Psychic Spiral: "Shuffle all cards from your graveyard into your library. Target player mills that many cards.": as
     // many as were shuffled in.
     if (/^Shuffle all cards from your graveyard into your library$/.test(s) && /^Target player mills that many cards\.?$/.test(sentences[si + 1] ?? "")) {
@@ -2574,6 +2618,35 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = filter ? parseOne(capital(revealDo[1]!), ctx) : null;
       if (!filter || !fx?.length || ctx.targets.length !== before) return null;
       effects.push({ type: "revealFromHand", filter, one: true, ...(revealOne[2] ? { orControl: true as const } : {}) }, { type: "if", cond: { kind: "amountNow", amount: { count: { kind: "revealedFromHand" } }, min: 1 }, effects: fx });
+      si++;
+      continue;
+    }
+    // Sweep (Plow Through Reito): "Return any number of Plains you control to their owner's hand. Target creature gets
+    // +1/+1 until end of turn for each Plains returned this way.": returned as it resolves, not as a cost (rulings), as
+    // many as you choose (CR 107.1c); counted as those put into a hand.
+    const sweepBack = /^Return any number of ([A-Z][a-z]+) you control to their owner's hand$/.exec(s);
+    if (sweepBack && !ctx.bouncedAny && new RegExp(`\\b${singularWord(sweepBack[1]!).replace(/s$/, "")}s? returned this way\\b`).test(sentences[si + 1] ?? "")) {
+      const filter = pickFilter(sweepBack[1]!);
+      if (!filter || filter.kind !== "object" || !filter.subtypes?.length) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", anyNumber: true });
+      ctx.bouncedAny = sweepBack[1]!;
+      continue;
+    }
+    // Sacred Rites: "Discard any number of cards. Creatures you control get +0/+1 until end of turn for each card
+    // discarded this way.": none or more, chosen as it resolves (CR 107.1c).
+    if (s === "Discard any number of cards" && /\bfor each card discarded this way\b/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true });
+      continue;
+    }
+    // Landslide: "Sacrifice any number of Mountains. ~ deals that much damage to target player or planeswalker.": one
+    // damage for each Mountain sacrificed, as it resolves (rulings).
+    const slide = /^Sacrifice any number of ([A-Z][a-z]+)$/.exec(s);
+    const slideNext = sentences[si + 1]?.replace(/\.$/, "") ?? "";
+    if (slide && /^~ deals that much damage to target [a-z ]+$/.test(slideNext)) {
+      const filter = pickFilter(slide[1]!);
+      const fx = filter && parseOne(slideNext.replace("that much", "X"), ctx);
+      if (!filter || filter.kind !== "object" || fx?.length !== 1 || fx[0]!.type !== "damage") return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter, n: 1, action: "sacrifice", anyNumber: true }, ...replaceX(fx, { count: { kind: "sacrificedThisWayCount" } }));
       si++;
       continue;
     }
@@ -3718,6 +3791,50 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // graveyard." (Mulch, Wrenn and Seven): every matching card, no choice; the rest where they go (CR 401.4 for "any order").
     // "Put all creature and land cards revealed this way" (Lair Delve): each that's either. "The top X cards" (Enshrined
     // Memories): X as it was cast.
+    // Thought Hemorrhage: "Target player reveals their hand. ~ deals 3 damage to that player for each card with the chosen
+    // name revealed this way.": the cards with that name in the hand just revealed (nothing happens in between, rulings),
+    // dealt as one amount (rulings).
+    const perRevealed = /^~ deals (\d+) damage to that player for each card with the chosen name revealed this way$/.exec(s);
+    if (perRevealed) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      effects.push({ type: "damage", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } }, times: Number(perRevealed[1]) }, to: prev.who });
+      continue;
+    }
+    // Vigean Intuition: "Choose a card type, then reveal the top four cards of your library. Put all cards of the chosen type
+    // revealed this way into your hand and the rest into your graveyard." The type is chosen first, as it resolves (CR
+    // 608.2d): Mulch's dig with that type.
+    const typeThenReveal = /^Choose a card type$/.test(s) ? new RegExp(`^[Rr]eveal the top ${NUM} cards of your library$`).exec(sentences[si + 1] ?? "") : null;
+    if (typeThenReveal && /^Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard$/.test(sentences[si + 2] ?? "")) {
+      const n = num(typeThenReveal[1]!);
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) }, { type: "dig", n, count: n, upTo: false, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "cardType", text: "card of the chosen type" }, into: "hand", rest: "graveyard", reveal: true, required: true });
+      si += 2;
+      continue;
+    }
+    // Sanity Grinding: "Reveal the top ten cards of your library. For each blue mana symbol in the mana costs of the revealed
+    // cards, target opponent mills a card. Then put the cards you revealed this way on the bottom of your library in any
+    // order." Stomping Slabs: "Reveal the top seven cards of your library, then put those cards on the bottom of your library
+    // in any order. If a card named ~ was revealed this way, ~ deals 7 damage to any target." The cards stay on top while
+    // they're counted, then go to the bottom in the order you choose (all of them if there are fewer, rulings).
+    const revealKeep = new RegExp(`^Reveal the top ${NUM} cards of your library$`).exec(s);
+    const forEachRevealed = revealKeep && /^For each (white|blue|black|red|green) mana symbol in the mana costs of the revealed cards, (target opponent mills a card)$/.exec(sentences[si + 1] ?? "");
+    if (revealKeep && forEachRevealed && /^Then put the cards you revealed this way on the bottom of your library in any order$/.test(sentences[si + 2] ?? "")) {
+      ctx.revealedTopN = true;
+      const mill = parseOne(`${capital(forEachRevealed[2]!)} for each ${forEachRevealed[1]} mana symbol in the mana costs of the revealed cards`, ctx);
+      ctx.revealedTopN = false;
+      if (!mill) return null;
+      effects.push({ type: "revealTop", n: num(revealKeep[1]!) }, ...mill, { type: "revealedUntilToBottom" });
+      si += 2;
+      continue;
+    }
+    const namedRevealed = revealKeep && /^[Pp]ut those cards on the bottom of your library in any order$/.test(sentences[si + 1] ?? "") ? /^If a card named ~ was revealed this way, (.+)$/.exec(sentences[si + 2] ?? "") : null;
+    if (revealKeep && namedRevealed) {
+      const inner = parseOne(capital(namedRevealed[1]!), ctx);
+      if (!inner || inner.some((e) => pauses(e))) return null;
+      effects.push({ type: "revealTop", n: num(revealKeep[1]!) }, { type: "revealedUntilToBottom" }, { type: "if", cond: { kind: "revealedTopIs", filter: { kind: "card", types: [], notTypes: [], notColors: [], named: "~", text: "card named ~" } }, effects: inner });
+      si += 2;
+      continue;
+    }
     const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
     const putAll = revealN && /^Put all (.+?) cards revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (revealN && putAll) {
@@ -5463,8 +5580,45 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       /^If damage from a creature source is prevented this way, ~ deals that much damage to that creature$/.test(s) &&
       /^If damage from a noncreature source is prevented this way, ~ deals that much damage to the source's controller\.?$/.test(sentences[si + 1] ?? "");
     if (toCreature) si++;
-    const rider = toCreature ? { dealBack: { creatureToIt: true as const } } : tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s);
+    // Test of Faith: "For each 1 damage prevented this way, put a +1/+1 counter on that creature"; Sacred Boon: "At the
+    // beginning of the next end step, put a +0/+1 counter on that creature for each 1 damage prevented this way";
+    // Scars of the Veteran: "If it's a creature, put a +0/+1 counter on it for each 1 damage prevented this way at the
+    // beginning of the next end step" (CR 615.5, 603.7).
+    const counterRider =
+      /^For each 1 damage prevented this way, put an? ([+-]\d+\/[+-]\d+) counter on that creature$/.exec(s) ??
+      /^At the beginning of the next end step, put an? ([+-]\d+\/[+-]\d+) counter on that creature for each 1 damage prevented this way$/.exec(s) ??
+      /^If it's a creature, put an? ([+-]\d+\/[+-]\d+) counter on it for each 1 damage prevented this way at the beginning of the next end step$/.exec(s);
+    // Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker".
+    const dealToM = /^If damage is prevented this way, ~ deals that much damage to (target [a-z ]+)$/.exec(s);
+    let extraRider: Pick<DamageRuleSpec, "countersOn" | "dealTo"> | undefined;
+    if (counterRider || dealToM) {
+      // The prevention before it as a damage rule ("Prevent the next 3 damage that would be dealt to target creature this
+      // turn", "Prevent all damage that would be dealt to target creature this turn"), which can carry the rider.
+      const prev = effects[effects.length - 1];
+      const asRule = prevAsDamageRule(prev);
+      if (!asRule) return null;
+      effects[effects.length - 1] = asRule;
+      const on = asRule.rule.to?.target;
+      if (counterRider) {
+        const creature = s.startsWith("If it's a creature");
+        const spec = on && "index" in on ? ctx.targets[on.index] : undefined;
+        // "that creature" is a target creature; "If it's a creature ... on it", any target.
+        if (!spec || spec.kind !== (creature ? "any" : "object") || (!creature && !spec.types?.includes("Creature"))) return null;
+        extraRider = { countersOn: { counter: counterRider[1] as CounterKind, ...(/end step/.test(s) ? { endStep: true as const } : {}), ...(creature ? { ifCreature: true as const } : {}) } };
+      } else {
+        const fx = parseOne(`~ deals 1 damage to ${dealToM![1]}`, ctx);
+        const d = fx?.length === 1 ? fx[0]! : undefined;
+        if (d?.type !== "damage" || d.amount !== 1 || !Object.keys(d).every((k) => ["type", "amount", "to"].includes(k))) return null;
+        extraRider = { dealTo: d.to };
+      }
+    }
+    const rider = extraRider ?? (toCreature ? { dealBack: { creatureToIt: true as const } } : tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s));
     if (rider) {
+      const prev0 = effects[effects.length - 1];
+      const asRule = prev0?.type === "preventNext" ? prevAsDamageRule(prev0) : undefined;
+      // Candles' Glow: "Prevent the next 3 damage that would be dealt to any target this turn. You gain life equal to the
+      // damage prevented this way."
+      if (asRule) effects[effects.length - 1] = asRule;
       const prev = effects[effects.length - 1];
       if (prev?.type !== "damageRule" || prev.rule.redirect) return null;
       effects[effects.length - 1] = { ...prev, rule: { ...prev.rule, ...rider } };
@@ -7041,6 +7195,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // toughness as it last existed (CR 608.2h).
     // Demonic Junker: "If a creature you controlled was destroyed this way, ...": controlled as it was destroyed
     // (CR 608.2h).
+    // Cosmic Horror: "destroy ~ unless you pay {3}{B}{B}{B}. If ~ is destroyed this way, it deals 7 damage to you": only
+    // if it was destroyed, not regenerated or indestructible (rulings); the damage from it as it last existed (CR 608.2h).
+    const selfDestroyed = /^If ~ is destroyed this way, it deals (\d+) damage to you$/.exec(s);
+    const prevMay = effects[effects.length - 1];
+    if (selfDestroyed && prevMay?.type === "may" && prevMay.otherwise?.length === 1 && prevMay.otherwise[0]!.type === "destroy" && prevMay.otherwise[0]!.what.ref === "self") {
+      const inner = parseOne(`~ deals ${selfDestroyed[1]} damage to you`, ctx);
+      if (!inner) return null;
+      prevMay.otherwise.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      continue;
+    }
     const ifDestroyed = /^If a creature (you controlled was|is) destroyed this way, (.+)$/.exec(s);
     if (ifDestroyed) {
       const prev = effects[effects.length - 1];
@@ -7343,7 +7507,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       let back = effects.length - 1;
       while (back >= 0 && effects[back]!.type === "if" && (effects[back] as { cond: SpellCondition }).cond.kind === "milledIs") back--;
       const prev = effects[back];
-      // Not "its mana value" (Lammastide Weave): which card that is isn't kept.
+      // Lammastide Weave: "you gain life equal to its mana value" after milling one card: that card.
+      if (filter && prev?.type === "mill" && prev.n === 1 && then === "you gain life equal to its mana value") {
+        effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: [{ type: "gainLife", who: { ref: "you" }, n: { count: { kind: "milledManaValue" } } }] });
+        continue;
+      }
       if (!filter || prev?.type !== "mill" || /\b(?:it|its)\b|\brepeat\b/.test(then)) return null;
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;

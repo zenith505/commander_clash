@@ -12,7 +12,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, cardPT, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
@@ -5930,7 +5930,7 @@ export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?
 const mvXCost = (c: AdditionalCost) => c.kind === "discard" && !!c.mvX && !!c.filter;
 
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
-export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
+export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.energyX || !!ab.removeCounters?.x || !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
@@ -6373,8 +6373,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       // "The revealed card's power" (Titan's Presence): as it last existed in the hand, wherever it goes (rulings).
       for (const id of choices.reveal ?? []) {
         const o = obj(s, id);
-        const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
+        sacrificed.push({ power: cardPT(s, o, "power"), toughness: cardPT(s, o, "toughness"), manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
       }
     }
     else if (c.kind === "mill" && c.exile) {
@@ -6408,6 +6407,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
       if (!ids.length) continue;
+      // "The exiled card's power" (Corpse Lunge): the one card exiled, as it was in the graveyard (CR 608.2h).
+      if (c.kind === "exileFromGraveyard" && !c.top && c.n === 1 && ids.length === 1 && !costs.some((x) => x.kind === "sacrifice")) {
+        const o = obj(s, ids[0]!);
+        sacrificed.push({ power: cardPT(s, o, "power"), toughness: cardPT(s, o, "toughness"), manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
+      }
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
     }
@@ -6512,7 +6516,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
   if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
-  if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
+  // "Remove X ki counters from ~": X counters, up to how many it has (CR 107.3a).
+  const toRemove = ab.removeCounters?.x ? (x ?? 0) : (ab.removeCounters?.n ?? 0);
+  if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < toRemove) return `${d.name} doesn't have ${toRemove} ${ab.removeCounters.counter} counter${toRemove === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
     const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
@@ -6876,7 +6882,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     p.energy = (p.energy ?? 0) - x;
     log(s, `${p.name} pays ${x} energy.`);
   }
-  const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : undefined;
+  const countersRemoved = ab.removeCounters?.all ? Math.max(0, o.counters[ab.removeCounters.counter] ?? 0) : ab.removeCounters?.x ? (x ?? 0) : undefined;
   if (ab.removeCounters) removeCountersCost(s, o, countersRemoved !== undefined ? { counter: ab.removeCounters.counter, n: countersRemoved } : ab.removeCounters);
   if (countersRemoved !== undefined) log(s, `${p.name} removes ${countersRemoved} ${ab.removeCounters!.counter} counter${countersRemoved === 1 ? "" : "s"} from ${d.name}.`);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).
@@ -6927,6 +6933,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  const tappedOne = ab.costs?.some((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x) && costs?.tap?.length === 1 ? costs.tap[0] : undefined;
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -6954,6 +6961,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(countersRemoved !== undefined ? { countersRemoved } : {}),
     ...(costExiled.length ? { costExiled } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
+    // "Tap an untapped creature you control: ... where X is the power of the creature tapped this way" (Keldon Battlewagon).
+    ...(!ab.station && tappedOne !== undefined ? { stationed: { id: tappedOne, zc: obj(s, tappedOne).zoneChanges ?? 0, power: power(s, obj(s, tappedOne)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(JSON.stringify(body.effects).includes('"kind":"activatedTimes"') ? { activatedIndex: index } : {}),
@@ -9217,7 +9226,9 @@ function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg:
 export function combatDamageOf(s: GameState, o: GameObject): number {
   const c = characteristics(s, o);
   const [p, t] = [power(s, o), toughness(s, o)];
-  return c.assignsToughness || (c.assignsToughnessIfGreater && t > p) ? t : p;
+  if (c.assignsToughness || (c.assignsToughnessIfGreater && t > p)) return t;
+  // Loot, the Anomaly: its toughness still wins when something has it assign damage by toughness (rulings).
+  return c.assignsAbsPower && p < 0 ? -p : p;
 }
 
 /** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. True if it waits on a choice. */

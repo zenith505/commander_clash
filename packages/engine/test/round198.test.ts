@@ -9,7 +9,7 @@
 // revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence),
 // "up to twice X target cards" (Erebos's Intervention), cheaper cycling (Fluctuator), a color
 // of a permanent you control (Meteor Crater), "put any number of creature cards milled this way into your hand" (Vivien
-// on the Hunt).
+// on the Hunt); with them, Elven Passage (behold) and Endless Ranks of HYDRA (as Vivi's Persistence).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -61,7 +61,9 @@ const erebossIntervention = card("Erebos's Intervention", "Instant", "{X}{B}", {
 const fluctuator = card("Fluctuator", "Artifact", "{2}", {"cmc":2,"keywords":[],"oracleText":"Cycling abilities you activate cost {2} less to activate.","colors":[],"colorIdentity":[]});
 const meteorCrater = card("Meteor Crater", "Land", "", {"cmc":0,"keywords":[],"oracleText":"{T}: Choose a color of a permanent you control. Add one mana of that color.","colors":[],"colorIdentity":[]});
 const vivienOnTheHunt = card("Vivien on the Hunt", "Legendary Planeswalker — Vivien", "{4}{G}{G}", {"cmc":6,"loyalty":"4","keywords":["Mill"],"oracleText":"+2: You may sacrifice a creature. If you do, search your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put it onto the battlefield, then shuffle.\n+1: Mill five cards, then put any number of creature cards milled this way into your hand.\n−1: Create a 4/4 green Rhino Warrior creature token.","colors":["G"],"colorIdentity":["G"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator, meteorCrater, vivienOnTheHunt];
+const elvenPassage = card("Elven Passage", "Land", "", {"cmc":0,"keywords":["Behold"],"oracleText":"{T}, Pay 1 life, Sacrifice this land: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle. You may behold an Elf. If you do, untap that land. (To behold an Elf, choose an Elf you control or reveal an Elf card from your hand.)","colors":[],"colorIdentity":[]});
+const endlessRanksOfHydra = card("Endless Ranks of HYDRA", "Sorcery", "{3}{B}", {"cmc":4,"keywords":[],"oracleText":"For each opponent, you create a 2/1 black Villain creature token with menace.\nWhenever your commander enters or attacks, you may pay {1}{B}. If you do, return this card from your graveyard to your hand.","colors":["B"],"colorIdentity":["B"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence, erebossIntervention, fluctuator, meteorCrater, vivienOnTheHunt, elvenPassage, endlessRanksOfHydra];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -523,5 +525,44 @@ describe("Round 198", () => {
     expect(p?.kind === "searchLibrary" && p.fromGraveyard === "hand" && [...p.cards].sort()).toEqual([tops[0], tops[2], tops[3]].sort());
     s = act(s, { type: "searchLibrary", player: ap, found: [tops[0]!, tops[3]!] });
     expect(tops.map((id) => s.objects[id]!.zone)).toEqual(["hand", "graveyard", "graveyard", "hand", "graveyard"]);
+  });
+
+  it("Elven Passage: the basic land enters tapped, and beholding an Elf untaps it", () => {
+    for (const elf of [true, false]) {
+      const { s: s0, ap } = setup([]);
+      const passage = putOnBattlefield(s0, ap, elvenPassage);
+      const life = s0.players[ap]!.life;
+      const shown = elf ? into(s0, ap, creature("Test Elf", "Elf", 1), "hand") : undefined;
+      let s = run(s0, planActivate(s0, ap, passage, 0));
+      s = resolveAll(s);
+      expect(s.pending?.kind).toBe("searchLibrary");
+      const forest = s.pending?.kind === "searchLibrary" ? s.pending.cards[0]! : "";
+      s = act(s, { type: "searchLibrary", player: ap, found: [forest] });
+      if (elf) {
+        expect(s.pending?.kind === "searchLibrary" && s.pending.behold && s.pending.cards).toEqual([shown]);
+        s = act(s, { type: "searchLibrary", player: ap, found: [shown!] });
+      }
+      s = resolveAll(s);
+      expect(s.objects[forest]!.zone).toBe("battlefield");
+      expect(s.objects[forest]!.tapped).toBe(!elf);
+      expect(s.objects[passage]!.zone).toBe("graveyard");
+      expect(s.players[ap]!.life).toBe(life - 1);
+    }
+  });
+
+  it("Endless Ranks of HYDRA: a Villain for each opponent; back from the graveyard when your commander attacks", () => {
+    let { s, ap, ids } = setup([endlessRanksOfHydra]);
+    s = resolveAll(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Villain")).length).toBe(3);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    const c = putOnBattlefield(s, ap, card("Test Commander", "Legendary Creature — Ox", "{2}", { cmc: 2, power: "2", toughness: "2" }));
+    s.objects[c]!.isCommander = true;
+    s.objects[c]!.controlledSinceTurn = s.turn - 1;
+    s = passUntil(s, "declareAttackers", ap);
+    const defender = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!;
+    s = resolveAll(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: c, defender }] }));
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = resolveAll(run(s, [...planMana(s, ap, parseManaCost("{1}{B}"))!, { type: "chooseMay", player: ap, yes: true } as Action]));
+    expect(s.objects[ids[0]!]!.zone).toBe("hand");
   });
 });

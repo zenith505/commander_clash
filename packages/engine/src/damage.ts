@@ -135,21 +135,27 @@ export function dealDamage(
   }
   const targetName = "object" in to ? characteristics(s, to.object).name : player(s, to.player).name;
   // The Phantom creatures: prevent it all and remove a +1/+1 counter (CR 615). Damage dealt at the same time by
-  // several sources (combat) removes only one counter; with none on it, the damage is still prevented (rulings).
-  if ("object" in to && abilitiesOf(s, to.object).phantom && canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
+  // several sources (combat) removes only one counter; with none on it, the damage is still prevented; damage that can't
+  // be prevented is dealt and still removes one (rulings). Undergrowth Champion: only while it has a +1/+1 counter on it.
+  const phantom = "object" in to ? abilitiesOf(s, to.object).phantom : undefined;
+  if ("object" in to && phantom) {
     const o = to.object;
-    const event = opts.combat ? `${s.turn}:${s.step}` : undefined;
-    log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
-    if (!event || o.phantomEvent !== event) {
-      if (o.counters["+1/+1"]) {
-        o.counters["+1/+1"] -= 1;
-        if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
-        invalidateCharacteristics(s);
-        log(s, `A +1/+1 counter is removed from ${targetName}.`);
+    const event = opts.combat ? `${s.turn}:${s.combatsThisTurn ?? 0}:${s.step}` : undefined;
+    if (phantom !== "whileCounter" || (o.counters["+1/+1"] ?? 0) > 0 || (event && o.phantomEvent === event)) {
+      if (!event || o.phantomEvent !== event) {
+        if (o.counters["+1/+1"]) {
+          o.counters["+1/+1"] -= 1;
+          if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
+          invalidateCharacteristics(s);
+          log(s, `A +1/+1 counter is removed from ${targetName}.`);
+        }
+        o.phantomEvent = event;
       }
-      o.phantomEvent = event;
+      if (canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
+        log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
+        return 0;
+      }
     }
-    return 0;
   }
   // Phyrexian Hydra: all of it prevented, then a -1/-1 counter for each 1 damage prevented (CR 615.5). Other shields
   // came first (dealDamageBatch), its controller's choice of order (rulings, CR 616.1).
@@ -1025,7 +1031,8 @@ export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: numbe
   const src = objectSource(s, from);
   const prev = canPreventDamage(s) && !unpreventable(src, combat);
   if (combat && s.preventCombatDamage && prev) return 0;
-  if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).phantom) return 0;
+  const phantom = "object" in to && s.objects[to.object] ? abilitiesOf(s, obj(s, to.object)).phantom : undefined;
+  if ("object" in to && prev && phantom && (phantom !== "whileCounter" || (obj(s, to.object).counters["+1/+1"] ?? 0) > 0)) return 0;
   if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).counterShield && (obj(s, to.object).counters["+1/+1"] ?? 0) > 0) return 0;
   const k = recKey(to);
   return planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true).final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0);

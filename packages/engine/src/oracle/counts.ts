@@ -579,6 +579,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:the discarded card's mana value|the mana value of the discarded card)$/i.test(p) && ctx) return count({ kind: "discardedManaValue" });
   // Morbid Curiosity: "the mana value of the sacrificed permanent" is "the sacrificed permanent's mana value".
   if ((m = /^the (power|toughness|mana value) of the sacrificed (creature|artifact|enchantment|permanent)$/i.exec(p))) p = `the sacrificed ${m[2]}'s ${m[1]}`;
+  // Havoc Eater: "for each opponent, goad up to one target creature that player controls. Put X +1/+1 counters on ~, where
+  // X is the total power of creatures goaded this way": the targets still there as it resolves.
+  if (/^the total power of creatures goaded this way$/.test(p) && ctx?.lastTargets && ctx.targets[ctx.lastTargets.index]?.perOpponent && ctx.targets[ctx.lastTargets.index]?.types?.includes("Creature")) return count({ kind: "totalPowerOf", of: { ref: "target", ...ctx.lastTargets } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
   if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);

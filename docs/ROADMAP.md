@@ -1,7 +1,7 @@
 # Roadmap
 
-26,901 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,895 of
+26,915 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,939 of 4,988 (99%), top 10,000: 8,909 of
 9,979 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -543,6 +543,27 @@ line blocks.
    Out after round 191 (looked at, not done): Jin Sakai, Ghost of Tsushima ("attacks a player, if no other creatures are
    attacking that player"), Stiltzkin, Moogle Merchant ("target opponent gains control of another target permanent you
    control. If they do, ...").
+   Round 192 went on from the top: "at the beginning of your next first main phase, add X mana in any combination of
+   colors, where X is that spell's mana value" (Plasm Capture), "the total power of creatures goaded this way" (Havoc
+   Eater), "choose one or more. Each mode must target a different player" (Vindictive Lich: no more modes than players
+   it can target, the bot too), "or a creature spell you control becomes the target" (Surrak, Elusive Hunter), "reveal
+   cards until you reveal two land cards" (Skyserpent Seeker), "you may have any number of them phase out" (Change of
+   Plans), "each Sliver card in each player's hand has slivercycling" (Homing Sliver), an intervening "if" on a "whenever
+   a source you control deals noncombat damage" trigger (Fear of Burning Alive), "distribute X +1/+1 counters among any
+   number of target creatures" (Grove's Bounty, Broodlord), "exile a nonland card from it until ~ leaves the
+   battlefield" (Deep-Cavern Bat), "it enters tapped and attacking that player" (Shark Shredder), "while it has a +1/+1
+   counter on it, prevent that damage and remove a +1/+1 counter" (Undergrowth Champion), "until the end of your next
+   turn, you may cast that card and you may spend mana as though it were mana of any color" for an exiled creature
+   (Hurl Through Hell). Rules fix: damage that can't be prevented is now dealt to the Phantom creatures (Phantom
+   Centaur and the like), still removing a counter (rulings).
+   Out after round 192 (looked at, not done): Red Sun's Twilight (copies of the destroyed artifacts), Irencrag Feat,
+   Oath of Nissa, Sharae of Numbing Depths and Hylda ("becomes tapped by you"), Sigurd, Dog Umbra, Call for Aid, Narset
+   of the Ancient Way, Razorfield Ripper (reconfigure cost), Silverquill the Disputant (granted casualty), Lorehold the Historian (granted
+   miracle), Coram, Brimaz, Mindleech Mass, The Blue Spirit, Linvala, Shield of Sea Gate, Requiem Monolith, Behemoth of
+   Vault 0, Abigale (loses all abilities, keyword counters), Once Upon a Time, Tasigur, Hazezon, Corrupted
+   Shapeshifter, Balor (its modes), Unbreathing Horde ("for each other Zombie you control and each Zombie card in your
+   graveyard"), Horde of Notions (playing a land card during resolution), Undead Alchemist, Auntie Ool (ward—blight),
+   Chaos Defiler (random choice among chosen permanents), Onakke Oathkeeper.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

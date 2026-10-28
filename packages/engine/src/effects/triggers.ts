@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -1806,6 +1806,21 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
       }
     }
+    // Surrak, Elusive Hunter: "or a creature spell you control" (TriggeredAbility.targeted.orSpell): a spell the item
+    // targets, once for each.
+    const spells = new Set<string>();
+    for (const t of item?.targets ?? []) if (t.kind === "stack" && !ev.only) spells.add(t.id);
+    for (const sid of spells) {
+      const target = s.stack.find((x) => x.id === sid);
+      if (target?.kind !== "spell") continue;
+      const by = item!.controller;
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        if (target.controller !== wc) continue;
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && !!tr.targeted?.orSpell && spellMatches(s, tr.targeted.orSpell, target) && (!tr.targeted.spell || item!.kind === "spell") && (tr.targeted.by === "you" ? by === wc : tr.targeted.by === "opponent" ? by !== wc : true), undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: by });
+      }
+    }
     // "Whenever you or a permanent you control becomes the target of ..." (Unsettled Mariner): a player the item targets,
     // once however many of its targets name them (rulings).
     const players = new Set<PlayerId>();
@@ -2007,6 +2022,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? ev.step === "main1" && ev.active === d.controller
               : d.when === "yourNextMain"
               ? (ev.step === "main1" || ev.step === "main2") && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
+              : d.when === "yourNextFirstMain"
+              ? ev.step === "main1" && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
@@ -2095,7 +2112,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       // "Choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program): checked now,
       // as it's put on the stack (rulings on Prophetic Titan); kept for the answer (chooseTriggerModes).
       if (printed.modal.bothIf && staticConditionNow(s, printed.modal.bothIf, t.sourceId, t.controller)) t.both = true;
-      const [min, max] = modeRange(printed, !!t.both);
+      const [min, max0] = modeRange(printed, !!t.both);
+      const max = distinctModeCap(s, printed, t.controller, max0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       // "Choose both instead": both, or the one that can be chosen (CR 603.3c).
       if (t.both && printed.modal.bothExactly && n > 0) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
       else if (n === 0 || n < min) {

@@ -2249,13 +2249,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Each creature card in your hand has ninjutsu {2}{U}{B}" (Satoru Umezawa): the keyword's ability on those cards.
     // "Each creature card in your hand has cycling {1}{U}" (Rhet-Tomb Mystic): the same (CR 702.29a).
-    const handGrant = /^Each ([a-z]+) card in your hand has ((?:ninjutsu|cycling) (?:\{[^}]+\})+)\.$/.exec(line);
+    // Homing Sliver: "Each Sliver card in each player's hand has slivercycling {3}": in every player's hand (CR 702.29e).
+    const handGrant = /^Each ([a-z]+|[A-Z][a-z]+) card in (your|each player's) hand has ((?:ninjutsu|cycling|[a-z]+cycling) (?:\{[^}]+\})+)\.$/.exec(line);
     if (handGrant) {
       // The card's kind read as a graveyard card's, without the graveyard.
       const f = parseTargetPhrase(`${handGrant[1]} card from a graveyard`);
-      const kw = keywordAbilities(handGrant[2]!, d);
+      const kw = keywordAbilities(handGrant[3]!.replace(/^./, (c) => c.toUpperCase()), d);
+      const every = handGrant[2] === "each player's";
       if (f?.kind !== "card" || kw?.activated.length !== 1 || kw.triggers.length || kw.statics.length) out.unsupported.push(raw);
-      else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in your hand` }, activated: kw.activated });
+      else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in ${every ? "each player's" : "your"} hand` }, activated: kw.activated, ...(every ? { everyHand: true as const } : {}) });
       continue;
     }
     const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);
@@ -2744,8 +2746,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
-    if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
+    // Unbreathing Horde: "... prevent that damage and remove a +1/+1 counter from it." the same; Undergrowth Champion's
+    // "while it has a +1/+1 counter on it" only while it has one (rulings).
+    if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." || line === "If ~ would be dealt damage, prevent that damage and remove a +1/+1 counter from it.") {
       out.phantom = true;
+      continue;
+    }
+    if (line === "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove a +1/+1 counter from ~.") {
+      out.phantom = "whileCounter";
       continue;
     }
     // The Mindskinner (CR 615.5, 615.12): see staticRules in damage.ts.
@@ -4382,7 +4390,7 @@ function joinModes(lines: string[]): string[] {
     // "..., choose one. If you control a commander, you may choose both instead." (SOLDIER Military Program) too.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random|\. If [^.]+, (?:you may )?choose both instead)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
-    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /you may choose two\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
+    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /(?:you may choose two|choose one or more)\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
   close();

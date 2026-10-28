@@ -1274,6 +1274,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems((w, wc) => attackWatch(w, wc));
+    // "Whenever your commander attacks, you may pay {2}. If you do, return ~ from your graveyard to your hand" (Vivi's
+    // Persistence): cards in graveyards, their owners watching (CR 113.6m, 113.8).
+    fromGraveyards((w, owner) => attackWatch(w, owner));
     // "Until end of turn, whenever a Kraken, ... or Serpent attacks, draw a card" (Summon: Leviathan, CR 603.7b).
     fromFloating((src, ctrl, triggers) => attackWatch(src, ctrl, triggers));
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).

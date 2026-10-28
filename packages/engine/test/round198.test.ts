@@ -6,11 +6,11 @@
 // or more collection counters on it, sacrifice it. If you do, draw a card, then you may search ..." (Charitable Levy),
 // "Whenever a creature you control but don't own dies" (Edea, Possessed Sorceress), behold (Sarkhan, Dragon Ascendant), a
 // mana ability that returns its source to hand, as a sorcery (Grinning Ignus), "Choose creature or land" for the cards
-// revealed (Winding Way).
+// revealed (Winding Way), "whenever your commander attacks" from the graveyard (Vivi's Persistence).
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, characteristics, defOf, manaOptions, planManaAbility, invalidateCharacteristics, objHasKeyword, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, parseManaCost, planMana, characteristics, defOf, manaOptions, planManaAbility, invalidateCharacteristics, objHasKeyword, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -51,7 +51,8 @@ const edeaPossessedSorceress = card("Edea, Possessed Sorceress", "Legendary Crea
 const sarkhanDragonAscendant = card("Sarkhan, Dragon Ascendant", "Legendary Creature — Human Druid", "{1}{R}", {"cmc":2,"power":"2","toughness":"2","keywords":["Behold","Treasure"],"oracleText":"When Sarkhan enters, you may behold a Dragon. If you do, create a Treasure token. (To behold a Dragon, choose a Dragon you control or reveal a Dragon card from your hand.)\nWhenever a Dragon you control enters, put a +1/+1 counter on Sarkhan. Until end of turn, Sarkhan becomes a Dragon in addition to his other types and gains flying.","colors":["R"],"colorIdentity":["R"]});
 const grinningIgnus = card("Grinning Ignus", "Creature — Elemental", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":[],"oracleText":"{R}, Return this creature to its owner's hand: Add {C}{C}{R}. Activate only as a sorcery.","colors":["R"],"colorIdentity":["R"]});
 const windingWay = card("Winding Way", "Sorcery", "{1}{G}", {"cmc":2,"keywords":[],"oracleText":"Choose creature or land. Reveal the top four cards of your library. Put all cards of the chosen type revealed this way into your hand and the rest into your graveyard.","colors":["G"],"colorIdentity":["G"]});
-const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay];
+const vivisPersistence = card("Vivi's Persistence", "Instant", "{1}{R}", {"cmc":2,"keywords":[],"oracleText":"Create a 0/1 black Wizard creature token with \"Whenever you cast a noncreature spell, this token deals 1 damage to each opponent.\"\nWhenever your commander enters or attacks, you may pay {2}. If you do, return this card from your graveyard to your hand.","colors":["R"],"colorIdentity":["R"]});
+const ALL = [combustionMan, dawnblessedPennant, kindredBoon, fromTheRubble, staffOfEdenVaultsKey, thievesTools, neverwinterHydra, killingWave, charitableLevy, edeaPossessedSorceress, sarkhanDragonAscendant, grinningIgnus, windingWay, vivisPersistence];
 
 describe("Round 198", () => {
   it("all compile", () => supported(...ALL));
@@ -410,5 +411,38 @@ describe("Round 198", () => {
       const zone = (n: string) => s.objects[tops[top.findIndex((d) => d.name === n)]!]!.zone;
       for (const d of top) expect(zone(d.name), `${pick}: ${d.name}`).toBe((want as readonly string[]).includes(d.name) ? "hand" : "graveyard");
     }
+  });
+
+  it("Vivi's Persistence: from your graveyard, when your commander enters and when it attacks, pay {2} to return it to hand", () => {
+    let { s, ap } = setup([]);
+    const vivi = into(s, ap, vivisPersistence, "graveyard");
+    const cmd = s.players[ap]!.command[0]!;
+    s = run(s, planCast(s, ap, cmd));
+    s = resolveAll(s);
+    expect(s.objects[cmd]!.zone).toBe("battlefield");
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: false } as Action);
+    s = resolveAll(s);
+    expect(s.objects[vivi]!.zone).toBe("graveyard");
+    // Another creature attacking does nothing; the commander does.
+    const other = putOnBattlefield(s, ap, creature("Test Ox", "Ox", 2));
+    s.objects[cmd]!.controlledSinceTurn = s.turn - 1;
+    s = passUntil(s, "declareAttackers", ap);
+    const defender = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!;
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: other, defender }, { attacker: cmd, defender }] });
+    s = resolveAll(s);
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = run(s, [...planMana(s, ap, parseManaCost("{2}"))!, { type: "chooseMay", player: ap, yes: true } as Action]);
+    s = resolveAll(s);
+    expect(s.pending ?? undefined).toBeUndefined();
+    expect(s.objects[vivi]!.zone).toBe("hand");
+  });
+
+  it("Vivi's Persistence: in hand or on the stack it doesn't trigger", () => {
+    let { s, ap } = setup([vivisPersistence]);
+    const cmd = s.players[ap]!.command[0]!;
+    s = run(s, planCast(s, ap, cmd));
+    s = resolveAll(s);
+    expect(s.pending ?? undefined).toBeUndefined();
   });
 });

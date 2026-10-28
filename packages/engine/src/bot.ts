@@ -351,11 +351,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     }
-    // Revealing from the hand: a card with another copy left in our library first (Assembly Hall, Infernal Tutor then
-    // search for its name), then the costliest.
+    // Revealing from the hand for a search for its name (Assembly Hall, Infernal Tutor): a card with another copy left in
+    // our library first. Otherwise the costliest.
     if (pend.kind === "searchLibrary" && pend.fromHand) {
-      const copies = (id: ObjectId) => libraryCopies(s, pid, defOf(s, obj(s, id)).name);
-      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(copies(b) > 0) - Number(copies(a) > 0) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+      const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
+      const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => copies(b) - copies(a) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     }
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
     if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];

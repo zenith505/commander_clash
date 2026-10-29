@@ -916,6 +916,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "Of the chosen type" (Elvish Soultiller): the type chosen as it resolved.
         const filter = e.filter && bindChosen(e.filter, ctx.chosen);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        if (e.exchange && e.hand && e.graveyard) {
+          // Harness Infinity: "Exchange your hand and graveyard" (CR 701.12a): put into the graveyard, not discarded (rulings).
+          const hand = [...p.hand];
+          const yard = [...p.graveyard];
+          for (const id of hand) moveObject(s, id, "graveyard");
+          for (const id of yard) moveObject(s, id, "hand");
+          log(s, `${p.name} exchanges their hand (${hand.length} card${hand.length === 1 ? "" : "s"}) and graveyard (${yard.length} card${yard.length === 1 ? "" : "s"}).`);
+          continue;
+        }
         if (e.exchange) {
           // Morality Shift: both at once (CR 701.12a); the library's cards go to the graveyard together, so their owner
           // orders them when the order matters (CR 404.3, see graveyard.ts; rulings).

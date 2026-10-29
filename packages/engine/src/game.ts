@@ -1,4 +1,4 @@
-import { kickerName } from "./abilities";
+import { isRealKicker, kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
@@ -4184,7 +4184,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
-export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}) });
+export const spellUse = (d: CardDef, alt?: AltCostKind, cost?: ParsedCost, choices?: CostChoices): ManaUse => ({ spell: d, ...(altCost(d, alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...(cost ? { xCost: cost.hasX } : {}), ...spellHow(d, choices) });
+
+/** Kicked (CR 702.33d) or cast for its disturb cost (CR 702.146a), for mana spent only on such spells (ManaUse). */
+export const spellHow = (d: CardDef, choices?: CostChoices): { kicked?: true; disturb?: true } => ({ ...(choices?.kicks?.length && isRealKicker(compileCard(d).kicker) ? { kicked: true as const } : {}), ...(choices?.via === "disturb" ? { disturb: true as const } : {}) });
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
@@ -4555,7 +4558,7 @@ export function castProblem(
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
-  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt, cost.cost), cost.extra, p.life)) {
+  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt, cost.cost, choices), cost.extra, p.life)) {
     // Costs not chosen yet: a permanent offered pays part of it (CR 702.48c).
     const offerable = !choices && compileCard(d).offering ? offeringCandidates(s, pid, id) : [];
     const paid = offerable.some((offering) => {
@@ -5292,8 +5295,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
-  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
+  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt, cost.cost, choices)).pool);
+  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt, cost.cost, choices) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -5471,7 +5474,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const costExiled: { id: ObjectId; zc: number }[] = [];
   const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded, costExiled);
   // "Behold a Kithkin and exile it": linked to the permanent this spell becomes, one zone change from now (CR 607.2q).
-  if (costExiled.length && compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
+  // "Exile a creature you control" (Fear of Abduction): the same (CompiledCard.costExileLinked).
+  if (costExiled.length && (compileCard(d).additionalCosts?.some((c) => c.kind === "reveal" && c.exile) || compileCard(d).costExileLinked)) (s.linkedExile ??= {})[`${o.id}@${(o.zoneChanges ?? 0) + 1}`] = costExiled;
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;

@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -168,6 +168,13 @@ function scarcity(sources: Source[], used: Set<ObjectId>, demand: Map<ManaType, 
  * keeping sources that make the colors in `avoid` for last. `wantSnow`: snow sources first where there's a choice.
  */
 function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>(), demand = new Map<ManaType, number>(), harm: Partial<Record<Color, number>> = {}, snow0: ManaPool = emptyPool(), wantSnow = false, colorOnly0: ManaPool = emptyPool()) {
+  // Least given up first; when that falls short and a source has a way to make more than one mana (Throne of Makindi's
+  // charge counter for two rather than its {C}), the most mana first.
+  return planFreeWith(cost, extraGeneric, life, pool0, sources, used0, avoid, demand, harm, snow0, wantSnow, colorOnly0)
+    ?? (sources.some((src) => src.options.some((x) => x.adds.length > 1)) ? planFreeWith(cost, extraGeneric, life, pool0, sources, used0, avoid, demand, harm, snow0, wantSnow, colorOnly0, true) : null);
+}
+
+function planFreeWith(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid: Set<ManaType>, demand: Map<ManaType, number>, harm: Partial<Record<Color, number>>, snow0: ManaPool, wantSnow: boolean, colorOnly0: ManaPool, mostFirst = false) {
   const pool = { ...pool0 };
   const snow = { ...snow0 };
   // Mana that can't pay generic costs (Jegantha), part of `pool`: for colored symbols only.
@@ -249,6 +256,7 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
       .flatMap((src, order) => src.options.filter((x) => !x.cost && !x.colorOnly && tapsFor(x, used)).map((x) => ({ x, order, src })))
       .sort(
         (a, b) =>
+          (mostFirst ? b.x.adds.length - a.x.adds.length : 0) ||
           a.x.penalty - b.x.penalty ||
           (wantSnow ? (b.x.snow?.length ?? 0) - (a.x.snow?.length ?? 0) : 0) ||
           a.x.adds.reduce((n, m) => n + harmOf(m), 0) - b.x.adds.reduce((n, m) => n + harmOf(m), 0) ||
@@ -289,7 +297,7 @@ export function planCast(
   if (choices.face !== undefined && o.face !== choices.face) return asFace(s, o, choices.face, () => planCast(s, pid, objectId, targets, modes, convoke, x, choices));
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   // The spell as it will be on the stack, for mana that can only be spent on some spells (CR 106.6).
-  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}) };
+  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...spellHow(d, choices) };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets, modes });

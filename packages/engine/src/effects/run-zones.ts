@@ -1720,10 +1720,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!cards.length) return;
       if (e.dest === "battlefield") {
         // All at once (CR 608.2f), under this ability's controller's control.
-        log(s, `${p.name} puts ${cards.map((c) => defOf(s, c).name).join(", ")} onto the battlefield from exile (${src}).`);
+        log(s, `${e.ownersControl ? "" : `${p.name} puts `}${cards.map((c) => defOf(s, c).name).join(", ")} ${e.ownersControl ? `${cards.length === 1 ? "returns" : "return"} to the battlefield under ${cards.length === 1 ? "its owner's" : "their owners'"} control` : "onto the battlefield"} from exile (${src}).`);
         const ids = cards.map((c) => c.id);
         enterTogether(s, () => {
-          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: p.id, ...(e.counters ? { counters: { ...e.counters } } : {}) });
+          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: e.ownersControl ? c.owner : p.id, ...(e.counters ? { counters: { ...e.counters } } : {}) });
         });
         const now = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });

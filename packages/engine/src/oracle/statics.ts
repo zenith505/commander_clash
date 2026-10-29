@@ -908,6 +908,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const n = m[2] ? 1 : m[1] ? num(m[1]) : 1;
     return { kind: "onBattlefield", filter: { ...spec, text: `attacking ${m[3]}` }, min: n, ...(m[2] ? { max: 1 } : {}) };
   }
+  // Dreadlight Monstrosity: "Activate only if you own a card in exile."
+  if (text === "you own a card in exile") return { kind: "amount", amount: { count: { kind: "cardsInExile", who: { ref: "you" } } }, min: 1 };
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in exile$`).exec(text))) return { kind: "amount", amount: { count: { kind: "cardsInExile" } }, max: num(m[1]!) - 1 };
   // "If there are thirteen or more creatures on the battlefield" (Blasphemous Edict).
   if ((m = new RegExp(`^there are ${NUM} or more (.+) on the battlefield$`).exec(text))) {

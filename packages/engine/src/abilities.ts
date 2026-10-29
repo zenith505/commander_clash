@@ -2207,7 +2207,7 @@ export type Effect =
    * `dest` "battlefield": "Put all creature cards exiled with ~ onto the battlefield under your control. They gain
    * decayed." (Gisa, Glorious Resurrector): those matching `filter`, all at once, gaining `gain` for good.
    */
-  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game"; atEndStep?: "sacrifice" }
+  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true; /** Emperor of Bones: "It gains haste. Sacrifice it at the beginning of the next end step." for the permanent it became. */ haste?: "game"; atEndStep?: "sacrifice"; /** Safe Haven: "under its owner's control", not this ability's controller's. */ ownersControl?: true }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -3249,7 +3249,7 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef; /** "Into your library": yours is shuffled even if no card is put into it. */ yours?: true; /** "Target player shuffles ... into their library" (Memory's Journey): that player's is, the same way. */ who?: PlayerRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
-  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). With `hand`, "exchange your hand and library" (Mordenkainen): to the hand. */ exchange?: true }
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Target player mills that many cards" next (Psychic Spiral): how many cards were shuffled in, as ResolvingInfo.movedLinked. */ countThisWay?: true; /** "All creature cards from your graveyard": only those. */ filter?: TargetSpec; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true; /** "Then draws that many cards" (Winds of Change): each player as many as they shuffled in, after all have shuffled. */ drawThatMany?: true; /** "You gain life equal to the number of cards shuffled into your library this way" (Elixir). */ gainThatMany?: true; /** "Exchange your graveyard and library" (Morality Shift): the library's cards go to the graveyard at the same time, and nothing is shuffled (a "Then shuffle" of its own does). With `hand`, "exchange your hand and library" (Mordenkainen): to the hand. With `hand` and `graveyard`, "exchange your hand and graveyard" (Harness Infinity): no library. */ exchange?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens
@@ -5180,6 +5180,10 @@ export interface ManaSpend {
    * ability's activation cost with {X} in it (rulings); with the other fields unset.
    */
   xCosts?: true;
+  /** "Spend this mana only to cast kicked spells" (Throne of Makindi): a spell kicked as it's cast (ManaUse.kicked). */
+  kickedSpells?: true;
+  /** "Only to pay a disturb cost or ..." (Unblinking Observer): a spell cast for its disturb cost too (ManaUse.disturb). */
+  disturb?: true;
   text: string;
 }
 
@@ -5628,6 +5632,8 @@ export interface CompiledCard {
    * (CR 208.2b, 707.2), so a copy effect over what it is; `text` is the choice as offered.
    */
   entersForms?: { except: CopyExcept; text: string }[];
+  /** Fear of Abduction: the card exiled to pay its "exile a creature you control" cost is linked to its leaves ability too, with the card its enters ability exiles (CR 607.2q). */
+  costExileLinked?: true;
   /** Read ahead (CR 702.155): a Saga that enters with the chapter number its controller chooses in lore counters. */
   readAhead?: true;
   /** "As ~ enters, you may exchange ~'s text box and another creature's" (Deadpool, Trading Card; CR 612.5, 701.12h). */

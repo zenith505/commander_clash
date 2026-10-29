@@ -4618,6 +4618,9 @@ function linkExile(out: CompiledCard) {
   // that became this permanent (CR 607.2q, recorded as it's cast).
   const costExile = out.additionalCosts?.filter((c) => c.kind === "reveal" && c.exile).length === 1 && !out.costOr;
   if (costExile && !exiles.length && returns.length === 1 && returns[0]!.event === "selfLeaves" && allEffects(returns[0]!.body.effects).every((e) => e.type !== "linkedExileToken")) return;
+  // Fear of Abduction: "As an additional cost to cast this spell, exile a creature you control" with an enters ability that
+  // exiles: both are linked to the leaves ability (CR 607.2a, 607.2q).
+  if (out.additionalCosts?.filter((c) => c.kind === "sacrifice" && c.exile).length === 1 && !out.costOr && exiles.length === 1 && returns.length === 1 && returns[0]!.event === "selfLeaves" && allEffects(returns[0]!.body.effects).every((e) => e.type !== "linkedExileToken")) out.costExileLinked = true;
   if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;

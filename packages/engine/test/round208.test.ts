@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { applyAction, botActions, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, power, runStateBasedActions, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, botActions, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, potentialAttackers, power, runStateBasedActions, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -201,5 +201,212 @@ describe("equip {2} or {B}", () => {
     s.players[ap]!.manaPool.C = 2;
     s = settle(run(s, planActivate(s, ap, c, 0, [tgt(b2)])));
     expect(s.objects[c]!.attachedTo).toBe(b2);
+  });
+});
+
+const kayaIntangibleSlayer = card("Kaya, Intangible Slayer", "Legendary Planeswalker — Kaya", "{3}{W}{W}{B}{B}", {"cmc":7,"loyalty":"6","keywords":["Hexproof","Scry"],"oracleText":"Hexproof\n+2: Each opponent loses 3 life and you gain 3 life.\n0: You draw two cards. Then each opponent may scry 1.\n−3: Exile target creature or enchantment. If it wasn't an Aura, create a token that's a copy of it, except it's a 1/1 white Spirit creature with flying in addition to its other types.","colors":["B","W"],"colorIdentity":["B","W"],"layout":"normal"});
+const originOfSpiderman = card("Origin of Spider-Man", "Enchantment — Saga", "{1}{W}", {"cmc":2,"keywords":[],"oracleText":"(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Create a 2/1 green Spider creature token with reach.\nII — Put a +1/+1 counter on target creature you control. It becomes a legendary Spider Hero in addition to its other types.\nIII — Target creature you control gains double strike until end of turn.","colors":["W"],"colorIdentity":["W"],"layout":"saga"});
+const captainAmericaSupersoldier = card("Captain America, Super-Soldier", "Legendary Creature — Human Soldier Hero", "{1}{W}{W}", {"cmc":3,"power":"3","toughness":"2","keywords":["First strike"],"oracleText":"First strike\nCaptain America enters with a shield counter on him. (If he would be dealt damage or destroyed, remove a shield counter from him instead.)\nAs long as Captain America has a shield counter on him, you and other Heroes you control have hexproof.","colors":["W"],"colorIdentity":["W"],"layout":"normal"});
+const kolodinTriumphCaster = card("Kolodin, Triumph Caster", "Legendary Creature — Human Pilot", "{R}{W}", {"cmc":2,"power":"2","toughness":"3","keywords":[],"oracleText":"Mounts and Vehicles you control have haste.\nWhenever a Mount you control enters, it becomes saddled until end of turn.\nWhenever a Vehicle you control enters, it becomes an artifact creature until end of turn.","colors":["R","W"],"colorIdentity":["R","W"],"layout":"normal"});
+const tarielReckonerOfSouls = card("Tariel, Reckoner of Souls", "Legendary Creature — Angel", "{4}{R}{W}{B}", {"cmc":7,"power":"4","toughness":"7","keywords":["Flying","Vigilance"],"oracleText":"Flying, vigilance\n{T}: Choose a creature card at random from target opponent's graveyard. Put that card onto the battlefield under your control.","colors":["B","R","W"],"colorIdentity":["B","R","W"],"layout":"normal"});
+const slimefootAndSquee = card("Slimefoot and Squee", "Legendary Creature — Fungus Goblin", "{B}{R}{G}", {"cmc":3,"power":"3","toughness":"3","keywords":[],"oracleText":"Whenever Slimefoot and Squee enters or attacks, create a 1/1 green Saproling creature token.\n{1}{B}{R}{G}, Sacrifice a Saproling: Return this card and up to one other target creature card from your graveyard to the battlefield. Activate only as a sorcery.","colors":["B","G","R"],"colorIdentity":["B","G","R"],"layout":"normal"});
+const hazoretGodseeker = card("Hazoret, Godseeker", "Legendary Creature — God", "{1}{R}", {"cmc":2,"power":"5","toughness":"3","keywords":["Indestructible","Haste","Start your engines!"],"oracleText":"Indestructible, haste\nStart your engines! (If you have no speed, it starts at 1. It increases once on each of your turns when an opponent loses life. Max speed is 4.)\n{1}, {T}: Target creature with power 2 or less can't be blocked this turn.\nHazoret can't attack or block unless you have max speed.","colors":["R"],"colorIdentity":["R"],"layout":"normal"});
+const indoraptorThePerfectHybrid = card("Indoraptor, the Perfect Hybrid", "Legendary Creature — Dinosaur Mutant", "{1}{B/G}{R}", {"cmc":3,"power":"3","toughness":"1","keywords":["Enrage","Bloodthirst","Menace"],"oracleText":"Bloodthirst X (This creature enters with X +1/+1 counters on it, where X is the damage dealt to your opponents this turn.)\nMenace\nEnrage — Whenever Indoraptor is dealt damage, choose an opponent at random. Indoraptor deals damage equal to its power to that player unless they sacrifice a nontoken creature of their choice.","colors":["B","G","R"],"colorIdentity":["B","G","R"],"layout":"normal"});
+const bloodlordOfVaasgoth = card("Bloodlord of Vaasgoth", "Creature — Vampire Warrior", "{3}{B}{B}", {"cmc":5,"power":"3","toughness":"3","keywords":["Flying","Bloodthirst"],"oracleText":"Bloodthirst 3 (If an opponent was dealt damage this turn, this creature enters with three +1/+1 counters on it.)\nFlying\nWhenever you cast a Vampire creature spell, it gains bloodthirst 3.","colors":["B"],"colorIdentity":["B"],"layout":"normal"});
+
+describe("exile target creature or enchantment. If it wasn't an Aura, create a token copy", () => {
+  it("compile", () => supported(kayaIntangibleSlayer));
+
+  it("Kaya −3: a creature is exiled and comes back as a 1/1 white Spirit token copy with flying", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const k = putOnBattlefield(s0, ap, kayaIntangibleSlayer);
+    s0.objects[k]!.counters = { loyalty: 6 };
+    const theirs = putOnBattlefield(s0, opp, card("Test Ogre", "Creature — Ogre", "{2}{R}", { cmc: 3, power: "3", toughness: "3" }));
+    let s = passUntil(s0, "main1", ap);
+    s = settle(run(s, planActivate(s, ap, k, 2, [tgt(theirs)])));
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    const [copy] = named(s, ap, "Test Ogre");
+    expect(copy).toBeDefined();
+    const c = characteristics(s, s.objects[copy!]!);
+    expect([c.power, c.toughness]).toEqual([1, 1]);
+    expect(c.subtypes).toEqual(expect.arrayContaining(["Ogre", "Spirit"]));
+    expect(c.colors).toEqual(["W"]);
+    expect(objHasKeyword(s, s.objects[copy!]!, "Flying")).toBe(true);
+  });
+
+  it("Kaya −3: an Aura is only exiled", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const k = putOnBattlefield(s0, ap, kayaIntangibleSlayer);
+    s0.objects[k]!.counters = { loyalty: 6 };
+    const host = putOnBattlefield(s0, opp, bear({ name: "Host Bear" }));
+    const aura = putOnBattlefield(s0, opp, card("Test Aura", "Enchantment — Aura", "{W}", { cmc: 1, oracleText: "Enchant creature\nEnchanted creature gets +1/+1." }));
+    s0.objects[aura]!.attachedTo = host;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "main1", ap);
+    s = settle(run(s, planActivate(s, ap, k, 2, [tgt(aura)])));
+    expect(s.objects[aura]!.zone).toBe("exile");
+    expect(named(s, ap, "Test Aura").length).toBe(0);
+  });
+});
+
+describe("it becomes a legendary Spider Hero in addition to its other types", () => {
+  it("compile", () => supported(originOfSpiderman));
+
+  it("Origin of Spider-Man II: a +1/+1 counter, and the creature is a legendary Spider Hero for good", () => {
+    const { s: s0, ap } = setup([]);
+    const saga = putOnBattlefield(s0, ap, originOfSpiderman);
+    s0.objects[saga]!.counters = { lore: 1 };
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = passUntil(passUntil(s0, "end", ap), "main1", ap);
+    s = settle(s, { targets: [tgt(b)] });
+    const c = characteristics(s, s.objects[b]!);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(1);
+    expect(c.supertypes).toContain("Legendary");
+    expect(c.subtypes).toEqual(expect.arrayContaining(["Bear", "Spider", "Hero"]));
+  });
+});
+
+describe("as long as ~ has a shield counter on him, you and other Heroes you control have hexproof", () => {
+  it("compile", () => supported(captainAmericaSupersoldier));
+
+  it("Captain America: you and your other Heroes can't be targeted by opponents while the shield counter is there", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const cap = putOnBattlefield(s0, ap, captainAmericaSupersoldier);
+    s0.objects[cap]!.counters = { shield: 1 };
+    const hero = putOnBattlefield(s0, ap, bear({ name: "Test Hero", typeLine: "Creature — Human Hero", subtypes: ["Human", "Hero"] }));
+    invalidateCharacteristics(s0);
+    const shock = card("Test Shock", "Instant", "{R}", { cmc: 1, oracleText: "Test Shock deals 2 damage to any target." });
+    let s = passUntil(s0, "main1", opp);
+    const sh = into(s, opp, shock, "hand");
+    s.players[opp]!.manaPool.R = 1;
+    expect(planCast(s, opp, sh, [{ kind: "player", id: ap }])).toBeNull();
+    expect(planCast(s, opp, sh, [tgt(hero)])).toBeNull();
+    expect(objHasKeyword(s, s.objects[cap]!, "Hexproof")).toBe(false); // "other" Heroes
+    expect(planCast(s, opp, sh, [tgt(cap)])).not.toBeNull();
+    s.objects[cap]!.counters = {};
+    invalidateCharacteristics(s);
+    expect(planCast(s, opp, sh, [{ kind: "player", id: ap }])).not.toBeNull();
+    expect(planCast(s, opp, sh, [tgt(hero)])).not.toBeNull();
+  });
+});
+
+const guidelightMatrix = card("Guidelight Matrix", "Artifact", "{2}", {"cmc":2,"keywords":[],"oracleText":"When this artifact enters, draw a card.\n{2}, {T}: Target Mount you control becomes saddled until end of turn. Activate only as a sorcery.\n{2}, {T}: Target Vehicle you control becomes an artifact creature until end of turn.","colors":[],"colorIdentity":[],"layout":"normal"});
+const petrifiedWoodkin = card("Petrified Wood-Kin", "Creature — Elemental Warrior", "{6}{G}", {"cmc":7,"power":"3","toughness":"3","keywords":["Bloodthirst","Protection"],"oracleText":"This spell can't be countered.\nBloodthirst X (This creature enters with X +1/+1 counters on it, where X is the damage dealt to your opponents this turn.)\nProtection from instants","colors":["G"],"colorIdentity":["G"],"layout":"normal"});
+
+describe("whenever a Mount you control enters, it becomes saddled until end of turn", () => {
+  it("compile", () => supported(kolodinTriumphCaster, guidelightMatrix));
+
+  it("Guidelight Matrix: target Mount you control becomes saddled", () => {
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, guidelightMatrix);
+    const m = putOnBattlefield(s0, ap, card("Test Mount", "Creature — Horse Mount", "{1}{W}", { cmc: 2, power: "2", toughness: "2", keywords: ["Saddle"], oracleText: "Saddle 1" }));
+    let s = passUntil(s0, "main1", ap);
+    s.players[ap]!.manaPool.C = 2;
+    s = settle(run(s, planActivate(s, ap, g, 0, [tgt(m)])));
+    expect(s.objects[m]!.saddled).toBe(true);
+  });
+
+  it("Kolodin: a Mount entering is saddled (and has haste) this turn", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, kolodinTriumphCaster);
+    const mount = card("Test Mount", "Creature — Horse Mount", "{1}{W}", { cmc: 2, power: "2", toughness: "2", keywords: ["Saddle"], oracleText: "Whenever this creature attacks while saddled, you gain 2 life.\nSaddle 1" });
+    let s = passUntil(s0, "main1", ap);
+    const m = into(s, ap, mount, "hand");
+    s.players[ap]!.manaPool.W = 2;
+    s = settle(run(s, planCast(s, ap, m)));
+    expect(s.objects[m]!.saddled).toBe(true);
+    const life = s.players[ap]!.life;
+    s = settle(attack(s, ap, s.turnOrder.find((p) => p !== ap)!, [m]));
+    expect(s.players[ap]!.life).toBe(life + 2);
+  });
+});
+
+describe("a creature card at random from target opponent's graveyard onto the battlefield under your control", () => {
+  it("compile", () => supported(tarielReckonerOfSouls));
+
+  it("Tariel: one of that opponent's creature cards, under your control; not a noncreature card", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const t = putOnBattlefield(s0, ap, tarielReckonerOfSouls);
+    const z = into(s0, opp, zombie("Their Zombie"), "graveyard");
+    into(s0, opp, rock("Their Rock"), "graveyard");
+    let s = passUntil(s0, "main1", ap);
+    s = settle(run(s, planActivate(s, ap, t, 0, [{ kind: "player", id: opp }])));
+    expect(s.objects[z]!.zone).toBe("battlefield");
+    expect(s.objects[z]!.controller).toBe(ap);
+    expect(s.objects[z]!.owner).toBe(opp);
+  });
+});
+
+describe("return ~ and up to one other target creature card from your graveyard to the battlefield", () => {
+  it("compile", () => supported(slimefootAndSquee));
+
+  it("Slimefoot and Squee: with a creature card, or alone", () => {
+    const { s: s0, ap } = setup([]);
+    const sl = into(s0, ap, slimefootAndSquee, "graveyard");
+    const z = into(s0, ap, zombie(), "graveyard");
+    const sap = putOnBattlefield(s0, ap, card("Saproling Token", "Token Creature — Saproling", "", { power: "1", toughness: "1" }));
+    s0.objects[sap]!.isToken = true;
+    const sap2 = putOnBattlefield(s0, ap, card("Saproling Token", "Token Creature — Saproling", "", { power: "1", toughness: "1" }));
+    s0.objects[sap2]!.isToken = true;
+    let s = passUntil(s0, "main1", ap);
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, B: 1, R: 1, G: 2 };
+    expect(planActivate(s, ap, sl, 0, [tgt(sl)], undefined, undefined, undefined, { sacrifice: [sap] })).toBeNull(); // "other"
+    s = settle(run(s, planActivate(s, ap, sl, 0, [tgt(z)], undefined, undefined, undefined, { sacrifice: [sap] })));
+    expect(s.objects[sl]!.zone).toBe("battlefield");
+    expect(s.objects[z]!.zone).toBe("battlefield");
+    const { s: t0, ap: p } = setup([]);
+    const sl2 = into(t0, p, slimefootAndSquee, "graveyard");
+    const tok = putOnBattlefield(t0, p, card("Saproling Token", "Token Creature — Saproling", "", { power: "1", toughness: "1" }));
+    t0.objects[tok]!.isToken = true;
+    let t = passUntil(t0, "main1", p);
+    t.players[p]!.manaPool = { ...t.players[p]!.manaPool, B: 1, R: 1, G: 2 };
+    t = settle(run(t, planActivate(t, p, sl2, 0, [{ kind: "none" }], undefined, undefined, undefined, { sacrifice: [tok] })));
+    expect(t.objects[sl2]!.zone).toBe("battlefield");
+  });
+});
+
+describe("~ can't attack or block unless you have max speed", () => {
+  it("compile", () => supported(hazoretGodseeker));
+
+  it("Hazoret, Godseeker: attacks only at speed 4", () => {
+    const { s: s0, ap } = setup([]);
+    const h = putOnBattlefield(s0, ap, hazoretGodseeker);
+    s0.players[ap]!.speed = 3;
+    const s = passUntil(s0, "main1", ap);
+    expect(potentialAttackers(s, ap).some((o) => o.id === h)).toBe(false);
+    s.players[ap]!.speed = 4;
+    invalidateCharacteristics(s);
+    expect(potentialAttackers(s, ap).some((o) => o.id === h)).toBe(true);
+  });
+});
+
+describe("bloodthirst X; a spell gains bloodthirst 3", () => {
+  it("compile", () => supported(indoraptorThePerfectHybrid, bloodlordOfVaasgoth, petrifiedWoodkin));
+
+  it("Indoraptor: enters with a +1/+1 counter for each damage the opponents were dealt this turn", () => {
+    const { s: s0, ap, opp } = setup([indoraptorThePerfectHybrid]);
+    let s = passUntil(s0, "main1", ap);
+    const third = s.turnOrder.find((p) => p !== ap && p !== opp)!;
+    s.damageThisTurn = { [opp]: 3, [third]: 2, [ap]: 4 };
+    s.damagedThisTurn = [opp, third, ap];
+    const i = s.players[ap]!.hand.find((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("Indoraptor"))!;
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, B: 1, R: 1, C: 1 };
+    s = settle(run(s, planCast(s, ap, i)));
+    expect(s.objects[i]!.counters["+1/+1"]).toBe(5);
+  });
+
+  it("Bloodlord of Vaasgoth: a Vampire creature spell gains bloodthirst 3, on top of its own", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, bloodlordOfVaasgoth);
+    const vamp = card("Test Vampire", "Creature — Vampire", "{1}{B}", { cmc: 2, power: "2", toughness: "2", keywords: ["Bloodthirst"], oracleText: "Bloodthirst 1" });
+    let s = passUntil(s0, "main1", ap);
+    s.damagedThisTurn = [opp];
+    const v = into(s, ap, vamp, "hand");
+    const bearCard = into(s, ap, bear(), "hand");
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, B: 2, G: 2 };
+    s = settle(run(s, planCast(s, ap, v)));
+    expect(s.objects[v]!.counters["+1/+1"]).toBe(4);
+    s = settle(run(s, planCast(s, ap, bearCard)));
+    expect(s.objects[bearCard]!.counters["+1/+1"] ?? 0).toBe(0);
   });
 });

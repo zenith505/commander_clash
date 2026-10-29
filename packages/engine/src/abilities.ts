@@ -2359,7 +2359,7 @@ export type Effect =
    */
   /** Primal Surge: "Exile the top card of your library. If it's a permanent card, you may put it onto the battlefield. If you do, repeat this process." */
   | { type: "surge" }
-  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand; Reap the Past's X. */ n?: Amount; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" | /** Tersa Lightshatter: "exile a card at random from your graveyard. You may play that card this turn." */ "exilePlay" }
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; /** Tariel, Reckoner of Souls: "from target opponent's graveyard", onto the battlefield under your control. */ from?: PlayerRef; /** Make a Wish: "Return two cards at random": that many different ones (all of them if fewer), into your hand; Reap the Past's X. */ n?: Amount; /** "creatureOrExile": onto the battlefield if it's a creature card, otherwise exiled (Search for Survivors); "creatureOrHand", otherwise into your hand (Deadbridge Chant). */ dest: "hand" | "creatureOrExile" | "creatureOrHand" | /** Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield". */ "battlefield" | /** Tersa Lightshatter: "exile a card at random from your graveyard. You may play that card this turn." */ "exilePlay" }
   /**
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
@@ -5584,6 +5584,8 @@ export interface CompiledCard {
   entersWithCounters?: { counter: CounterKind; n: Amount; /** "Roll X d6. It enters with ... counters equal to the total of those results" (Neverwinter Hydra): `n` dice with this many sides, rolled as it enters. */ rollD?: number; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you didn't cast it from your hand" (Epochrasite). */ notCastFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "It escapes with twelve +1/+1 counters on it instead" (Polukranos, Unchained, CR 702.138c): as many when it escaped. */ escaped?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
+  /** Bloodthirst X (CR 702.54b): enters with a +1/+1 counter for each damage its controller's opponents were dealt this turn. */
+  bloodthirstX?: true;
   /**
    * Sunburst (CR 702.44a): entering from the stack, a counter for each color of mana spent to cast it: +1/+1 counters
    * if it's a creature (its printed types, ignoring type-changing effects), charge counters otherwise. `counter`:
@@ -5955,6 +5957,8 @@ export interface CompiledCard {
   youHave?: "hexproof" | "shroud" | "protection";
   /** "During your turn, you and ~ have hexproof" (Gruul Spellbreaker): `youHave` only while its controller is the active player. */
   youHaveDuringYourTurn?: true;
+  /** "As long as ~ has a shield counter on him, you and other Heroes you control have hexproof" (Captain America, Super-Soldier): `youHave` only while this is true. */
+  youHaveIf?: StaticCondition;
   /** Serra's Emissary: its controller has protection from the card type chosen as it entered (CR 702.16b). */
   youProtectedFromChosenType?: true;
   /**

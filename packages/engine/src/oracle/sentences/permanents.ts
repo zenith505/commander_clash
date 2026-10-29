@@ -15,6 +15,12 @@ import { parseGrants } from "../grants";
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
   let m: RegExpExecArray | null;
+  // Kolodin, Triumph Caster: "Whenever a Mount you control enters, it becomes saddled until end of turn": the designation
+  // saddling gives (CR 702.171b), with no creature having saddled it.
+  if ((m = /^(It|That creature|Target .+?) becomes saddled until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it").replace(/^That creature$/, "that creature"), ctx);
+    if (what && what.ref !== "self") return [{ type: "becomeSaddled", what }];
+  }
   // The Laces: "Target spell or permanent becomes green": with no duration, for as long as it's that spell or that
   // permanent (CR 611.2a, 105.3); a permanent spell's new color stays with the permanent it becomes (CR 112.4, 400.7a).
   // Blind Seer, Eight-and-a-Half-Tails: "... becomes the color of your choice / white until end of turn" (rulings: the
@@ -167,6 +173,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     // "It gains sunburst" (Lux Artillery): it works as the permanent enters from the stack (CR 702.44a), each instance
     // apart (rulings).
     if (m[1] === "sunburst" && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: ["Sunburst"] }] }];
+    // "It gains bloodthirst 3" (Bloodlord of Vaasgoth): it works as the permanent enters (CR 702.54a; rulings: with its
+    // own bloodthirst, both apply).
+    if (/^bloodthirst \d+$/.test(m[1]!) && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: [`Bloodthirst ${m[1]!.split(" ")[1]}`] }] }];
     // Rivaz of the Claw: 'it gains "When this creature dies, exile it."': the permanent it becomes has it, with no end
     // (rulings), even if it stops being a creature.
     if (!m[2] && /^"[^"]+"$/.test(m[1]!)) {
@@ -1418,6 +1427,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods: Modification[] = m[2] === "artifact" ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [] }] : [{ kind: "addTypes", types: [], subtypes: [m[2]!] }];
     // Olivia, Mobilized for War: "that creature" being the trigger's subject, for as long as it's that object (CR 400.7).
     if (what && (what.ref === "target" || what.ref === "each" || what.ref === "subject")) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
+  // Origin of Spider-Man: "Put a +1/+1 counter on target creature you control. It becomes a legendary Spider Hero in
+  // addition to its other types": the supertype and creature types added in layer 4 (CR 205.1b, 613.1d), indefinitely.
+  if ((m = /^(It|That creature) becomes a (legendary )?((?:[A-Z][a-z]+ )*[A-Z][a-z]+) in addition to its other types$/.exec(s)) && m[3]!.split(" ").every((t) => CREATURE_TYPES.has(t)) && (m[2] || m[3]!.includes(" "))) {
+    const what = parseObject(m[1] === "It" ? "it" : "that creature", ctx);
+    if (what?.ref === "target") return [{ type: "continuous", what, mods: [{ kind: "addTypes", types: [], subtypes: m[3]!.split(" "), ...(m[2] ? { supertypes: ["Legendary"] } : {}) }], duration: "game" }];
   }
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
   // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield

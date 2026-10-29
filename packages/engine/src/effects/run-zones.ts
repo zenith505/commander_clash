@@ -2195,7 +2195,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "randomFromGraveyard": {
-      const p = player(s, ctx.controller);
+      const from = e.from ? players(s, e.from, ctx)[0] : ctx.controller;
+      if (from === undefined) return;
+      const p = player(s, from);
       const pool = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, s.objects[id]!)));
       // Reap the Past: "X cards at random", none for an X of 0.
       const count = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
@@ -2221,7 +2223,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "exile");
         if (o.zone === "exile") o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
       } else if ((e.dest === "battlefield" || isPermanentCard(d)) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
-        log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
+        log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield${p.id === ctx.controller ? "" : ` under ${player(s, ctx.controller).name}'s control`}.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
       } else if (e.dest === "creatureOrHand") {
         log(s, `${src}: ${d.name} is chosen at random and put into ${p.name}'s hand.`);

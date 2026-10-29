@@ -231,7 +231,18 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
       // "In addition to its other colors and types" (Lazotep Convert): it keeps its colors too; otherwise these are its colors.
       if (m[5] && (!colors.length || /colorless/.test(m[3] ?? ""))) return null;
       if (colors.length) out[m[5] ? "addColors" : "colors"] = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
-      const words = m[4]!.split(" ").map((w) => w.replace(/s$/, "")).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+      // Kaya, Intangible Slayer: "except it's a 1/1 white Spirit creature with flying in addition to its other types": the
+      // keywords it has too (CR 707.9b).
+      const withKw = / with (.+)$/.exec(m[4]!);
+      const typeWords = withKw ? m[4]!.slice(0, withKw.index) : m[4]!;
+      if (withKw) {
+        const kw = parseKeywordList(withKw[1]!);
+        if (!kw) return null;
+        (out.keywords ??= []).push(...kw);
+      }
+      // Only type words: a subtype is capitalized, a card type or "legendary" may not be.
+      if (typeWords.split(" ").some((w) => !/^[A-Z][a-z]+s?$/.test(w) && w !== "legendary" && !COPY_CARD_TYPES.has(w.charAt(0).toUpperCase() + w.slice(1).replace(/s$/, "")))) return null;
+      const words = typeWords.split(" ").map((w) => w.replace(/s$/, "")).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
       if (words.some((w) => !/^[A-Z][a-z]+$/.test(w))) return null;
       // "It's legendary in addition to its other types": a supertype (CR 205.4). Other supertypes aren't modeled here.
       if (words[0] === "Legendary") {

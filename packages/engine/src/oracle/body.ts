@@ -1452,6 +1452,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Vexing Radgull: "that player gets two rad counters if they don't have any rad counters. Otherwise, proliferate."
   text = text.replace(/(^|\. )[Tt]hat player gets (\w+) rad counters if they don't have any rad counters\. Otherwise,/, (_, lead: string, n: string) => `${lead}If that player has no rad counters, that player gets ${n} rad counters. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Tariel, Reckoner of Souls: "Choose a creature card at random from target opponent's graveyard. Put that card onto the
+  // battlefield under your control." is one instruction about that card.
+  text = text.replace(/^Choose a creature card at random from target opponent's graveyard\. Put that card onto the battlefield under your control\./, "Put a creature card chosen at random from target opponent's graveyard onto the battlefield under your control.");
   // Sword of the Meek: "return ~ from your graveyard to the battlefield, then attach it to that creature": one sentence
   // (sentences/zones.ts), not split at ", then".
   text = text.replace(/\b([Rr]eturn ~ from your graveyard to the battlefield), then (attach it to that creature)\./, "$1 and then $2.");
@@ -6810,6 +6813,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(controlled[2]!.charAt(0).toUpperCase() + controlled[2]!.slice(1), ctx);
       if (!fx || ctx.targets.length !== i + 1) return null;
       effects.push({ type: "if", cond: { kind: "targetWasYours", index: i }, effects: fx });
+      continue;
+    }
+    // Kaya, Intangible Slayer: "Exile target creature or enchantment. If it wasn't an Aura, create a token that's a copy of
+    // it, ...": whether it was an Aura as it last existed on the battlefield (rulings, CR 608.2h), so it's checked just
+    // before it's exiled, and the rest happens after.
+    const exileWasnt = /^Exile target [^.]+$/.test(s) ? /^If it wasn't an? ([A-Z][a-z]+), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (exileWasnt && exileWasnt[1] === "Aura") {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "exile" || ctx.targets[before]!.kind !== "object" || ctx.targets[before]!.optional) return null;
+      const then = parseOne(capital(exileWasnt[2]!), ctx);
+      if (!then || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [exileWasnt[1]!], text: `an ${exileWasnt[1]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: fx, otherwise: [...structuredClone(fx), ...then] });
+      si++;
       continue;
     }
     // "Exile target card from a graveyard. If it was a creature card, ..." (Scavenging Ooze, Cling to Dust, Deluge of the

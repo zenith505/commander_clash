@@ -732,6 +732,8 @@ export function parseMostStat(what: string): MostStat | null {
 
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
+  // Hazoret, Godseeker: "~ can't attack or block unless you have max speed" (CR 702.179e: speed 4).
+  if (text === "you have max speed") return { kind: "maxSpeed" };
   // Thoughtbound Primoc: "if a player controls more Wizards than each other player", Ghazbán Ogre: "has more life",
   // Sokenzan Renegade: "has more cards in hand": one player with the most, none tied (rulings).
   if ((m = /^a player (?:controls more ([A-Za-z]+)|has more (life|cards in hand)) than each other player$/.exec(text))) {

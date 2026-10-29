@@ -764,7 +764,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         o.sunburstGained = (o.sunburstGained ?? 0) + 1;
         log(s, `${defOf(s, o).name} gains sunburst.`);
       }
-      const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst";
+      // Bloodthirst likewise as it enters (Bloodlord of Vaasgoth, CR 702.54a, 614.12).
+      for (const x of e.mods) {
+        if (x.kind !== "addKeywords") continue;
+        for (const k of x.keywords) {
+          const bt = /^Bloodthirst (\d+)$/.exec(k);
+          if (!bt) continue;
+          o.bloodthirstGained = (o.bloodthirstGained ?? 0) + Number(bt[1]);
+          log(s, `${defOf(s, o).name} gains bloodthirst ${bt[1]}.`);
+        }
+      }
+      const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst" || /^Bloodthirst \d+$/.test(k);
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => !stackOnly(k)) ? [{ ...x, keywords: x.keywords.filter((k) => !stackOnly(k)) }] : []));
       if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}), ...(e.whileSpell ? { whileSpell: true as const } : {}), ...(e.until ? { until: e.until } : {}) });
       return;

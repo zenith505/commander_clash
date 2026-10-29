@@ -555,6 +555,8 @@ export interface GameObject {
   reboundGained?: true;
   /** A spell that gained sunburst this many times (Lux Artillery): each instance works as it enters from the stack (CR 702.44a). */
   sunburstGained?: number;
+  /** Bloodthirst the spell gained (Bloodlord of Vaasgoth: "it gains bloodthirst 3"): the total N, each instance apart (CR 702.54c). */
+  bloodthirstGained?: number;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**

@@ -976,6 +976,7 @@ export function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: kw.entersCounter.counter, n: kw.entersCounter.n };
       }
       if (kw.bloodthirst) out.bloodthirst = (out.bloodthirst ?? 0) + kw.bloodthirst;
+      if (kw.bloodthirstX) out.bloodthirstX = true;
       if (kw.sunburst) {
         if (out.sunburst) {
           out.unsupported.push(raw); // two sunburst abilities: not modeled
@@ -2271,6 +2272,17 @@ export function compile(d: CardDef): CompiledCard {
       out.youHave = "hexproof";
       out.youHaveDuringYourTurn = true;
       out.statics.push({ ...youAndSelf, text: line });
+      continue;
+    }
+    // Captain America, Super-Soldier: "As long as ~ has a shield counter on him, you and other Heroes you control have
+    // hexproof": you have it while that's true, and so do they (CR 702.11d, 611.3a).
+    const youAndIf = !out.youHave ? /^As long as (~ has an? [a-z]+ counter on) ~, you and ((?:other )?[^,]+ you control) have (hexproof|shroud)\.$/.exec(line) : null;
+    const youAndIfCond = youAndIf ? parseStaticCondition(`${youAndIf[1]} it`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const youAndIfSt = youAndIfCond ? parseConditionalStatic(`As long as ${youAndIf![1]} it, ${youAndIf![2]} have ${youAndIf![3]}.`) : null;
+    if (youAndIfCond && youAndIfSt) {
+      out.youHave = youAndIf![3] as "hexproof" | "shroud";
+      out.youHaveIf = youAndIfCond;
+      out.statics.push({ ...youAndIfSt, text: line });
       continue;
     }
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);

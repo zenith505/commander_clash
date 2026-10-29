@@ -946,6 +946,7 @@ export function moveObject(
     o.spellGains = undefined;
     o.reboundGained = undefined;
     o.sunburstGained = undefined;
+    o.bloodthirstGained = undefined;
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -1131,7 +1132,9 @@ export function moveObject(
     o.entersGaining = undefined;
     const sunburstGained = fromZone === "stack" ? (o.sunburstGained ?? 0) : 0;
     o.sunburstGained = undefined;
-    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const bloodthirstGained = fromZone === "stack" ? (o.bloodthirstGained ?? 0) : 0;
+    o.bloodthirstGained = undefined;
+    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(bloodthirstGained ? { bloodthirstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1239,7 +1242,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
+type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; /** Bloodthirst the spell gained (Bloodlord of Vaasgoth), its total N. */ bloodthirstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1289,8 +1292,15 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, evalAmount(s, e.n, { controller: controllerOf(s, o), sourceId: o.id }));
   for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
-  if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
-    putCounters(s, o, "+1/+1", printed.bloodthirst, true);
+  // Bloodlord of Vaasgoth: bloodthirst the spell gained too, each instance applying (CR 702.54c).
+  const thirst = (printed.bloodthirst ?? 0) + (opts.bloodthirstGained ?? 0);
+  if (thirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
+    putCounters(s, o, "+1/+1", thirst, true);
+  // Bloodthirst X: "where X is the total damage your opponents have been dealt this turn" (CR 702.54b).
+  if (printed.bloodthirstX) {
+    const n = opponents(s, o.controller).reduce((sum, pid) => sum + (s.damageThisTurn?.[pid] ?? 0), 0);
+    if (n > 0) putCounters(s, o, "+1/+1", n, true);
+  }
   // "~ escapes with N +1/+1 counters on it" (CR 702.138c).
   if (opts.escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
   // Sunburst: only a resolving spell, and only for colored mana spent to cast it (CR 702.44b). Whether it enters as a

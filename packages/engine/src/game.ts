@@ -1143,7 +1143,7 @@ export function moveObject(
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
-    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN } : undefined);
+    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: withCounters.rollD ? rollDice(s, o.controller, withCounters.rollD, counterN, realDefOf(s, o).name).result : counterN, ...(withCounters.also ? { also: withCounters.also } : {}) } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
       s.battlefield = s.battlefield.filter((x) => x !== id);
@@ -1250,7 +1250,7 @@ type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance 
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
  * then its enters event. `withCounters`: its "enters with N counters", counted before it was on the battlefield.
  */
-function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number }) {
+function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number; also?: { counter: string; n: number } }) {
   const id = o.id;
   // Its own replacement effects apply only if it has them as it would exist on the battlefield (CR 614.12): a nonbasic
   // land entering under Blood Moon has lost them (CR 305.7, rulings), so it doesn't enter tapped.
@@ -1279,6 +1279,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Polukranos, Unchained: "It escapes with twelve +1/+1 counters on it instead" (CR 702.138c).
   if (withCounters && opts.escaped && printed.entersWithCounters?.escaped !== undefined) withCounters = { ...withCounters, n: printed.entersWithCounters.escaped };
   if (withCounters) add(withCounters.counter, withCounters.n);
+  if (withCounters?.also) add(withCounters.also.counter, withCounters.also.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
@@ -1437,7 +1438,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
   const n0 = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
   // Neverwinter Hydra: that many dice, rolled as it enters; the counters their total (none rolled with X 0).
   const n = ewc?.rollD && n0 > 0 ? rollDice(s, o.controller, ewc.rollD, n0, realDefOf(s, o).name).result : n0;
-  finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
+  finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n, ...(ewc.also ? { also: ewc.also } : {}) } : undefined);
 }
 
 /**
@@ -4643,6 +4644,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const moreMana = mods.moreColored.map((c) => `{${c}}`).join("");
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
+  const targetsFor = (filter: TargetSpec) =>
+    !!how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, filter, obj(s, t.id), pid, false)) || (t.kind === "object" && filter.kind === "card" && s.objects[t.id]?.zone === "graveyard" && printedMatches(filter, defOf(s, obj(s, t.id)))) || (t.kind === "stack" && filter.kind === "spell" && !!filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], filter.targetsWhat, pid)) || (t.kind === "stack" && filter.kind === "spell" && !filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, filter, x))(s.stack.find((x) => x.id === t.id))));
+  // Brush Off: "~ costs {1}{U} less to cast if it targets an instant or sorcery spell": its colored part.
+  for (const c of compileCard(d).costLessIfTargets ?? []) if (c.colored && targetsFor(c.filter)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
   // Eluge's "{U} (or {1})": the {U} it can take off, the rest as generic (rulings).
   const lessColored = (c: ParsedCost) => {
@@ -4757,6 +4762,16 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   if (way?.less !== undefined && wayMana !== undefined) less += Math.max(0, evalAmount(s, way.less, { controller: pid, sourceId: o.id }));
+  // Catalyst Stone: "Flashback costs you pay cost {2} less. Flashback costs your opponents pay cost {2} more.": the flashback
+  // cost, a card's own or one an effect gave it (CR 702.34a, 601.2f).
+  let flashbackMore = 0;
+  if (wayMana !== undefined && (way!.kind === "flashback" || way!.kind === "grantedFlashback"))
+    for (const id of s.battlefield) {
+      const a = abilitiesOf(s, obj(s, id));
+      const by = controllerOf(s, obj(s, id));
+      if (by === pid) less += a.flashbackLess ?? 0;
+      else if (opponents(s, by).includes(pid)) flashbackMore += a.flashbackTax ?? 0;
+    }
   for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
   // Emerge (CR 702.119a): the total cost is reduced by the sacrificed creature's mana value, in generic mana only. It's
   // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).
@@ -4780,10 +4795,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "Costs {3} less to cast if it targets a tapped creature": the targets are chosen before the cost is (CR 601.2c, 601.2f).
   // "... if it targets a spell or ability that targets a creature you control with power 7 or greater" (Not of This
   // World): what that spell or ability targets now (rulings).
-  for (const c of compileCard(d).costLessIfTargets ?? [])
-    if (how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false)) || (t.kind === "object" && c.filter.kind === "card" && s.objects[t.id]?.zone === "graveyard" && printedMatches(c.filter, defOf(s, obj(s, t.id)))) || (t.kind === "stack" && c.filter.kind === "spell" && !!c.filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], c.filter.targetsWhat, pid)) || (t.kind === "stack" && c.filter.kind === "spell" && !c.filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, c.filter, x))(s.stack.find((x) => x.id === t.id))))) less += c.n;
+  for (const c of compileCard(d).costLessIfTargets ?? []) if (targetsFor(c.filter)) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more - less) });
+  return costAtLeast(s, { cost: reducedCost, extra: Math.max(0, total.extra + mods.more + more + flashbackMore - less) });
 }
 
 /**
@@ -5409,6 +5423,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (rider?.counter) o.extraCounters = { ...o.extraCounters, [rider.counter]: (o.extraCounters?.[rider.counter] ?? 0) + 1 };
     if (rider?.subtypes?.length) (o.spellGains ??= []).push({ mods: [{ kind: "addTypes", types: [], subtypes: rider.subtypes }], timestamp: s.nextTimestamp++, controller: p.id, source: s.graveGrants!.find((g) => g.key === permit)!.source, forever: true });
   }
+  // Undead Sprinter: "If you do, ~ enters with a +1/+1 counter on it": the spell cast with that permission (CR 614.1c).
+  if (via?.entersWith) o.extraCounters = { ...o.extraCounters, [via.entersWith.counter]: (o.extraCounters?.[via.entersWith.counter] ?? 0) + via.entersWith.n };
   // "Once each turn, you may pay {0} ..." (As Foretold): that permanent's permission is used up for this turn.
   if (choices.alt === "payZero") {
     const by = payZeroSource(s, p.id, o)!;
@@ -6601,7 +6617,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true });
       }
@@ -6995,8 +7011,11 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
   const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
-  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
-  let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
+  // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
+  // only (CR 601.2f), whoever's permanent says so about their own graveyard.
+  const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;
+  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
+  let less = (ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0) + yardLess;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;

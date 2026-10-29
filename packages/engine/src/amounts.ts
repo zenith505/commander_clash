@@ -224,13 +224,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
-        if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
+        if (c.counterKinds) for (const [k, v] of Object.entries(o.counters)) (v ?? 0) > 0 && names.add(k);
+        else if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
         else if (c.differentManaValues) names.add(String(o.faceDown ? 0 : defMv(defOf(s, o))));
         else if (c.differentPowers) names.add(String(ch.power));
         else if (!c.differentNames) n++;
         else if (ch.name && !o.faceDown) names.add(ch.name);
       }
-      return c.differentNames || c.differentManaValues || c.differentPowers ? names.size : n;
+      return c.differentNames || c.differentManaValues || c.differentPowers || c.counterKinds ? names.size : n;
     }
     case "mostSharingCreatureType": {
       // White Lotus Tile: for each creature type, how many creatures you control have it; a changeling has every one
@@ -931,7 +932,7 @@ function describeCount(c: Count): string {
     case "chosenNumber":
       return "the chosen number";
     case "permanents":
-      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.counterKinds ? "kinds of counters among " : ""}${c.differentNames ? "differently named " : ""}${c.other || c.otherThanAffected ? "other " : ""}${c.filter.text.replace(/^target /, "")}${c.differentManaValues ? " (different mana values)" : ""}${c.differentPowers ? " (different powers)" : ""}`;
     case "cardsInHand":
       return "#cards in hand";
     case "handMoreThanYou":

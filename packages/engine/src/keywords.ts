@@ -155,6 +155,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "arcane") return "Protection from Arcane";
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
+  if (q === "creatures of the chosen type") return CHOSEN_CREATURE_TYPE_PROTECTION;
   if (q === "each of that creature's colors") return TARGET_COLORS_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
@@ -205,15 +206,22 @@ export const IDENTITY_PROTECTION = "Protection from each color not in your comma
 export const TARGET_COLORS_PROTECTION = "Protection from each of that creature's colors";
 /** "Protection from the chosen card type" (Serra's Emissary): the card type chosen as the source entered (CR 702.16a). */
 export const CHOSEN_TYPE_PROTECTION = "Protection from the chosen card type";
+/**
+ * "Protection from creatures of the chosen type" (Riders of Gavony): the creature type chosen as the source entered,
+ * bound as "Protection from creatures of type Goblin": creatures only, not other objects of that type (CR 702.16a).
+ */
+export const CHOSEN_CREATURE_TYPE_PROTECTION = "Protection from creatures of the chosen type";
 /** The card types a player may name in a game here (rulings on Serra's Emissary; kindred cards aren't supported), as protection says them. */
 export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts", Battle: "battles", Creature: "creatures", Enchantment: "enchantments", Instant: "instants", Land: "lands", Planeswalker: "planeswalkers", Sorcery: "sorceries" };
 /**
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string) =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string, creatureType?: string) =>
   keywords.flatMap((k) =>
-    k === CHOSEN_TYPE_PROTECTION
+    k === CHOSEN_CREATURE_TYPE_PROTECTION
+      ? creatureType ? [`Protection from creatures of type ${creatureType}`] : []
+      : k === CHOSEN_TYPE_PROTECTION
       ? cardType && CARD_TYPE_PLURAL[cardType] ? [`Protection from ${CARD_TYPE_PLURAL[cardType]}`] : []
       : k === CHOSEN_PROTECTION || k === CHOSEN_HEXPROOF
       ? color && COLOR_WORD[color] ? [`${k === CHOSEN_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[color]}`] : []
@@ -265,6 +273,9 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (mv && (mv[2] === "less" ? (src.manaValue ?? 0) <= Number(mv[1]) : (src.manaValue ?? 0) >= Number(mv[1]))) return true;
     const st = creatureTypeOfPlural(q);
     if (st && src.subtypes?.includes(st)) return true;
+    // Riders of Gavony's chosen type: a creature source of that type, a changeling too (CR 702.73a).
+    const ofType = /^creatures of type (.+)$/.exec(q);
+    if (ofType && src.types?.includes("Creature") && (src.allCreatureTypes || src.subtypes?.some((t) => t.toLowerCase() === ofType[1]))) return true;
     // "Protection from legendary creatures", "... non-Spirit creatures": a creature source that's legendary, or that isn't
     // a Spirit (a changeling is every creature type, CR 702.73a).
     const isCreature = !!src.types?.includes("Creature");

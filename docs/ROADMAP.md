@@ -1,7 +1,7 @@
 # Roadmap
 
-27,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,138 of
+27,893 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,145 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -980,6 +980,30 @@ line blocks.
    Slime (a die replacement); Astral Drift and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
    Rowan, Scion of War; Aven Courier; Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
    n+1), not the controller's choice of order (CR 616.1).
+   Round 213 took fresh cards from ranks 11,900 to 13,500: "each opponent chooses a permanent they control that shares a
+   card type with the sacrificed permanent" (Fatal Grudge; the sacrifice cost now remembers card types); "costs {1}{U}
+   less to cast if it targets" with colored mana (Brush Off); "if an opponent has eight or more cards in their
+   graveyard, instead counter that spell, then scry 2" (Anticognition); spell mastery's "also regenerate each other
+   creature you control" (Dark Dabbling); "then repeat this process for instant cards with mana values 2 and 1"
+   (Firemind's Foresight); "choose up to two" with "return those cards" bullets (Call Damage Control); "flashback costs
+   you pay cost {2} less / your opponents pay cost {2} more" (Catalyst Stone); "activated abilities of creature cards in
+   your graveyard cost {1} less" (Embalmer's Tools); granted mentor (Nyxborn Unicorn; Aegis of the Legion's first line
+   too); "protection from creatures of the chosen type" (Riders of Gavony); "another artifact is put into your graveyard
+   from the battlefield or an artifact card ... from anywhere other than the battlefield" (Ultron, Ultron's Auxiliary);
+   "1 damage to each of up to one target creature, up to one target player, and/or up to one target planeswalker"
+   (Volatile Arsonist); "look at the top card ... cast it without paying its mana cost if it's an instant or sorcery
+   spell" (Galvanoth); "copy it" for Pegasus/Unicorn/Horse spells and "Pegasi" (Thurid); "when you cast this spell,
+   create a token that's a copy of it, except it isn't legendary" (Osgood); "you may cast this card from your
+   graveyard [if ...]. If you do, it enters with ... counter(s)" and "by paying {W}{U}{B}{R}{G} rather than paying its
+   mana cost" (Undead Sprinter, Worldheart Phoenix, Hundred-Battle Veteran with "three or more different kinds of
+   counters among creatures you control", Raffine's Guidance); "enters with two +1/+1 counters and a lifelink counter"
+   (Dust Animus); "the number of opponents who control more lands than you" (Priest of the Blessed Graf); "three times
+   this creature's power" (Rootwire Amalgam); "when the tenth +1/+1 counter is put on" (Shang-Chi); "~ and target Frog
+   you control" (Tatsunari); "permanent cards with cycling abilities" (Herald of the Forgotten). +26 (27,893 of 31,936
+   with rounds 211 and 212 and B40-B43).
+   Out after round 213 (next fresh candidates, not looked at yet): Nurgle's Conscription, Dream Pillager, Mezzio Mugger,
+   Lidless Gaze, Shiko, Paragon of the Way, Tyrant of Discord. Aegis of the Legion still needs "whenever equipped
+   creature mentors a creature".
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

@@ -176,7 +176,8 @@ export function parseGrants(text: string): Modification[] | null {
     // Evolve (CR 702.100d) and training (702.149b) too: "Creature tokens you control have evolve" (Propagator Drone).
     // Provoke too (CR 702.39b): "All Sliver creatures have provoke" (Hunter Sliver). Extort too, each instance triggering
     // on its own (CR 702.101b): "Other creatures you control have extort" (Pontiff of Blight).
-    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke|extort)$/i.test(w)) {
+    // Mentor too (CR 702.134a): "Enchanted creature gets +2/+2 and has mentor" (Nyxborn Unicorn).
+    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke|extort|mentor)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }

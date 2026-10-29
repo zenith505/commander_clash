@@ -366,7 +366,8 @@ export function normalizeSelf(d: CardDef): string {
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token
   // Tuktuk the Explorer creates).
   const comma = full.split(",")[0]!;
-  const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:of|the) /.exec(full)?.[1] : undefined;
+  // "Shang-Chi" for "Shang-Chi and the Ten Rings".
+  const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:and the|of|the) /.exec(full)?.[1] : undefined;
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
   // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated.
   const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
@@ -554,6 +555,13 @@ export function compile(d: CardDef): CompiledCard {
           })
           .join("\n");
       })
+      // Ultron the Annihilator: "Whenever another artifact is put into your graveyard from the battlefield or an artifact
+      // card is put into your graveyard from anywhere other than the battlefield, ...": two events that never overlap, one
+      // trigger for each.
+      .replace(/^Whenever another artifact is put into your graveyard from the battlefield or an artifact card is put into your graveyard from anywhere other than the battlefield, ([^\n]+)$/m, "Whenever another artifact is put into your graveyard from the battlefield, $1\nWhenever an artifact card is put into your graveyard from anywhere other than the battlefield, $1")
+      // Call Damage Control: "Choose up to two. Return those cards from your graveyard to your hand." then "• Target
+      // artifact card." and so on: each mode returns its one target.
+      .replace(/^Choose up to two\. Return those cards from your graveyard to your hand\.((?:\n• Target [a-z]+ card\.)+)$/m, (_, b: string) => `Choose up to two —${b.replace(/• Target ([a-z]+) card\./g, "• Return target $1 card from your graveyard to your hand.")}`)
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // Woolly Razorback: "As long as ~ has an ice counter on it, prevent all combat damage it would deal and it has
@@ -2806,6 +2814,18 @@ export function compile(d: CardDef): CompiledCard {
       out.unlockLess = (out.unlockLess ?? 0) + Number(unlockLess[1]);
       continue;
     }
+    const yardLess = /^Activated abilities of creature cards in your graveyard cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (yardLess) {
+      out.yardCreatureAbilityLess = (out.yardCreatureAbilityLess ?? 0) + Number(yardLess[1]);
+      continue;
+    }
+    // Catalyst Stone: "Flashback costs you pay cost {2} less." "Flashback costs your opponents pay cost {2} more." (CR 601.2f)
+    const flashbackMod = /^Flashback costs (you|your opponents) pay cost \{(\d+)\} (less|more)\.$/.exec(line);
+    if (flashbackMod && (flashbackMod[1] === "you") === (flashbackMod[3] === "less")) {
+      if (flashbackMod[1] === "you") out.flashbackLess = (out.flashbackLess ?? 0) + Number(flashbackMod[2]);
+      else out.flashbackTax = (out.flashbackTax ?? 0) + Number(flashbackMod[2]);
+      continue;
+    }
     const morphTax = /^All morph costs cost \{(\d+)\} more\.$/.exec(line);
     if (morphTax) {
       out.morphTax = (out.morphTax ?? 0) + Number(morphTax[1]);
@@ -3574,6 +3594,15 @@ export function compile(d: CardDef): CompiledCard {
       const plain = (x: typeof a) => !!x && typeof x === "object" && !x.times && !x.plus && !x.half && !x.negate;
       if (!a || !b || !plain(a) || !plain(b) || out.entersWithCounters) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(ewcTwo[1]!), n: { count: { kind: "sum", of: [a.count, b.count] } } };
+      continue;
+    }
+    // Dust Animus: "If you control five or more untapped lands, ~ enters with two +1/+1 counters and a lifelink counter on
+    // it": both kinds at once if the condition holds as it enters (a replacement effect, CR 614.1c).
+    const ewcIfTwo = new RegExp(`^If (.+?), ~ enters(?: the battlefield)? with ${NUM} ${COUNTER} counters? and ${NUM} ${COUNTER} counters? on it\\.$`).exec(line);
+    if (ewcIfTwo) {
+      const cond = parseStaticCondition(ewcIfTwo[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || out.entersWithCounters || ewcIfTwo[3] === ewcIfTwo[5]) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(ewcIfTwo[3]!), n: num(ewcIfTwo[2]!), if: cond, also: { counter: counterKind(ewcIfTwo[5]!), n: num(ewcIfTwo[4]!) } };
       continue;
     }
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.

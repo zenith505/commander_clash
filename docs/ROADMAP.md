@@ -2824,9 +2824,28 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B43: Cinderheart Giant (damage to a creature chosen at random, not targeted), Torment of Venom and
   Xathrid Demon (new punisher forms), Courier of Comestibles and Inscribed Tablet ("if you didn't put a card into your
   hand this way" after a search or a fixed-count reveal, not parsed yet).
-- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Mana
-  Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
-  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence. Then the unsupported ones above that, least played first
+- Round B44 (harder skipped cards, least played first): mana that can only be spent some ways ("only to cast kicked
+  spells": Throne of Makindi, Elfhame Druid; "only to pay a disturb cost or cast an instant or sorcery spell":
+  Unblinking Observer; "can't be spent to cast spells from your hand": Karolina Dean, Vhal, Heartwood Crafter; autopay
+  now keeps an activated mana ability's restriction, and retries with the sources that make the most mana first),
+  "put a -1/-1 counter on a creature you control" as an additional cost (Lethal Sting, Scarscale Ritual), linked exile
+  returned to hands or under owners' control (Fear of Abduction, its cost's creature too; Safe Haven), "Exchange your
+  hand and graveyard" (Harness Infinity), "if you own a card in exile" (Dreadlight Monstrosity), Tomik (planeswalkers
+  get "No more than one creature can attack"), Shard Convergence and Gem of Becoming (one card of each basic type),
+  Throw from the Saddle, Last Stand, Charging Cinderhorn ("if no creatures attacked this turn"), Futurist Operative
+  ("it's a Human Citizen with base power and toughness 1/1"), Dovin's Acuity ("during your main phase"), Rofellos's
+  Gift ("for each card revealed this way"), Celestial Convergence (highest life total wins, a tie is a draw), Serene
+  Master (exchanging power, CR 701.12g), Lamplight Phoenix ("exile it and collect evidence 4", not counting itself),
+  Doomsday Specter. +25 (27,823 of 31,936 with B43). Ultron's Auxiliary was left to round 213, which has it.
+- Out after round B44: Mana Cache (a mana ability any player may activate), Torrent Elemental (an ability activated
+  from exile needs the UI and the bot), Keldon Twilight ("that player sacrifices a creature they controlled since the
+  beginning of the turn"), Leshrac's Sigil ("you may pay {B}{B}. If you do, look at that player's hand and choose a
+  card from it": the look sits inside the "if you do"), Rewrite History ("whenever one or more creatures you control
+  become tapped"), Spiny Starfish (counting regenerations), Magmablood Archaic (colors spent on the triggering spell),
+  Wanderwine Farewell (Kindred), Archery Training and Heartseeker (a granted ability that names the source),
+  Stormwild Capridor (prevented damage turned into counters), Awesome Presence (a block cost for each blocker).
+- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Colfenor's Plans, Wight, Nivix, Szadek,
+  Rain of Gore, Infernal Darkness, Pako, Goddric. Then the unsupported ones above that, least played first
   (`npm run popular -- --least`).
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,

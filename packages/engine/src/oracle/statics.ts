@@ -261,6 +261,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return st && { ...st, text: line };
   }
   if ((m = /^(.+?) as long as (.+)$/.exec(text)) && !/^During your turn, /.test(text)) [statement, cond] = [m[1], m[2]];
+  // Hobble: "Enchanted creature can't block if it's black": while it's black, by its colors as the layers so far left them.
+  else if ((m = /^(Enchanted creature can't block) if (it's (?:white|blue|black|red|green))$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   // Cloud, Planet's Champion: "During your turn, as long as ~ is equipped, it has double strike and indestructible": both.
   else if ((m = /^During your turn, as long as ([^,]+), (.+)$/.exec(text))) [cond, statement, alsoYourTurn] = [m[1], m[2], true];
@@ -1019,6 +1021,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^no opponent has more life than that player$/.test(text)) return { kind: "defenderMostLife" };
   if ((m = /^(?:~|it)(?:'s| is) (not )?paired with (another creature|a creature with soulbond)$/.exec(text)) && st.affects.kind === "self")
     return { kind: "paired", ...(m[2] === "a creature with soulbond" ? { withKeyword: "Soulbond" } : {}), ...(m[1] ? { not: true as const } : {}) };
+  // "If it's night" (Olivia's Midnight Ambush, Moonrager's Slash): the game's day/night designation (CR 731.1); neither
+  // before it's first day.
+  if ((m = /^it's (day|night)$/.exec(text))) return { kind: "dayNight", v: m[1] as "day" | "night" };
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
   if ((m = /^you (have|don't have) an enduring story$/.exec(text))) return { kind: "enduringStory", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.195b
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
@@ -1246,6 +1251,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^~ isn't (equipped|enchanted)$/.exec(text))) return { kind: "self", is: m[1] as "equipped" | "enchanted", not: true };
   // Intrepid Ace: "~ gets +2/+0 as long as it isn't attacking or blocking" (CR 506.4).
   if (/^it isn't attacking or blocking$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackingOrBlocking", not: true };
+  if ((m = /^it's (white|blue|black|red|green)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", colors: [COLOR_WORDS[m[1]!]!], text: m[1]! } };
   // Spectral Cloak: "Enchanted creature has shroud as long as it's untapped": the enchanted creature.
   if ((m = /^it's (tapped|untapped)$/.exec(text)) && st.affects.kind === "attached") return { kind: "attachedIs", filter: { kind: "object", tapped: m[1] === "tapped", text: `${m[1]} permanent` } };
   // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).

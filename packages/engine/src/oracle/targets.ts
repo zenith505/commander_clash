@@ -19,6 +19,7 @@ export const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,
 const OTHER_SUBTYPES = ["Arcane", "Omen", "Adventure", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Bobblehead", "Gate", "Desert", "Cave", "Town", "Urza's", "Locus", "Spacecraft", "Planet", "Plan"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
+const CREATURE_OR_LEGENDARY: TargetSpec[] = [{ kind: "object", types: ["Creature"], text: "creature" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }];
 export const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
 
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
@@ -1216,6 +1217,11 @@ export function parseTargetPhrase(
     extra.anyOf = HISTORIC;
     p = p.replace(/(^|\s)historic\s/, "$1");
   }
+  // Icy Reception: "target creature or legendary spell": a spell that's either, by its printed card (TargetSpec.anyOf).
+  if (/^creature or legendary spells?$/.test(p) && !extra.anyOf) {
+    extra.anyOf = CREATURE_OR_LEGENDARY;
+    p = p.replace(/^creature or legendary /, "");
+  }
   // "Permanents they control that are one or more colors" (All Is Dust): colored ones (CR 105.2c).
   const colored = / that(?:'s| is| are) one or more colors\b/.exec(p);
   if (colored && !extra.colorCount) {
@@ -1860,7 +1866,7 @@ export function parseTargetPhrase(
   // doesn't change. Only "legendary" among supertypes.
   // "Creature spell with power or toughness 2 or less" (Stern Scolding): as it is on the stack (see spellMatches).
   const spellPt = (extra.power || extra.toughness || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf.every((a) => a.power || a.toughness))) && types.length === 1 && types[0] === "Creature";
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC && !spellPt) || ((extra.power || extra.toughness) && !spellPt) || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.faceDown || (extra.anyOf && extra.anyOf !== HISTORIC && extra.anyOf !== CREATURE_OR_LEGENDARY && !spellPt) || ((extra.power || extra.toughness) && !spellPt) || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

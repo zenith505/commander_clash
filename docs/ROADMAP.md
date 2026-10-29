@@ -1,7 +1,7 @@
 # Roadmap
 
-27,472 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,081 of
+27,554 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,083 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -2607,6 +2607,24 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   first), Kav Landseeker (Lander token sacrificed on your next turn), Deus of Calamity ("6 or more damage to an
   opponent"), Chisei (remove a counter from a permanent as an upkeep cost), Throne of Makindi (mana only for kicked
   spells), Mind Bomb (each player discards up to three), Stormwild Capridor (counters per damage prevented).
+- Round B37 (harder skipped cards, least played first): the five Shrines ("At the beginning of your upkeep and whenever you
+  cast a black spell", two triggers), "You draw a card for each Mountain and red card in it" after a revealed hand
+  (Baleful Stare, Withering Gaze; each card once), "If that permanent is red or green, put it on top of its owner's
+  library instead" (Consign to Dream) and "If that creature is attacking, you may ..." (Sweep Away), "That player
+  discards a card" after a counter-unless (Frightful Delusion, paid or not), "Citizens you control get an additional
+  +1/+1 and gain vigilance" (Take to the Streets), "If it's a creature, it can't block this turn" after damage to any
+  target (Searing Barb), "if it's night" (CR 731.1: Olivia's Midnight Ambush, Moonrager's Slash, Wolf Strike; neither
+  before day/night starts), "unless its controller pays life equal to its toughness" (Essence Vortex, CR 119.4),
+  "target creature or legendary spell" (Icy Reception), "gets +1/+0, becomes black, and gains shadow" (Traitor's
+  Clutch), "one or two target creatures would deal" (Soul Parry), 1, 2 and 3 damage to three targets (Cone of Flame),
+  "Remove two loyalty counters from each planeswalker" (Pestilent Haze), "deals 2 damage to any target and doesn't
+  untap" (Reveka), "a +1/+1 counter on ~ and ~ gains flying" (Machine Man), "can't block if it's black" (Hobble), Guan
+  Yu's shuffle, "creatures named ~ on the battlefield" (Plague Rats), "discards all cards of that color" (Persecute;
+  bots now name the opponents' colors for a discard), "chooses a card in their hand and discards the rest"
+  (Monomania). +28 (27,554 of 31,936 with B35, B36 and rounds 202 to 205).
+- Out after round B37: Inquisitor's Snare (its prevention must keep working after the creature leaves the battlefield,
+  rulings), Arashin Sovereign ("your choice of the top or bottom", the dying creature's controller choosing, not its
+  owner).
 - Next for Lane B, least played first: Goblins of the Flarg (a state trigger), Tiger-Tribe Hunter (pack tactics).
   Then up from about 21,900 (rounds B8 and B35 took the easier ones; these are left): Wall of Shadows, Fickle Efreet,
   Bill Ferny, Enkira, Bullseye, Rayami, Library of Lat-Nam, Resolute Strike, Boom Scholar, Splitting the Powerstone,

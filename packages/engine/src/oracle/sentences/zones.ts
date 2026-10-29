@@ -34,6 +34,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Breakthrough: "choose X cards in your hand and discard the rest": all but X of them, chosen as it resolves (none if
   // X is at least the hand's size; all with X 0).
   if (/^[Cc]hoose X cards in your hand and discard the rest$/.test(s0) && ctx.spell) return [{ type: "discard", who: { ref: "you" }, n: 0, keep: { count: { kind: "x" } } }];
+  // Monomania: "Target player chooses a card in their hand and discards the rest": that player keeps one of their choice.
+  if (/^Target player chooses a card in their hand and discards the rest$/.test(s0)) {
+    const who = parsePlayer("target player", ctx);
+    return who ? [{ type: "discard", who, n: 0, keep: 1 }] : null;
+  }
   let m: RegExpExecArray | null;
   // "Return from your graveyard to the battlefield any number of target creature cards ..." (Agadeem's Awakening): the
   // same as "Return any number of target creature cards ... from your graveyard to the battlefield".

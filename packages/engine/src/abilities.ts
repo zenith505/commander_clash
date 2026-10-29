@@ -232,7 +232,7 @@ export type Count =
   | { kind: "damageThisWay" }
   | { kind: "excessThisWay"; /** Only that target's (The Last Agni Kai's "add that much {R}"). */ target?: number }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
-  | { kind: "lifeLostThisWay" }
+  | { kind: "lifeLostThisWay"; /** "If no life is lost this way" (Blitzwing, Cruel Tormentor): what its loseLife instructions took off life totals, any player's. */ byLoss?: true }
   /**
    * "Where X is the difference between those players' life totals" after "two target players exchange life totals"
    * (Profane Transfusion): their totals now, after the exchange (rulings), even if one is no longer a legal target (CR 608.2b).
@@ -3809,6 +3809,8 @@ export type SpellCondition =
   | { kind: "wonClash" }
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
   | { kind: "wonFlip"; lost?: true }
+  /** "Choose flying or indestructible at random" (Blitzwing, Adaptive Assailant): the first of two, with even chances, decided as the instruction is reached. */
+  | { kind: "atRandom" }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
   | { kind: "destroyedThisWay"; died?: true; /** "If a creature you controlled was destroyed this way" (Demonic Junker). */ you?: true; /** "If an enchantment was destroyed this way" (Shredder's Technique): one of that card type, as it last existed. */ cardType?: string }

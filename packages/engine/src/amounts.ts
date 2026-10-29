@@ -303,7 +303,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "totalPowerOf":
       return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
-      return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
+      return c.byLoss ? (s.resolving?.lifeLost ?? 0) : (s.resolving?.exchanged?.lost[ctx.controller] ?? 0);
     case "exchangedLifeDifference": {
       const ps = s.resolving?.exchanged?.players ?? [];
       return ps.length === 2 ? Math.abs(s.players[ps[0]!]!.life - s.players[ps[1]!]!.life) : 0;
@@ -1007,7 +1007,7 @@ function describeCount(c: Count): string {
     case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":
-      return "the life you lost";
+      return c.byLoss ? "the life lost this way" : "the life you lost";
     case "exchangedLifeDifference":
       return "the difference between their life totals";
     case "votes":

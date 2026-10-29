@@ -512,3 +512,50 @@ describe("spells cost {X} less, where X is equipped creature's power; put all ..
     expect(s.objects[g]!.zone).toBe("exile");
   });
 });
+
+const blitzwingCruelTormentor = scry("transform", [{"name":"Blitzwing, Cruel Tormentor","type_line":"Legendary Artifact Creature — Robot","mana_cost":"{5}{B}","oracle_text":"More Than Meets the Eye {3}{B} (You may cast this card converted for {3}{B}.)\nAt the beginning of your end step, target opponent loses life equal to the life that player lost this turn. If no life is lost this way, convert Blitzwing.","power":"6","toughness":"5"},{"name":"Blitzwing, Adaptive Assailant","type_line":"Legendary Artifact — Vehicle","oracle_text":"Living metal (During your turn, this Vehicle is also a creature.)\nAt the beginning of combat on your turn, choose flying or indestructible at random. Blitzwing gains that ability until end of turn.\nWhenever Blitzwing deals combat damage to a player, convert it.","power":"3","toughness":"5"}], { keywords: ["Living metal","Convert","More Than Meets the Eye"], color_identity: ["B"] });
+
+describe("if no life is lost this way, convert ~; choose flying or indestructible at random", () => {
+  it("compile", () => supported(blitzwingCruelTormentor));
+
+  const endStep = (lost: number) => {
+    const { s: s0, ap, opp } = setup([]);
+    const b = putOnBattlefield(s0, ap, blitzwingCruelTormentor);
+    let s = passUntil(s0, "main1", ap);
+    s.players[opp]!.life -= lost;
+    s.turnLog = { ...(s.turnLog ?? {}), lifeLost: { [opp]: lost } };
+    s = passUntil(s, "end", ap);
+    s = settle(s, { targets: [{ kind: "player", id: opp }] });
+    return { s, b, opp };
+  };
+
+  it("Blitzwing, Cruel Tormentor: the opponent loses as much again; it stays", () => {
+    const { s, b, opp } = endStep(3);
+    expect(s.players[opp]!.life).toBe(34);
+    expect(s.objects[b]!.face ?? 0).toBe(0);
+  });
+
+  it("Blitzwing, Cruel Tormentor: no life lost this way, so it converts", () => {
+    const { s, b, opp } = endStep(0);
+    expect(s.players[opp]!.life).toBe(40);
+    expect(s.objects[b]!.face).toBe(1);
+  });
+
+  it("Blitzwing, Adaptive Assailant: flying or indestructible until end of turn, one of them, at random", () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 12; seed++) {
+      const { s: s0, ap } = setup([]);
+      s0.rngState = seed * 7919;
+      const b = putOnBattlefield(s0, ap, blitzwingCruelTormentor);
+      s0.objects[b]!.face = 1;
+      invalidateCharacteristics(s0);
+      let s = passUntil(s0, "main1", ap);
+      s = settle(passUntil(s, "beginCombat", ap));
+      const fly = objHasKeyword(s, s.objects[b]!, "Flying");
+      const ind = objHasKeyword(s, s.objects[b]!, "Indestructible");
+      expect(fly !== ind).toBe(true);
+      seen.add(fly ? "Flying" : "Indestructible");
+    }
+    expect([...seen].sort()).toEqual(["Flying", "Indestructible"]);
+  });
+});

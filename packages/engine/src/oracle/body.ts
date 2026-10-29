@@ -9941,6 +9941,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       prev.play = "thisTurn";
       continue;
     }
+    // Blitzwing, Adaptive Assailant: "choose flying or indestructible at random. ~ gains that ability until end of turn": one
+    // of the two, chosen as it resolves (CR 608.2c).
+    const kwAtRandom = /^[Cc]hoose ([a-z]+) or ([a-z]+) at random$/.exec(s);
+    if (kwAtRandom && sentences[si + 1] === "~ gains that ability until end of turn") {
+      const [a, b] = [kwAtRandom[1]!, kwAtRandom[2]!].map((k) => parseOne(`~ gains ${k} until end of turn`, ctx));
+      if (!a || !b) return null;
+      effects.push({ type: "if", cond: { kind: "atRandom" }, effects: a, otherwise: b });
+      si++;
+      continue;
+    }
+    // Blitzwing, Cruel Tormentor: "Target opponent loses life equal to the life that player lost this turn. If no life is lost
+    // this way, convert ~": none if the amount was 0 or their life total couldn't change (CR 119.3).
+    const noLoss = /^If no life is lost this way, (.+)$/.exec(s);
+    if (noLoss) {
+      const inner = effects[effects.length - 1]?.type === "loseLife" && parseOne(capital(noLoss[1]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "lifeLostThisWay", byLoss: true } }, max: 0 }, effects: inner });
+      continue;
+    }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
     if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
       const last = effects[effects.length - 1];

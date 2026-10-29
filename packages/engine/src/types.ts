@@ -2122,6 +2122,8 @@ export interface Resolving {
   movedLinkedIds?: ObjectId[];
   /** The two players its exchangeLife instruction named (even one no longer a legal target), and the life each lost doing it. */
   exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
+  /** The life its loseLife instructions took off life totals so far: "if no life is lost this way" (Blitzwing, Cruel Tormentor). */
+  lifeLost?: number;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   /**

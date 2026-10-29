@@ -1705,6 +1705,10 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, reflexive: body };
       continue;
     }
+    if (line === "If ~ would die, put it on top of its owner's library instead.") {
+      out.libraryTopInsteadOfDying = true;
+      continue;
+    }
     // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)
     const exileDies = /^If (~|a|an|another) (.+? )?would die, exile it instead\.$/.exec(line);
     if (exileDies) {

@@ -326,6 +326,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "damage") return null;
     return [...fx, { type: "damage", amount: { count: { kind: "x" }, half: "up" }, to: { ref: "you" } }];
   }
+  // Banshee: "~ deals half X damage, rounded down, to any target, and half X damage, rounded up, to you" (X paid as it was
+  // activated): the two halves (CR 107.1a).
+  if (/^~ deals half X damage, rounded down, to any target, and half X damage, rounded up, to you$/.test(s)) {
+    const fx = parseSentence("~ deals X damage to any target", ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "damage") return null;
+    return [{ ...fx[0]!, amount: { count: { kind: "x" }, half: "down" } }, { type: "damage", amount: { count: { kind: "x" }, half: "up" }, to: { ref: "you" } }];
+  }
   // Soul Charmer: "you gain 2 life unless that creature's controller pays {2}" (the creature it dealt combat damage to).
   if ((m = /^[Yy]ou gain (\d+) life unless that creature's controller (pays (?:\{[^}]+\})+)$/.exec(s)) && ctx.subjectIt) {
     const options = parsePunisherOptions(m[2]!, ctx);
@@ -777,6 +784,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]acrifice (~|it) unless you discard a card( at random)?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const discard: Effect = { type: "discard", who: { ref: "you" }, n: 1, ...(m[2] ? { random: true } : {}) };
     return [{ type: "may", effects: [discard], otherwise: [sacrificeSelf], keep: true, text: `Discard a card${m[2] ?? ""} to keep ~` }];
+  }
+  // Deep Spawn: "sacrifice ~ unless you mill two cards": with fewer cards in the library, milling two can't be chosen
+  // (CR 701.13b), so it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you mill (a|two|three) cards?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const n = m[2] === "a" ? 1 : num(m[2]!);
+    const keep: Effect = { type: "may", effects: [{ type: "mill", who: { ref: "you" }, n }], otherwise: [sacrificeSelf], keep: true, text: `Mill ${m[2] === "a" ? "a card" : `${m[2]} cards`} to keep ~` };
+    return [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "cardsInLibrary", who: { ref: "you" } } }, min: n }, effects: [keep], otherwise: [sacrificeSelf] }];
   }
   // "Sacrifice ~ unless you discard a land card" (Fallow Wurm), "exile it unless you discard a creature card" (Body
   // Snatcher): only such a card can be discarded; with none, it's sacrificed (exiled).

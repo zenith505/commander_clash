@@ -122,6 +122,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (of?.ref !== "target") return null;
     return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: { count: { kind: "power", of } } }], duration: "game" }];
   }
+  // Wall of Tombstones: "~'s base toughness becomes equal to 1 plus the number of creature cards in your graveyard" (lasting
+  // indefinitely): counted as it resolves and locked in (CR 608.2h), set in layer 7b (CR 613.4b).
+  if ((m = /^~'s base (power|toughness) becomes equal to (\d+) plus (the number of .+)$/.exec(s))) {
+    const n = parseCount(m[3]!, ctx);
+    if (!n || typeof n !== "object" || n.plus || n.times || n.half || n.negate) return null;
+    const amount = { ...n, plus: Number(m[2]) };
+    return [{ type: "continuous", what: { ref: "self" }, mods: [m[1] === "power" ? { kind: "setPower", power: amount } : { kind: "setToughness", toughness: amount }], duration: "game" }];
+  }
   if ((m = /^~'s base power becomes equal to (the number of .+) until end of turn$/.exec(s))) {
     const n = parseCount(m[1]!, ctx);
     if (!n) return null;
@@ -1236,9 +1244,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Riding the Dilu Horse: "Target creature gets +2/+2 and gains horsemanship.": no duration, so for as long as it stays
   // on the battlefield (CR 611.2a, rulings).
-  if ((m = /^([Tt]arget creature) (gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)?)$/.exec(s))) {
+  // Goblin Ski Patrol: "~ gets +2/+0 and gains flying" the same.
+  if ((m = /^([Tt]arget creature|~) (gets [+-]\d+\/[+-]\d+(?: and gains [a-z]+)?)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
+    const mods = what?.ref === "target" || (what?.ref === "self" && m[1] === "~") ? parseChanges(m[2]!) : null;
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || x.kind === "modifyPT")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // Chance for Glory: "Creatures you control gain indestructible": the creatures there as it resolves (CR 611.2c), for as

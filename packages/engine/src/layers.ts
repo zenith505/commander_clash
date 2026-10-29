@@ -1180,7 +1180,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // "An opponent controls seven or more lands": any one opponent.
       // "Activate only during combat and only if defending player controls ..." (Kjeldoran Guard): the player the source is
       // attacking, or else any one of the defending players, the active player's opponents (CR 508.5a, 802.2).
-      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "anyDefending" ? (src.attacking !== undefined ? [src.attacking] : s.turnOrder.filter((p) => p !== s.activePlayer && !s.players[p]!.lost)) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
+      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "anyDefending" ? (src.attacking !== undefined ? [src.attacking] : s.turnOrder.filter((p) => p !== s.activePlayer && !s.players[p]!.lost)) : cond.who === "eventPlayer" ? (eventPlayer !== undefined ? [eventPlayer] : []) : cond.who === "attached" ? (src.attachedTo && chars.get(src.attachedTo) ? [chars.get(src.attachedTo)!.controller] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose[cond.every ? "every" : "some"]((who) => {
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.
@@ -1189,7 +1189,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         const byType = new Map<string, number>();
         let everyType = 0;
         for (const [id, c] of chars) {
-          if (cond.other && id === sourceId) continue;
+          if (cond.other && id === (cond.who === "attached" ? src.attachedTo : sourceId)) continue;
           if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
           if (!objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;

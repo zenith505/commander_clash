@@ -485,6 +485,8 @@ export interface GameObject {
   convoked?: { id: ObjectId; zc: number }[];
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
   manaSpent?: number;
+  /** As a spell, and as the permanent it became: which spell cast this turn it was (StackItem.castNth). */
+  castNth?: number;
   /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
   spent?: SpentMana;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */

@@ -809,8 +809,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
-      const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
-      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : c.notSource && ctx.sourceId ? s.objects[ctx.sourceId]?.castNth : undefined;
+      return (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller)) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
     }
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
@@ -1099,7 +1099,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
+      return `#${c.other || c.notSource ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.anyone ? "" : c.eventPlayer ? "they've " : "you've "}cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "graveyardManaValues":

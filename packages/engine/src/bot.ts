@@ -216,6 +216,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const dig = good < Math.min(2, pend.vault.length) && paid < 4 && player(s, pid).life > (pend.pay?.life ?? 1) + 10 && player(s, pid).library.length > pend.vault.length;
       return [{ type: "chooseMay", player: pid, yes: dig }];
     }
+    // Aboroth's cumulative upkeep in -1/-1 counters: keep it while it survives them with some toughness to spare.
+    const upkeepFx = s.resolving?.body.effects[s.resolving.next];
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.selfCounter) {
+      const self = s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+      const n = s.resolving?.scratch?.n ?? 0;
+      const left = self?.zone === "battlefield" ? toughness(s, self) - (upkeepFx.selfCounter === "-1/-1" ? n : 0) : 0;
+      return [{ type: "chooseMay", player: pid, yes: left >= 2 }];
+    }
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
       const { mana, life = 0, energy = 0 } = pend.pay;

@@ -2451,14 +2451,34 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   library, then a check against the names of spells each opponent cast this turn), Cycle of Life (a target "creature
   you cast this turn", "has base power and toughness 0/1 until your next upkeep", and a delayed counter at that
   upkeep), Soldevi Sage ("draw three cards, then discard one of them": only the cards just drawn).
-- Next for Lane B, least played first: Illusionary Presence (a land type chosen each upkeep), Dralnu's Pet,
-  Mindreaver, Thelon's Curse, North Star, Silhouette, Suffocation, Radiant Kavu (prevent the damage creatures of two
-  colors would deal), Aboroth (cumulative upkeep that is -1/-1 counters), Elephant Resurgence (each player's own token
-  counting its controller's graveyard), Volcanic Eruption ("the number of Mountains put into a graveyard this way").
+- Round B34 (harder skipped cards, least played first): "each other spell cast this turn", every player's, the one
+  cast while it was on the stack too (Storm Entity: only its own cast isn't counted), "as long as its controller
+  controls no other creatures" on an Aura (Predator's Gambit), "that player sacrifices enchanted creature" at its
+  controller's end step (Lingering Death), "that creature deals damage equal to its power to you" (Form of the
+  Dinosaur), cumulative upkeep that is -1/-1 counters (Aboroth; bots keep it while it would survive with 2 toughness),
+  "creature you control that's attacking alone" (Crowd of True Believers, Viper), "those creatures" in an "attacks
+  you" trigger (Sabotage Strategist), "Prevent all combat damage blue creatures and black creatures would deal"
+  (Radiant Kavu), "an enchantment or an enchanted permanent" (Godhunter Octopus), "Green ... spells and white ...
+  spells cost" (Irini Sengir, High Seas), "If ~ would die, put it on top of its owner's library instead" (Gravebane
+  Zombie), "sacrifice ~ unless you mill two cards" (Deep Spawn, CR 701.13b: not with fewer in the library), "Activate
+  only once and only if you control a snow Mountain" (Goblin Ski Patrol), "If you sacrifice an Island this way"
+  (Serendib Djinn), X damage to itself "where X is" (Sunflare Shaman), "the next 1 combat damage that would be dealt to
+  you this turn" (Decorated Griffin; two attackers at once ask which one, CR 615.7), half X rounded down and up
+  (Banshee), a base toughness locked in each upkeep (Wall of Tombstones, CR 608.2h), "a creature spell that has an
+  Adventure" (Garenbrig Squire, Edgewall Innkeeper, Wandermare). +23 (27,370 of 31,936 with B33 and rounds 199-201).
+- Out after round B34: Wicked Guardian ("you may have it deal 2 damage to another creature you control. If you do"),
+  Desecrator Hag (the card with the greatest power, a tie chosen), Dralnu's Pet (X from the card discarded for
+  kicker), Illusionary Presence (a land type chosen each upkeep), Elephant Resurgence (each player's own token
+  counting its controller's graveyard), Volcanic Eruption ("the number of Mountains put into a graveyard this way"),
+  Horn of Plenty (the casting player's may-pay and their delayed draw), Lavabrink Venturer (protection from odd or
+  even mana values), Reviving Vapors (life equal to the chosen card's mana value), Mind Maggots (counters per card
+  discarded this way), Empty-Shrine Kannushi (protection from colors among your permanents), Dance of the Skywise
+  (becomes a Dragon Illusion that loses all abilities), Chlorophant (threshold granting a second upkeep trigger),
+  Thrasta (trample over planeswalkers; its cost reduction compiles now).
+- Next for Lane B, least played first: Mindreaver, Thelon's Curse, North Star, Silhouette, Suffocation.
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
-  trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
-  cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Storm Entity
-  ("each other spell cast this turn"), Predator's Gambit, Bladecoil Serpent, Lingering Death, Sabotage Strategist, Lavabrink Venturer (odd or even).
+  trigger), Tiger-Tribe Hunter (pack tactics), Oracle of Dust (a card an opponent owns from exile as a cost),
+  Haphazard Bombardment (aim counters), Bladecoil Serpent.
   Then up from about 21,900 (round B8 took the easier ones; these are left): Wall of Shadows, Festering Newt,
   Flameskull, Defiant Greatmaw, Aegis Sculptor, Fickle Efreet, Burn Away ("when that creature dies this turn"), Bill
   Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame

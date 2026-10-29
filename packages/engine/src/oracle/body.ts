@@ -127,6 +127,8 @@ export interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** After "you may remove all +1/+1 counters from ~. If you do" (Sarulf): "the number of counters removed this way". */
+  removedCounters?: boolean;
   /** A "whenever you activate an ability" trigger: "that ability" is the ability activated (Rings of Brighthearth). */
   activatedAbility?: boolean;
   /** A cast trigger's first instruction: "it gains haste" (Tyvar Kell's emblem) is the spell cast. */
@@ -189,7 +191,9 @@ function thenSubject(first: string, next: string): string {
   // Bogardan): lowercase after the trigger.
   // Hired Torturer: "Target opponent loses 2 life, then reveals a card at random from their hand"; Singe-Mind Ogre: "target
   // player reveals a card at random from their hand, then loses life ...".
-  const who = /^(Target player|Target opponent|target player|target opponent|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
+  // Nicol Bolas, Planeswalker: "That player or that planeswalker's controller discards seven cards, then sacrifices seven
+  // permanents of their choice": the same player.
+  const who = /^(Target player|Target opponent|target player|target opponent|That player or that planeswalker's controller|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^[Tt]arget /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
   if (who && /^[Tt]arget /.test(who[1]!) && /^reveals a card at random from their hand$/.test(next)) return `That player ${next}`;
   // Pendant of Prosperity: "~'s owner draws a card, then that player may put a land card from their hand onto the
@@ -3137,6 +3141,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "returnDiedThisWay", each: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" } });
       continue;
     }
+    // Tuktuk Scrapper: "you may destroy target artifact. If that artifact is put into a graveyard this way, ~ deals damage to
+    // that artifact's controller ...": only if it went to a graveyard (rulings: not if it's indestructible, regenerated,
+    // not destroyed, or moved elsewhere instead; a token goes there first).
+    const intoYard = /^If that (artifact|creature|enchantment|permanent) is put into a graveyard this way, (.+)$/.exec(s);
+    const mayKill = effects[effects.length - 1];
+    const killed = mayKill?.type === "may" && !mayKill.pay && !mayKill.otherwise && mayKill.effects.length === 1 ? mayKill.effects[0]! : mayKill;
+    if (intoYard && killed?.type === "destroy" && killed.what.ref === "target" && !killed.what.n && ctx.targets[killed.what.index]?.kind === "object" && effects.filter((x) => x.type === "destroy" || x.type === "may").length === 1) {
+      const inner = parseOne(capital(intoYard[2]!), ctx);
+      if (!inner) return null;
+      const check: Effect = { type: "if", cond: { kind: "destroyedThisWay", died: true }, effects: inner };
+      if (mayKill !== killed) (mayKill as Extract<Effect, { type: "may" }>).effects.push(check);
+      else effects.push(check);
+      continue;
+    }
     // Come Back Wrong: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the
     // battlefield under your control. Sacrifice it at the beginning of your next end step." The card the destroy put
     // there (a token isn't a card), with no chance to act in between (rulings).
@@ -4524,6 +4542,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Yennett, Cryptic Sovereign: "Reveal the top card of your library. You may cast it without paying its mana cost if its
+    // mana value is odd. If you don't cast it, draw a card." Cast as this resolves or not at all; not cast, it stays on top
+    // and is the card you draw (rulings). A land's mana value is 0, even.
+    if (/^[Rr]eveal the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast it without paying its mana cost if its mana value is odd" && sentences[si + 2]?.replace(/\.$/, "") === "If you don't cast it, draw a card") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], manaValue: { parity: "odd" }, text: "card with an odd mana value" }, max: 1, noneCastDraw: 1 });
+      si += 2;
+      continue;
+    }
     // Mind's Dilation, in an opponent's cast trigger: "that player exiles the top card of their library. If it's a nonland
     // card, you may cast it without paying its mana cost." Cast as this resolves (CR 608.2g); a land, or a card not cast,
     // stays exiled (rulings).
@@ -4654,7 +4680,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may cast target instant or sorcery card from your graveyard. If that spell would be put into your graveyard, exile
     // it instead." (Emet-Selch, Toshiro Umezawa, Chandra, Flame's Catalyst): cast as it resolves or not at all, paying its
     // costs, timing ignored (CR 608.2g, 601.2).
-    const castPaid = /^[Yy]ou may cast (target .+? card from your graveyard)$/.exec(s);
+    // Chandra, Acolyte of Flame: "target instant or sorcery card with mana value 3 or less": only as it's targeted (rulings:
+    // an X is 0 then, and the spell can be cast with a greater X).
+    const castPaid = /^[Yy]ou may cast (target .+? card(?: with mana value \d+ or less)? from your graveyard)$/.exec(s);
     const paidRider = sentences[si + 1]?.replace(/\.$/, "");
     if (castPaid && (paidRider === "If that spell would be put into your graveyard, exile it instead" || paidRider === "If that spell would be put into a graveyard, exile it instead")) {
       const before = ctx.targets.length;
@@ -4958,6 +4986,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseSentence(`Each player chooses ${arrogance[1]} from among the nonland permanents they control, then sacrifices the rest`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "keepRest") return null;
       effects.push({ ...fx[0]!, youChoose: true });
+      si++;
+      continue;
+    }
+    // Dredge the Mire: "Each opponent chooses a creature card in their graveyard. Put those cards onto the battlefield under
+    // your control." Each opponent in turn order, knowing the choices before theirs, then all at the same time (rulings).
+    const oppYard = /^Each opponent chooses an? (.+? card) in their graveyard$/.exec(s);
+    if (oppYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(oppYard[1]!);
+      if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachOpponent" }, underYours: true });
       si++;
       continue;
     }
@@ -8813,6 +8851,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ ...e, duration: "game", whileCounter: counter });
       continue;
     }
+    // Shield Broker: "Put a shield counter on target noncommander creature you don't control. You gain control of that
+    // creature for as long as it has a shield counter on it": control (layer 2) of what the counter was just put on, ending
+    // once it has none (CR 611.2b; the shield counter, CR 122.1c).
+    const ctlCtr = new RegExp(`^You gain control of (that creature|that permanent|it) for as long as it has an? ${COUNTER} counter on it$`).exec(s);
+    if (ctlCtr) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(ctlCtr[2]!);
+      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target") return null;
+      effects.push({ type: "continuous", what: prev.what, mods: [{ kind: "control" }], duration: "game", whileCounter: counter });
+      continue;
+    }
     // Ultima, Origin of Oblivion: "Put a blight counter on target land. For as long as that land has a blight counter on it,
     // it loses all land types and abilities and has "{T}: Add {C}."": its land types go (CR 305.7; card types and
     // supertypes stay, rulings), then all its abilities, then it has that one, all in this effect's timestamp.
@@ -9058,6 +9107,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const inner = parseOne(capital(ifDid[2]!), ctx);
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "card" } }, effects: inner });
+        continue;
+      }
+      // Sarulf, Realm Eater: "you may remove all of them. If you do, exile ... the number of counters removed this way": only
+      // if any were removed (rulings: none if it's left the battlefield or has none as this resolves).
+      const mayRemove = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 && prev.effects[0]!.type === "removeCounters" && prev.effects[0]!.what.ref === "self" && prev.effects[0]!.n === "all" ? prev.effects[0]! : undefined;
+      if (ifDid[1] === "do" && mayRemove?.type === "removeCounters" && !ctx.spell) {
+        const inner = parseOne(capital(ifDid[2]!), { ...ctx, removedCounters: true });
+        if (!inner) return null;
+        mayRemove.setsDid = true;
+        (prev as Extract<Effect, { type: "may" }>).effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
         continue;
       }
       // "Remove a hope counter from ~. If you do, draw a card." (Dawn of a New Age): not optional, and done only if that
@@ -9496,7 +9555,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond, subject: { ref: "attached" } }, effects: fx });
       continue;
     }
-    const ifState = /^If ([^,]+), (.+)$/.exec(s);
+    // Altar of the Pantheon: "If you control a God, a Demigod, or a legendary enchantment, ...": a list in the condition.
+    const ifState = /^If (you control an? [^,]+, an? [^,]+, or an? [^,]+), (.+)$/.exec(s) ?? /^If ([^,]+), (.+)$/.exec(s);
     // Sphinx Sovereign: "If ~ is untapped, ...": ~ itself, as it resolves or as it last existed (rulings).
     const selfTapped = !!ifState && /^~ is (?:un)?tapped$/.test(ifState[1]!);
     // Ayara's Oathsworn: "Put a +1/+1 counter on it. Then if it has exactly four +1/+1 counters on it, ...": ~, which the
@@ -10421,6 +10481,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       else if (lapse[2] === "into its owner's hand") last.hand = true;
       else if (lapse[2] === "on your choice of the top or bottom of its owner's library") last.libraryChoice = true;
       else last.top = true;
+      continue;
+    }
+    // Nissa, Worldwaker: "Search your library for any number of basic land cards, put them onto the battlefield, then
+    // shuffle. Those lands become 4/4 Elemental creatures with trample.": the lands found, as they are on the battlefield,
+    // for as long as each stays there (no duration, CR 611.2a; a new object after a zone change, CR 400.7).
+    const thoseLands = /^Those lands become (\d+\/\d+) ((?:[A-Z][a-z]+ )*)creatures( with [a-z]+(?:(?:, | and )[a-z]+)*)?$/.exec(s);
+    const landSearch = effects[effects.length - 1];
+    if (thoseLands && landSearch?.type === "search" && landSearch.dest.zone === "battlefield" && !landSearch.others && !landSearch.who && !landSearch.library && !landSearch.split && !landSearch.condDest && !landSearch.landTo && !landSearch.cardTo && !landSearch.mayInstead && !landSearch.payDiff && !landSearch.withHeld) {
+      const mods = parseChanges(`becomes a ${thoseLands[1]} ${thoseLands[2]}creature${thoseLands[3] ?? ""}`);
+      if (!mods) return null;
+      landSearch.rememberAll = true;
+      effects.push({ type: "continuous", what: { ref: "created" }, mods, duration: "game" });
       continue;
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).

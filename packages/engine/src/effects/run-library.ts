@@ -1159,7 +1159,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       r.searchFound = moves.map((m) => m.id);
       // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
-      if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
+      if ((e.n === 1 || e.rememberAll) && !e.others && e.dest.zone === "battlefield") r.created = [];
       // Sword of Hearth and Home: the card exiled before enters with the found card, under your control (rulings: at the
       // same time). A permanent card still in exile as the object it became (CR 400.7).
       const held = e.withHeld ? (r.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (obj(s, l.id).zoneChanges ?? 0) === l.zc && isPermanentCard(defOf(s, obj(s, l.id)))).map((l) => l.id) : [];

@@ -434,6 +434,8 @@ export interface GameObject {
   declaredInCombat?: { turn: number; combat: number };
   /** The turn it last became blocked (CR 509.1h), as this object (CR 400.7): "if it was blocked this turn" (Fyndhorn Druid). */
   becameBlockedTurn?: number;
+  /** The turn it last dealt combat damage to a player, as this object (CR 400.7): "for the first time each turn" (Raphael, Tag Team Tough). */
+  combatHitTurn?: number;
   attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
   /**
    * The turn it last could have been declared as an attacker, as this object (CR 508.1a): it was one of the active

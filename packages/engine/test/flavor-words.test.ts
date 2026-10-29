@@ -1,6 +1,6 @@
 // Flavor words (CR 207.2d): an italic word before an ability that isn't an ability word (207.2c) or a keyword (702) has
 // no rules meaning. "Blow Up — {T}, Sacrifice this creature: ..." is the activated ability "{T}, Sacrifice this
-// creature: ..."; "Boast — ..." is a keyword (CR 702.142), not stripped: boast isn't supported yet, so neither is the card.
+// creature: ..."; "Boast — ..." is a keyword (CR 702.142), not stripped: it keeps its restrictions.
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, putOnBattlefield, setup, target } from "./helpers";
@@ -15,8 +15,8 @@ describe("flavor words", () => {
   it("parse as the ability after them", () => {
     [bomb, rope].forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
     expect(compileCard(rope).activated.map((a) => a.manaCost)).toEqual(["", "{3}", "{4}"]);
-    // A keyword before an ability isn't a flavor word: boast's restrictions aren't dropped.
-    expect(isFullySupported(braggart)).toBe(false);
+    // A keyword before an ability isn't a flavor word: boast's restrictions aren't dropped (CR 702.142a).
+    expect(compileCard(braggart).activated[0]).toMatchObject({ keyword: "Boast", oncePerTurn: true, activateIf: { kind: "self", is: "attackedThisTurn" } });
   });
 
   it("Blazing Bomb blows up: damage equal to its power, as a sorcery", () => {

@@ -284,6 +284,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (p.options.some((o) => "pay" in o) || p.options.filter((o) => "sacrifice" in o).length > 1) return null;
     return [{ ...p, picks: { count: { kind: "counters", counter: m[1]!, of: { ref: "self" } } } }];
   }
+  // Martyr's Bond: "each opponent sacrifices a permanent of their choice that shares a card type with it": the permanent
+  // the trigger is about, its card types as it last existed (one permanent of any of them, rulings).
+  if (/^[Ee]ach opponent sacrifices a permanent of their choice that shares a card type with it$/.test(s) && (ctx.subject || ctx.subjectIt))
+    return [{ type: "pick", who: { ref: "eachOpponent" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSubject: true, text: "permanent that shares a card type with it" }, n: 1, action: "sacrifice" }];
   // Punishers: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a
   // card", "that player loses 2 life unless they pay {2}" (see the punisher effect).
   if ((m = new RegExp(`^(.+?) (?:loses|lose) ${NUMX} life unless (?:they|that player|he or she) (.+)$`).exec(s))) {
@@ -1187,6 +1191,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent
   // an opponent controls": the same, until its controller's next turn begins (CR 611.2b).
+  // Gideon of the Trials: "Until your next turn, prevent all damage target permanent would deal": the same, by it.
+  if ((m = /^Until your next turn, prevent all damage (target (?:permanent|creature)) would deal$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "preventDamage", by: true }], duration: "yourNextTurn" }] : null;
+  }
   if ((m = /^Until your next turn, (prevent all .+)$/.exec(s))) {
     const p = parsePreventAll(capital(m[1]!));
     const what = p && /^target .+$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;

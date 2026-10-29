@@ -534,6 +534,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryTop", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
   }
+  // Stillness in Motion: "put five cards from your graveyard on top of your library in any order": chosen as it resolves
+  // (all of them with fewer), then put in the order you choose (CR 401.4).
+  if ((m = /^(?:[Tt]hen )?[Pp]ut (two|three|four|five|six|seven) cards from your graveyard on top of your library in any order$/.exec(s))) {
+    const n = num(m[1]!);
+    return [{ type: "chooseFromGraveyard", n, dest: "libraryTop" }, { type: "orderTop", who: { ref: "you" }, n }];
+  }
   // "Return any number of cards with different mana values from your graveyard to your hand" (Seasons Past): chosen as it
   // resolves (rulings), no two with the same mana value; X in a mana cost is 0 and a card with no mana cost has 0 (CR 202.3).
   if ((m = /^[Rr]eturn any number of (.+?) with different mana values from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
@@ -844,12 +850,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "You may put an Aura or Equipment card from your hand or graveyard onto the battlefield attached to ~" (Danitha,
   // Benalia's Hope): only to the source permanent (see Effect putFromHand's `attachToSelf`).
   const toSelf = / attached to ~$/.test(s);
+  // Holy Avenger: "... onto the battlefield attached to it": the trigger's creature (Effect putFromHand's `attachToSubject`).
+  const toSubject = !toSelf && !!ctx.subjectIt && / attached to it$/.test(s);
   // "You may put a creature card from your hand onto the battlefield and attach ~ to it" (Deathrender): the Equipment to
   // the creature it became, if it can equip it (rulings).
   const attachSelf = / and attach ~ to it$/.test(s);
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : toSelf ? s.replace(/ attached to ~$/, "") : attachSelf ? s.replace(/ and attach ~ to it$/, "") : s))) {
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(finality ? s.replace(/ with a finality counter on it$/, "") : toSelf ? s.replace(/ attached to ~$/, "") : toSubject ? s.replace(/ attached to it$/, "") : attachSelf ? s.replace(/ and attach ~ to it$/, "") : s))) {
     const orYard = !!m[4];
     if (toSelf && (ctx.spell || m[2] === "any number of" || m[5] || m[6])) return null;
+    if (toSubject && (ctx.spell || m[2] === "any number of" || m[4] || m[5] || m[6] || m[3] !== "Aura card")) return null;
     if (attachSelf && (ctx.spell || m[2] === "any number of" || m[4] || m[5] || m[6] || m[3] !== "creature card")) return null;
     if (finality && (m[2] === "any number of" || m[6])) return null;
     m.splice(4, 1);
@@ -868,7 +877,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;
     const filter = filter0 && (lesser || equal) ? { ...filter0, text: m[3]! } : filter0;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}), ...(attachSelf ? { attachSelf: true as const } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}), ...(finality ? { counters: { finality: 1 } } : {}), ...(toSelf ? { attachToSelf: true as const } : {}), ...(toSubject ? { attachToSubject: true as const } : {}), ...(attachSelf ? { attachSelf: true as const } : {}) }];
   }
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
@@ -1239,6 +1248,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Heavenly Blademaster: "When ~ enters, you may attach any number of Auras and Equipment you control to it": to the
   // source, chosen as it resolves; each only if it could be attached (rulings, CR 701.3a-b).
+  // Yuffie, Materia Hunter: "Then you may attach an Equipment you control to ~": one, chosen as it resolves (not targeted),
+  // only one that could be attached to it (CR 701.3a-b).
+  if (/^(?:you may )?attach an Equipment you control to ~$/i.test(s) && !ctx.spell && (ctx.selfIt || ctx.selfCard) && !ctx.subjectIt) return [{ type: "attachAny", host: -1, self: true, equipment: true, one: true }];
   if (/^(?:you may )?attach any number of Auras and Equipment you control to (?:it|~)$/i.test(s) && !ctx.spell && (ctx.selfIt || ctx.selfCard) && !ctx.subjectIt && ctx.lastObjectTarget === undefined) return [{ type: "attachAny", host: -1, self: true }];
   // Stolen Uniform: "Attach it to the chosen creature": the target Equipment to the target creature (CR 701.3a); if
   // either is an illegal target, it doesn't move (rulings).

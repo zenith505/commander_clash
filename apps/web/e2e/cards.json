@@ -11097,6 +11097,47 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5aafc6c3-14f2-45b1-bd5b-c27760d791dd",
+  "name": "Marina Vendrell",
+  "manaCost": "{W}{U}{B}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "When Marina Vendrell enters, reveal the top seven cards of your library. Put all enchantment cards from among them into your hand and the rest on the bottom of your library in a random order.\n{T}: Lock or unlock a door of target Room you control. Activate only as a sorcery.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7f00bc45-7c65-4455-9db0-58bd79bcdb4b",
   "name": "Martyr of Ashes",
   "manaCost": "{R}",
@@ -21106,6 +21147,41 @@
   "commanderLegal": "legal",
   "set": "iko",
   "releasedAt": "2020-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "acdcbb49-9d71-4c36-8ccb-650fb11c3a58",
+  "name": "Yuffie, Materia Hunter",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "Ninjutsu {1}{R} ({1}{R}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhen Yuffie enters, gain control of target noncreature artifact for as long as you control Yuffie. Then you may attach an Equipment you control to Yuffie.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Ninjutsu"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

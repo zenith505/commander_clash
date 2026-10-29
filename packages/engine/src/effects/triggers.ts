@@ -234,7 +234,7 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   /** With `planeswalker`, the damage was dealt to that planeswalker, and `player` controls it. */
-  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId; /** Dealt to a battle instead, `player` its protector. */ battle?: ObjectId }
+  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; /** The first time this turn this object dealt combat damage to a player. */ first?: true; planeswalker?: ObjectId; /** Dealt to a battle instead, `player` its protector. */ battle?: ObjectId }
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number; /** Combat damage (a batch is all combat damage or none, CR 510.2). */ combat?: true }
   /** The damage one source dealt a permanent in one event (Phyrexian Obliterator), and that source's controller. */
@@ -1681,7 +1681,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     causedBy = { event: "combatDamage", objs: [{ o, controller: controllerOf(s, o) }] };
     // Cartographer's Hawk: "to a player who controls more lands than you", as the damage is dealt.
     const lands = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
-    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o))), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.firstHit && !ev.first) && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)) && !(t.toMoreLands && lands(ev.player) <= lands(controllerOf(s, o))), undefined, undefined, undefined, undefined, undefined, undefined, info);
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
@@ -1794,6 +1794,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
         if (t.cast.spentLessThanMv && !(item && !ev.copy && (ev.manaSpent ?? 0) < spellManaValue(s, item))) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
+        if (t.cast.sharesNoTypeWithYours) {
+          if (!spell) return false;
+          const kinds = creatureTypesOf(s, spell);
+          const mine = [...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature")), ...player(s, you).graveyard.filter((id) => defOf(s, obj(s, id)).types.includes("Creature"))];
+          if (mine.some((id) => shareCreatureType(kinds, creatureTypesOf(s, obj(s, id))))) return false;
+        }
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.

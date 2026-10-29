@@ -225,7 +225,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Shriekwood Devourer: "the greatest power among those creatures": the attackers of the trigger's event, those still on
   // the battlefield as it resolves (rulings).
-  if (!each && /^the greatest power among those creatures$/i.test(p) && ctx?.lastGroup && "ref" in ctx.lastGroup && ctx.lastGroup.ref === "eventGroup")
+  // Aloy, Savior of Meridian: "... attack, discover X, where X is the greatest power among them": the same.
+  if (!each && /^the greatest power among (?:those creatures|them)$/i.test(p) && ctx?.lastGroup && "ref" in ctx.lastGroup && ctx.lastGroup.ref === "eventGroup")
     return { count: { kind: "greatestPower", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "those creatures" }, inEventGroup: true } };
   // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
   // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
@@ -249,7 +250,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // this way" (Vish Kal), "the number of charge counters removed this way" (Geometric Nexus), "for each five counters
   // removed this way" (Sage of Hours: each whole group of five).
   if (ctx?.activated && each && (m = /^(?:(five) counters|(?:(?:[+-]1\/[+-]1|[a-z]+) )?counter) removed this way$/i.exec(p))) return { count: { kind: "countersRemovedThisWay" }, ...(m[1] ? { per: 5 } : {}) };
-  if (ctx?.activated && !each && /^the number of (?:(?:[+-]1\/[+-]1|[a-z]+) )?counters removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
+  if ((ctx?.activated || ctx?.removedCounters) && !each && /^the number of (?:(?:[+-]1\/[+-]1|[a-z]+) )?counters removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
   // Profane Transfusion: "where X is the difference between those players' life totals", after they exchanged them.
   if (!each && ctx?.exchanged && /^the difference between those players' life totals$/i.test(p)) return { count: { kind: "exchangedLifeDifference" } };
   // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the
@@ -513,6 +514,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "commandersMv", onBattlefieldOrCommand: true, ...(m[1] === "they" ? { who: { ref: "eachOne" } as const } : {}) });
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
   if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
+  if (each && /^\{E\}(?: \(energy counter\))? you've paid or lost this turn$/i.test(p)) return count({ kind: "energyLostThisTurn" });
   if (each ? /^1 life you(?:'ve| have)? gained this turn$/i.test(p) : /^the (?:total )?amount of life you(?:'ve| have)? gained this turn$/i.test(p)) return count({ kind: "lifeGainedThisTurn" });
   // Willowdusk, Essence Seer: "the amount of life you gained this turn or the amount of life you lost this turn, whichever
   // is greater".
@@ -582,6 +584,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
+  // Revivify: "the number of creature cards in your graveyard that were put there from the battlefield this turn".
+  if ((m = /^(?:the number of )?([a-z]+ )?cards? in your graveyard that (?:was|were) put there from the battlefield this turn$/i.exec(p))) {
+    const spec = m[1] ? parseTargetPhrase(`${m[1].trim()} card from a graveyard`, { chosen: true }) : { kind: "card" as const, types: [], notTypes: [], notColors: [], text: "card" };
+    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${m[1] ?? ""}card that was put there from the battlefield this turn` } }) : null;
+  }
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
   if ((m = /^(.*?)cards? in (your|all|that player's|target player's|target opponent's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);
@@ -931,6 +938,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   }
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
   if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;
+  // "Whenever you cast a spell, you lose life equal to its mana value" (Teval, Arbiter of Virtue): in a cast trigger's
+  // first sentence with no target, "it" is the spell cast.
+  if (x === "its" && ctx.castSpell && ctx.spellIt && !ctx.targets.length && !ctx.selfIt) return { ref: "castSpell" };
   // "The creature's power" after "that creature's controller" (Boros Fury-Shield): the creature targeted.
   if (x === "the creature's") return ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   // "Destroy target artifact. ... where X is that artifact's mana value" (Artifact Mutation): the target, as it last existed.

@@ -1,7 +1,7 @@
 # Roadmap
 
-27,692 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
+27,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,138 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -511,7 +511,7 @@ line blocks.
    opponents may activate, and control changes), Radiant Lotus, Brotherhood Headquarters, Maralen, Abstruse
    Appropriation, Ixhel, Cybership, Impulsivity, Intrepid Paleontologist, Ravenloft Adventurer, Kagha, Obeka, Tale of
    Katara and Toph, Ramses, Shuri, Wall of Stolen Identity, Scion of the Ur-Dragon, Hourglass of the Lost, Kaya the
-   Inexorable, Yuffie, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
+   Inexorable, Summon: Kujata, Soul Immolation, Ruxa, Omenpath Journey, Havengul Lich, Out of Time, Breath of
    Fury, Firkraag, Tam, Ivy, Disorienting Choice, Endless Sands, Tyvar the Bellicose, Sidisi, Pir's Whim, Eruth,
    Drowner of Truth, Command the Dreadhorde.
    Round 191 went on from the top: base power and toughness "and are Juggernauts in addition to their other creature
@@ -900,6 +900,64 @@ line blocks.
    the Aura's own source); Gluttonous Hellkite (counters for each creature sacrificed by its cast trigger); Insatiable
    Frugivore ("repeat this process" after an optional exile); Broodguard Elite (warp {X}); Mog, Moogle Warrior (what each
    player discarded decides two effects).
+   Round 210 went on from the top: "spells you cast have delve" (Teval, Arbiter of Virtue); "you can't spend mana to cast
+   this spell", paid only by convoke and delve (Hogaak, Arisen Necropolis); "the next spell you cast this turn has affinity
+   for artifacts" (Saheeli, the Gifted); "deals combat damage to a player for the first time each turn" (Raphael, Tag Team
+   Tough); "the greatest power among them" for the attacking artifact creatures (Aloy, Savior of Meridian); "you may
+   remove all of them. If you do, ... the number of counters removed this way" (Sarulf, Realm Eater); "mills a card for
+   each 1 damage ... If the player mills at least one creature card this way" (Anowon, the Ruin Thief); "if that artifact
+   is put into a graveyard this way" (Tuktuk Scrapper); "each opponent sacrifices a permanent of their choice that shares
+   a card type with it" (Martyr's Bond); "each opponent chooses a creature card in their graveyard. Put those cards onto
+   the battlefield under your control" (Dredge the Mire); "until your next turn, prevent all damage target permanent would
+   deal" and a can't-lose emblem that works only while you control a Gideon (Gideon of the Trials); "reveal the top card
+   ... cast it free if its mana value is odd. If you don't cast it, draw a card" (Yennett, Cryptic Sovereign); "untap up to
+   four target Forests" and "those lands become 4/4 Elemental creatures" after a search (Nissa, Worldwaker); "gain control
+   of that creature for as long as it has a shield counter on it" (Shield Broker); "put an Aura card from your hand onto
+   the battlefield attached to it" (Holy Avenger); "then you may attach an Equipment you control to ~", a one-Equipment
+   picker with a browser test (Yuffie, Materia Hunter); devotion increased by one and "if you control a God, a Demigod, or
+   a legendary enchantment" (Altar of the Pantheon); "that player or that planeswalker's controller discards seven cards,
+   then sacrifices seven permanents" (Nicol Bolas, Planeswalker); "cast target instant or sorcery card with mana value 3 or
+   less from your graveyard" as it resolves, paying for it (Chandra, Acolyte of Flame); "put five cards from your
+   graveyard on top of your library in any order" (Stillness in Motion). +24 (27,766 of 31,936 with round 209 and Lane B rounds B39 to B41); the same text also covers Winter Soldier, Icy Assassin, Fendeep
+   Summoner, In the Eye of Chaos and Afflicted Deserter // Werewolf Ransacker.
+   Out after round 210 (looked at, not done): Eivor, Battle-Ready ("a Saga card and/or a land card from among them" needs
+   a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
+   Hand of Vecna ("equipped creature or a creature you control named Vecna" and a life-per-card equip cost); Grave Sifter
+   (each player's own creature type); Overseer of Vault 76 ("remove three quest counters from among permanents you
+   control"); Dragon's Approach (exiling four named cards as an optional cost); Signal the Clans (a random pick if the
+   three names differ); Fblthp, the Lost (entered or cast from the library; "becomes the target of a spell");
+   Dack Fayden ("gain control of those permanents" a spell targets); Ashiok, Nightmare Muse ("then that player exiles a
+   card from their hand", cast face-up exiled cards).
+   Round 211 went on from the top: "you may pay any amount of {E}" with "destroy each ... with mana value less than or
+   equal to the amount of {E} paid this way" (Wrath of the Skies) and "counter that spell unless its controller pays {1}
+   for each {E} paid this way" (Aether Spike; "Choose target spell" now targets spells only, not abilities); "you may pay
+   one or more {E}. If you do, each creature you control with power equal to the amount ..." (Localized Destruction);
+   "costs {1} less to cast for each {E} you've paid or lost this turn", energy paid or lost now counted per turn (Blaster
+   Hulk); "you may get {E}{E}. If you don't, you may play that card this turn" (Synth Eradicator); "put all enchantment
+   cards from among them into your hand" and "lock or unlock a door of target Room you control", a new lock-or-unlock
+   choice with a browser test (Marina Vendrell, Keys to the House); "defending player reveals cards until they reveal a
+   land card ... +1/+0 for each card revealed this way" (Trepanation Blade); "roll a d20 and add the number of creature
+   cards put into your graveyard from the battlefield this turn" (Revivify); "for as long as ~ remains on the
+   battlefield, gain control of that permanent, it loses all abilities, and it can't attack or block" (Opportunistic
+   Dragon); "a creature spell that doesn't share a creature type with a creature you control or a creature card in your
+   graveyard" (Volo, Guide to Monsters); "if that player had another land enter the battlefield under their control this
+   turn" (Confounding Conundrum); "mill a card and choose an opponent at random" (Ursine Monstrosity); "you may discard
+   one or more land cards. When you do, return up to that many ..." (Loamcrafter Faun); "If you put a card into your
+   hand this way" (Sidequest: Catch a Fish); "exile a card from your graveyard at random. You may play the exiled card
+   this turn" (Advanced Reconstruction); "starting with the next opponent in turn order, each opponent chooses a creature
+   card in your graveyard that hasn't been chosen" (Rejoin the Fight); "if that spell is countered this way, exile it
+   ..., then you may cast it without paying its mana cost" (Transcendent Dragon), "you may play it without paying its
+   mana cost for as long as it remains exiled" (Spelljack, Kheru Spellsnatcher); "cast target instant or sorcery card
+   from a graveyard, and mana of any type can be spent" (Quistis Trepe). +21 (27,813 of 31,936 with round 210 and Lane B rounds B40 to B42).
+   Out after round 211 (looked at, not done): Tegwyll's Scouring (flash by tapping three flyers as an additional cost);
+   The Kenriths' Royal Funeral (a cost cut counted from linked exiled cards); Suppression Ray ("choose up to that many
+   creatures tapped this way"); Baba Lysaga, Night Witch ("sacrifice up to three permanents" as a cost, then card types
+   among them); Dargo, the Shipwrecker (optional sacrifices as a cost that cut it); Curse of Misfortunes (a Curse not
+   sharing a name with one attached to that player); Archmage Ascension (a "would draw" replacement by a search);
+   Eumidian Wastewaker ("discard a card or sacrifice a permanent", then counting lands put into graveyards this way);
+   Plasma Caster ("target creature that's blocking equipped creature"); Curie, Emergent Intelligence (base power and a
+   copy with an extra ability); Spry and Mighty (the difference between two chosen creatures' powers); Eventide's Shadow
+   (remove any number of counters from among permanents).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1074,8 +1132,7 @@ line blocks.
    controller is the only opponent they have left. Smaller gaps from round 135: bots use Doubling Cube only for a plan of eight or more land taps that ends
    in one spell or ability (not with convoke or improvise). Smaller gaps from round 134: Astarion's Thirst has no rulings
    and follows CR 608.2h and 903.9a (a commander exiled this way is still in exile as it resolves). Smaller gaps from round 133: "put your
-   choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was chosen; Yennett's "if
-   its mana value is odd" is out. Smaller gaps from round 132: bots choose Selective Obliteration's color by the worth of their own one-color
+   choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was chosen. Smaller gaps from round 132: bots choose Selective Obliteration's color by the worth of their own one-color
    permanents and take Atraxa's cards one at a time, the first that fits. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
    power (a */* card counts as 0); with several "cast from the top" permissions the one that gives haste is used;
    Hoarder's Overflow ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation
@@ -1500,8 +1557,7 @@ line blocks.
      is out on its cost line.)
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
-     (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and
-     Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
+     (Caparocti Sunborn), "the mana value of the exiled card" (Ellie and Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
    - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat), "as long as ~ remains on the
      battlefield, that creature is also goaded" (Hot Pursuit).
    - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek).
@@ -2802,7 +2858,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   it at an opponent's creature), "Creatures blocking or blocked by ~ have lifelink" (Alms Beast), "cards in your hand
   minus the number of cards in that player's hand" (Bulwark), "for each Cave you control and each Cave card in your
   graveyard" (Gargantuan Leech; Machinist's Dismissal, not Commander-legal, compiles with it too), Anthroplasm, Rock
-  Jockey, "When you play a card" (Juju Bubble), Coral Fighters. +26 (27,768 of 31,936 with round 209 and B40).
+  Jockey, "When you play a card" (Juju Bubble), Coral Fighters. +26 (27,792 of 31,936 with rounds 209 and 210 and B40).
 - Out after round B42: Visions (looking at another player's library needs a viewer), Primordial Ooze ("you may pay
   {X}, where X is ...; If you don't"), Dragon's Fire (reveal a Dragon card or choose a Dragon you control: the damage
   is that Dragon's power), Lichenthrope and Phytohydra (damage replaced by counters, not prevented), Tobias,
@@ -2819,8 +2875,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "if the sacrificed creature was red / a Saproling was sacrificed this way" (Lyzolda, Thallid Omnivore), "Sacrifice a
   creature. ... equal to that creature's power" (Rupture), spell mastery returns and digs (Necromantic Summons, Gather
   the Pack), the Empires trio (Throne, Scepter, Crown), Destroy the Evidence, Oathsworn Knight, Relic Amulet, Seeds of
-  Innocence, Urgoros, Foul Renewal, Hog-Monkey Rampage, Roiling Terrain, Lictor, Moment of Glory. +30 (27,798 of
-  31,936 with round 209 and B40-B42).
+  Innocence, Urgoros, Foul Renewal, Hog-Monkey Rampage, Roiling Terrain, Lictor, Moment of Glory. +30 (27,843 of
+  31,936 with rounds 209 to 211 and B40-B42).
 - Out after round B43: Cinderheart Giant (damage to a creature chosen at random, not targeted), Torment of Venom and
   Xathrid Demon (new punisher forms), Courier of Comestibles and Inscribed Tablet ("if you didn't put a card into your
   hand this way" after a search or a fixed-count reveal, not parsed yet).
@@ -2831,7 +2887,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond
-  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, Spelljack, All
+  March, Skeletal Swarming, Spinal Embrace, Song of Inspiration, Countersculpt, Order of Succession, All
   Suns' Dawn, Psychotic Episode, False Cure, Midnight Oil, The Rack, Xander's Pact, Debt of Loyalty, Fiery Encore,
   Devouring Greed, Savage Swipe, Infernal Tutor, Sadistic Sacrament, Kalitas, Heroic Return, Punishing Fire,
   Drain Power, Purity, Cloudkill, Magus of the Abyss, Cuombajj Witches, Volcano Hellion, Bridge from

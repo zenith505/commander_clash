@@ -434,6 +434,8 @@ export interface GameObject {
   declaredInCombat?: { turn: number; combat: number };
   /** The turn it last became blocked (CR 509.1h), as this object (CR 400.7): "if it was blocked this turn" (Fyndhorn Druid). */
   becameBlockedTurn?: number;
+  /** The turn it last dealt combat damage to a player, as this object (CR 400.7): "for the first time each turn" (Raphael, Tag Team Tough). */
+  combatHitTurn?: number;
   attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
   /**
    * The turn it last could have been declared as an attacker, as this object (CR 508.1a): it was one of the active
@@ -1488,6 +1490,8 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /** Energy counters each player paid or lost in total (Blaster Hulk). */
+  energyLost?: Record<number, number>;
   /** Life each player lost in total, paid life included (CR 119.4): "the total amount of life your opponents have lost this turn". */
   lifeLost?: Record<number, number>;
   /**
@@ -2062,6 +2066,8 @@ export interface Resolving {
   countered?: Record<ObjectId, { zc: number; x: number; /** The mana spent to cast it (Mana Sculpt). */ manaSpent?: number }>;
   /** The source of an activated or triggered ability its counter instructions countered (Tishana's Tidebinder). */
   counteredSource?: { id: ObjectId; zc: number };
+  /** "If that spell is countered this way, exile it instead": the card it became in exile (Transcendent Dragon, Spelljack). */
+  counteredExiled?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
   /** The cards "reveal cards from the top of your library until you reveal a nonland card" revealed, in order (Erratic Explosion). */

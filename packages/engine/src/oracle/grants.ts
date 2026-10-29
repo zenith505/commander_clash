@@ -283,9 +283,13 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
 export function emblemAbilityOk(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, ...rest } = c;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, cantLose, cantWin, gameEndIf, ...rest } = c;
+  // Gideon of the Trials': "As long as you control a Gideon planeswalker, you can't lose the game and your opponents can't
+  // win the game", for its owner (game.ts gameEndBlocked).
+  const gameLock = cantLose === "you" && cantWin === "opponents" && (!gameEndIf || gameEndIf.kind === "control");
+  if ((cantLose || cantWin) && !gameLock) return false;
   if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
-  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor) return false;
+  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor && !gameLock) return false;
   // Serra the Benevolent's: a life floor for its owner (read from emblems in damage.ts), maybe while they control a creature.
   if (lifeFloorIf && lifeFloorIf.kind !== "control") return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its

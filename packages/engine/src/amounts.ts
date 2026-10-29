@@ -7,6 +7,7 @@
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
+import { compileCard } from "./oracle";
 import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue, spellPT } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
@@ -412,7 +413,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const affected = c.affectedController && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       const whose = c.affectedController ? (affected ? [view(affected)?.controller ?? controllerOf(s, affected)] : []) : refPlayers(s, c.who, ctx);
       if (c.greatestPower) return Math.max(0, ...whose.flatMap((pid) => s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).map((id) => characteristics(s, s.objects[id]!).power)));
-      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
+      // Revivify: only those put there from the battlefield this turn.
+      return whose.reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, s.objects[id]!))) && (!filter?.fromBattlefieldThisTurn || s.objects[id]!.fromBattlefieldTurn === s.turn)).length, 0);
     }
     case "life":
       if (c.highest) return Math.max(0, ...refPlayers(s, c.who, ctx).map((pid) => s.players[pid]!.life));
@@ -498,6 +500,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "lifeGainedThisTurn":
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
+    case "energyLostThisTurn":
+      return s.turnLog?.energyLost?.[ctx.controller] ?? 0;
     case "lifeLostThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.turnLog?.lifeLost?.[pid] ?? 0), 0);
     case "opponentsLifeLost":
@@ -737,6 +741,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[id]!;
         if (view(o)?.controller !== ctx.controller) continue;
         n += manaSymbolsOf(defOf(s, o).manaCost, c.colors);
+        // Altar of the Pantheon: one more for each color or combination of colors (CR 700.5), even if it has lost its
+        // abilities (rulings: the effect applies before any that would remove them), so from the card itself.
+        n += compileCard(defOf(s, o)).devotionBonus ?? 0;
       }
       return n;
     }

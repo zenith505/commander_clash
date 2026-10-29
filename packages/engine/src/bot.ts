@@ -3496,7 +3496,8 @@ function choiceHurts(c: CompiledCard): boolean {
     if (o.chosen === "notType" || o.chosen === "notColor") own = true;
     else if (typeof o.chosen === "string") ((harmful && o.controller !== "you") || o.controller === "opponent" ? (hurts = true) : (own = true));
     let h = harmful;
-    if (typeof o.type === "string") h = ["destroy", "exile", "bounce", "tap", "damage", "putInLibrary"].includes(o.type) || (o.type === "counters" && harmfulCounter(o.counter as string)) || (o.type === "continuous" && modsAreHarmful(o.mods as never));
+    // "Discards all cards of the chosen color" (Persecute) is aimed at someone else's hand.
+    if (typeof o.type === "string") h = ["destroy", "exile", "bounce", "tap", "damage", "putInLibrary", "discard"].includes(o.type) || (o.type === "counters" && harmfulCounter(o.counter as string)) || (o.type === "continuous" && modsAreHarmful(o.mods as never));
     if (Array.isArray(o.mods) && "affects" in o) h = modsAreHarmful(o.mods as never);
     for (const [k, x] of Object.entries(o)) if (k !== "chosen") visit(x, h);
   };

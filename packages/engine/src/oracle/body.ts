@@ -1,7 +1,7 @@
 import { parseFromTop } from "./compile";
 import { ANY_COUNTER, allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type StaticCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose, type Modification, type DamageRuleSpec, type CounterKind } from "../abilities";
 import { substituteX } from "../amounts";
-import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana } from "./words";
+import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS, plainMana, BASIC_TYPES } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, SUPPORTED_KEYWORDS, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -845,6 +845,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Homarid Warrior: "~ gains shroud until end of turn and doesn't untap during your next untap step. Tap it.": two
     // instructions about ~, then tapping ~.
     .replace(/^~ gains (\w+) until end of turn and doesn't untap during your next untap step\. Tap it\.$/, "~ gains $1 until end of turn. ~ doesn't untap during your next untap step. Tap ~.")
+    // Reveka, Wizard Savant: "~ deals 2 damage to any target and doesn't untap during your next untap step": two
+    // instructions about ~, in order.
+    .replace(/^~ deals (\d+) damage to any target and doesn't untap during your next untap step\.$/, "~ deals $1 damage to any target. ~ doesn't untap during your next untap step.")
+    // Machine Man, Model X-51: "put a +1/+1 counter on ~ and ~ gains flying until end of turn": the same.
+    .replace(/^put an? \+1\/\+1 counter on ~ and ~ gains ([a-z]+) until end of turn\.$/, "put a +1/+1 counter on ~. ~ gains $1 until end of turn.")
     // Yawgmoth Demon: "tap ~ and it deals 2 damage to you": the same.
     .replace(/\b([Tt]ap ~ and) it (deals \d+ damage to you)\b/g, "$1 ~ $2")
     // Touch of the Eternal: "count the number of permanents you control. Your life total becomes that number.": the number
@@ -1209,6 +1214,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Strength of Night: "If ~ was kicked, Zombie creatures you control get an additional +2/+2 until end of turn": a
   // second pump on top of the first.
   text = text.replace(/(\. If ~ was kicked, [A-Z][a-z]+ creatures you control get) an additional ([+-]\d+\/[+-]\d+ until end of turn\.)$/, "$1 $2");
+  // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the chosen one.
+  text = text.replace(/^(Choose a color\. (?:Target player|Target opponent) reveals their hand and discards all cards of) that color\.$/, "$1 the chosen color.");
+  // Traitor's Clutch: "Target creature gets +1/+0, becomes black, and gains shadow until end of turn.": all three to it,
+  // until end of turn.
+  text = text.replace(/^Target creature gets ([+-]\d+\/[+-]\d+), becomes (white|blue|black|red|green), and gains ([a-z]+) until end of turn\./, "Target creature gets $1 and gains $3 until end of turn. That creature becomes $2 until end of turn.");
+  // Take to the Streets: "Creatures you control get +2/+2 until end of turn. Citizens you control get an additional +1/+1 and
+  // gain vigilance until end of turn.": a second pump on top of the first for those.
+  text = text.replace(/^(Creatures you control get [+-]\d+\/[+-]\d+ until end of turn\. [A-Z][a-z]+s you control get) an additional ([+-]\d+\/[+-]\d+ and gain [a-z]+ until end of turn\.)$/, "$1 $2");
   // Ageless Sentinels: "it becomes a Bird Giant, and it loses defender": one change to it, indefinitely (rulings).
   text = text.replace(/^(it|~) becomes an? ([A-Z][a-z]+(?: [A-Z][a-z]+)?), and it loses defender\.$/, "$1 becomes a $2 and loses defender.");
   // Sabertooth Alley Cat: "Creatures without defender can't block ~ this turn": the same as "~ can't be blocked by creatures
@@ -1227,6 +1240,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Ral's Staticaster: "~ gets +1/+0 for each card in your hand until end of turn": the usual order, counted as it
   // resolves (rulings).
   text = text.replace(/(^|\. )(~ gets [+-]\d+\/[+-]\d+) for each ([^.]+?) until end of turn\./, "$1$2 until end of turn for each $3.");
+  // Frightful Delusion: "Counter target spell unless its controller pays {1}. That player discards a card.": that spell's
+  // controller, whether they paid or not (rulings).
+  text = text.replace(/^(Counter target spell unless its controller pays \{\d+\})\. That player discards a card\.$/, "$1. That spell's controller discards a card.");
   // Saprazzan Outrigger: "When ~ attacks or blocks, put it on top of its owner's library at end of combat": ~ itself.
   text = text.replace(/^put it on top of its owner's library at end of combat\.$/, "put ~ on top of its owner's library at end of combat.");
   // Burning Palm Efreet: "~ deals 2 damage to target creature with flying and that creature loses flying until end of
@@ -1651,6 +1667,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     return {
       targets: [creature(0), creature(1), creature(2)],
       effects: [1, 2, 3].map((n, i) => ({ type: "counters" as const, what: { ref: "target" as const, index: i }, counter, n })),
+      text,
+    };
+  }
+  // Cone of Flame: "~ deals 1 damage to any target, 2 damage to another target, and 3 damage to a third target.": three
+  // different targets (CR 115.3), each dealt its own amount, as "~ deals 1 damage to any target and 2 damage to another
+  // target" is.
+  const cone = /^~ deals (\d+) damage to any target, (\d+) damage to another target, and (\d+) damage to a third target\.$/.exec(text.trim());
+  if (cone) {
+    const any = (i: number): TargetSpec => ({ kind: "any", text: i ? "any other target" : "any target", ...(i ? { distinctFrom: [...Array(i).keys()] } : {}) });
+    return {
+      targets: [any(0), any(1), any(2)],
+      effects: [cone[1]!, cone[2]!, cone[3]!].map((n, i) => ({ type: "damage" as const, amount: Number(n), to: { ref: "anyTarget" as const, index: i } })),
       text,
     };
   }
@@ -3986,6 +4014,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "damage", amount: { count: { kind: "cardsInHand", who: prev.who, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "name", text: "card with the chosen name" } }, times: Number(perRevealed[1]) }, to: prev.who });
       continue;
     }
+    // Baleful Stare, Withering Gaze: "Target opponent reveals their hand. You draw a card for each Mountain and red card in
+    // it.": the cards in the hand just revealed that are either (each card once), counted as it resolves.
+    const perKindIn = /^You draw a card for each ([A-Z][a-z]+) and (white|blue|black|red|green) card in it$/.exec(s);
+    if (perKindIn && BASIC_TYPES.includes(perKindIn[1]!)) {
+      const prev = effects.at(-1);
+      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      const base = { kind: "card" as const, types: [], notTypes: [], notColors: [] };
+      const filter: TargetSpec = { ...base, anyOf: [{ ...base, subtypes: [perKindIn[1]!], text: perKindIn[1]! }, { ...base, colors: [COLOR_WORDS[perKindIn[2]!]!], text: `${perKindIn[2]} card` }], text: `${perKindIn[1]} and ${perKindIn[2]} card` };
+      effects.push({ type: "draw", who: { ref: "you" }, n: { count: { kind: "cardsInHand", who: prev.who, filter } } });
+      continue;
+    }
     // Vigean Intuition: "Choose a card type, then reveal the top four cards of your library. Put all cards of the chosen type
     // revealed this way into your hand and the rest into your graveyard." The type is chosen first, as it resolves (CR
     // 608.2d): Mulch's dig with that type.
@@ -5819,6 +5858,34 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (last?.type !== "counters" || last.what.ref !== "target" || last.what.n || last.counter !== "+1/+1" || last.n !== 1 || !CREATURE_TYPES.has(moreCounters[2]!)) return null;
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [moreCounters[2]!], ...(moreCounters[1] === "another" ? { notSource: true } : {}), text: `${moreCounters[1]} ${moreCounters[2]}` };
       effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(moreCounters[3]!) }], otherwise: [last] };
+      continue;
+    }
+    // Olivia's Midnight Ambush: "Target creature gets -2/-2 until end of turn. If it's night, that creature gets -13/-13
+    // until end of turn instead.": one or the other, by day or night as it resolves (CR 731.1, 608.2c).
+    const nightInstead = /^If it's (day|night), that creature gets ([+-]\d+)\/([+-]\d+) until end of turn instead$/.exec(s);
+    const nightPrev = effects.at(-1);
+    if (nightInstead && nightPrev?.type === "continuous" && nightPrev.what.ref === "target" && nightPrev.duration === "endOfTurn" && nightPrev.mods.length === 1 && nightPrev.mods[0]!.kind === "modifyPT" && nightPrev.what.index === ctx.targets.length - 1) {
+      effects.pop();
+      const instead: Effect = { ...nightPrev, mods: [{ kind: "modifyPT", power: Number(nightInstead[2]), toughness: Number(nightInstead[3]) }] };
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "dayNight", v: nightInstead[1] as "day" | "night" } }, effects: [instead], otherwise: [nightPrev] });
+      continue;
+    }
+    // Wolf Strike: "Target creature you control gets +2/+0 until end of turn if it's night. Then it deals damage ...": the
+    // target is chosen either way; the bonus only by night as it resolves.
+    const pumpAtNight = /^((?:[Tt]arget|[Aa]nother target) creature(?: you control)? gets [+-]\d+\/[+-]\d+ until end of turn) if it's (day|night)$/.exec(s);
+    if (pumpAtNight) {
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(pumpAtNight[1]!), ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "continuous" || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "dayNight", v: pumpAtNight[2] as "day" | "night" } }, effects: fx });
+      continue;
+    }
+    // Searing Barb: "~ deals 2 damage to any target. If it's a creature, it can't block this turn.": a creature as it
+    // resolves (CR 608.2c; state-based actions haven't been checked yet, so a creature dealt lethal damage is still one).
+    const barbPrev = effects.at(-1);
+    if (/^If it's a creature, it can't block this turn$/.test(s) && barbPrev?.type === "damage" && barbPrev.to.ref === "anyTarget" && ctx.targets[barbPrev.to.index]?.kind === "any" && barbPrev.to.index === ctx.targets.length - 1) {
+      const i = barbPrev.to.index;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" } }, effects: [{ type: "continuous", what: { ref: "target", index: i }, mods: [{ kind: "cantBlock" }], duration: "endOfTurn" }] });
       continue;
     }
     // Rush the Room: "If it's a Goblin or Orc, it also gains haste until end of turn": either creature type.
@@ -9085,6 +9152,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "citysBlessing" } }, effects: [{ type: "may", effects: [{ type: "putInLibrary", what: last.what, position: "top" }], otherwise: [back], text: "put that permanent on top of its owner's library instead" }], otherwise: [back] });
       continue;
     }
+    // Consign to Dream: "Return target permanent to its owner's hand. If that permanent is red or green, put it on top of its
+    // owner's library instead." Sweep Away: "Return target creature to its owner's hand. If that creature is attacking, you
+    // may put it on top of its owner's library instead." The permanent as it resolves (CR 608.2c), one move or the other.
+    const bounceTop = /^If that (?:permanent|creature) is ((white|blue|black|red|green) or (white|blue|black|red|green)|attacking), (you may )?put it on top of its owner's library instead$/.exec(s);
+    if (bounceTop && effects.length - prevWhole === 1 && last?.type === "bounce" && last.what.ref === "target" && !last.what.n && Object.keys(last).length === 2) {
+      const back = effects.pop()!;
+      const base = { kind: "object" as const, types: [], notTypes: [], notColors: [] };
+      const filter: TargetSpec = bounceTop[2] ? { ...base, colors: [COLOR_WORDS[bounceTop[2]]!, COLOR_WORDS[bounceTop[3]!]!], text: bounceTop[1]! } : { ...base, combat: "attacking", text: "attacking" };
+      const top: Effect = { type: "putInLibrary", what: last.what, position: "top" };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [bounceTop[4] ? { type: "may", effects: [top], otherwise: [structuredClone(back)], text: "put it on top of its owner's library instead" } : top], otherwise: [back] });
+      continue;
+    }
     // Consuming Ferocity: "put a +1/+0 counter on enchanted creature. If that creature has three or more +1/+0 counters on
     // it, it deals damage equal to its power to its controller, then destroy that creature and it can't be regenerated.":
     // the creature as this resolves (CR 608.2c); "it" is that creature.
@@ -9893,7 +9972,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         for (const o of prev.options) if (o[0]!.type === "destroy") o[0]!.noRegen = true;
         continue;
       }
-      const last = prev?.type === "if" && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : prev;
+      // Essence Vortex: "Destroy target creature unless its controller pays life equal to its toughness. A creature destroyed
+      // this way can't be regenerated.": the destroy if they don't pay.
+      const last = (prev?.type === "if" && !prev.otherwise) || (prev?.type === "punisher" && /^A creature destroyed this way/.test(s)) ? (prev.effects.length === 1 ? prev.effects[0] : undefined) : prev;
       if (!last || last.type !== "destroy") return null;
       last.noRegen = true;
       // "Destroy target nonblack creature and target land. They can't be regenerated.": both.

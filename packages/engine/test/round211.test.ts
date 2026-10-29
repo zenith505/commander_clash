@@ -638,3 +638,43 @@ describe("costs {1} less for each {E} you've paid or lost this turn (Blaster Hul
     expect(spellCost(s, ap, s.objects[h]!).extra).toBe(before);
   });
 });
+
+const transcendentDragon = card("Transcendent Dragon", "Creature — Dragon", "{4}{U}{U}", {"cmc":6,"power":"4","toughness":"3","keywords":["Flying","Flash"],"oracleText":"Flash\nFlying\nWhen this creature enters, if you cast it, counter target spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard, then you may cast it without paying its mana cost.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+const spelljack = card("Spelljack", "Instant", "{3}{U}{U}{U}", {"cmc":6,"keywords":[],"oracleText":"Counter target spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard. You may play it without paying its mana cost for as long as it remains exiled. (If it has X in its mana cost, X is 0.)","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+const kheruSpellsnatcher = card("Kheru Spellsnatcher", "Creature — Snake Wizard", "{3}{U}", {"cmc":4,"power":"3","toughness":"3","keywords":["Morph"],"oracleText":"Morph {4}{U}{U} (You may cast this card face down as a 2/2 creature for {3}. Turn it face up any time for its morph cost.)\nWhen this creature is turned face up, counter target spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard. You may cast that card without paying its mana cost for as long as it remains exiled.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+
+describe("counter target spell; if countered this way, exile it, then you may cast it free (Transcendent Dragon), or play it free while it stays exiled (Spelljack)", () => {
+  const study = card("Test Study", "Sorcery", "{1}{U}", { cmc: 2, oracleText: "Draw two cards." });
+  it("compile", () => supported(transcendentDragon, spelljack, kheruSpellsnatcher));
+
+  it("Transcendent Dragon: counters a spell, exiles it, and its controller casts it free as the trigger resolves", () => {
+    const { s: s0, ap } = setup([transcendentDragon, study]);
+    s0.players[ap]!.manaPool.U = 8;
+    const st = inHand(s0, ap, study.name);
+    let s = run(s0, planCast(s0, ap, st));
+    const stackId = s.stack[0]!.id;
+    s = run(s, planCast(s, ap, inHand(s, ap, transcendentDragon.name)));
+    s = settle(s, { targets: [{ kind: "stack", id: stackId }] });
+    expect(s.objects[st]!.zone).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: st });
+    const hand = s.players[ap]!.hand.length;
+    s = settle(act(s, { type: "castSpell", player: ap, objectId: st, targets: [] }));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.objects[st]!.zone).toBe("graveyard");
+  });
+
+  it("Spelljack: the exiled card can be cast later without paying its mana cost", () => {
+    const { s: s0, ap } = setup([spelljack, study]);
+    s0.players[ap]!.manaPool.U = 8;
+    const st = inHand(s0, ap, study.name);
+    let s = run(s0, planCast(s0, ap, st));
+    const stackId = s.stack[0]!.id;
+    s = settle(run(s, planCast(s, ap, inHand(s, ap, spelljack.name), [{ kind: "stack", id: stackId }])));
+    expect(s.objects[st]!.zone).toBe("exile");
+    expect(s.objects[st]!.mayPlay).toMatchObject({ player: ap, free: true });
+    s.players[ap]!.manaPool.U = 0;
+    const hand = s.players[ap]!.hand.length;
+    s = settle(run(s, planCast(s, ap, st)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+});

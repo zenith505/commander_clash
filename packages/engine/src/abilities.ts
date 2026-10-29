@@ -3270,6 +3270,8 @@ export type Effect =
       top?: boolean;
       /** Remand: "If that spell is countered this way, put it into its owner's hand instead of into that player's graveyard." */
       hand?: true;
+      /** With `exile`: "You may play it without paying its mana cost for as long as it remains exiled" (Spelljack; "cast that card", Kheru Spellsnatcher): a permission for this ability's controller (CR 609.4b), that card only while it stays exiled (CR 400.7). */
+      youMayFree?: "play" | "cast";
       /** Delay: "exile it with three time counters on it instead ... If it doesn't have suspend, it gains suspend." */
       suspend?: number;
       /**
@@ -3442,7 +3444,11 @@ export type Effect =
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
   | { type: "unearth" }
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
-  | { type: "castFromExileFree" }
+  | {
+      type: "castFromExileFree";
+      /** "Counter target spell. If that spell is countered this way, exile it instead ..., then you may cast it without paying its mana cost" (Transcendent Dragon): the card countered and exiled this way (Resolving.counteredExiled), cast as this resolves (CR 608.2g). */
+      countered?: true;
+    }
   /**
    * Jeweled Amulet: "Note the type of mana spent to pay this activation cost." As the ability resolves, its source notes
    * that type (GameObject.notedMana); with no mana spent, nothing new is noted.

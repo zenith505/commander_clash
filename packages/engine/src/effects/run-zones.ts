@@ -918,9 +918,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "castFromExileFree": {
-      // Rebound (CR 702.88a): the card has to still be in exile, the same object (CR 400.7).
-      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
-      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+      // Rebound (CR 702.88a): the card has to still be in exile, the same object (CR 400.7). Transcendent Dragon: the card
+      // its counter exiled.
+      const at = e.countered ? s.resolving?.counteredExiled : ctx.subject;
+      const o = at ? s.objects[at.id] : undefined;
+      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== at!.zc) return;
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
       if (sc.may !== undefined) return; // asked already

@@ -878,6 +878,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const countered = e.thenSource ? s.stack.find((x) => x.id === t.id) : undefined;
       const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.librarySecond ? "librarySecond" : e.libraryChoice ? "libraryChoice" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
+      // Spelljack, Kheru Spellsnatcher: the card countered and exiled this way, while it stays exiled (CR 400.7).
+      const ex = e.youMayFree && s.resolving?.counteredExiled ? s.objects[s.resolving.counteredExiled.id] : undefined;
+      if (ex && ex.zone === "exile" && (ex.zoneChanges ?? 0) === s.resolving!.counteredExiled!.zc && !ex.isToken) {
+        ex.mayPlay = { player: ctx.controller, zc: ex.zoneChanges ?? 0, until: "exiled", turn: s.turn, free: true, ...(e.youMayFree === "cast" ? { castOnly: true as const } : {}) };
+        log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, ex).name} without paying its mana cost for as long as it remains exiled.`);
+      }
       // Green Slime, Trickbind: a permanent's ability countered (gone from the stack), its source still on the battlefield as
       // the object it was (CR 400.7); a card's ability in another zone isn't a permanent's.
       const by = countered?.kind === "ability" && countered.sourceId && !s.stack.some((x) => x.id === t.id) ? s.objects[countered.sourceId] : undefined;
@@ -1018,6 +1024,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   // "The amount of mana spent to cast that spell" (Mana Sculpt): as it was on the stack.
   if (gone && (item.x || spent) && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x ?? 0, ...(spent ? { manaSpent: spent } : {}) };
   if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
+  if (gone && gone.zone === "exile" && !gone.spellCopy && item.kind === "spell" && s.resolving) s.resolving.counteredExiled = { id: gone.id, zc: gone.zoneChanges ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
   if (item.kind === "spell" && s.resolving) {

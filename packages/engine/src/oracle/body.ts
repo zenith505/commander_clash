@@ -10425,10 +10425,29 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // Hinder: "put that card on your choice of the top or bottom of its owner's library instead ...".
-    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put (?:it|that card) (on top of its owner's library|into its owner's hand|on your choice of the top or bottom of its owner's library) instead of into that player's graveyard)$/i.exec(s);
+    const lapseThen = /^(If that spell is countered this way, exile it instead of putting it into its owner's graveyard), then you may cast it without paying its mana cost$/.exec(s);
+    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put (?:it|that card) (on top of its owner's library|into its owner's hand|on your choice of the top or bottom of its owner's library) instead of into that player's graveyard)$/i.exec(lapseThen?.[1] ?? s);
     if (lapse) {
       const last = effects[effects.length - 1];
       if (last?.type !== "counterSpell" || last.bounce) return null;
+      // Transcendent Dragon: "..., then you may cast it without paying its mana cost": as this resolves (rulings), only if
+      // it was countered and exiled. Spelljack: "You may play it without paying its mana cost for as long as it remains
+      // exiled" (Kheru Spellsnatcher: "cast that card"), later, with its usual timing.
+      const next = (sentences[si + 1] ?? "").replace(/\.$/, "");
+      const castNow = lapse[1] && (lapse[2] === undefined && lapseThen ? true : /^(?:[Tt]hen )?you may cast it without paying its mana cost$/.test(next));
+      const later = lapse[1] && !castNow ? /^You may (play|cast) (?:it|that card) without paying its mana cost for as long as it remains exiled$/.exec(next) : null;
+      if (castNow) {
+        last.exile = true;
+        effects.push({ type: "castFromExileFree", countered: true });
+        if (!lapseThen) si++;
+        continue;
+      }
+      if (later) {
+        last.exile = true;
+        last.youMayFree = later[1] as "play" | "cast";
+        si++;
+        continue;
+      }
       if (lapse[1]) last.exile = true;
       else if (lapse[2] === "into its owner's hand") last.hand = true;
       else if (lapse[2] === "on your choice of the top or bottom of its owner's library") last.libraryChoice = true;

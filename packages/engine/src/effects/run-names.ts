@@ -120,7 +120,9 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.resolving!.revealedUntilCount = seen.length;
       if (hit) s.resolving!.revealedUntilMv = characteristics(s, obj(s, hit)).manaValue;
       else delete s.resolving!.revealedUntilMv;
-      log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
+      log(s, `${p.name} ${e.exile ? "exiles" : "reveals"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
+      // Venture Forth: the cards are exiled one at a time until a land card is (CR 406.3), then go on from exile.
+      if (e.exile) for (const id of seen) moveObject(s, id, "exile");
       for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in the library.`);
       // Several found for the battlefield enter at the same time (Open the Way, Kindred Summons).
       if (found === "graveyard") {
@@ -150,6 +152,10 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const order = [...rest];
         shuffle(s, order);
         for (const id of order) {
+          if (e.exile) {
+            if (obj(s, id).zone === "exile") moveObject(s, id, "library");
+            continue;
+          }
           p.library.splice(p.library.indexOf(id), 1);
           p.library.push(id);
         }

@@ -76,6 +76,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^creature blocking (?:it|~)$/.test(p) && (ctx?.subjectIt || /~$/.test(p))) return { count: ctx?.subjectIt && !/~$/.test(p) ? { kind: "blockingIt", subject: true } : { kind: "blockingIt" } };
   // Guardian of the Gateless: "Whenever ~ blocks, it gets +1/+1 until end of turn for each creature it's blocking".
   if (each && /^creature (?:it's|~ is) blocking$/.test(p) && (ctx?.selfIt || /~/.test(p))) return { count: { kind: "itBlocks" } };
+  // Staff of Eden: "for each permanent you control but don't own" (CR 108.3).
+  if (each && p === "permanent you control but don't own") {
+    const filter = parseTargetPhrase(p);
+    return filter?.kind === "object" ? { count: { kind: "permanents", filter: { ...filter, text: p } } } : null;
+  }
   // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
   // battlefield named ~", any player's.
   if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);
@@ -117,6 +122,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Iridescent Hornbeetle: "for each +1/+1 counter you've put on creatures under your control this turn", as they were
   // put, even on creatures that have left since (rulings).
   if (each && /^\+1\/\+1 counter you've put on creatures under your control this turn$/.test(p)) return { count: { kind: "plusOnesPutThisTurn", byYou: true, onYours: true, creature: true } };
+  // Vault 12: The Necropolis: "the total number of rad counters among players" (CR 728, 122.1), every player's together.
+  if (/^the total number of rad counters among players$/i.test(p)) return { count: { kind: "rad" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "Each creature your opponents control gets -1/-1 until end of turn for each poison counter its controller has" (Phyresis
@@ -350,8 +357,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Malignus: "the highest life total among your opponents" (those still in the game).
   if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
-  // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too).
-  if (/^the highest life total among players$/i.test(p)) return count({ kind: "life", who: { ref: "eachPlayer" }, highest: true });
+  // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too); Sorin, Grim
+  // Nemesis: "among all players".
+  if (/^the highest life total among (?:all )?players$/i.test(p)) return count({ kind: "life", who: { ref: "eachPlayer" }, highest: true });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
@@ -412,8 +420,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponents? (?:that|who) (?:were|was) dealt damage this turn$/i.test(p)) return count({ kind: "players", opponents: true, damaged: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
+  // Search for Blex: "You lose 3 life for each card you put into your hand this way", after its look at the top cards.
+  if (ctx?.dugToHand && each && /^card you put into your hand this way$/.test(p)) return { count: { kind: "dugToHand" } };
   // Reaper's Scythe: "for each player who lost life this turn", you too.
   if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
+  // The Master of Lake-town: "for each graveyard with seven or more cards in it": each player's graveyard (CR 404.1), of
+  // the players still in the game (a player who left takes their cards along, CR 800.4a).
+  if (each && (m = /^graveyard with (one|two|three|four|five|six|seven|eight|nine|ten) or more cards in it$/i.exec(p))) return count({ kind: "players", yardAtLeast: num(m[1]!) });
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
@@ -568,6 +581,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
+  if (each && /^creature type among creatures you control$/i.test(p)) return count({ kind: "creatureTypesAmong" });
   // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
   if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });

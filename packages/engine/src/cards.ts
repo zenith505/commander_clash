@@ -1,10 +1,10 @@
-import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
+import type { AbilityBody, CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
-import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
+import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
-import { objectMatches, printedMatches } from "./effects/targeting";
+import { bindChosen, objectMatches, printedMatches } from "./effects/targeting";
 import { isRingBearer } from "./effects/run-ring";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
@@ -310,6 +310,8 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
   if (o.chosen?.name !== undefined) own = withChosenName(own, o.chosen.name);
+  // "Return target card of the chosen type" (Dawn-Blessed Pennant): the creature type chosen as it entered.
+  if (o.chosen?.type !== undefined) own = withChosenType(own, o.chosen);
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
@@ -470,6 +472,22 @@ function withChosenName(base: CompiledCard, name: string): CompiledCard {
   if (!hit) {
     const bind = (t: TargetSpec): TargetSpec => (t.chosen === "name" ? (({ chosen: _, ...rest }) => ({ ...rest, named: name }))(t) : t);
     byName.set(name, (hit = { ...base, activated: base.activated.map((a) => ({ ...a, body: { ...a.body, targets: a.body.targets.map(bind) } })) }));
+  }
+  return hit;
+}
+
+const typed = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+/** Triggered and activated abilities whose targets are "of the chosen type", with that type filled in (bindChosen). */
+function withChosenType(base: CompiledCard, chosen: Chosen): CompiledCard {
+  const has = (b: AbilityBody) => b.targets.some((t) => t.chosen === "type") || !!b.modal?.modes.some((m) => m.targets.some((t) => t.chosen === "type"));
+  if (!base.activated.some((a) => has(a.body)) && !base.triggers.some((t) => has(t.body))) return base;
+  let byType = typed.get(base);
+  if (!byType) typed.set(base, (byType = new Map()));
+  let hit = byType.get(chosen.type!);
+  if (!hit) {
+    const bind = (t: TargetSpec): TargetSpec => (t.chosen === "type" ? bindChosen(t, chosen) : t);
+    const body = (b: AbilityBody): AbilityBody => (has(b) ? { ...b, targets: b.targets.map(bind), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map((m) => ({ ...m, targets: m.targets.map(bind) })) } } : {}) } : b);
+    byType.set(chosen.type!, (hit = { ...base, activated: base.activated.map((a) => ({ ...a, body: body(a.body) })), triggers: base.triggers.map((t) => ({ ...t, body: body(t.body) })) }));
   }
   return hit;
 }

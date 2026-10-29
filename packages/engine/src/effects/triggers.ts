@@ -1,6 +1,6 @@
 import { defMv, restingDef, sameName } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
-import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
+import { isRealKicker, type AbilityBody, type BatchTrigger, type CompiledCard, type TargetChoice, type TargetSpec, type TriggeredAbility, type TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER, stillControlsSource } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
@@ -238,7 +238,7 @@ export type TriggerSourceEvent =
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
   /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
-  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number }
+  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number; combat?: true }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
@@ -1043,6 +1043,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       // Valgavoth: "for the first time during each of their turns".
+      add(o, you, (e) => e === "playerLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
       if (you !== ev.player) add(o, you, (e, t) => e === "opponentLosesLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
       // "Whenever one or more opponents lose life": once for life lost at the same time (Emet-Selch), not once per player.
       // "Each lose exactly 1 life" (Ob Nixilis): once for that event too, with what each opponent lost in it added up; it
@@ -1276,6 +1277,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems((w, wc) => attackWatch(w, wc));
+    // "Whenever your commander attacks, you may pay {2}. If you do, return ~ from your graveyard to your hand" (Vivi's
+    // Persistence): cards in graveyards, their owners watching (CR 113.6m, 113.8).
+    fromGraveyards((w, owner) => attackWatch(w, owner));
     // "Until end of turn, whenever a Kraken, ... or Serpent attacks, draw a card" (Summon: Leviathan, CR 603.7b).
     fromFloating((src, ctrl, triggers) => attackWatch(src, ctrl, triggers));
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
@@ -1449,8 +1453,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") {
-      add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
-      addHosted(o, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
+      add(o, controllerOf(s, o), (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
+      addHosted(o, (e, t) => (e === "selfDealsDamage" && ev.amount >= (t.minDamage ?? 0)) || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
       // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
       if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount }), o);
       // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.
@@ -1519,7 +1523,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         if (controllerOf(s, w) !== ev.by) continue;
-        const fits = (t: TriggeredAbility, dealt: boolean) => !!t.damageTo && !!t.damageTo.subjectDealt === dealt && (toWalker || t.damageTo.what === "playerOrPlaneswalker") && (t.damageTo.self ? w.id === dealer.id : objectMatches(s, t.dealer!.filter, dealer, ev.by, false));
+        const fits = (t: TriggeredAbility, dealt: boolean) => !!t.damageTo && !!t.damageTo.subjectDealt === dealt && (!t.damageTo.combat || !!ev.combat) && (toWalker || t.damageTo.what === "playerOrPlaneswalker") && (t.damageTo.self ? w.id === dealer.id : objectMatches(s, t.dealer!.filter, dealer, ev.by, false));
         add(w, ev.by, (e, t) => e === "yourCreatureDealsDamage" && fits(t, false), undefined, undefined, dealer, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
         if (toWalker) add(w, ev.by, (e, t) => e === "yourCreatureDealsDamage" && fits(t, true), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
       }
@@ -1741,6 +1745,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;
+        if (t.cast.nameInCasterYard) {
+          const name = spell && !ev.copy && !spell.faceDown ? characteristics(s, spell).name : undefined;
+          if (!name || !player(s, ev.controller).graveyard.some((g) => sameName(defOf(s, obj(s, g)).name, name))) return false;
+        }
         if (t.cast.spentLessThanMv && !(item && !ev.copy && (ev.manaSpent ?? 0) < spellManaValue(s, item))) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
@@ -1748,7 +1756,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // "A kicked spell": kicked as it was cast (CR 702.33d), or a copy of one (CR 707.10).
-        if (t.cast.kicked && !item?.kicked?.length) return false;
+        // Not an optional cost paid like kicker, as "you may blight 1" (Burning Curiosity) or replicate.
+        if (t.cast.kicked && !(item?.kicked?.length && (!spell || isRealKicker(compileCard(defOf(s, spell)).kicker)))) return false;
         // "A creature spell that has an Adventure" (Garenbrig Squire): the card is an adventurer card (CR 715.2).
         if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
@@ -2085,7 +2094,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active) && (!t.chosenPlayersTurn || o.chosen?.player === ev.active) && (!t.monarchsTurn || s.monarch === ev.active) && (!t.firstUpkeep || (s.turnLog?.upkeeps ?? 1) === 1)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
     fromEmblems(stepWatch);

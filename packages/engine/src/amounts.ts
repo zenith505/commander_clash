@@ -86,7 +86,8 @@ export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   // Two to the power of it (Mathemagics); past 1024 the number can't matter, it's more than all the cards in the game.
   const v0 = a.pow2 ? 2 ** Math.min(Math.max(0, c), 10) : Math.floor(c / (a.per ?? 1)) * (a.times ?? 1) + (a.plus ?? 0);
   const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
-  const n = a.signed ? v : Math.max(0, a.half ? (a.third ? (a.half === "up" ? Math.ceil(v / 3) : Math.floor(v / 3)) : halve(v, a.half)) : v);
+  const n0 = a.signed ? v : Math.max(0, a.half ? (a.third || a.tenth ? ((d) => (a.half === "up" ? Math.ceil(v / d) : Math.floor(v / d)))(a.tenth ? 10 : 3) : halve(v, a.half)) : v);
+  const n = a.max !== undefined ? Math.min(n0, a.max) : n0;
   return a.negate ? -n : n;
 }
 
@@ -265,6 +266,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     {
       // "For each card with the chosen name revealed this way" (Thought Hemorrhage): the name chosen as it resolves.
       const f = c.filter && bindChosen(c.filter, ctx.chosen);
+      if (c.differentManaValues) return new Set(refPlayers(s, c.who, ctx).flatMap((pid) => s.players[pid]!.hand.map((id) => defMv(defOf(s, s.objects[id]!))))).size;
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (f ? s.players[pid]!.hand.filter((id) => printedMatches(f, defOf(s, s.objects[id]!))).length : s.players[pid]!.hand.length), 0);
     }
     case "cardsInLibrary":
@@ -291,6 +293,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
       return ctx.event?.groupPower ?? 0;
+    case "eventGroupCardTypes": {
+      // The cards' own types, as Tarmogoyf's count reads a graveyard (a card that has left counts as it was, CR 608.2h).
+      const types = new Set((ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] ? defOf(s, s.objects[g.id]!).types : [])));
+      return types.size;
+    }
     case "totalPowerOf":
       return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
@@ -347,6 +354,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.objects?.({ ref: c.subject ? "subject" : "self" })[0]?.blockedBy?.length ?? 0;
     case "itBlocks":
       return ctx.objects?.({ ref: "self" })[0]?.blocking?.length ?? 0;
+    case "dugToHand":
+      return s.resolving?.dugToHand ?? 0;
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
@@ -589,6 +598,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.lifeAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.life <= c.lifeAtMost!).length;
       if (c.lifeLessThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.life < (s.players[ctx.controller]?.life ?? 0)).length;
       if (c.handMoreThanYou) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length > (s.players[ctx.controller]?.hand.length ?? 0)).length;
+      if (c.yardAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && s.players[pid]!.graveyard.length >= c.yardAtLeast!).length;
       if (c.handAtLeast !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length >= c.handAtLeast!).length;
       if (c.handAtMost !== undefined) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.players[pid]!.hand.length <= c.handAtMost!).length;
       // Smuggler's Share: players still in the game, by what they did this turn.
@@ -818,6 +828,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return colors.size;
     }
+    case "creatureTypesAmong": {
+      const types = new Set<string>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (!ch || ch.controller !== ctx.controller || !ch.types.includes("Creature")) continue;
+        if (ch.allCreatureTypes) return CREATURE_TYPES.size;
+        for (const t of ch.subtypes) if (CREATURE_TYPES.has(t)) types.add(t);
+      }
+      return types.size;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       const whose = c.whose ? refPlayers(s, c.whose, ctx) : [ctx.controller];
@@ -871,7 +891,7 @@ export function describeAmount(a: Amount): string {
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
-  const v1 = a.half ? `${a.third ? "a third of" : "half"} ${v0}, rounded ${a.half}` : v0;
+  const v1 = a.half ? `${a.third ? "a third of" : a.tenth ? "a tenth of" : "half"} ${v0}, rounded ${a.half}` : v0;
   const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
   return a.negate ? `-(${v})` : v;
 }
@@ -928,6 +948,8 @@ function describeCount(c: Count): string {
       return "#creatures blocking it";
     case "itBlocks":
       return "#creatures it's blocking";
+    case "dugToHand":
+      return "#cards put into your hand";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "milledManaValue":
@@ -968,6 +990,8 @@ function describeCount(c: Count): string {
       return "#those cards still exiled";
     case "eventGroupPower":
       return "the total power of those creatures";
+    case "eventGroupCardTypes":
+      return "#card types among those cards";
     case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":
@@ -1005,7 +1029,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostGame ? " who have lost the game" : ""}${c.attacked ? " you attacked this turn" : ""}${c.combatDamaged ? " dealt combat damage this turn" : ""}${c.damaged ? " dealt damage this turn" : ""}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}${c.handAtMost !== undefined ? ` with ${c.handAtMost} or fewer cards in hand` : ""}${c.handAtLeast !== undefined ? ` with ${c.handAtLeast} or more cards in hand` : ""}${c.yardAtLeast !== undefined ? ` with ${c.yardAtLeast}+ cards in their graveyard` : ""}${c.handMoreThanYou ? " with more cards in hand than you" : ""}${c.lifeLessThanYou ? " with less life than you" : ""}${c.lifeAtMost !== undefined ? ` with ${c.lifeAtMost} or less life` : ""}${c.fewerCreaturesThanYou ? " with fewer creatures than you" : ""}${c.moreCreaturesThanYou ? " with more creatures than you" : ""}${c.moreLandsThanYou !== undefined ? ` with ${c.moreLandsThanYou}+ more lands than you` : ""}`;
     case "creaturesLeftThisTurn":
       return "#creatures that left the battlefield under your control this turn";
     case "typeToYourGraveyardThisTurn":
@@ -1072,6 +1096,8 @@ function describeCount(c: Count): string {
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";
+    case "creatureTypesAmong":
+      return "#creature types among your creatures";
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
@@ -1161,11 +1187,11 @@ function describeCount(c: Count): string {
 export function substituteX(a: Amount, x: AmountExpr): Amount {
   if (typeof a === "number" || a.count.kind !== "x") return a;
   // "Half X life, rounded down" with X defined as a plain count (Brass Infiniscope's spell's X): halved all the same.
-  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
+  if ((a.half || a.third || a.per || a.pow2) && !x.half && !x.third && !x.tenth && !x.per && !x.pow2 && !x.negate && (x.times ?? 1) === 1 && !x.plus) return { ...a, count: x.count };
   const t = a.times ?? 1;
   // X itself is the definition, never below 0 (CR 107.1b); "-X" negates it afterwards.
   // "Half X damage, rounded up, ..., where X is the number of Mountains you control" (Eternal Flame): half the definition.
-  if (a.half) return t === 1 && !a.plus && !a.negate && !x.half && !x.third && !x.per && !x.negate ? { ...x, half: a.half } : a;
+  if (a.half) return t === 1 && !a.plus && !a.negate && !x.half && !x.third && !x.tenth && !x.per && !x.negate ? { ...x, half: a.half } : a;
   if (t === 1 && !a.plus) return { ...x, ...(a.negate !== x.negate ? { negate: true } : { negate: undefined }) };
   return { count: x.count, times: t * (x.times ?? 1), plus: t * (x.plus ?? 0) + (a.plus ?? 0), ...(a.negate ? { negate: true } : {}) };
 }

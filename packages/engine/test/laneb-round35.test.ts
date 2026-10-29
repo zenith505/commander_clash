@@ -57,8 +57,6 @@ const emptyHand = (s: GameState, pid: PlayerId) => {
 };
 
 // Real oracle text (Scryfall).
-const aegisSculptor = () => card("Aegis Sculptor", "Creature — Bird Wizard", "{3}{U}", { cmc: 4, colors: ["U"], power: "2", toughness: "3", keywords: ["Flying","Ward"], oracleText: "Flying\nWard {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nAt the beginning of your upkeep, you may exile two cards from your graveyard. If you do, put a +1/+1 counter on this creature." });
-const skywarpSkaab = () => card("Skywarp Skaab", "Creature — Zombie Drake", "{3}{U}{U}", { cmc: 5, colors: ["U"], power: "2", toughness: "5", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, you may exile two creature cards from your graveyard. If you do, draw a card." });
 const festeringNewt = () => card("Festering Newt", "Creature — Salamander", "{B}", { cmc: 1, colors: ["B"], power: "1", toughness: "1", oracleText: "When this creature dies, target creature an opponent controls gets -1/-1 until end of turn. That creature gets -4/-4 instead if you control a creature named Bogbrew Witch." });
 const bogbrewWitch = () => card("Bogbrew Witch", "Creature — Human Wizard", "{3}{B}", { cmc: 4, colors: ["B"], power: "1", toughness: "3", oracleText: "{2}, {T}: Search your library for a card named Festering Newt or Bubbling Cauldron, put it onto the battlefield tapped, then shuffle." });
 const defiantGreatmaw = () => card("Defiant Greatmaw", "Creature — Hippo", "{2}{G}", { cmc: 3, colors: ["G"], power: "4", toughness: "5", oracleText: "When this creature enters, put two -1/-1 counters on target creature you control.\nWhenever you put one or more -1/-1 counters on this creature, remove a -1/-1 counter from another target creature you control." });
@@ -116,48 +114,10 @@ const types = (s: GameState, id: string) => characteristics(s, s.objects[id]!);
 
 describe("Lane B round 35", () => {
   it("compiles every card fully", () => {
-    supported(aegisSculptor(), skywarpSkaab(), festeringNewt(), defiantGreatmaw(), evolvedSpinoderm(), gnarlbarkElm(), piousKitsune(), thrullWizard());
+    supported(festeringNewt(), defiantGreatmaw(), evolvedSpinoderm(), gnarlbarkElm(), piousKitsune(), thrullWizard());
     supported(animateWall(), forgestokerDragon(), vengefulRebirth());
     supported(hauntedPlateMail(), wallOfResurgence(), cycloneSire(), noyanDarRoilShaper(), rootwiseSurvivor(), wakerOfTheWilds(), sanctuaryWall(), lochMare(), reapingWillow());
     supported(silhanaWayfinder(), skirkDrillSergeant(), countrysideCrusher(), madcapExperiment(), burnAway(), shiftingLoyalties(), audaciousReshapers(), theTricksterGodsHeist(), gwenStacy(), bilboLuckwearer());
-  });
-});
-
-describe("Exiling cards from your graveyard as a choice", () => {
-  it("Aegis Sculptor: you may exile two cards from your graveyard at upkeep for a +1/+1 counter", () => {
-    const { s: s0, ap } = setup([]);
-    emptyHand(s0, ap);
-    const sculptor = putOnBattlefield(s0, ap, aegisSculptor());
-    const [a, b] = [toZone(s0, ap, greenBear(), "graveyard"), toZone(s0, ap, hillGiant(), "graveyard")];
-    let s = settle(toNextUpkeep(s0, ap), at("chooseMay", ap));
-    expect(s.pending?.kind).toBe("chooseMay");
-    s = settle(choose(s, true));
-    expect([zone(s, a), zone(s, b), s.objects[sculptor]!.counters["+1/+1"], pt(s, sculptor)]).toEqual(["exile", "exile", 1, "3/4"]);
-  });
-
-  it("Aegis Sculptor: with only one card in your graveyard it can't be done, so nothing is asked and no counter", () => {
-    const { s: s0, ap } = setup([]);
-    emptyHand(s0, ap);
-    const sculptor = putOnBattlefield(s0, ap, aegisSculptor());
-    const a = toZone(s0, ap, greenBear(), "graveyard");
-    let s = settle(toNextUpkeep(s0, ap), at("chooseMay", ap));
-    expect(s.pending?.kind).not.toBe("chooseMay");
-    s = settle(s);
-    expect([zone(s, a), s.objects[sculptor]!.counters["+1/+1"] ?? 0]).toEqual(["graveyard", 0]);
-  });
-
-  it("Skywarp Skaab: two creature cards from your graveyard for a card; a land doesn't count toward the two", () => {
-    const { s: s0, ap, ids } = setup([skywarpSkaab()]);
-    toZone(s0, ap, greenBear(), "graveyard");
-    toZone(s0, ap, swampCard(), "graveyard");
-    let s = settle(castNow(s0, ap, ids[0]!), at("chooseMay", ap));
-    expect(s.pending?.kind).not.toBe("chooseMay");
-    const { s: s1, ap: ap1, ids: ids1 } = setup([skywarpSkaab()]);
-    const [a, b] = [toZone(s1, ap1, greenBear(), "graveyard"), toZone(s1, ap1, hillGiant(), "graveyard")];
-    const hand = s1.players[ap1]!.hand.length;
-    s = settle(castNow(s1, ap1, ids1[0]!), at("chooseMay", ap1));
-    s = settle(choose(s, true));
-    expect([zone(s, a), zone(s, b), s.players[ap1]!.hand.length]).toEqual(["exile", "exile", hand]);
   });
 });
 

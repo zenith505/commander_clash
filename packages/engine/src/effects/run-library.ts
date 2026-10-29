@@ -335,7 +335,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
       // discards the rest (n is per player then).
       const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
-      const nFor = e.downToFewest ? {} : amountFor(s, e.n, ctx, who);
+      const keepN = e.keep !== undefined ? amountNow(s, e.keep, ctx) : 0;
+      const nFor = e.downToFewest ? {} : e.keep !== undefined ? Object.fromEntries(who.map((pid) => [pid, Math.max(0, player(s, pid).hand.length - keepN)])) : amountFor(s, e.n, ctx, who);
       if (e.random && !e.hand) {
         // Picked once, before anyone is asked about Library of Leng.
         const rp = (sc0.randomPicks ??= Object.fromEntries(
@@ -567,6 +568,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         let n = amountNow(s, e.n, ctx);
         // Enhanced Surveillance: more cards in a surveil of one or more (CR 701.25c: surveil 0 isn't surveilling).
         if (e.type === "surveil" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).surveilMore ?? 0;
+        // Kenessos, Priest of Thassa: a scry of one or more is a scry of one more, for each (CR 614.1a; scry 0 isn't a scry,
+        // 701.22b).
+        if (e.type === "scry" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).scryMore ?? 0;
         const cards = p.library.slice(0, n);
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).
@@ -903,10 +907,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (e.exchange) {
           // Morality Shift: both at once (CR 701.12a); the library's cards go to the graveyard together, so their owner
           // orders them when the order matters (CR 404.3, see graveyard.ts; rulings).
+          // Mordenkainen: "Exchange your hand and library": into the hand, not drawn (rulings).
           const lib = [...p.library];
           for (const id of ids) moveObject(s, id, "library");
-          for (const id of lib) moveObject(s, id, "graveyard");
-          log(s, `${p.name} exchanges their graveyard (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
+          for (const id of lib) moveObject(s, id, e.hand ? "hand" : "graveyard");
+          log(s, `${p.name} exchanges their ${e.hand ? "hand" : "graveyard"} (${ids.length} card${ids.length === 1 ? "" : "s"}) and library (${lib.length} card${lib.length === 1 ? "" : "s"}).`);
           continue;
         }
         if (e.bottom) {
@@ -1107,7 +1112,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const condNow = !!e.condDest && staticConditionNow(s, e.condDest.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller);
       const unpaid = !!sc.payDiff && sc.may !== true;
       const instead = !!sc.mayInstead && sc.may === true;
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.condDest && condNow ? e.condDest.dest : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (unpaid ? { zone: "graveyard" } : instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) >= (e.firstN ?? 1) && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.cardTo && printedMatches(e.cardTo.card, defOf(s, obj(s, id))) ? e.cardTo.dest : e.condDest && condNow ? e.condDest.dest : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
       // CR 400.7).
@@ -1164,7 +1169,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           } else if (to.zone === "battlefield") {
             // "With X additional +1/+1 counters on it" (CR 614.1c).
             const extra = to.counters ? Math.max(0, amountNow(s, to.counters.n, ctx)) : 0;
-            moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
+            // "Under target player's control" (Yavimaya Dryad).
+            const under = to.under ? players(s, to.under, ctx)[0] : undefined;
+            moveObject(s, id, "battlefield", { controller: under ?? pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
           // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.
@@ -1430,7 +1437,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
           const what = e.totalMv !== undefined ? `any number of ${kind.replace(/\bcard\b/, "cards")}` : e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "graveyard" ? `into ${from === pid ? "your" : `${player(s, from).name}'s`} graveyard` : e.into === "exile" ? `into exile${e.playFree ? " (you may cast it this turn without paying its mana cost)" : e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : from === pid ? "back on top of your library" : `back on top of ${player(s, from).name}'s library`;
           const rest = e.rest === "graveyard" ? (from === pid ? "into your graveyard" : `into ${player(s, from).name}'s graveyard`) : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "exile" ? "into exile" : e.rest === "keep" ? "left on top for now" : from !== pid ? `on the bottom of ${player(s, from).name}'s library` : "on the bottom of your library";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to: e.lifeEach ? `${to} (you lose ${e.lifeEach} life for each)` : to, rest, ...(e.lifeEach ? { lifeEach: e.lifeEach } : {}) }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
           return "paused";
         }
         // Nothing to choose: all of them, or (one for each) as many as fit.
@@ -1480,6 +1487,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
       r.digTook = found.length > 0;
+      if (e.into === "hand") r.dugToHand = found.length;
       enterTogether(s, () => {
         for (const id of found) {
           if (e.into === "hand") moveObject(s, id, "hand");

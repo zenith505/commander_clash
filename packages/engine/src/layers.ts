@@ -700,8 +700,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "amount": {
       // Counted as the layers applied so far left things ("permanents you control": control is layer 2).
       // "Among lands that player controls" (Mask of Intolerance): the trigger's player.
-      const n = evalAmount(s, cond.amount, { controller: you, sourceId, view: (o) => chars.get(o.id), ...(eventPlayer !== undefined ? { event: { player: eventPlayer } } : {}) });
-      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+      const ctx = { controller: you, sourceId, view: (o: GameObject) => chars.get(o.id), ...(eventPlayer !== undefined ? { event: { player: eventPlayer } } : {}) };
+      const n = evalAmount(s, cond.amount, ctx);
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx));
     }
     case "monarch":
       if (cond.none) return s.monarch === undefined;
@@ -824,7 +825,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "phase": {
       const combat = ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
       const now = cond.phase === "combat" ? combat : cond.phase === "end" ? s.step === "end" : s.step === "main1" || s.step === "main2";
-      return now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1);
+      return (now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1)) !== !!cond.not;
     }
     case "prowl": {
       // CR 702.76a: the spell's creature types as it's cast (a changeling has all of them, CR 702.73a), against the

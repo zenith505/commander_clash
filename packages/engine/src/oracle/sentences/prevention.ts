@@ -134,6 +134,9 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
     const redirect = to && destination(m[5]!, ctx);
     return by && to && redirect ? rule({ by: { choose: by }, to, n: amt(m[1]!), redirect }) : null;
   }
+  // Decorated Griffin: "Prevent the next 1 combat damage that would be dealt to you this turn": a shield of 1 for combat
+  // damage to you only (CR 615.7, 510.2).
+  if ((m = new RegExp(`^Prevent the next ${NUMX} combat damage that would be dealt to you this turn$`, "i").exec(s))) return rule({ combat: "only", to: { players: "you" }, n: amt(m[1]!) });
   // "Prevent the next 3 damage that would be dealt to any target this turn by a source of your choice" (Healing Grace).
   if ((m = new RegExp(`^Prevent the next ${NUMX} damage that would be dealt to (.+?) this turn by ${QUAL}$`, "i").exec(s))) {
     const by = choose(m[3], m[4]);
@@ -183,6 +186,8 @@ export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Prevent all damage that creatures would deal to players this turn" (Chameleon Blur), "Prevent all damage that black
   // sources and red sources would deal this turn" (Luminesce).
+  // Radiant Kavu: "Prevent all combat damage blue creatures and black creatures would deal this turn", without "that".
+  s = s.replace(/^(Prevent all (?:combat )?damage) ((?:white|blue|black|red|green) creatures and (?:white|blue|black|red|green) creatures would deal this turn)$/, "$1 that $2");
   if ((m = /^Prevent all (combat )?damage that (.+?) would deal(?: to (.+?))? this turn$/i.exec(s))) {
     if (/^(~|it|that creature|target .+|enchanted .+|equipped .+)$/i.test(m[2]!)) return undefined;
     // Haze Frog: "Prevent all combat damage that other creatures would deal this turn": all creatures but its source as it

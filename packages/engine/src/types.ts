@@ -52,6 +52,10 @@ export interface DamageRule {
   millSelf?: number;
   /** Nine Lives: a counter of this kind on that permanent for each source whose damage it would prevent, even damage that can't be prevented (rulings, CR 615.12). */
   counterOn?: { id: ObjectId; kind: string };
+  /** "For each 1 damage prevented this way, put a +1/+1 counter on that creature" (Test of Faith, CR 615.5): on `to.object`, as the damage is prevented; `tally`: counted in GameState.preventedTally for a delayed trigger instead (Sacred Boon). */
+  countersOn?: { counter: string; tally?: true };
+  /** Vengeful Archon: "If damage is prevented this way, ~ deals that much damage to target player or planeswalker", fixed as it resolved (rulings). */
+  dealTo?: { object: ObjectId; zc: number } | { player: PlayerId };
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -336,6 +340,8 @@ export interface GameObject {
   escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
+  /** How many more of its controller's untap steps it skips after the next one (Telekinesis). */
+  skipMoreUntaps?: number;
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
   damagedBy?: ObjectId[];
   /** It was dealt damage this turn (forgotten in the cleanup step, CR 514.2, and when it leaves the battlefield). */
@@ -360,12 +366,13 @@ export interface GameObject {
    * "yourNextEndStep": until that player's next end step begins (Yasmin Khan). "adventure": a card that went on an
    * adventure (CR 715.3d), for as long as it stays exiled, but not cast as an Adventure again this way. "duringNextTurn":
    * only during that player's next turn (Galvanic Relay). "whileControlled": while that player controls `source`, ended
-   * for good the first time they don't (Lightning, Security Sergeant).
+   * for good the first time they don't (Lightning, Security Sergeant). "yourNextUpkeep": until that player's next upkeep
+   * begins (Elkin Bottle), so during the rest of this turn and the turns before it.
    */
   mayPlay?: {
     player: PlayerId;
     zc: number;
-    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled";
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled" | "yourNextUpkeep";
     turn: number;
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
@@ -478,6 +485,8 @@ export interface GameObject {
   convoked?: { id: ObjectId; zc: number }[];
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
   manaSpent?: number;
+  /** As a spell, and as the permanent it became: which spell cast this turn it was (StackItem.castNth). */
+  castNth?: number;
   /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
   spent?: SpentMana;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
@@ -946,7 +955,7 @@ export interface DelayedTrigger {
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
   /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
   /** `playersNextEndStep`: at the beginning of `player`'s next end step (The Eternal Wanderer: the exiled card's owner's). */
-  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
+  when: "nextEndStep" | "yourNextEndStep" | "playersNextEndStep" | /** "At the beginning of the next combat" (Legion's Initiative): the next beginning of combat step, any player's. */ "nextBeginCombat" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat" | /** With `thisTurn`: each time the subject becomes blocked this turn (Barreling Attack, CR 603.7b). */ "becomesBlocked";
   player?: PlayerId;
   combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
@@ -1783,6 +1792,8 @@ export interface GameState {
   emblems?: ObjectId[];
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */
   dayNight?: "day" | "night";
+  /** How much damage each damage rule with a tallied `countersOn` has prevented (Sacred Boon), by rule id. */
+  preventedTally?: Record<string, number>;
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
   lastTurn?: { active: PlayerId; cast: number[]; /** The players who lost life during it (First Response: "if you lost life last turn"). */ lostLife?: PlayerId[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
@@ -2077,6 +2088,8 @@ export interface Resolving {
   joinForcesPaidBy?: Record<PlayerId, number>;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
+  /** A spell this countered (Fold into Aether's "If that spell is countered this way"). */
+  spellCountered?: true;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
   endTurn?: true;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
@@ -2116,7 +2129,7 @@ export interface Resolving {
   /** "Put a +1/+1 counter on each of those Vampires" (Urge to Feed): the permanents its tapAnyNumber tapped. */
   tappedIds?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
-  bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
+  bouncedThisWay?: { id: ObjectId; subtypes: string[]; /** It went to a hand (Count bouncedThisWayCount). */ returned?: true }[];
   /** The cards its "return ... to their owners' hands" put into a hand (Paradoxical Outcome); a token isn't a card. */
   returnedToHand?: ObjectId[];
   /** Who controlled each nontoken permanent its "return all ..." returned (or tried to, CR 614.6), as it left (SpellCondition returnedYoursAtLeast). */
@@ -2233,6 +2246,8 @@ export interface Resolving {
       discards?: number;
       /** Or that this permanent is destroyed (Combustion Man's "destroy target permanent unless ..."). */
       destroys?: ObjectId;
+      /** Or that its controller sacrifices the source (Icy Prison's "sacrifice ~ unless any player pays {3}"). */
+      losesSource?: true;
       /** "If a player does" / "If no one does" (see the punisher effect). */
       mode?: "ifAny" | "ifNone";
     };
@@ -2260,6 +2275,7 @@ export interface Resolving {
     mayEach?: { at: number; yes: number[] };
     mayAnswer?: boolean;
     found?: ObjectId[]; // the cards a library search found
+    toughnessGained?: true; // Talara's Bane's life was gained before the discard waited on a choice
     picking?: true; // an opponent is choosing among revealed cards (Gifts Ungiven); `picked`, what they chose
     picked?: ObjectId[];
     /** Separating cards into two piles (Fact or Fiction, CR 700.3): `separating` while it's being done, `pileOne` the first pile, `pileChoice` the pile chosen (0 or 1). */

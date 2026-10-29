@@ -26,6 +26,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = what?.ref === "target" && !what.n ? ctx.targets[what.index] : undefined;
     return spec?.kind === "object" && spec.controller === "you" && !spec.optional ? [{ type: "sacrifice", what: what! }] : null;
   }
+  // Lingering Death: "that player sacrifices enchanted creature" ("that creature", the enchanted creature, in a trigger at
+  // the beginning of a step of its controller's): that player, if they still control it (CR 701.21a).
+  if (ctx.eventPlayer && /^[Tt]hat player sacrifices enchanted creature$/.test(s)) return [{ type: "sacrifice", what: { ref: "attached" }, byEventPlayer: true }];
   // "Sacrifice all creatures you control" (CR 701.21a), "Each player sacrifices all permanents they control that are one or
   // more colors" (All Is Dust): every one of them, each by its controller (rulings: all at the same time).
   if ((m = /^([Ss]acrifice|[Ee]ach player sacrifices) all (.+?) (you|they) control( that .+)?$/.exec(s)) && /^sacrifice$/i.test(m[1]!) === (m[3] === "you")) {
@@ -425,6 +428,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       ctx.targets[to.index] = { ...ctx.targets[to.index]!, notSourceHost: true, text: "any other target" };
       return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: "attached" }];
     }
+    // Consuming Ferocity: "it deals damage equal to its power to its controller", the enchanted creature, to whoever controls it.
+    if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^its controller$/i.test(m[2]!)) return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ref: "hostController" }, by: "attached" }];
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
     // "... to any other target" (Special Move): not that creature (CR 115.3).
     if (a?.ref === "target" && !a.n && /^any (?:other )?target$/i.test(m[2]!)) {

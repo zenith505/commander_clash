@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount, manaSymbolsOf } from "../amounts";
-import { objectMatches, bindBound, manyX, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -902,6 +902,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && anyBlocker(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
+        // Barreling Attack: "When that creature becomes blocked this turn" (a delayed trigger, CR 603.7b).
+        for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === o.id && d.subject.zc === (o.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: o.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
         const bearer = isRingBearer(s, o);
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
@@ -1499,7 +1501,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.by !== undefined)
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.otherSource && ev.source === w.id) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
     // Pain Magnification: "Whenever an opponent is dealt 3 or more damage by a single source": every permanent whose
     // controller that player is an opponent of, once for each source (rulings).
@@ -1779,6 +1781,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "A kicked spell": kicked as it was cast (CR 702.33d), or a copy of one (CR 707.10).
         // Not an optional cost paid like kicker, as "you may blight 1" (Burning Curiosity) or replicate.
         if (t.cast.kicked && !(item?.kicked?.length && (!spell || isRealKicker(compileCard(defOf(s, spell)).kicker)))) return false;
+        // "A creature spell that has an Adventure" (Garenbrig Squire): the card is an adventurer card (CR 715.2).
+        if (t.cast.adventure && !(spell && s.cards[spell.cardId]?.layout === "adventure")) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
         if (t.cast.keyword === "Cascade" ? !hasCascade : t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
@@ -2046,6 +2050,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Made during that step, "the next end step" or "end of combat" is a later one (CR 603.7c, 511.2).
       // "The next cleanup step": every one made before this one began, so also during an earlier cleanup step of
       // this turn (CR 514.3a).
+      // "When that creature becomes blocked this turn": only blocks trigger it, and this turn is over.
+      if (d.when === "becomesBlocked") {
+        if (d.thisTurn !== s.turn) s.delayed = s.delayed!.filter((x) => x !== d);
+        continue;
+      }
       // "That combat" never came this turn: it never will.
       if (d.when === "thatCombat" && d.turn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);
@@ -2190,6 +2199,16 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       if (!hasLegalTargets(s, body.targets, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId)) {
         log(s, `${def.name}'s ability has no legal targets and is removed.`);
         s.triggerQueue.shift();
+        continue;
+      }
+      // "Target creature an opponent controls chosen at random" (Scab-Clan Giant): picked among the legal ones as it's put
+      // on the stack, each with an equal chance (rulings).
+      if (body.targets.length === 1 && body.targets[0]!.random) {
+        const legal = legalTargets(s, body.targets[0]!, t.controller, undefined, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
+        const pick = legal[Math.floor(nextRandom(s) * legal.length)]!;
+        log(s, `${def.name}'s ability targets ${pick.kind === "player" ? player(s, pick.id).name : defOf(s, obj(s, pick.id)).name}, chosen at random.`);
+        pushTrigger(s, t, [pick]);
+        added = true;
         continue;
       }
       // "Any number of target creatures" with none to choose and nothing else to target: zero targets (CR 115.6).

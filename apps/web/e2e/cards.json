@@ -1093,6 +1093,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8da9f975-519d-455a-80c1-2b468cad79a1",
+  "name": "Assembly Hall",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{4}, {T}: Reveal a creature card in your hand. Search your library for a card with the same name as that card, reveal it, put it into your hand, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "abbcb153-0763-44c6-964f-b4ff0eb64257",
   "name": "Atraxa, Grand Unifier",
   "manaCost": "{3}{G}{W}{U}{B}",
@@ -4590,6 +4612,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "19a8c2d3-b06e-4a76-bb28-8928ce84186c",
+  "name": "Devouring Rage",
+  "manaCost": "{4}{R}",
+  "cmc": 5,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of Spirits.\nTarget creature gets +3/+0 until end of turn. For each Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a9abed25-9256-4fc7-8afb-edb4286e18f4",
   "name": "Dina's Guidance",
   "manaCost": "{1}{B}{G}",
@@ -4750,6 +4800,32 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "be48877f-97b1-4a10-a618-cbc57515e617",
+  "name": "Doubling Chant",
+  "manaCost": "{5}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each creature you control, you may search your library for a creature card with the same name as that creature. Put those cards onto the battlefield, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m12",
+  "releasedAt": "2011-07-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6332,6 +6408,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "42b01697-8663-4b53-86d5-699063bd0778",
+  "name": "Flowstone Sculpture",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Artifact Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "{2}, Discard a card: Put a +1/+1 counter on this creature or this creature gains flying, first strike, or trample. (This effect lasts indefinitely.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7dde4eb6-e9d7-4259-abc2-3af738e0f00f",
   "name": "Foil",
   "manaCost": "{2}{U}{U}",
@@ -7755,6 +7858,36 @@
   "set": "mom",
   "releasedAt": "2023-04-21",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7ac433a7-c107-46de-b36b-d7419c9ec565",
+  "name": "Hana Kami",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "{1}{G}, Sacrifice this creature: Return target Arcane card from your graveyard to your hand.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -9190,6 +9323,36 @@
   "commanderLegal": "legal",
   "set": "bbd",
   "releasedAt": "2018-06-08",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e937e0f5-ca35-4dce-9f05-8f2075731628",
+  "name": "Kami of Ancient Law",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Sacrifice this creature: Destroy target enchantment.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -12304,6 +12467,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "acc74d59-f587-46a2-a90b-865f721d494d",
+  "name": "Nulltread Gargantuan",
+  "manaCost": "{1}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "When this creature enters, put a creature you control on top of its owner's library.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "arb",
+  "releasedAt": "2009-04-30",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d39b9f64-dc9b-413f-8d05-e21ef46d6756",
   "name": "Oblivion Sower",
   "manaCost": "{6}",
@@ -12708,6 +12903,37 @@
   "set": "fut",
   "releasedAt": "2007-05-04",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6ca49880-4e12-494b-b14e-e49385d0f7f5",
+  "name": "Painbringer",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Minion",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Minion"
+  ],
+  "oracleText": "{T}, Exile any number of cards from your graveyard: Target creature gets -X/-X until end of turn, where X is the number of cards exiled this way.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ody",
+  "releasedAt": "2001-10-01",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -13383,6 +13609,36 @@
   "set": "mat",
   "releasedAt": "2023-05-12",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e04f151a-66bb-4bc3-a625-91cd23cb1b18",
+  "name": "Plow Through Reito",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Sweep — Return any number of Plains you control to their owner's hand. Target creature gets +1/+1 until end of turn for each Plains returned this way.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Sweep"
+  ],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -15804,6 +16060,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "74466fa6-34d9-42f9-8590-c7f1fa672bf5",
+  "name": "Skullmane Baku",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Whenever you cast a Spirit or Arcane spell, you may put a ki counter on this creature.\n{1}, {T}, Remove X ki counters from this creature: Target creature gets -X/-X until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d3d8dd6e-a80b-4063-a542-ff67ef8dad4f",
   "name": "Skullwinder",
   "manaCost": "{2}{G}",
@@ -16008,6 +16294,38 @@
   "keywords": [],
   "producedMana": [
    "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac8cc74d-e43b-4118-bba0-dfa8b9c04d45",
+  "name": "Snow-Covered Plains",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Basic Snow Land — Plains",
+  "supertypes": [
+   "Basic",
+   "Snow"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Plains"
+  ],
+  "oracleText": "({T}: Add {W}.)",
+  "colors": [],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
   ],
   "commanderLegal": "legal",
   "set": "khm",
@@ -19440,6 +19758,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "000e5d65-96c3-498b-bd01-72b1a1991850",
+  "name": "Walking Sponge",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Sponge",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sponge"
+  ],
+  "oracleText": "{T}: Target creature loses your choice of flying, first strike, or trample until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ulg",
+  "releasedAt": "1999-02-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3d175a59-c1b4-43b8-8a1f-f7cbcefe130e",
   "name": "Wand of the Worldsoul",
   "manaCost": "{2}{W}",
@@ -19465,6 +19813,37 @@
   "set": "moc",
   "releasedAt": "2023-04-21",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ee2c8714-6e85-4eb5-9bd6-057b6abfb136",
+  "name": "Warlord's Elite",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "As an additional cost to cast this spell, tap two untapped artifacts, creatures, and/or lands you control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

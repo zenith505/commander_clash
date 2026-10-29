@@ -151,6 +151,16 @@ export function parseDamageMod(line: string): StaticAbility | null {
     const mod: DamageMod = { op: "raiseTo", amount, text: line, ...(raise[2] ? { combat: raise[2] === "combat " ? ("only" as const) : ("non" as const) } : {}), ...(byP.by ? { by: byP.by } : {}), ...(to ? { to } : {}) };
     return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
   }
+  // Forethought Amulet: "If an instant or sorcery source would deal 3 or more damage to you, it deals 2 damage to you
+  // instead": a replacement of that much damage only (rulings: not of damage that's already 2 or 1).
+  const setTo = /^If (.+?) would deal (\d+) or more damage to (you), it deals (\d+) damage to you instead$/.exec(text);
+  if (setTo) {
+    const byP = parseBy(setTo[1]!, false);
+    const to = byP && parseTo(setTo[3], false);
+    if (!byP || !to || Number(setTo[4]) >= Number(setTo[2])) return null;
+    const mod: DamageMod = { op: "setTo", amount: Number(setTo[4]), atLeast: Number(setTo[2]), text: line, ...(byP.by ? { by: byP.by } : {}), to };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   const OP = "(double that damage|twice that much damage|triple that damage|half that damage, rounded down|that much damage (?:plus|minus) (?:\\d+|X|an amount of damage equal to .+?))";
   const m = new RegExp(
     `^[Ii]f (.+?) would deal (combat |noncombat )?damage(?: to (.+?))?(?: while (.+?))?, (?:(?:it|that source) deals ${OP}(?:,? to (?:that (?:permanent or player|player or permanent|player|creature|permanent)|you|~|equipped creature|enchanted creature))? instead|instead it deals ${OP})(?:, where X is (.+))?$`,

@@ -192,6 +192,23 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // Form of the Dinosaur: "~ deals 15 damage to target creature an opponent controls and that creature deals damage equal to
+  // its power to you": two damage events in order, the second from that creature, its power as it resolves; none from it
+  // if it's an illegal target by then (rulings).
+  const dino = /^~ deals (\d+) damage to (target creature(?: an opponent controls| you don't control)?) and that creature deals damage equal to its power to you$/.exec(s);
+  if (dino) {
+    const first = parseSentence(`~ deals ${dino[1]} damage to ${dino[2]}`, ctx);
+    const a = ctx.lastObjectTarget;
+    if (first?.length !== 1 || first[0]!.type !== "damage" || a === undefined || ctx.targets.length !== a + 1) return null;
+    return [...first, { type: "damage", amount: { count: { kind: "power", of: { ref: "target", index: a } } }, to: { ref: "you" }, by: { target: a } }];
+  }
+  // Deep Spawn: "~ gains shroud until end of turn and doesn't untap during your next untap step": both, in order.
+  const andNoUntap = /^(~ gains [a-z ]+ until end of turn) and (doesn't untap during your next untap step)$/.exec(s);
+  if (andNoUntap) {
+    const a = parseSentence(andNoUntap[1]!, ctx);
+    const b = a && parseSentence(`~ ${andNoUntap[2]}`, ctx);
+    return a && b ? [...a, ...b] : null;
+  }
   // "Target player untaps all basic lands they control" (Early Harvest): the same as "untap all basic lands target player
   // controls"; who untaps them changes nothing (CR 701.26b).
   const untapsAll = /^Target player untaps all ([a-z ]+?lands) they control$/.exec(s);
@@ -506,6 +523,8 @@ export function parseBecomes(text: string): Modification[] | null {
   // "Becomes snow" (Arcum's Weathervane, Thermal Flux): it gains the supertype and keeps its others (CR 205.4a, rulings).
   if (/^snow$/i.test(rest)) return [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Snow"] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
+  // Deepwood Elder: "X target lands become Forests": each one (plural subject).
+  if ((m = /^(Plains|Islands|Swamps|Mountains|Forests)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!.replace(/(?<!Plain)s$/, "")] }];
   // "Becomes an Island in addition to its other types" (Xolatoyac's flood counters): the land keeps its types and abilities
   // and has the basic land type's mana ability too (CR 305.6, 305.7; rulings).
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other types$/.exec(rest))) return [{ kind: "addTypes", types: [], subtypes: [m[1]!] }];

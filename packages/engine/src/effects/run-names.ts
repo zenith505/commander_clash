@@ -1,15 +1,15 @@
-import type { Effect } from "../abilities";
+import type { Effect, SameNameRef } from "../abilities";
 import { defOf, isType, objIsType } from "../cards";
 import { attackingPermanentOf, creatureTypesOf, enterTogether, log, loseLife, moveObject, obj, player, shareCreatureType } from "../game";
 import { currentName } from "../names";
 import { CREATURE_TYPES } from "../keywords";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
-import { bindChosen, printedMatches } from "./targeting";
+import { bindChosen, objectMatches, printedMatches } from "./targeting";
 import { attackChoices, chooseAuraHosts } from "./run-zones";
 import { cantSearch, searchBarred } from "./run-library";
 import type { AuraHost } from "../game";
-import { characteristics } from "../layers";
+import { characteristics, controllerOf } from "../layers";
 import { ResolveCtx, amountNow, players } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
@@ -21,10 +21,19 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const pid = players(s, e.who, ctx)[0];
       if (pid === undefined) return;
       const p = player(s, pid);
-      const name = e.sameAs !== undefined ? targetName(s, ctx, e.sameAs) : ctx.chosen?.name;
-      const filter = { ...bindChosen(e.filter, ctx.chosen), ...(name !== undefined ? { named: name } : {}) };
+      // Pick the Brain: "the same name as the exiled card", the one its instruction before exiled.
+      const names = e.sameName ? namesFrom(s, e.sameName, ctx) : undefined;
+      const name = names ? names[0] : e.sameAs !== undefined ? targetName(s, ctx, e.sameAs) : ctx.chosen?.name;
+      const filter = { ...bindChosen(e.filter, ctx.chosen), ...(names ? { namedAny: names } : name !== undefined ? { named: name } : {}) };
       // No name (none was chosen, or the card was face down): the zones are searched, but nothing can be found (CR 701.23c).
       const match = (id: ObjectId) => name !== undefined && printedMatches(filter, defOf(s, obj(s, id)));
+      if (e.handOnly) {
+        // Hour of Glory: the hand is revealed, so all of them, no choice (and no library to shuffle).
+        const ids = p.hand.filter(match);
+        for (const id of ids) moveObject(s, id, "exile");
+        log(s, `${p.name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "no cards"} from their hand.`);
+        return;
+      }
       if (!sc.found) {
         r.exiledFromHand = 0;
         // "All cards": the ones in the graveyard, a public zone, must be found; in the hidden hand and library, the
@@ -164,6 +173,46 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
   }
+}
+
+/**
+ * The names "the same name as ..." means as it resolves (CR 201.2; see SameNameRef): none if that object has none, a
+ * face-down one (CR 708.2a), or is gone without a trace.
+ */
+export function namesFrom(s: GameState, ref: SameNameRef, ctx: ResolveCtx): string[] {
+  const one = (n: string | undefined) => (n === undefined ? [] : [n]);
+  if ("target" in ref) {
+    if (!ref.card) return one(targetName(s, ctx, ref.target));
+    // Deicide: "the exiled card", the card itself where it is now (rulings), not what the permanent was.
+    const t = ctx.targets[ref.target];
+    const o = t?.kind === "object" && ctx.legal[ref.target] ? s.objects[t.id] : undefined;
+    return one(o && !o.faceDown ? currentName(s, o) : undefined);
+  }
+  if ("subject" in ref) {
+    // Remembrance: the creature that died, as it last existed (a copy's copied name, rulings), one zone change ago.
+    const sub = ctx.subject;
+    const o = sub ? s.objects[sub.id] : undefined;
+    if (!sub || !o) return [];
+    if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sub.zc) return one(currentName(s, o));
+    const lk = s.lastKnown?.[o.id];
+    if (!lk || (lk.zc !== sub.zc && lk.zc !== sub.zc - 1)) return [];
+    return one(lk.source?.name ?? (lk.copyKey ? s.cards[lk.copyKey]?.name : undefined));
+  }
+  if ("spell" in ref) return one(ctx.cause !== undefined ? s.castItems?.[ctx.cause]?.castName : undefined);
+  if ("permanents" in ref) {
+    // Pattern Matcher: "another creature you control", each one's name now (a copy's copied name, rulings on Doubling
+    // Chant); never a face-down one's (CR 708.2a). One entry for each permanent (Doubling Chant's one card for each).
+    const whose = ref.whose ? players(s, ref.whose, ctx)[0] : ctx.controller;
+    return s.battlefield
+      .map((id) => s.objects[id]!)
+      .filter((o) => !o.faceDown && controllerOf(s, o) === whose && !(ref.other && o.id === ctx.sourceId) && objectMatches(s, ref.permanents, o, ctx.controller, false))
+      .map((o) => characteristics(s, o).name);
+  }
+  if ("yourGraveyard" in ref) return player(s, ctx.controller).graveyard.map((id) => defOf(s, obj(s, id)).name);
+  // Assembly Hall: "that card", the one revealed from your hand, still there.
+  if ("revealed" in ref) return (s.resolving?.revealedFromHandIds ?? []).filter((id) => s.objects[id]?.zone === "hand").map((id) => defOf(s, obj(s, id)).name);
+  // "Each card exiled this way" (Haunting Echoes), "the exiled card" (Pick the Brain): those still in exile.
+  return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile").map((id) => defOf(s, obj(s, id)).name);
 }
 
 /** The trigger subject's creature types: as it is on the battlefield, or as it last existed there (CR 608.2h). */

@@ -342,6 +342,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "bouncedThisWayCount":
+      return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
+    case "preventedByRule":
+      return s.preventedTally?.[c.rule] ?? 0;
     case "sacrificedThisWayGreatestPower":
       return Math.max(0, ...(s.resolving?.sacrificedThisWay ?? []).map((l) => l.power ?? 0));
     case "putThisWay":
@@ -513,6 +517,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       return item?.x ?? 0;
     }
+    case "castSpellKicked": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      return item?.kicked?.length ?? 0;
+    }
     case "castSpellColors": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
@@ -644,7 +652,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const st = ctx.stationed;
       const o = st && s.objects[st.id];
       if (!st) return 0;
-      return Math.max(0, o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc ? characteristics(s, o).power : st.power);
+      if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc) return Math.max(0, characteristics(s, o).power);
+      // As it last existed on the battlefield (CR 608.2h), if that's recorded; else as it was tapped.
+      const lk = s.lastKnown?.[st.id];
+      return Math.max(0, lk && lk.zc === st.zc ? lk.power : st.power);
     }
     case "power":
     case "toughness":
@@ -808,8 +819,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "spellsCastThisTurn": {
       // "Other": the resolving spell's own cast is its castNth'th; a copy wasn't cast (CR 707.10).
-      const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
-      return (s.castThisTurn ?? []).filter((x, i) => i !== self && x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
+      const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : c.notSource && ctx.sourceId ? s.objects[ctx.sourceId]?.castNth : undefined;
+      return (s.castThisTurn ?? []).filter((x, i) => i !== self && (c.anyone || x.player === (c.eventPlayer ? ctx.event?.player : ctx.controller)) && !(c.notFromHand && x.from === "hand") && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
     }
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
@@ -933,6 +944,10 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "bouncedThisWayCount":
+      return "#returned";
+    case "preventedByRule":
+      return "#damage prevented";
     case "sacrificedThisWayGreatestPower":
       return "the greatest power sacrificed";
     case "putThisWay":
@@ -1094,7 +1109,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
-      return `#${c.other ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.eventPlayer ? "they've" : "you've"} cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
+      return `#${c.other || c.notSource ? "other " : ""}${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells ${c.anyone ? "" : c.eventPlayer ? "they've " : "you've "}cast this turn${c.notFromHand ? " from anywhere other than your hand" : ""}`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "graveyardManaValues":
@@ -1117,6 +1132,8 @@ function describeCount(c: Count): string {
       return "colors of mana spent";
     case "castSpellX":
       return "that spell's X";
+    case "castSpellKicked":
+      return "times that spell was kicked";
     case "castSpellColors":
       return "that spell's colors";
     case "castSpellManaSymbols":

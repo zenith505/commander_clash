@@ -345,13 +345,18 @@ export function normalizeSelf(d: CardDef): string {
   const otherNames: string[] = [];
   if (full) t = t.replace(new RegExp(`(\\bnamed )((?:[A-Z][\\w'-]*|of|the)(?: (?:[A-Z][\\w'-]*|of|the))* ${esc(full)})(?![\\w'-])`, "g"), (_, a: string, n: string) => `${a}\u0002${otherNames.push(n) - 1}\u0002`);
   if (full) {
+    // "Return target card named Rekindling Phoenix" in its token's ability (Sound the Call, Deathpact Angel): a name, the
+    // card's, not the object with the ability (CR 201.4b), so it stays as written for that ability's own compile.
+    t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`(\\bnamed )${esc(full)}(?![\\w'-])`, "g"), (_, a: string) => `${a}\u0002${otherNames.push(full) - 1}\u0002`));
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
     // The card named Exile: "Exile target nonwhite attacking creature" is the keyword action, not the card (its name
     // followed by "target" is never the card).
     const verb = /^[A-Z][a-z]+$/.test(full) ? "(?! target\\b)" : "";
     // Aurochs: "for each other attacking Aurochs" is the creature type that is also its name (CR 205.3m), not the card.
+    // Assembly-Worker: "Target Assembly-Worker creature" is the type too (rulings: any creature of that type).
     const typed = CREATURE_TYPES.has(full) ? "(?<!attacking )" : "";
-    t = t.replace(new RegExp(typed + esc(full) + verb, "g"), "~");
+    const typedAfter = CREATURE_TYPES.has(full) ? "(?! creatures?\\b)" : "";
+    t = t.replace(new RegExp(typed + esc(full) + verb + typedAfter, "g"), "~");
   }
   // Shortened names (CR 201.5c): "Gylwain" for "Gylwain, Casting Director", and for a legendary card with no comma,
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token
@@ -602,6 +607,8 @@ export function compile(d: CardDef): CompiledCard {
   // Pawprints (CR 700.2i): "Choose up to five {P} worth of modes. You may choose the same mode more than once." and a
   // "{P}{P} — [effect]" line for each mode.
   let paws: { budget: number; costs: number[]; texts: string[]; lines: string[] } | undefined;
+  // Devouring Rage: what its additional cost sacrifices any number of, the number sacrificed its X.
+  let costSacrificedX: string | undefined;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
@@ -1569,6 +1576,19 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Devouring Rage: "As an additional cost to cast this spell, you may sacrifice any number of Spirits." then "For each
+    // Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn.": an additional cost with an X
+    // of 0 or more (CR 601.2b, 107.3a), the number sacrificed; the spell's text counts it as X.
+    const sacFor = /^As an additional cost to cast ~, you may sacrifice any number of ([A-Z][a-z]+)\.$/.exec(line);
+    if (sacFor && !parseManaCost(d.manaCost).hasX && !out.additionalCosts?.some((c) => c.kind === "sacrifice") && lines.some((l) => l.includes(`For each ${singularWord(sacFor[1]!)} sacrificed this way, `))) {
+      const spec = parseTargetPhrase(singularWord(sacFor[1]!));
+      if (spec?.kind !== "object" || !spec.subtypes?.length) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacFor[1]!) }, n: 0, x: true, optional: true });
+        costSacrificedX = singularWord(sacFor[1]!);
+      }
+      continue;
+    }
     // Plumb the Forbidden: "you may sacrifice one or more creatures. When you do, copy this spell for each creature
     // sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), and a reflexive trigger as
     // it's cast (CR 603.12) copying it that many times.
@@ -1683,6 +1703,10 @@ export function compile(d: CardDef): CompiledCard {
       const body = parseBody(`${capital(exileWhen[2]!)}.`, {});
       if (filter?.kind !== "object" || filter.combat || !body || body.targets.length || /\b(?:it|that creature|that card)\b/.test(exileWhen[2]!)) out.unsupported.push(raw);
       else out.exileInsteadOfDying = { filter, reflexive: body };
+      continue;
+    }
+    if (line === "If ~ would die, put it on top of its owner's library instead.") {
+      out.libraryTopInsteadOfDying = true;
       continue;
     }
     // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)
@@ -2568,6 +2592,11 @@ export function compile(d: CardDef): CompiledCard {
     const unlockLess = /^Unlock costs you pay cost \{(\d+)\} less\.$/.exec(line);
     if (unlockLess) {
       out.unlockLess = (out.unlockLess ?? 0) + Number(unlockLess[1]);
+      continue;
+    }
+    const morphTax = /^All morph costs cost \{(\d+)\} more\.$/.exec(line);
+    if (morphTax) {
+      out.morphTax = (out.morphTax ?? 0) + Number(morphTax[1]);
       continue;
     }
     const plotLess = /^Plotting cards from your hand costs \{(\d+)\} less\.$/.exec(line);
@@ -3934,10 +3963,10 @@ export function compile(d: CardDef): CompiledCard {
     const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
     // First Day of Class: "Whenever a creature you control enters this turn, ..." then "Learn." in its own paragraph: the
     // delayed trigger's text ends with its paragraph (CR 603.7a); the next one is another instruction of the spell.
-    const floatingFirst = tail === undefined && spellLines.length > 1 && /^Whenever [^,]+ this turn, /.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
+    const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /^Whenever [^,]+ this turn, /.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
     const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
     const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
-    const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
+    const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).
@@ -4433,10 +4462,16 @@ function checkCastingLinks(out: CompiledCard) {
   // "The chosen player's upkeep", "whenever the chosen player casts" (Black Vise, Sewer Nemesis): the player its
   // "As ~ enters, choose a player" chose.
   if (out.triggers.some((tr) => tr.chosenPlayersTurn || tr.cast?.by === "chosen") && !out.entersChoosePlayer) bad = true;
+  // "The power of the creature tapped this way" needs a "Tap an untapped creature you control" cost (or station's).
+  const tapPowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"stationPower"');
+  if (tapPowIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => tapPowIn(ab) && !ab.station && ab.costs?.filter((c) => c.kind === "tap" && c.n === 1 && !c.untap && !c.x && c.filter.kind === "object" && !!c.filter.types?.includes("Creature")).length !== 1)) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
   if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
+  // "If the exiled card is a snow land" needs an activated ability's "Exile the top card of your library" cost.
+  const exIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"costExiledIs"');
+  if (exIn([out.spell, out.triggers, out.statics]) || out.activated.some((ab) => exIn(ab) && ab.costs?.filter((c) => c.kind === "mill" && c.exile && c.n === 1).length !== 1)) bad = true;
   // Hisoka's "the same mana value as the discarded card": an activated ability's discard cost of one card.
   const mvDiscIn = (v: unknown) => JSON.stringify(v ?? null).includes('"ifMvDiscarded":true');
   if (mvDiscIn(out.spell) || mvDiscIn(out.triggers) || mvDiscIn(out.statics) || out.activated.some((ab) => mvDiscIn(ab) && !ab.costs?.some((c) => c.kind === "discard" && c.n === 1))) bad = true;
@@ -4715,4 +4750,10 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     return of && of.every((x) => x.filter.controller === "you") ? { of } : null;
   }
   return null;
+}
+
+/** Devouring Rage: "For each Spirit sacrificed this way, that creature gets an additional +3/+0 until end of turn" is "That creature gets +3/+0 until end of turn for each Spirit sacrificed this way". */
+function spellBodyText(text: string, costSacrificedX: string | undefined): string {
+  if (!costSacrificedX) return text;
+  return text.replace(new RegExp(`For each ${costSacrificedX} sacrificed this way, that creature gets an additional ([+-]\\d+/[+-]\\d+) until end of turn\\.`), `That creature gets $1 until end of turn for each ${costSacrificedX} sacrificed this way.`);
 }

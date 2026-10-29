@@ -331,6 +331,10 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 }
 
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  // Sanguine Praetor: "each creature with the same mana value as the sacrificed creature"; Endemic Plague: "all creatures
+  // that share a creature type with the sacrificed creature": compared with the creature as it last existed (CR 608.2h).
+  const kin = /^(?:each creature|all creatures) (with the same mana value as|that shares? a creature type with) the sacrificed creature$/i.exec(p.trim());
+  if (kin) return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: p.trim().replace(/^(?:each|all) /i, "") }, sacrificedKin: /mana value/.test(kin[1]!) ? "manaValue" : "creatureType" };
   // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
   if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // Kjeldoran Frostbeast: "all creatures blocking or blocked by ~": the ones in combat with it as this resolves.
@@ -527,6 +531,11 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const g = parseGroup(subjectAnd[1]!);
     return g?.other && !/ (?:with|that|who|which) /i.test(subjectAnd[1]!) ? { ref: "each", filter: g.filter, andSubject: true } : null;
   }
+  // "Sacrifice ~: Enchanted creature and other creatures that share a creature type with it get +1/+1 until end of turn"
+  // (Crown of Vigor): what the Aura enchanted, as it last existed once it's sacrificed, and every other creature sharing
+  // a creature type with it as this resolves (CR 608.2h).
+  if (!ctx.spell && /^enchanted creature and other creatures that share a creature type with it$/i.test(x))
+    return { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature that shares a creature type with enchanted creature" }, andAttached: true };
   // "It and other creatures you control that share a creature type with it each get +2/+0 ... until end of turn" (Haunted
   // One): the source while it's still there, and the others as this resolves (CR 611.2c).
   // "~ and Drakes you control each get +X/+X" (Alandra, Sky Dreamer): the same, the source counted once if it's one too.
@@ -1026,6 +1035,11 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [{ kind: "object", status: "enchanted", text: "enchanted creature" }, { kind: "object", types: ["Enchantment"], text: "enchantment creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "enchanted creature or enchantment creature") };
   }
+  // Godhunter Octopus: "an enchantment or an enchanted permanent": a permanent that's either one (TargetSpec.anyOf).
+  if (/^an? enchantment or an enchanted permanent$/.test(phrase.trim())) {
+    const anyOf: TargetSpec[] = [{ kind: "object", types: ["Enchantment"], text: "enchantment" }, { kind: "object", status: "enchanted", text: "enchanted permanent" }];
+    return { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: "enchantment or enchanted permanent" };
+  }
   // Sonar Strike: "target attacking, blocking, or tapped creature": one that's any of them (TargetSpec.anyOf).
   const combatOrTapped = /^(target )?attacking, blocking, or tapped creature$/.exec(phrase.trim());
   if (combatOrTapped) {
@@ -1033,6 +1047,14 @@ export function parseTargetPhrase(
     if (rest?.kind !== "object" || rest.anyOf) return null;
     const anyOf: TargetSpec[] = [{ kind: "object", combat: "attackingOrBlocking", text: "attacking or blocking creature" }, { kind: "object", tapped: true, text: "tapped creature" }];
     return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "attacking, blocking, or tapped creature") };
+  }
+  // Tetsuo Umezawa: "target tapped or blocking creature": either one.
+  const tappedOrBlocking = /^(target )?tapped or blocking creature$/.exec(phrase.trim());
+  if (tappedOrBlocking) {
+    const rest = parseTargetPhrase(`${tappedOrBlocking[1] ?? ""}creature`, opts);
+    if (rest?.kind !== "object" || rest.anyOf) return null;
+    const anyOf: TargetSpec[] = [{ kind: "object", tapped: true, text: "tapped creature" }, { kind: "object", combat: "blocking", text: "blocking creature" }];
+    return { ...rest, anyOf, text: rest.text.replace(/\bcreature\b/, "tapped or blocking creature") };
   }
   // Silumgar Assassin: "target creature with power 3 or less an opponent controls": the same as "target creature an
   // opponent controls with power 3 or less".
@@ -1058,6 +1080,12 @@ export function parseTargetPhrase(
   if (twoKinds && twoKinds[2] !== twoKinds[3]) {
     const anyOf = [twoKinds[2]!, twoKinds[3]!].map((w) => parseTargetPhrase(`${w} creature`, opts));
     if (anyOf.every((x) => x?.kind === "object" && !x.anyOf)) return { kind: "object", types: ["Creature"], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().toLowerCase()}` };
+  }
+  // Nissa's Defeat: "Forest, green enchantment, or green planeswalker": a permanent that's any of them.
+  const landHued = /^(target )?(Plains|Island|Swamp|Mountain|Forest), (white|blue|black|red|green) enchantment, or (white|blue|black|red|green) planeswalker$/.exec(phrase.trim());
+  if (landHued) {
+    const anyOf = [landHued[2]!, `${landHued[3]} enchantment`, `${landHued[4]} planeswalker`].map((w) => parseTargetPhrase(w, opts));
+    if (anyOf.every((x) => x?.kind === "object" && !x.anyOf && !x.controller)) return { kind: "object", types: [], notTypes: [], notColors: [], anyOf: anyOf as TargetSpec[], text: `target ${phrase.trim().replace(/^target /, "")}` };
   }
   // Bumi Bash: "land creature or nonbasic land": a permanent that's either one, or both.
   const landOr = /^(target )?(land|artifact) creature or nonbasic land$/.exec(phrase.trim());
@@ -1332,11 +1360,11 @@ export function parseTargetPhrase(
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
   }
-  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creature you control with a level counter on it" (Time of Heroes), "creatures with ice counters on them", "creature you control with a counter on
+  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creature you control with a level counter on it" (Time of Heroes), "a land with a trap counter on it" (Trap Digger), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1410,6 +1438,10 @@ export function parseTargetPhrase(
       if (anyOf.some((f) => f?.kind !== "card")) return null;
       return { kind: "card", anyOf: anyOf.map((f) => ({ ...f!, owner: undefined })), ...(owner ? { owner } : {}), text };
     }
+    // Rekindling Phoenix's Elemental: "return target card named Rekindling Phoenix from your graveyard": that name (CR
+    // 201.2), another card's (compile keeps a quoted ability's own card name as written).
+    const namedCard = /^card named ([A-Z][\w'-]*(?:,? (?:[A-Z][\w'-]*|of|the|a))*)$/.exec(listed);
+    if (namedCard && !linkedExile && !Object.keys(extra).length) return { kind: "card", types: [], notTypes: [], notColors: [], named: namedCard[1]!, ...(owner ? { owner } : {}), text };
     // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
     if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".
@@ -1489,10 +1521,10 @@ export function parseTargetPhrase(
     // cycling too (CR 702.29e; the card data lists "Cycling" with it).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
-  } else if ((m = / with (modular|flanking)( you control)?$/.exec(p))) {
+  } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {
     // Arcbound Overseer: "each creature you control with modular": modular as the card data lists it (CR 702.43a), on
     // the battlefield's characteristics (lost with all abilities, layer 6). Telim'Tor: "attacking creatures with
-    // flanking" (CR 702.25a), granted flanking too.
+    // flanking" (CR 702.25a), granted flanking too. Parallax Inhibitor: "each permanent with fading you control" (CR 702.32a).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index) + (m[2] ?? "");
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
@@ -1541,6 +1573,11 @@ export function parseTargetPhrase(
   if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you or a planeswalker you control$/.test(p)) {
     extra.combat = "attackingYouOrYourPlaneswalker";
     p = "creature";
+  }
+  // Crowd of True Believers: "target creature you control that's attacking alone": the only attacking creature (CR 506.5).
+  if (!inGraveyard && !extra.combat && /^creature( you control)? that's attacking alone$/.test(p)) {
+    extra.combat = "attackingAlone";
+    p = p.replace(/ that's attacking alone$/, "");
   }
   // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
   // Giant Trap Door Spider: "target creature without flying that's attacking you".

@@ -17,6 +17,7 @@ import {
   blocksMayCost,
   livingPlayers,
   abilityProblem,
+  definedX,
   faceUpWays,
   faceUpManaCost,
   dredgeAmount,
@@ -113,6 +114,7 @@ import {
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
+import { prepareSpellOf } from "./prepare";
 import { castingBody, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
@@ -531,6 +533,22 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const haste = pend.what === "riot" && s.activePlayer === pid && s.step === "main1";
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
+    }
+    // Time travel (CR 701.56a): a suspended card or an impending permanent comes sooner with one fewer; a permanent with
+    // vanishing lasts longer, and one whose mana or power counts its time counters grows, with one more. Anything else
+    // stays as it is.
+    if (pend.kind === "chooseOption" && pend.what === "timeTravel") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const mine = o?.zone === "battlefield" && controllerOf(s, o) === pid;
+      const cc = o ? compileCard(defOf(s, o)) : undefined;
+      const choice = !o
+        ? "none"
+        : o.zone === "exile" || (mine && o.castAlt === "impending")
+          ? "remove"
+          : mine && (cc!.triggers.some((t) => t.event === "selfLastTimeCounterRemoved") || /"counter":"time"/.test(JSON.stringify([cc!.mana, cc!.statics])))
+            ? "add"
+            : "none";
+      return [{ type: "chooseOption", player: pid, choice }];
     }
     // "Enters with your choice of a flying counter or a first strike counter": evasion first, then what wins fights.
     if (pend.kind === "chooseOption" && pend.what === "counterChoice") {
@@ -1570,6 +1588,15 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const ranked = all.filter((t) => t.kind === "object" && (controllerOf(s, obj(s, t.id)) === pid) === helps).sort((a, b) => (a.kind === "object" && b.kind === "object" ? worth(s, pid, obj(s, b.id)) - worth(s, pid, obj(s, a.id)) : 0));
     if (forced) return ranked[0] ? [ranked[0]] : all[0] ? [all[0]] : null;
     return ranked[0] && s.activePlayer === pid && s.step === "main1" && !s.stack.length ? [ranked[0]] : null;
+  }
+  // "Target creature becomes prepared" (Skycoach Waypoint): our best creature that has a prepare spell and isn't prepared;
+  // "... becomes unprepared" (Biblioplex Tomekeeper): an opponent's prepared creature. Anything else does nothing (rulings).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "becomePrepared" && body.effects[0]!.what.ref === "target") {
+    const un = !!body.effects[0]!.un;
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const ranked = all.filter((t) => t.kind === "object" && (un ? !!obj(s, t.id).prepared && controllerOf(s, obj(s, t.id)) !== pid : !obj(s, t.id).prepared && !!prepareSpellOf(s, obj(s, t.id)) && controllerOf(s, obj(s, t.id)) === pid)).sort((a, b) => (a.kind === "object" && b.kind === "object" ? worth(s, pid, obj(s, b.id)) - worth(s, pid, obj(s, a.id)) : 0));
+    const pick = ranked[0] ?? (forced ? all[0] : undefined);
+    return pick ? [pick] : null;
   }
   // Misleading Signpost: the attacker we'd turn, the strongest one attacking us first, then one of ours.
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "reselectAttack") {
@@ -4031,7 +4058,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (!craft && (groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
-      const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      // Prototype Portal: X set by the ability (CR 107.3c).
+      const fixedX = definedX(s, o, ab);
+      const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];

@@ -160,6 +160,20 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const token: TokenSpec = { name: m[6]!, named: true, colors: [], types: ["Artifact"], subtypes: m[5] ? ["Equipment"] : [], keywords: [], abilities: [...texts, ...(m[9] ? [`Equip ${m[9]}`] : [])].join("\n"), ...(m[4] ? { snow: true as const } : {}) };
     return who && texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who, n: amt(m[2]!), token, ...(m[3] ? { tapped: true as const } : {}) }] : null;
   }
+  // Farid, Enterprising Salvager: "create a colorless artifact token named Scrap": its name and type only, no abilities
+  // (rulings, CR 111.4).
+  if ((m = /^(?:You )?[Cc]reate a colorless artifact token named ([A-Z][\w'-]*)$/.exec(s))) {
+    const token: TokenSpec = { name: m[1]!, named: true, colors: [], types: ["Artifact"], subtypes: [], keywords: [] };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token }];
+  }
+  // Setzer, Wandering Gambler: "create The Blackjack, a legendary 3/3 colorless Vehicle artifact token with flying and crew
+  // 2": a named legendary Vehicle (CR 111.4, 205.4d, 301.7, 702.122a).
+  if ((m = /^(?:You )?[Cc]reate ((?:The )?[A-Z][\w'-]*(?: [A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) colorless Vehicle artifact token with (?:([a-z, ]+?),? and )?crew (\d+)$/.exec(s))) {
+    const keywords = m[4] ? parseKeywordList(m[4]) : [];
+    if (!keywords) return null;
+    const token: TokenSpec = { name: m[1]!, named: true, legendary: true, power: Number(m[2]), toughness: Number(m[3]), colors: [], types: ["Artifact"], subtypes: ["Vehicle"], keywords, abilities: `Crew ${m[5]}` };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token }];
+  }
   // Overlord of the Hauntwoods: "create a tapped colorless land token named Everywhere that is every basic land type": a
   // Plains, Island, Swamp, Mountain and Forest, with each one's mana ability (CR 305.6), but not basic (rulings).
   if ((m = /^(?:You )?[Cc]reate a (tapped )?colorless land token named ([A-Z][\w'-]*) that is every basic land type$/.exec(s))) {
@@ -245,7 +259,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "Copies of the sacrificed creature" (Cleaver Skaab): of the one sacrificed for the cost, as it last existed, copy
     // effects included (CR 707.2, rulings).
     const sacrificed = /^the sacrificed (?:creature|artifact|permanent)$/.test(m[4]!);
-    const what0 = ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
+    // "A copy of the exiled card" after "you may exile an artifact or creature card from your hand. If you do" (Nexus of
+    // Becoming): that card, copied as it is in exile (CR 707.2).
+    const fromHand = ctx.mayExiledFromHand && /^(?:the exiled card|it|that card)$/.test(m[4]!);
+    const what0 = fromHand ? { ref: "exiledFromHand" as const } : ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     // "A copy of that card" about a creature that died (Myrkul, Lord of Bones): of the card, not of the creature it was
     // as it last existed (rulings).
     const what = what0?.ref === "subjectCard" && m[4] === "that card" ? { ...what0, printed: true as const } : what0;
@@ -347,6 +364,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!inner || ctx.targets.length !== before || allEffects(inner).some((y) => ("what" in y && !selfTransform(y)) || ("who" in y && (y.who as { ref: string }).ref !== "you"))) return null;
     return [{ type: "delayed", when: "nextTurnUpkeep", effects: inner, text: m[1]! }];
   }
+  // Time travel (CR 701.56a): "Time travel three times" (The Tenth Doctor) is three time travel actions, one after another.
+  if (/^Time travel$/i.test(s)) return [{ type: "timeTravel" }];
+  if ((m = /^Time travel (twice|three times)$/i.exec(s))) return [{ type: "repeat", n: m[1] === "twice" ? 2 : 3, effects: [{ type: "timeTravel" }] }];
   // Proliferate (CR 701.27), amass (CR 701.47).
   if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
   if (/^Proliferate twice$/i.test(s)) return [{ type: "proliferate", twice: true }];

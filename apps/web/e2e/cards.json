@@ -13941,6 +13941,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7f3b6c25-b855-4ea5-a8ad-d954a6cdffb7",
+  "name": "Prototype Portal",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Imprint — When this artifact enters, you may exile an artifact card from your hand.\n{X}, {T}: Create a token that's a copy of the exiled card. X is the mana value of that card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Imprint"
+  ],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
   "name": "Pyroblast",
   "manaCost": "{R}",
@@ -14767,6 +14791,34 @@
   "gameChanger": true
  },
  {
+  "oracleId": "2b8afa9f-4236-4c02-a8d5-3c145caecfd6",
+  "name": "Rift Bolt",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Rift Bolt deals 3 damage to any target.\nSuspend 1—{R} (Rather than cast this card from your hand, you may pay {R} and exile it with a time counter on it. At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Suspend"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-04-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "45bcebd0-5e93-4433-b92f-b4c161d04bd6",
   "name": "Ripples of Potential",
   "manaCost": "{1}{U}",
@@ -14848,6 +14900,33 @@
   "set": "bfz",
   "releasedAt": "2015-10-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f07a8c8d-73a1-44cc-9313-05f3bcf1a67c",
+  "name": "Rotating Fireplace",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "This artifact enters tapped with a time counter on it.\n{T}: Add an amount of {C} equal to the number of time counters on this artifact.\n{4}, {T}: Time travel. Activate only as a sorcery. (For each suspended card you own and each permanent you control with a time counter on it, you may add or remove a time counter.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Time Travel"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -18151,6 +18230,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bdd41af0-bbd1-4ecd-a699-99f006f5e5ce",
+  "name": "Thorin Oakenshield",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Dwarf Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dwarf",
+   "Noble"
+  ],
+  "oracleText": "Trample\nStoried (If you control three or more artifacts, legendaries, and/or Sagas, you have an enduring story for the rest of the game.)\nAs long as you have an enduring story, artifacts and creatures you control have ward {1}.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Trample",
+   "Storied"
+  ],
+  "commanderLegal": "legal",
+  "set": "hob",
+  "releasedAt": "2026-08-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "edd8d1e8-be43-4c38-bb3a-83081fbaf0b5",
   "name": "Thoughtseize",
   "manaCost": "{B}",
@@ -19971,6 +20088,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "31f15274-301b-47c5-ba19-0ced04520878",
+  "name": "Wayfarer's Bauble",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}, {T}, Sacrifice this artifact: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9842734c-1eac-4509-a731-4c22017ae586",
   "name": "Wear // Tear",
   "manaCost": "{1}{R} // {W}",
@@ -20108,6 +20247,34 @@
   "set": "sld",
   "releasedAt": "2025-02-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5207621d-aecf-40ae-8108-2bd571e3a427",
+  "name": "Wibbly-wobbly, Timey-wimey",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Time travel. (For each suspended card you own and each permanent you control with a time counter on it, you may add or remove a time counter.)\nDraw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Time Travel"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

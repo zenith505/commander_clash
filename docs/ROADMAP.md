@@ -1,7 +1,7 @@
 # Roadmap
 
-27,327 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,040 of
+27,452 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,063 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -241,7 +241,7 @@ line blocks.
    counters are put on a creature"), Printlifter Ooze (turned face up), Adrestia ("if an Assassin crewed it"),
    Sorcerous Squall (casting from an opponent's graveyard), Narset, Enlightened Master (free noncreature casts from
    among exiled cards), Azra Oddsmaker ("choose a creature" with a this-turn trigger), Capricopian (reselecting the
-   attacked player, activated by that player), Rotating Fireplace (time travel), Aggressive Mining ("you can't play
+   attacked player, activated by that player), Aggressive Mining ("you can't play
    lands"), Essence Sliver (any damage by a Sliver), Hunting Wilds (Forests put onto the battlefield this way become
    3/3), Overwhelming Splendor (a player can't activate abilities that aren't mana abilities), Gandalf, Goblins' Bane
    (Flameshape's face-down exile with play permission), Mastermind's Acquisition (a card from outside the game), Qal
@@ -360,7 +360,7 @@ line blocks.
    Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins,
    Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void, In Too Deep, Dollhouse of Horrors, Harald
-   Unites the Elves, Soul Foundry, Peerless Samurai, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
+   Unites the Elves, Peerless Samurai, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact, Fear of Infinity, Elderscale Wurm, Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
    Scheming Fence, Oath of Lieges, Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
@@ -737,12 +737,70 @@ line blocks.
    the card discarded, in a reflexive trigger), Savage Summoning (flash and "can't be countered" for the next creature
    spell), Rocco, Street Chef, Grolnok, Golden Guardian. Still missing from CR 800.4a: a spell someone else owns on the
    stack under a leaving player's control is removed rather than exiled.
+   Round 202 went on from the top (ranks 6,000 to 12,000 not looked at before): "Whenever a creature you control
+   connives" (Iron Monger, Ultron; once the conniving is done, gone or not, CR 701.50f), "you may have it connive. Do this
+   only once each turn" (Baron Strucker), "Whenever ~ or another Dwarf you control enters and whenever an Equipment you
+   control enters" (Giott: one trigger for a permanent that's both, CR 603.2c), "copy the next spell you cast this turn
+   when you cast it" (Flamehold Grappler, Tzaangor Shaman), "copy it for each other instant and sorcery spell you've cast
+   this turn", counted as the trigger resolves (Show of Confidence), "a noncreature spell with one or more blue mana
+   symbols in its mana cost, create that many" (Namor), "a colorless artifact token named Scrap" (Farid), "create The
+   Blackjack, a legendary 3/3 colorless Vehicle artifact token with flying and crew 2" (Setzer), "one or more goaded
+   creatures deal combat damage to one of your opponents" (Puppet Master), "Whenever you activate an ability of a
+   creature", mana abilities too (Elrond), "Vehicles you control become artifact creatures ... Creatures you control get
+   +2/+0" (Start Your Engines), "When this token deals damage, sacrifice it" (Vrondiss), "each creature that entered the
+   battlefield under your control this turn" (Shaile), "Whenever you turn a permanent face up" (Growing Dread: the player
+   who turned it, by the special action or an effect), "can't cast instant or sorcery spells during that player's next
+   turn" (Azor, Sphinx's Decree), "Whenever an opponent becomes the monarch, if you were the monarch as the turn began"
+   (Knights of the Black Rose), "Whenever another player loses the game ... that player's life total as the turn began"
+   (Sengir). No new prompts.
+   Out after round 202 (looked at, not done): Masako the Humorless (tapped creatures blocking: every blocker check reads
+   untapped), Sea Gate Stormcaller ("copy that spell twice instead" if kicked, inside the delayed trigger), Ramses,
+   Assassin Lord (attacked this turn by an Assassin you controlled), Kros, Defense Contractor (no record of who put
+   counters on a creature), Visions of Phyrexia (no record of playing a card from exile), Glorious Purpose (the sixth
+   plan counter), Loot Dispute (attacking the player who has the initiative), Rhys, the Evermore (remove any number of
+   counters), Bladegriff Prototype (a target the damaged player chooses), Bronze Bombshell, Zidane, Tantalus Thief ("an
+   opponent gains control of a permanent from you"), Tameshi, Reality Architect (noncreature permanents returned to
+   hand), Obeka, Splitter of Seconds (extra upkeep steps after this phase).
+   Round 203 went on from the top: storied and the enduring story (CR 702.195: Balin, Bifur, Bombur, Dáin, Fíli, Kíli,
+   Óin, Ori, Thorin), "artifacts and creatures you control" as one group (Thorin), time travel (CR 701.56a, a prompt
+   for each permanent with a time counter and each suspended card, then all the changes at once: Wibbly-wobbly,
+   Timey-wimey, All of History, All at Once, Time Beetle, Rotating Fireplace, The Tenth Doctor, The Girl in the
+   Fireplace, The Parting of the Ways), "you may exile an artifact or creature card from your hand. If you do, create a
+   token that's a copy of the exiled card" (Nexus of Becoming), no activated abilities of cards in graveyards (Ashes of
+   the Abhorrent), cards in graveyards can't be targeted (Ground Seal, Underworld Cerberus), "target player other than
+   ~'s owner" (Crown of Doom), an X the ability's text sets (CR 107.3c: Prototype Portal, Soul Foundry; the app doesn't
+   ask for it). New prompt: time travel.
+   Out after round 203 (looked at, not done): Coward // Killer (the face named Coward, and "each other creature that
+   shares a creature type with it"), The Wedding of River Song, The Aesir Escape Valhalla ("the exiled card" across
+   chapters), Overgrown Zealot (mana only to turn permanents face up), Yuna's Decision, Hylda of the Icy Crown
+   ("whenever you tap an untapped creature an opponent controls"), Admiral Beckett Brass (combat damage by three or
+   more Pirates to one player), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
+   nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
+   Summary Dismissal, Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
+   Round 204 went on from the top: "target creature becomes prepared / unprepared" on any creature (CR 722.3a-b:
+   Skycoach Waypoint, Hexhaven Dueling Arena, Biblioplex Tomekeeper, Infinite Coursework; the bot aims it at its own
+   creature with a prepare spell), "you may exile N cards from your graveyard. If you do" with N above one (CR 609.3:
+   Emeritus of Ideation, Skywarp Skaab, Aegis Sculptor), "N or more artifact and/or creature cards in your graveyard"
+   (Lorehold Archivist, Mortal Combat, Scouring Swarm), "your third spell each turn / in a turn" (Emeritus of Conflict,
+   Captain Ripley Vance, Vance's Blasting Cannons), "whenever a creature attacks this turn" as a floating trigger
+   (CR 603.7b: The Revelations of Ezio, Origin of the Hidden Ones, Basri, Devoted Paladin, The Bloodsky Massacre, Ondu
+   Rising), "if it was cast from your graveyard" (Rocket-Powered Goblin Glider), renown triggers and "is renowned"
+   (CR 702.112b: Relic Seeker, Valeron Wardens, Scab-Clan Berserker, Honored Hierarch, Goblin Glory Chaser, Consul's
+   Lieutenant), "if it had N or more counters on it" as it last existed (CR 608.2h: Lost Isle Calling), "tap two other
+   untapped creatures you control" as a may (Tidal Terror, Gravelgill Scoundrel, Redcap Raiders, Civil Servant,
+   Meanders Guide, Saheeli, Filigree Master), "if you didn't cast it from your hand" (Epochrasite), Razzle-Dazzler,
+   Wicked Wolf, Triceraton Commander, Hope-Ender Coatl, Fall of the Thran, Rust Harvester. Kappa Cannoneer's "It can't
+   be blocked this turn" now means Kappa Cannoneer, not the artifact that entered. No new prompts.
+   Out after round 204 (looked at, not done): Codie, Ravenous Codex ("prepared spell" isn't defined yet), Glissa's
+   Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (a type-or-subtype filter), Behold the
+   Unspeakable (a pausing scry inside "Otherwise"), Song of Blood, Indulge // Excess, Harald Unites the Elves, Rent Is
+   Due, Search Elemental, Estinien Varlineau.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
    10,640: Emerald Dragon, Portent of Calamity, Keen-Eyed Curator, Dwarven Scorcher, Smoke Spirits'
    Aid, The Foretold Soldier, Radiant Scrollwielder, Become Anonymous, Night Soil, Overabundance, Avalanche of Sector
-   7, Obosh, Grappling Hook, Otrimi, Zhao, Fíli, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
+   7, Obosh, Grappling Hook, Otrimi, Zhao, Donal, Iroh, Garth One-Eye, Angrath, the Flame-Chained, Identity
    Thief, Mishra, Eminent One, Spell Queller, Goblin Charbelcher, Lucky Clover, Mistbind Clique; and the harder ones above it: Conqueror's Galleon, Grub, Storied Matriarch,
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
@@ -1400,7 +1458,7 @@ line blocks.
      damage or +X/±X by its mana value; still out: several targets (Kaboom!), a reflexive trigger after (Calibrated
      Blast), Undying Flames' epic, "if the spell's mana value is ..." (Bre, Breaching Dragonstorm, Ryan Sinclair,
      Solstice Revelations), paying life or energy instead (Bismuth Mindrender, Amped Raptor), each opponent / each player (Fevered Suspicion, Etali, Plargg and Nassari),
-     suspend and time counters (Kang Prime, The Tenth Doctor), Neera, Demonlord Belzenlok ("repeat this process").
+     suspend and time counters (Kang Prime), Neera, Demonlord Belzenlok ("repeat this process").
    Left from the round after dice (choose an opponent, choose a die result, leaves-the-battlefield triggers, searching
    another player's library):
    - "Choose an opponent" as a spell resolves works (Myrkul's Edict; bots choose the strongest opponent); "You and that
@@ -1504,7 +1562,7 @@ line blocks.
    - Reflexive spells still out: Ill-Timed Explosion ("the greatest mana value among cards discarded this way" carried
      into the trigger), Goblin Plate Mail ("attach
      ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
-   - "Triggers an additional time" still out: Bifur, Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
+   - "Triggers an additional time" still out: Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
      of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All, The
      Masamune, Valiant Emberkin, Veyran, Virtue of Knowledge, Wayta, Windcrag Siege, Wizard's Staff.
    - Simplifications: amass with several Armies uses the one with the most +1/+1 counters (CR 701.47a lets you
@@ -2491,15 +2549,16 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   graveyard until a nonland card (Countryside Crusher), damage "equal to the number of cards revealed this way", the
   one found included (Madcap Experiment, Audacious Reshapers), "When that creature dies this turn, exile its
   controller's graveyard" (Burn Away), "two target permanents that share a card type", checked again as it resolves
-  (Shifting Loyalties, The Trickster-God's Heist, Bilbo's Burglar's Plot; CR 205.2a). +28 (27,398 of 31,936 with main).
-- Out after round B35: Aegis Sculptor and Skywarp Skaab (done in Lane A's round 204, left to it), Carrion Rats ("any player may exile a card from their graveyard. If a player does"),
-  Flameskull (rejuvenation: "play one of those cards" until the end of your next turn), Mindreaver (a counter by
-  name among the cards it exiled), Lethal Exploit and Flame Discharge ("modified creature you controlled as you cast
-  ~"), Ardent Dustspeaker (an instant or sorcery card to the bottom as a may-cost), Break Out (a revealed card's mana
-  value deciding a second may), Turf War (contested counters), Capricious Efreet (destroy one of three targets at
-  random), Touch of Moonglove (a creature dealt damage by that creature dying this turn), Thelon's Curse (each
-  player's upkeep may-pay per tapped blue creature), Pick Up the Pace ("a creature you control that entered this turn
-  attacks" and play "as long as you attacked this turn").
+  (Shifting Loyalties, The Trickster-God's Heist, Bilbo's Burglar's Plot; CR 205.2a). +28 (27,480 of 31,936 with rounds 202 to 204).
+- Out after round B35: Aegis Sculptor and Skywarp Skaab (done in Lane A's round 204, left to it), Carrion Rats ("any
+  player may exile a card from their graveyard. If a player does"), Flameskull (rejuvenation: "play one of those
+  cards" until the end of your next turn), Mindreaver (a counter by name among the cards it exiled), Lethal Exploit
+  and Flame Discharge ("modified creature you controlled as you cast ~"), Ardent Dustspeaker (an instant or sorcery
+  card to the bottom as a may-cost), Break Out (a revealed card's mana value deciding a second may), Turf War
+  (contested counters), Capricious Efreet (destroy one of three targets at random), Touch of Moonglove (a creature
+  dealt damage by that creature dying this turn), Thelon's Curse (each player's upkeep may-pay per tapped blue
+  creature), Pick Up the Pace ("a creature you control that entered this turn attacks" and play "as long as you
+  attacked this turn").
 - Next for Lane B, least played first: North Star, Silhouette, Suffocation.
   Then up from about 25,300: Goblins of the Flarg (a state trigger), Tiger-Tribe Hunter (pack tactics), Oracle of
   Dust (a card an opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent.

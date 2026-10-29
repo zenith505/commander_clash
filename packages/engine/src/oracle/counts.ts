@@ -355,6 +355,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: "life", who });
   }
+  // Sengir, the Dark Baron: "that player's life total as the turn began".
+  if (ctx?.eventPlayer && /^that player's life total as the turn began$/i.test(p)) return count({ kind: "eventPlayerLifeAsTurnBegan" });
   // Malignus: "the highest life total among your opponents" (those still in the game).
   if (/^the highest life total among your opponents$/i.test(p)) return count({ kind: "life", who: { ref: "eachOpponent" }, highest: true });
   // Scourge of the Skyclaves: "the highest life total among players" (those still in the game, you too); Sorin, Grim
@@ -438,7 +440,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Devouring Rage: "For each Spirit sacrificed this way" is its X, the number its additional cost sacrificed (CR 107.3a).
   if (each && ctx?.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) return count({ kind: "x" });
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
-  if (each && ctx?.afterYourDiscard && /^card discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
+  // Balin, Loremaster: "you may discard your hand. Draw X cards, where X is the number of cards discarded this way".
+  if (each && ctx?.afterYourDiscard && /^cards? discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
   // Seasoned Pyromancer: "for each nonland card discarded this way".
   if (each && (m = /^(non[a-z]+|creature|land|artifact|instant|sorcery|enchantment) card discarded this way$/i.exec(p))) {
     const filter = parseSearchFilter(`${m[1]!.toLowerCase()} card`);

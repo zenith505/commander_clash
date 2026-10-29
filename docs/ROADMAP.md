@@ -859,7 +859,7 @@ line blocks.
    battlefield and in exile).
    Round 208 went on from the top: "draw four cards. When you do, ..." only if all four were drawn (The Royal Scions);
    "you may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight,
-   Hildibrand Manderville), a permission for the Adventure face only; "up to one other target creature loses all
+   Hildibrand Manderville), a permission for the Adventure face only, with a browser test; "up to one other target creature loses all
    abilities", then keyword counters on it (Abigale, Eloquent First-Year); "equip {2} or {B}", two equip abilities
    (Transmogrant's Crown, CR 702.6d); "if it wasn't an Aura, create a token that's a copy of it, except it's a 1/1 white
    Spirit creature with flying in addition to its other types" (Kaya, Intangible Slayer; the copy's "with flying" no

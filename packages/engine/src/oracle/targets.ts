@@ -163,6 +163,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (/^each opponent (?:with|who has) no cards in hand$/.test(x)) return { ref: "opponentsEmptyHanded" };
   const poisoned = new RegExp(`^each opponent (?:with|who has) ${NUM} or more poison counters$`).exec(x);
   if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
+  const life = /^each player with exactly (\d+) life$/.exec(x);
+  if (life) return { ref: "playersWithLife", n: Number(life[1]) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
   if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };
@@ -395,7 +397,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (dealt) return { ref: "damagedThisWay", ...(dealt[1]!.toLowerCase() !== "permanent" ? { filter: { kind: "object" as const, types: [dealt[1]![0]!.toUpperCase() + dealt[1]!.slice(1).toLowerCase()], text: dealt[1]!.toLowerCase() } } : {}) };
   // "~ and up to one other target creature can't be blocked this turn" (Martha Jones), "~ and another target creature each
   // get +1/+0": the source while it's still there (CR 611.2c), and the one target, other than the source.
-  const selfAndTarget = !ctx.spell && !ctx.selfCard && !cards && !ctx.targets.length ? /^~ and ((?:up to one other|another) target (?:creature|creature you control))$/i.exec(x) : null;
+  // Tatsunari, Toad Rider: "~ and target Frog you control can't be blocked this turn except by ...".
+  const selfAndTarget = !ctx.spell && !ctx.selfCard && !cards && !ctx.targets.length ? /^~ and ((?:up to one other|another) target (?:creature|creature you control)|target [A-Z][a-z]+ you control)$/.exec(x) : null;
   if (selfAndTarget) {
     const t = parseObjectNow(selfAndTarget[1]!, ctx, cards);
     return t?.ref === "target" && !t.n && !t.sameName && !t.sharesColor ? { ...t, andSelf: true } : null;
@@ -421,7 +424,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "~ and that creature each get +2/+0 and gain haste until end of turn" (Gogo, Mysterious Mime): the source and the target.
   if (/^~ and that creature(?: each)?$/i.test(x) && !ctx.spell && !ctx.selfCard && ctx.lastObjectTarget !== undefined && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget, andSelf: true };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
-    if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
+    // "Manifest dread, then put three +1/+1 counters on that creature" (Weight Room): the face-down 2/2 just manifested.
+    if (ctx.lastCreated && (/^it$/i.test(x) || ((ctx.lastPut || ctx.lastManifested) && /^that creature$/i.test(x)))) return { ref: "created" };
     // "Create a 1/1 ... Otter creature token ... put a +1/+1 counter on that creature" (Otterball Antics): a spell's one
     // token, with no other creature it could mean.
     if (ctx.lastCreatedCreature && ctx.spell && /^that creature$/i.test(x) && !ctx.targets.length && !ctx.subject && !ctx.subjectIt) return { ref: "created" };
@@ -837,8 +841,11 @@ function singularPhrase(p: string): string {
   else {
     // A creature type: "two target Goblins", "up to two target Elves you control".
     const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));
-    if (j < 0) return p;
-    words[j] = singular(words[j]!);
+    // A basic land type: "up to four target Forests" (Nissa, Worldwaker).
+    const land = j < 0 ? words.findIndex((w) => /^(?:Forests|Islands|Mountains|Swamps)$/.test(w)) : -1;
+    if (land >= 0) words[land] = words[land]!.slice(0, -1);
+    else if (j < 0) return p;
+    else words[j] = singular(words[j]!);
   }
   return words.join(" ").replace(/ your opponents control$/, " an opponent controls").replace(/ from graveyards$/, " from a graveyard");
 }
@@ -1408,7 +1415,8 @@ export function parseTargetPhrase(
   // it", "permanents you control with counters on them" (any kind)
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  // Tetzimoc, Primal Death: "each creature your opponents control with a prey counter on it".
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap|prey) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1560,10 +1568,11 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if (inGraveyard && (m = /(?:^| )with (cycling|awaken|foretell|mutate|flashback|madness|disturb|a (?=cycling ability$)cycling)(?: ability)?$/.exec(p))) {
+  } else if (inGraveyard && (m = /(?:^| )with (cycling(?: abilities)?|awaken|foretell|mutate|flashback|madness|disturb|a cycling ability)$/.exec(p))) {
     // Sacred Excavation: "cards with cycling from your graveyard": a card's printed keyword abilities, typecycling being
-    // cycling too (CR 702.29e; the card data lists "Cycling" with it). Spellpyre Phoenix: "with a cycling ability", the same.
-    if (m[1]!.startsWith("a ")) m[1] = "cycling";
+    // cycling too (CR 702.29e; the card data lists "Cycling" with it). Spellpyre Phoenix: "with a cycling ability", Herald
+    // of the Forgotten: "with cycling abilities", the same.
+    if (/cycling/.test(m[1]!)) m[1] = "cycling";
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
   } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {

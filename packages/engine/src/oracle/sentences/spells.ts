@@ -62,6 +62,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if ((m[3] || m[4]) && !times) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, next: true, ...(times ? { times } : {}) }];
   }
+  // Saheeli, the Gifted: "The next spell you cast this turn has affinity for artifacts": that spell costs {1} less for
+  // each artifact you control as you cast it (CR 702.41a), counted as its total cost is determined (CR 601.2f; rulings),
+  // generic mana only (rulings).
+  if ((m = /^[Tt]he next spell you cast this turn has affinity for (artifacts)$/.exec(s))) {
+    const change = parseCostChange(`Spells you cast cost {1} less to cast for each ${m[1]!.slice(0, -1)} you control`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || !change.costMod.times) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, next: true }];
+  }
   // Ral, Leyline Prodigy: "Until your next turn, instant and sorcery spells you cast cost {1} less to cast": the same,
   // until its controller's next turn begins (CR 611.2b).
   if ((m = /^Until your next turn, (.+? spells) you cast cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
@@ -561,6 +569,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Wild Ricochet: "You may choose new targets for target instant or sorcery spell. Then copy that spell."
   if (!ctx.castSpell && !ctx.selfCastSpell && /^(?:Then )?copy that spell$/i.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" && !ctx.targets[ctx.lastObjectTarget]!.stackAbilities)
     return [{ type: "copySpell", spell: { target: ctx.lastObjectTarget }, n: 1, newTargets: false }];
+  // Aether Spike: "Choose target spell. ... Counter that spell unless its controller pays {1} for each {E} paid this way"
+  // (body.ts makes the payment {X}, the energy paid): the spell chosen first.
+  if (!ctx.castSpell && !ctx.selfCastSpell && (m = /^Counter that spell unless its controller pays (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" && !ctx.targets[ctx.lastObjectTarget]!.stackAbilities) {
+    const unless = parseUnlessPays(m[1]!, ctx);
+    return unless ? [{ type: "counterSpell", index: ctx.lastObjectTarget, unless }] : null;
+  }
   // "When you cast this spell, any player may sacrifice a creature of their choice. If a player does, counter ~" (Brain Gorgers).
   if (ctx.selfCastSpell && /^[Cc]ounter (?:~|it|this spell)$/.test(s)) return [{ type: "counterSpell", index: -1, cause: true }];
   // Storm of Saruman: "copy it, except the copy isn't legendary" (CR 707.9b; a permanent spell's copy becomes a
@@ -659,10 +673,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // value, as it resolves, is countered (rulings).
   if (/^Target spell can't be countered$/i.test(s)) return [{ type: "spellUncounterable", index: addTarget(ctx, { kind: "spell", text: "target spell" }) }];
   // Double Negative: "Counter up to two target spells": each one chosen, two different spells (CR 115.3, 115.6).
-  if (/^Counter up to two target spells$/.test(s)) {
-    const a = addTarget(ctx, { kind: "spell", text: "target spell", optional: true });
-    const b = addTarget(ctx, { kind: "spell", text: "target spell", optional: true, distinctFrom: [a] });
-    return [{ type: "counterSpell", index: a }, { type: "counterSpell", index: b }];
+  // Katara's Reversal: "Counter up to four target spells and/or abilities": spells, activated and triggered abilities.
+  if ((m = /^Counter up to (two|four) target spells( and\/or abilities)?$/.exec(s))) {
+    const base: TargetSpec = m[2] ? { ...stackSpec("spell or ability"), text: "target spell or ability" } : { kind: "spell", text: "target spell" };
+    const idx: number[] = [];
+    for (let i = 0; i < num(m[1]!); i++) idx.push(addTarget(ctx, { ...base, optional: true, ...(idx.length ? { distinctFrom: [...idx] } : {}) }));
+    return idx.map((index): Effect => ({ type: "counterSpell", index }));
   }
   // Parallectric Feedback: "~ deals damage to target spell's controller equal to that spell's mana value": its mana value
   // with the X chosen for it (CR 202.3e), and the spell stays on the stack.

@@ -50,6 +50,7 @@ export function singular(word: string): string {
   if (/^(?:Octopus|Hero)es$/i.test(word)) return word.slice(0, -2);
   if (/^Mice$/i.test(word)) return `${word.charAt(0)}ouse`;
   if (/^Oxen$/.test(word)) return "Ox"; // Ox Drover
+  if (/^Pegasi$/.test(word)) return "Pegasus"; // Thurid, Mare of Destiny
   if (/ves$/.test(word)) return word.replace(/ves$/, "f");
   if (/ies$/.test(word)) return word.replace(/ies$/, "y");
   if (/(x|ch|sh)es$/.test(word)) return word.replace(/es$/, "");

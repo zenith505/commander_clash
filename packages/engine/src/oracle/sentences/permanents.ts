@@ -38,6 +38,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;
   }
+  // Staff Room: "turn that creature face up or put a +1/+1 counter on it", its controller's choice as it resolves (CR
+  // 608.2d). A face-down instant or sorcery card can't be turned face up (rulings), so that option does nothing then.
+  if ((fu = /^[Tt]urn (that creature) face up or (put an? \+1\/\+1 counter on it)$/.exec(s)) && ctx.subject) {
+    const what = parseObject(fu[1]!, ctx);
+    const put = what?.ref === "subject" ? parseSentence(fu[2]!.replace(/^p/, "P"), ctx) : null;
+    return put ? [{ type: "either", options: [[{ type: "turnFaceUp", what: what! }], put], labels: ["Turn it face up", "Put a +1/+1 counter on it"] }] : null;
+  }
   if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control) face up$/.exec(s))) {
     const filter = parseTargetPhrase(fu[1]!);
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: fu[1]! }, n: 1, action: "choose" }, { type: "turnFaceUp", what: { ref: "created" } }] : null;
@@ -93,6 +100,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const t = ctx.targets[what.index]!;
     ctx.targets[what.index] = { ...t, subtypes: ["Room"], text: "target Room you control" };
     return [{ type: "unlockDoor", what }];
+  }
+  // Marina Vendrell, Keys to the House: "Lock or unlock a door of target Room you control" (CR 709.5f-g): its controller
+  // chooses one of its doors, locked or unlocked, and it becomes the other.
+  if (/^[Ll]ock or unlock a door of target Room you control$/.test(s)) {
+    const what = parseObject("target enchantment you control", ctx);
+    if (what?.ref !== "target") return null;
+    ctx.targets[what.index] = { ...ctx.targets[what.index]!, subtypes: ["Room"], text: "target Room you control" };
+    return [{ type: "unlockDoor", what, orLock: true }];
   }
   // "Return an enchantment card from your graveyard to your hand or unlock a locked door of a Room you control" (Ghostly
   // Dancers): one or the other, chosen as it resolves, never one that can't be done (CR 608.2d).

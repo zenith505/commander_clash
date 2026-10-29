@@ -1,7 +1,7 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, drawGame, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, drawGame, loseEnergy, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
@@ -285,6 +285,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `Players${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "cantWinGame" ? " can't win the game" : "")).join(",")} this turn.`);
         return;
       }
+      if (e.opponents) {
+        for (const pid of opponents(s, ctx.controller)) for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: pid, rule });
+        log(s, `${player(s, ctx.controller).name}'s opponents${e.rules.map((r) => (r === "noLoyalty" ? " can't activate planeswalkers' loyalty abilities" : "")).join(",")} this turn.`);
+        return;
+      }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule, ...(e.byColors ? { byColors: e.byColors } : {}) });
       if (e.rules[0] === "seeHexproof") {
         log(s, `${player(s, ctx.controller).name}'s spells and abilities can target their opponents and their creatures as though they didn't have hexproof this turn.`);
@@ -444,7 +449,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         if (!p.poison && !p.energy && !p.experience && !p.rad) continue;
         p.poison = 0;
-        p.energy = 0;
+        loseEnergy(s, p.id, p.energy ?? 0);
         p.experience = 0;
         p.rad = 0;
         log(s, `${p.name} loses all counters.`);

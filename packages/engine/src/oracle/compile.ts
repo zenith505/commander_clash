@@ -366,7 +366,8 @@ export function normalizeSelf(d: CardDef): string {
   // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token
   // Tuktuk the Explorer creates).
   const comma = full.split(",")[0]!;
-  const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:of|the) /.exec(full)?.[1] : undefined;
+  // "Shang-Chi" for "Shang-Chi and the Ten Rings".
+  const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:and the|of|the) /.exec(full)?.[1] : undefined;
   // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
   // "Sliver" for "Sliver Queen"). "Imskir" for "Imskir Iron-Eater": the second word may be hyphenated.
   const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+(?:-[A-Z][a-z]+)?$/.exec(full)?.[1] : undefined;
@@ -554,6 +555,13 @@ export function compile(d: CardDef): CompiledCard {
           })
           .join("\n");
       })
+      // Ultron the Annihilator: "Whenever another artifact is put into your graveyard from the battlefield or an artifact
+      // card is put into your graveyard from anywhere other than the battlefield, ...": two events that never overlap, one
+      // trigger for each.
+      .replace(/^Whenever another artifact is put into your graveyard from the battlefield or an artifact card is put into your graveyard from anywhere other than the battlefield, ([^\n]+)$/m, "Whenever another artifact is put into your graveyard from the battlefield, $1\nWhenever an artifact card is put into your graveyard from anywhere other than the battlefield, $1")
+      // Call Damage Control: "Choose up to two. Return those cards from your graveyard to your hand." then "• Target
+      // artifact card." and so on: each mode returns its one target.
+      .replace(/^Choose up to two\. Return those cards from your graveyard to your hand\.((?:\n• Target [a-z]+ card\.)+)$/m, (_, b: string) => `Choose up to two —${b.replace(/• Target ([a-z]+) card\./g, "• Return target $1 card from your graveyard to your hand.")}`)
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
       // Woolly Razorback: "As long as ~ has an ice counter on it, prevent all combat damage it would deal and it has
@@ -904,6 +912,17 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^Splice onto\b/.test(line)) {
       out.unsupported.push(raw);
+      continue;
+    }
+    // Hogaak, Arisen Necropolis: "Convoke, delve" (CR 702.51a, 702.66a); "You can't spend mana to cast this spell", so
+    // convoke and delve pay its whole total cost (rulings).
+    if (line === "Convoke, delve") {
+      out.convoke = true;
+      out.delve = true;
+      continue;
+    }
+    if (line === "You can't spend mana to cast ~.") {
+      out.noManaSpend = true;
       continue;
     }
     const costKw = parseCostKeyword(line, d);
@@ -1900,6 +1919,18 @@ export function compile(d: CardDef): CompiledCard {
       (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${permYard[2]} cards` }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
+    // Jaya Ballard's emblem: "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be
+    // put into your graveyard, exile it instead." Any number, paying their costs and following the usual timing rules; a
+    // spell cast this way that's countered goes to exile too (CR 614.1a), one that leaves the stack another way doesn't.
+    if (line === "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be put into your graveyard, exile it instead.") {
+      const f = parseTargetPhrase("instant or sorcery card from a graveyard");
+      if (f?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...rest } = f;
+        (out.graveyardGrants ??= []).push({ filter: { ...rest, text: "instant and sorcery cards" }, way: { kind: "permission", costs: [], exile: false, exileIfToGraveyard: true } });
+      }
+      continue;
+    }
     // The Necrobloom: "Land cards in your graveyard have dredge 2." (CR 702.52a): those cards have the keyword while it
     // applies, so they can replace their owner's draws.
     const dredgeGrant = /^(.+?) cards? in your graveyard (?:has|have) dredge (\d+)\.$/.exec(line);
@@ -2195,6 +2226,10 @@ export function compile(d: CardDef): CompiledCard {
     // player who looks can put each of them back on top in the same order, so they're always looked at here.
     if (line === "If you would scry a number of cards, scry that many cards plus one instead.") {
       out.scryMore = (out.scryMore ?? 0) + 1;
+      continue;
+    }
+    if (line === "If you would scry a number of cards, draw that many cards instead.") {
+      out.scryToDraw = true;
       continue;
     }
     const surveilMore = new RegExp(`^You may look at an additional ${NUM} cards each time you surveil\\.$`).exec(line);
@@ -2597,6 +2632,15 @@ export function compile(d: CardDef): CompiledCard {
       out.loseGameExileSelf = true;
       continue;
     }
+    // Gideon of the Trials' emblem: "As long as you control a Gideon planeswalker, you can't lose the game and your
+    // opponents can't win the game": only while that's true.
+    const lockIf = /^As long as (.+), you can't lose the game and your opponents can't win the game\.$/.exec(line);
+    if (lockIf) {
+      const cond = parseStaticCondition(lockIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond) out.unsupported.push(raw);
+      else [out.cantLose, out.cantWin, out.gameEndIf] = ["you", "opponents", cond];
+      continue;
+    }
     const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
     if (lockEnd && lockEnd[1] !== lockEnd[2]) {
       if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
@@ -2616,6 +2660,16 @@ export function compile(d: CardDef): CompiledCard {
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
     if (line === "Spells you cast from exile have convoke.") {
       (out.spellsHaveConvoke ??= []).push({ filter: { kind: "spell", text: "spell" }, fromExile: true, text: line });
+      continue;
+    }
+    // "Spells you cast have delve" (Teval, Arbiter of Virtue), CR 702.66a, as for convoke.
+    if (line === "Spells you cast have delve.") {
+      (out.spellsHaveDelve ??= []).push({ filter: { kind: "spell", text: "spell" }, text: line });
+      continue;
+    }
+    // Altar of the Pantheon: one more to its controller's devotion to any color or combination of colors (CR 700.5).
+    if (line === "Your devotion to each color and each combination of colors is increased by one.") {
+      out.devotionBonus = (out.devotionBonus ?? 0) + 1;
       continue;
     }
     // "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126a, as for convoke.
@@ -2760,6 +2814,18 @@ export function compile(d: CardDef): CompiledCard {
       out.unlockLess = (out.unlockLess ?? 0) + Number(unlockLess[1]);
       continue;
     }
+    const yardLess = /^Activated abilities of creature cards in your graveyard cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (yardLess) {
+      out.yardCreatureAbilityLess = (out.yardCreatureAbilityLess ?? 0) + Number(yardLess[1]);
+      continue;
+    }
+    // Catalyst Stone: "Flashback costs you pay cost {2} less." "Flashback costs your opponents pay cost {2} more." (CR 601.2f)
+    const flashbackMod = /^Flashback costs (you|your opponents) pay cost \{(\d+)\} (less|more)\.$/.exec(line);
+    if (flashbackMod && (flashbackMod[1] === "you") === (flashbackMod[3] === "less")) {
+      if (flashbackMod[1] === "you") out.flashbackLess = (out.flashbackLess ?? 0) + Number(flashbackMod[2]);
+      else out.flashbackTax = (out.flashbackTax ?? 0) + Number(flashbackMod[2]);
+      continue;
+    }
     const morphTax = /^All morph costs cost \{(\d+)\} more\.$/.exec(line);
     if (morphTax) {
       out.morphTax = (out.morphTax ?? 0) + Number(morphTax[1]);
@@ -2811,6 +2877,12 @@ export function compile(d: CardDef): CompiledCard {
     if (handSize) {
       const n = num((handSize[2] ?? handSize[4])!);
       (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
+      continue;
+    }
+    // Winter, Misanthropic Guide: "Delirium — As long as there are four or more card types among cards in your graveyard,
+    // each opponent's maximum hand size is equal to seven minus the number of those card types" (CR 402.2, 205.2a).
+    if (/^(?:Delirium — )?As long as there are four or more card types among cards in your graveyard, each opponent's maximum hand size is equal to seven minus the number of those card types\.$/.test(line)) {
+      (out.handSize ??= []).push({ who: "opponents", set: 7, minus: { count: { kind: "graveyardCardTypes", who: { ref: "you" } } }, if: { kind: "graveyardTypes", n: 4 } });
       continue;
     }
     if (/^Players have no maximum hand size\.$/.test(line)) {
@@ -2887,6 +2959,15 @@ export function compile(d: CardDef): CompiledCard {
     const flashCond = flashWhile ? parseStaticCondition(flashWhile[1]!, { affects: { kind: "self" }, mods: [], text: line }) : null;
     if (flashCond) {
       (out.flashWhile ??= []).push(flashCond);
+      continue;
+    }
+    // Kianne, Corrupted Memory: "As long as ~'s power is even, you may cast noncreature spells as though they had flash":
+    // those spells, while the condition holds as the spell is proposed (CR 702.8a, 601.2).
+    const flashForWhile = /^As long as ([^,]+), you may cast ((?:non)?creature) spells as though they had flash\.$/.exec(line);
+    const ffwCond = flashForWhile ? parseStaticCondition(flashForWhile[1]!, { affects: { kind: "self" }, mods: [], text: line }) : null;
+    const ffwSpec = flashForWhile ? parseTargetPhrase(`${flashForWhile[2]} spell`) : null;
+    if (ffwCond && ffwSpec?.kind === "spell" && !ffwSpec.controller) {
+      (out.flashForWhile ??= []).push({ filter: { ...ffwSpec, text: `${flashForWhile![2]} spells` }, condition: ffwCond });
       continue;
     }
     // "Any player may cast Sliver spells as though they had flash" (Quick Sliver), "... spells ..." (Tidal Barracuda): every
@@ -3513,6 +3594,15 @@ export function compile(d: CardDef): CompiledCard {
       const plain = (x: typeof a) => !!x && typeof x === "object" && !x.times && !x.plus && !x.half && !x.negate;
       if (!a || !b || !plain(a) || !plain(b) || out.entersWithCounters) out.unsupported.push(raw);
       else out.entersWithCounters = { counter: counterKind(ewcTwo[1]!), n: { count: { kind: "sum", of: [a.count, b.count] } } };
+      continue;
+    }
+    // Dust Animus: "If you control five or more untapped lands, ~ enters with two +1/+1 counters and a lifelink counter on
+    // it": both kinds at once if the condition holds as it enters (a replacement effect, CR 614.1c).
+    const ewcIfTwo = new RegExp(`^If (.+?), ~ enters(?: the battlefield)? with ${NUM} ${COUNTER} counters? and ${NUM} ${COUNTER} counters? on it\\.$`).exec(line);
+    if (ewcIfTwo) {
+      const cond = parseStaticCondition(ewcIfTwo[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || out.entersWithCounters || ewcIfTwo[3] === ewcIfTwo[5]) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(ewcIfTwo[3]!), n: num(ewcIfTwo[2]!), if: cond, also: { counter: counterKind(ewcIfTwo[5]!), n: num(ewcIfTwo[4]!) } };
       continue;
     }
     // "Jeska enters with a loyalty counter on her for each ...": on ~ too.

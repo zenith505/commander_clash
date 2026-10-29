@@ -80,12 +80,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Consuming Aberration: each one reveals until a land card, then puts all of them, that one too, into their
       // graveyard; with no land card, the whole library (rulings). Revealing, not milling (CR 701.20a, 701.17a).
       // Mind Grind: until X land cards, all of the library with fewer (rulings).
+      // Trepanation Blade: "for each card revealed this way" (ResolvingState.revealedUntilCount).
+      s.resolving!.revealedUntilCount = 0;
       for (const pid of apnap(s, players(s, e.who, ctx))) {
         const p = player(s, pid);
         let lands = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         const at = lands < 1 ? -1 : p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land") && --lands === 0);
         const ids = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         if (!ids.length) continue;
+        s.resolving!.revealedUntilCount += ids.length;
         log(s, `${p.name} reveals ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} and puts ${ids.length === 1 ? "it" : "them"} into their graveyard.`);
         for (const id of ids) moveObject(s, id, "graveyard");
       }
@@ -582,6 +585,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Kenessos, Priest of Thassa: a scry of one or more is a scry of one more, for each (CR 614.1a; scry 0 isn't a scry,
         // 701.22b).
         if (e.type === "scry" && n > 0) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === p.id) n += abilitiesOf(s, obj(s, id)).scryMore ?? 0;
+        // Eligeth, Crossroads Augur: a scry of one or more is a draw of that many instead, so it's no scry (no "whenever you
+        // scry"). With Kenessos too, its controller would order the replacements (CR 616.1): one more card is drawn here.
+        // The draw can stop for dredge (CR 702.52a); `scryDrew` keeps it from drawing again when it carries on.
+        if (r.scratch?.scryDrew) return;
+        if (e.type === "scry" && n > 0 && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).scryToDraw)) {
+          (r.scratch ??= {}).scryDrew = true;
+          log(s, `${p.name} draws ${n} card${n === 1 ? "" : "s"} instead of scrying.`);
+          if (!draw(s, p.id, n)) return "paused";
+          return;
+        }
         const cards = p.library.slice(0, n);
         // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
         // you scry" triggers anyway (701.22d, 701.25d).
@@ -1168,7 +1181,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       r.searchFound = moves.map((m) => m.id);
       // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
-      if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
+      if ((e.n === 1 || e.rememberAll) && !e.others && e.dest.zone === "battlefield") r.created = [];
       // Sword of Hearth and Home: the card exiled before enters with the found card, under your control (rulings: at the
       // same time). A permanent card still in exile as the object it became (CR 400.7).
       const held = e.withHeld ? (r.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (obj(s, l.id).zoneChanges ?? 0) === l.zc && isPermanentCard(defOf(s, obj(s, l.id)))).map((l) => l.id) : [];

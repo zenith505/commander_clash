@@ -284,6 +284,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (p.options.some((o) => "pay" in o) || p.options.filter((o) => "sacrifice" in o).length > 1) return null;
     return [{ ...p, picks: { count: { kind: "counters", counter: m[1]!, of: { ref: "self" } } } }];
   }
+  // Martyr's Bond: "each opponent sacrifices a permanent of their choice that shares a card type with it": the permanent
+  // the trigger is about, its card types as it last existed (one permanent of any of them, rulings).
+  if (/^[Ee]ach opponent sacrifices a permanent of their choice that shares a card type with it$/.test(s) && (ctx.subject || ctx.subjectIt))
+    return [{ type: "pick", who: { ref: "eachOpponent" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSubject: true, text: "permanent that shares a card type with it" }, n: 1, action: "sacrifice" }];
+  // Fatal Grudge: "Each opponent chooses a permanent they control that shares a card type with the sacrificed permanent and
+  // sacrifices it": the permanent the spell's additional cost sacrificed, as it last existed (a copy uses the original's,
+  // rulings).
+  if (/^Each opponent chooses a permanent they control that shares a card type with the sacrificed permanent and sacrifices it$/.test(s) && ctx.spell)
+    return [{ type: "pick", who: { ref: "eachOpponent" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSacrificed: true, text: "permanent that shares a card type with the sacrificed permanent" }, n: 1, action: "sacrifice" }];
   // Punishers: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a
   // card", "that player loses 2 life unless they pay {2}" (see the punisher effect).
   if ((m = new RegExp(`^(.+?) (?:loses|lose) ${NUMX} life unless (?:they|that player|he or she) (.+)$`).exec(s))) {
@@ -291,6 +300,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[3]!, ctx);
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
+  }
+  // The Long Reach of Night: "Each opponent sacrifices a creature of their choice unless they discard a card": each
+  // chooses in APNAP order (a punisher); one with no card in hand can't choose to discard.
+  if ((m = /^(.+?) sacrifices? an? ([a-z]+) of their choice unless (?:they|that player) discards? a card$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[2]!);
+    if (!who || who.ref === "you" || filter?.kind !== "object") return null;
+    return [{ type: "punisher", who, options: [{ discard: 1 }], effects: [{ type: "pick", who: { ref: "punished" }, filter, n: 1, action: "sacrifice" }], penalty: `Sacrifice a ${m[2]}` }];
   }
   // Rhystic Syphon: "Unless target player pays {3}, that player loses 5 life and you gain 5 life": that player decides as
   // it resolves (CR 608.2d); the rest happens only if they don't pay.
@@ -1138,6 +1155,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // until the turn ends, which wins over anything that says they can (CR 101.2).
   // "Players can't cast creature or planeswalker spells until the end of your next turn" (Single Combat): until the end
   // of this effect's controller's next turn.
+  // Revel in Silence: "Your opponents can't cast spells or activate planeswalkers' loyalty abilities this turn" (CR 606.3).
+  if (/^Your opponents can't cast spells or activate planeswalkers' loyalty abilities this turn$/.test(s)) return [{ type: "cantCast", who: { ref: "eachOpponent" } }, { type: "turnRules", rules: ["noLoyalty"], opponents: true }];
   if ((m = /^(.+?) can't cast (?:(noncreature|creature|instant|sorcery|artifact|creature or planeswalker) )?spells (this turn|until the end of your next turn)$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null = w === "players" ? { ref: "eachPlayer" } : w === "your opponents" ? { ref: "eachOpponent" } : w === "players dealt damage this way" ? { ref: "damagedThisWay" } : parsePlayer(w, ctx);
@@ -1192,6 +1211,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Kiora, the Crashing Wave: "Until your next turn, prevent all damage that would be dealt to and dealt by target permanent
   // an opponent controls": the same, until its controller's next turn begins (CR 611.2b).
+  // Gideon of the Trials: "Until your next turn, prevent all damage target permanent would deal": the same, by it.
+  if ((m = /^Until your next turn, prevent all damage (target (?:permanent|creature)) would deal$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "preventDamage", by: true }], duration: "yourNextTurn" }] : null;
+  }
   if ((m = /^Until your next turn, (prevent all .+)$/.exec(s))) {
     const p = parsePreventAll(capital(m[1]!));
     const what = p && /^target .+$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;

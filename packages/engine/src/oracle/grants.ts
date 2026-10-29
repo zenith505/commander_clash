@@ -28,7 +28,7 @@ export function compileGranted(text: string): CompiledCard {
     const own = innerQuotes(text);
     // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}"), a crew ability to
     // a Vehicle (Swift Reconfiguration), read ahead to a Saga (Barbara Wright).
-    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
+    const subtypes = /^Equip (?:Knight )?\{\d+\}$/.test(text) ? ["Equipment"] : /^Crew \d+$/.test(text) ? ["Vehicle"] : text === "Read ahead" ? ["Saga"] : [];
     hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
@@ -179,7 +179,8 @@ export function parseGrants(text: string): Modification[] | null {
     // Evolve (CR 702.100d) and training (702.149b) too: "Creature tokens you control have evolve" (Propagator Drone).
     // Provoke too (CR 702.39b): "All Sliver creatures have provoke" (Hunter Sliver). Extort too, each instance triggering
     // on its own (CR 702.101b): "Other creatures you control have extort" (Pontiff of Blight).
-    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke|extort)$/i.test(w)) {
+    // Mentor too (CR 702.134a): "Enchanted creature gets +2/+2 and has mentor" (Nyxborn Unicorn).
+    if (/^(?:myriad|prowess|dethrone|exalted|exploit|evolve|training|provoke|extort|mentor)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
@@ -233,9 +234,10 @@ export function parseGrants(text: string): Modification[] | null {
       continue;
     }
     // "Equipment you control have equip {0}" (Puresteel Paladin): another equip ability (CR 702.6a, 702.6e).
-    const equip = /^equip (\{\d+\})$/i.exec(w);
+    // Syr Gwyn, Hero of Ashvale: "Equipment you control have equip Knight {0}": only onto a Knight you control (CR 702.6c).
+    const equip = /^equip (?:(Knight) )?(\{\d+\})$/i.exec(w);
     if (equip) {
-      out.push({ kind: "addAbility", text: `Equip ${equip[1]}` });
+      out.push({ kind: "addAbility", text: `Equip ${equip[1] ? `${equip[1]} ` : ""}${equip[2]}` });
       continue;
     }
     // "Is a Vehicle artifact with crew 5" (Swift Reconfiguration): a crew ability of its own (CR 702.122a), on top of any
@@ -286,9 +288,13 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
 export function emblemAbilityOk(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, ...rest } = c;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, drawsInOpponentsDrawStep, lifeFloor, lifeFloorIf, cantLose, cantWin, gameEndIf, ...rest } = c;
+  // Gideon of the Trials': "As long as you control a Gideon planeswalker, you can't lose the game and your opponents can't
+  // win the game", for its owner (game.ts gameEndBlocked).
+  const gameLock = cantLose === "you" && cantWin === "opponents" && (!gameEndIf || gameEndIf.kind === "control");
+  if ((cantLose || cantWin) && !gameLock) return false;
   if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
-  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor) return false;
+  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree && !drawsInOpponentsDrawStep && !lifeFloor && !gameLock) return false;
   // Serra the Benevolent's: a life floor for its owner (read from emblems in damage.ts), maybe while they control a creature.
   if (lifeFloorIf && lifeFloorIf.kind !== "control") return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its

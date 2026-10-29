@@ -400,7 +400,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -521,17 +521,19 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const what = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
   }
-  if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
+  // Brush Off: "~ costs {1}{U} less to cast if it targets an instant or sorcery spell": the {U} off its colored mana.
+  if ((m = /^~ costs \{(\d+)\}((?:\{[WUBRG]\})*) less to cast if it targets (an? .+)$/.exec(text))) {
+    const colored = [...m[2]!.matchAll(/\{([WUBRG])\}/g)].map((x) => x[1] as Color);
     // Revoke Demise: "... if it targets a creature card with mana value 3 or less": a card in a graveyard (its printed
     // characteristics, CR 109.2a).
-    const card = /^an? (.+? card\b.*)$/.exec(m[2]!);
+    const card = /^an? (.+? card\b.*)$/.exec(m[3]!);
     if (card && !/ from /.test(card[1]!)) {
       const f = parseTargetPhrase(`${card[1]} from a graveyard`);
-      return f?.kind === "card" ? { lessIfTargets: { n: Number(m[1]), filter: f } } : "fail";
+      return f?.kind === "card" ? { lessIfTargets: { n: Number(m[1]), filter: f, ...(colored.length ? { colored } : {}) } } : "fail";
     }
-    const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
+    const filter = parseTargetPhrase(m[3]!.replace(/^an? /, ""));
     // "If it targets a blue spell" (Mystical Dispute), "a creature spell" (Out of Air): a spell on the stack.
-    return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
+    return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter, ...(colored.length ? { colored } : {}) } } : "fail";
   }
   // "The first creature spell you cast each turn costs {2} less to cast", "The second spell you cast each turn ...".
   // Momo, Friendly Flier: "The first non-Lemur creature spell with flying you cast during each of your turns costs {1}
@@ -802,6 +804,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // The Djinns of Mirage: "as long as white is the most common color among all permanents or is tied for most common".
   if ((m = /^(white|blue|black|red|green) is the most common color among all permanents or is tied for most common$/.exec(text))) return { kind: "mostCommonColor", color: COLOR_WORDS[m[1]!]! };
   if ((m = new RegExp(`^(?:there are |you have )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  // Altar of the Pantheon: "If you control a God, a Demigod, or a legendary enchantment": any one of them.
+  if ((m = /^you control (an? [^,]+), (an? [^,]+), or (an? [^,]+)$/.exec(text))) {
+    const conds = [m[1]!, m[2]!, m[3]!].map((x) => parseStaticCondition(`you control ${x}`, st));
+    return conds.every((c) => c?.kind === "control") ? { kind: "anyOf", conds: conds as StaticCondition[] } : null;
+  }
   // Of One Mind: "if you control a Human creature and a non-Human creature": two different creatures, since none can be
   // both.
   if ((m = /^you control an? ([A-Z][a-z]+) creature and an? non-([A-Z][a-z]+) creature$/.exec(text)) && m[1] === m[2]) {
@@ -835,6 +842,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // enchantment, land and planeswalker (CR 110.4a).
   if ((m = new RegExp(`^there are ${NUM} or more permanent types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!), permanent: true };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
+  // Hundred-Battle Veteran: "there are three or more different kinds of counters among creatures you control", counted with
+  // the creatures as the layers have them so far.
+  if ((m = new RegExp(`^there are ${NUM} or more different kinds of counters among creatures you control$`).exec(text)))
+    return { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" }, counterKinds: true } }, min: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
   // Spell mastery: "If there are two or more instant and/or sorcery cards in your graveyard" (each card counted once).
@@ -1168,7 +1179,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
   // Cult Conscript: "if a non-Skeleton creature died under your control this turn": not of that type as it last existed,
   // a token too (rulings).
-  if ((m = /^a non-([A-Z][a-z]+) creature died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, yours: true } }, min: 1 };
+  // Undead Sprinter: "if a non-Zombie creature died this turn", under anyone's control.
+  if ((m = /^a non-([A-Z][a-z]+) creature died( under your control)? this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, ...(m[2] ? { yours: true as const } : {}) } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
@@ -1268,6 +1280,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const amount = parseCount(m[1]!, null);
     return amount ? { kind: "amount", amount, ...(m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) }) } : null;
   }
+  // Kianne, Corrupted Memory: "as long as ~'s power is even" (0 is even).
+  if ((m = /^(~'s power) is (even|odd)$/.exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    return amount ? { kind: "amount", amount, parity: m[2] as "even" | "odd" } : null;
+  }
   // Pestilence: "if no creatures are on the battlefield".
   // Wirecat: "if an enchantment is on the battlefield": anyone's. Knight of Malice: "as long as any player controls a white
   // permanent": the same.
@@ -1295,10 +1312,17 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Kosei, Penitent Warlord: "as long as ~ is enchanted, equipped, and has a counter on it": all three (any counter).
   if (/^~ is enchanted, equipped, and has a counter on it$/.test(text))
     return { kind: "allOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }, { kind: "self", is: "hasCounter" }] };
+  // Sarulf, Realm Eater: "if ~ has one or more +1/+1 counters on it".
+  if (/^~ has one or more \+1\/\+1 counters on it$/.test(text)) return { kind: "amount", amount: { count: { kind: "counters", counter: "+1/+1", of: { ref: "self" } } }, min: 1 };
   // The Ozolith: "if ~ has counters on it" (any kind).
   if (/^~ has (?:counters|a counter|one or more counters) on it$/.test(text)) return { kind: "self", is: "hasCounter" };
   // "If ~ is enchanted by two or more Auras, flip it" (Kitsune Mystic): the Auras attached to it.
   if ((m = new RegExp(`^~ is enchanted by ${NUM} or more Auras$`).exec(text))) return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: num(m[1]!) };
+  // Timber Paladin: "as long as ~ is enchanted by exactly two Auras".
+  if ((m = new RegExp(`^~ is enchanted by exactly (one|${NUM}) Auras?$`).exec(text))) {
+    const n = m[1] === "one" ? 1 : num(m[1]!);
+    return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: n, max: n };
+  }
   // Brass Knuckles: "Equipped creature has double strike as long as two or more Equipment are attached to it": to the
   // equipped creature, this one included.
   if ((m = new RegExp(`^${NUM} or more Equipment are attached to it$`).exec(text)) && st.affects.kind === "attached") return { kind: "amount", amount: { count: { kind: "attachedToHost", subtypes: ["Equipment"] } }, min: num(m[1]!) };
@@ -1709,6 +1733,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Archon of the Wild Rose: "have base power and toughness 4/4 and have flying" (layers 6 and 7b).
   if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+) and ((?:has|have) [a-z ,]+)$/.exec(rest))) {
     const more = parseStaticMods(m[3]!);
+    return more?.length && more.every((x) => x.kind === "addKeywords") ? [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more] : null;
+  }
+  // Timber Paladin: "has base power and toughness 5/5 and vigilance", "... 10/10, vigilance, and trample": the keywords
+  // it has (layer 6) after the base power and toughness (layer 7b).
+  if ((m = /^has base power and toughness (\d+)\/(\d+)(?: and |, )((?!has |have |is |are )[a-z ,]+)$/.exec(rest))) {
+    const more = parseStaticMods(`has ${m[3]}`);
     return more?.length && more.every((x) => x.kind === "addKeywords") ? [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more] : null;
   }
   // Sigarda's Summons: "have base power and toughness 4/4, have flying, and are Angels in addition to their other types"
@@ -2351,6 +2381,19 @@ function parseStaticLine(line: string): StaticAbility | null {
   // Hivestone: "Creatures you control are Slivers in addition to their other creature types"; Earl of Squirrel: "Creature
   // tokens you control are Squirrels ...": a creature type added in layer 4 (CR 205.1b, 613.1d), to whichever creatures
   // are in the group then.
+  // Arterial Alchemy: "Blood tokens you control are Equipment in addition to their other types and have "Equipped creature
+  // gets +2/+0" and equip {2}"; Senator Peacock: "Artifacts you control are Clues ... and have "..."": an artifact type
+  // for artifacts only (CR 205.3d), added in layer 4, and the abilities in layer 6 (CR 613.1d, 613.1f). An Equipment
+  // that's also a creature can't be attached (CR 301.5c); one that stops being an Equipment becomes unattached (704.5p).
+  const artifactType = /^(.+?) are ([A-Z][a-z]+?)s? in addition to their other types and (have .+)$/.exec(text);
+  const artifactTypeAffects = artifactType && parseAffected(artifactType[1]!);
+  if (artifactType && artifactTypeAffects?.kind === "filter" && artifactTypeAffects.spec && !artifactTypeAffects.spec.many) {
+    const spec = artifactTypeAffects.spec;
+    const sub = artifactType[2] === "Equipment" ? "Equipment" : artifactType[2]!;
+    const artifactsOnly = (spec.types?.length === 1 && spec.types[0] === "Artifact") || (!spec.types?.length && !!spec.subtypes?.length && spec.subtypes.every((t) => subtypeSet(t) === "Artifact"));
+    const more = parseStaticMods(artifactType[3]!);
+    if (subtypeSet(sub) === "Artifact" && artifactsOnly && more) return { affects: artifactTypeAffects, mods: [{ kind: "addTypes", types: [], subtypes: [sub] }, ...more], text: line };
+  }
   const areAlso = /^(.+?) are ([A-Z][a-z]+) in addition to their other (?:creature )?types$/.exec(text);
   const areAlsoAffects = areAlso && / have | and /.test(areAlso[1]!) ? null : areAlso && parseAffected(areAlso[1]!);
   if (areAlso && areAlsoAffects?.kind === "filter" && areAlsoAffects.types.includes("Creature") && !/ cards? /.test(areAlso[1]!)) {

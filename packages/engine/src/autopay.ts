@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, costIsPaid, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
@@ -322,6 +322,12 @@ export function planCast(
     ...taps,
     { type: "castSpell", player: pid, objectId, targets, ...(modes ? { modes } : {}), ...(creatures?.length ? { convoke: creatures } : {}), ...(artifacts?.length ? { improvise: artifacts } : {}), ...(x ? { x } : {}), ...paid },
   ];
+  // Hogaak, Arisen Necropolis: no mana spent, so the creatures tapped for convoke pay what delve didn't (rulings).
+  if (compileCard(d).noManaSpend) {
+    const creatures = Array.isArray(convoke) ? convoke : convoke === "auto" ? convokeAll(s, pid, cost, extra) : [];
+    const reduced = creatures && convokeReduce(cost, extra, creatures.map((id) => characteristics(s, obj(s, id)).colors));
+    return reduced && costIsPaid(reduced, 0) ? cast([], creatures!) : null;
+  }
   if (Array.isArray(convoke) && convoke.length) {
     const reduced = convokeReduce(cost, extra, convoke.map((id) => characteristics(s, obj(s, id)).colors));
     if (!reduced) return null;
@@ -438,7 +444,7 @@ function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: P
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */
 function costDependsOnBoard(s: GameState, d: CardDef): boolean {
   const c = compileCard(d);
-  return !!(c.costLess?.length || c.costLessIf?.length || s.costModsThisTurn?.length) || s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).costMods) || liveEmblems(s).some((o) => !!abilitiesOf(s, o).costMods) || eminenceCommanders(s).length > 0;
+  return !!(c.costLess?.length || c.costLessIf?.length || s.costModsThisTurn?.length) || s.battlefield.some((id) => ((a) => !!(a.costMods || a.flashbackLess || a.flashbackTax))(abilitiesOf(s, obj(s, id)))) || liveEmblems(s).some((o) => !!abilitiesOf(s, o).costMods) || eminenceCommanders(s).length > 0;
 }
 
 /**
@@ -504,6 +510,26 @@ export function autoConvoke(s: GameState, pid: PlayerId, cost: ParsedCost, tax: 
       return reduced.symbols.some((sym) => (sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid" ? cols.includes(sym.color as never) : sym.kind === "hybrid" && sym.options.some((x) => cols.includes(x))));
     });
     const next = colored ?? fits[0];
+    if (!next) return null;
+    chosen.push(next.id);
+  }
+}
+
+/** Creatures to tap for convoke that pay all of a cost with no mana (Hogaak, Arisen Necropolis), colored symbols first; null if they can't. */
+function convokeAll(s: GameState, pid: PlayerId, cost: ParsedCost, tax: number): ObjectId[] | null {
+  const left = s.battlefield.map((id) => obj(s, id)).filter((c) => controllerOf(s, c) === pid && !c.tapped && objIsType(s, c, "Creature"));
+  const chosen: ObjectId[] = [];
+  for (;;) {
+    const reduced = convokeReduce(cost, tax, chosen.map((id) => characteristics(s, obj(s, id)).colors));
+    if (!reduced) return null;
+    if (costIsPaid(reduced, 0)) return chosen;
+    const fits = left.filter((c) => !chosen.includes(c.id) && convokeReduce(cost, tax, [...chosen, c.id].map((id) => characteristics(s, obj(s, id)).colors)));
+    // A creature whose color pays a colored symbol first; colorless ones only for generic mana.
+    const colored = fits.find((c) => {
+      const cols = characteristics(s, c).colors;
+      return reduced.symbols.some((sym) => (sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid" ? cols.includes(sym.color as never) : sym.kind === "hybrid" && sym.options.some((x) => cols.includes(x))));
+    });
+    const next = colored ?? fits.find((c) => !characteristics(s, c).colors.length) ?? fits[0];
     if (!next) return null;
     chosen.push(next.id);
   }

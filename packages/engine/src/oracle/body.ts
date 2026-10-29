@@ -1458,6 +1458,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Vexing Radgull: "that player gets two rad counters if they don't have any rad counters. Otherwise, proliferate."
   text = text.replace(/(^|\. )[Tt]hat player gets (\w+) rad counters if they don't have any rad counters\. Otherwise,/, (_, lead: string, n: string) => `${lead}If that player has no rad counters, that player gets ${n} rad counters. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Tariel, Reckoner of Souls: "Choose a creature card at random from target opponent's graveyard. Put that card onto the
+  // battlefield under your control." is one instruction about that card.
+  text = text.replace(/^Choose a creature card at random from target opponent's graveyard\. Put that card onto the battlefield under your control\./, "Put a creature card chosen at random from target opponent's graveyard onto the battlefield under your control.");
   // Sword of the Meek: "return ~ from your graveyard to the battlefield, then attach it to that creature": one sentence
   // (sentences/zones.ts), not split at ", then".
   text = text.replace(/\b([Rr]eturn ~ from your graveyard to the battlefield), then (attach it to that creature)\./, "$1 and then $2.");
@@ -2590,6 +2593,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const mill = effects.find((e) => e.type === "mill");
       if (!mill || effects.some((e) => e.type === "graveyardCastThisTurn")) return null;
       effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "card" }, milled: true });
+      continue;
+    }
+    // "When ~ dies, you may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood
+    // Dreadknight, Hildibrand Manderville): a permission for that card, paying its Adventure's costs and following its
+    // timing (rulings), not to cast it as a creature.
+    if (/^[Yy]ou may cast it from your graveyard as an Adventure until the end of your next turn$/.test(s.replace(/\.$/, ""))) {
+      const what = parseObject("it", ctx);
+      if (what?.ref !== "selfCard") return null;
+      effects.push({ type: "mayCastFromGraveyard", what, asAdventure: true });
       continue;
     }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
@@ -6843,6 +6855,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetWasYours", index: i }, effects: fx });
       continue;
     }
+    // Kaya, Intangible Slayer: "Exile target creature or enchantment. If it wasn't an Aura, create a token that's a copy of
+    // it, ...": whether it was an Aura as it last existed on the battlefield (rulings, CR 608.2h), so it's checked just
+    // before it's exiled, and the rest happens after.
+    const exileWasnt = /^Exile target [^.]+$/.test(s) ? /^If it wasn't an? ([A-Z][a-z]+), (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (exileWasnt && exileWasnt[1] === "Aura") {
+      const before = ctx.targets.length;
+      const fx = parseOne(s, ctx);
+      if (!fx || fx.length !== 1 || ctx.targets.length !== before + 1 || fx[0]!.type !== "exile" || ctx.targets[before]!.kind !== "object" || ctx.targets[before]!.optional) return null;
+      const then = parseOne(capital(exileWasnt[2]!), ctx);
+      if (!then || ctx.targets.length !== before + 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [exileWasnt[1]!], text: `an ${exileWasnt[1]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: fx, otherwise: [...structuredClone(fx), ...then] });
+      si++;
+      continue;
+    }
     // "Exile target card from a graveyard. If it was a creature card, ..." (Scavenging Ooze, Cling to Dust, Deluge of the
     // Dead): about the card the instruction before exiled, by its characteristics in the graveyard, which are its printed
     // ones (CR 608.2h). A target that's illegal by then stops the whole ability (rulings), so it never gets here.
@@ -8219,6 +8246,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
     // "Put up to two creature cards from among the milled cards onto the battlefield" (The Grand Evolution): under your
     // control, chosen as it resolves.
+    // Gleam of Death: "Mill six cards, then put all instant and sorcery cards from among them into your hand": every one of
+    // the milled cards that matches, no choice.
+    const allMilled = /^(?:Then )?[Pp]ut all (.+? cards) from among them into your hand$/.exec(s);
+    if (allMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(allMilled[1]!.replace(/ cards$/, " card").replace(/ and /g, " or "));
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || !filter) return null;
+      effects.push({ type: "returnAllFromGraveyard", who: { ref: "you" }, filter, toHand: true, milled: true });
+      continue;
+    }
     const fromMilled =
       // Nashi, Searcher in the Dark: "You may put any number of legendary and/or enchantment cards from among them into your hand".
       /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards|any number of .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??
@@ -8397,6 +8434,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Mill three cards. When you do, ..." (Wick's Patrol): only if all of them were milled; with fewer in the library,
       // you mill as many as you can but it doesn't trigger (rulings on Wick's Patrol; CR 701.17b).
       const milled = prev?.type === "mill" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0;
+      // "Draw four cards. When you do, ..." (The Royal Scions): only if all of them were drawn; with fewer it doesn't
+      // trigger, and with more (a replacement) it triggers once (rulings).
+      const drew = prev?.type === "draw" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0 && effects.length === 1;
       // "Create a Food token. When you do, ..." (Eastfarthing Farmer): the token is created, so it triggers.
       const created = prev?.type === "createToken" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0 && !prev.attachTo;
       // "Create a Monster Role token attached to target creature you control. When you do, that creature fights ..." (Curse
@@ -8415,7 +8455,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // tapping none is doing it too, so it always triggers (rulings), with X the number tapped.
       // "Surveil 4. When you do, ..." (Dream Eater): with fewer cards in the library it triggers too (rulings).
       const always = (whenDo === searched || prev?.type === "amass" || prev?.type === "surveil" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
-      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
+      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !drew && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Mount Velus Manticore: "you may discard a card. When you do, ~ deals X damage to any target, where X is the number
       // of card types the discarded card has": that card's, counted as the reflexive ability triggers (its X, CR 603.12).
       const discTypes = mayDo && where?.[2] === "the number of card types the discarded card has" && prev.effects.length === 1 && prev.effects[0]!.type === "discard" && prev.effects[0]!.n === 1 && prev.effects[0]!.who.ref === "you" && !prev.effects[0]!.random;
@@ -8484,6 +8524,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (milled) {
         effects.pop();
         effects.push({ type: "if", cond: { kind: "libraryHas", n: prev.n as number }, effects: [prev, { type: "reflexive", body: reflexive }], otherwise: [prev] });
+        continue;
+      }
+      if (drew) {
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "drawnThisWay" } }, min: prev.n as number }, effects: [{ type: "reflexive", body: reflexive }] });
         continue;
       }
       if (created || always) {
@@ -9939,6 +9983,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "dig" || prev.into !== "exile" || prev.play || prev.count !== 1) return null;
       prev.play = "thisTurn";
+      continue;
+    }
+    // Blitzwing, Adaptive Assailant: "choose flying or indestructible at random. ~ gains that ability until end of turn": one
+    // of the two, chosen as it resolves (CR 608.2c).
+    const kwAtRandom = /^[Cc]hoose ([a-z]+) or ([a-z]+) at random$/.exec(s);
+    if (kwAtRandom && sentences[si + 1] === "~ gains that ability until end of turn") {
+      const [a, b] = [kwAtRandom[1]!, kwAtRandom[2]!].map((k) => parseOne(`~ gains ${k} until end of turn`, ctx));
+      if (!a || !b) return null;
+      effects.push({ type: "if", cond: { kind: "atRandom" }, effects: a, otherwise: b });
+      si++;
+      continue;
+    }
+    // Blitzwing, Cruel Tormentor: "Target opponent loses life equal to the life that player lost this turn. If no life is lost
+    // this way, convert ~": none if the amount was 0 or their life total couldn't change (CR 119.3).
+    const noLoss = /^If no life is lost this way, (.+)$/.exec(s);
+    if (noLoss) {
+      const inner = effects[effects.length - 1]?.type === "loseLife" && parseOne(capital(noLoss[1]!), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "lifeLostThisWay", byLoss: true } }, max: 0 }, effects: inner });
       continue;
     }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."

@@ -742,6 +742,7 @@ interface KeywordParts {
   /** Modular N's "enters with N +1/+1 counters" (CR 702.43a). */
   plusCounters: number;
   bloodthirst: number;
+  bloodthirstX?: true;
   entersOptions: EntersOption[];
   statics: StaticAbility[];
   /** Fading N's fade counters, vanishing N's time counters (CR 702.32a, 702.63a). */
@@ -1080,6 +1081,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         ifCond: { kind: "selfInGraveyard" },
       });
     } else if ((m = /^bloodthirst (\d+)$/i.exec(p))) out.bloodthirst += Number(m[1]); // CR 702.54a
+    else if (/^bloodthirst X$/i.test(p) && !out.bloodthirstX) out.bloodthirstX = true; // CR 702.54b
     else if ((m = /^devour(?: (artifact|food|land))? (\d+)$/i.exec(p))) {
       // CR 702.82a, c: "Devour [quality] N": as it enters, sacrifice any number of [quality] permanents (creatures).
       if (out.devour) return null;

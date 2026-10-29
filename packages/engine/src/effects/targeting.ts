@@ -4,7 +4,7 @@ import { compileCard, compileGranted } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basicLandManaAbility, basePower, basePowerNow, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedDuringLastTurn, attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
-import { characteristics, controllerOf, everyCreatureType, mostCommonColors, type Characteristics } from "../layers";
+import { characteristics, controllerOf, everyCreatureType, mostCommonColors, staticConditionNow, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem, withModes } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
@@ -503,6 +503,7 @@ export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shr
     if (controllerOf(s, o) !== pid) continue;
     const ab = abilitiesOf(s, o);
     if (ab.youHaveDuringYourTurn && s.activePlayer !== pid) continue;
+    if (ab.youHaveIf && !staticConditionNow(s, ab.youHaveIf, id, pid)) continue;
     const has = ab.youHave;
     if (has === "shroud") return "shroud";
     if (has === "hexproof") out = has;

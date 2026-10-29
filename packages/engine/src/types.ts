@@ -412,6 +412,8 @@ export interface GameObject {
     byType?: string;
     /** "Pay life equal to its mana value rather than paying its mana cost" (Nashi): an alternative cost, the only way. */
     life?: true;
+    /** "You may cast it from your graveyard as an Adventure" (Mosswood Dreadknight): only as this face (CR 715.3). */
+    face?: number;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -553,6 +555,8 @@ export interface GameObject {
   reboundGained?: true;
   /** A spell that gained sunburst this many times (Lux Artillery): each instance works as it enters from the stack (CR 702.44a). */
   sunburstGained?: number;
+  /** Bloodthirst the spell gained (Bloodlord of Vaasgoth: "it gains bloodthirst 3"): the total N, each instance apart (CR 702.54c). */
+  bloodthirstGained?: number;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**
@@ -2118,6 +2122,8 @@ export interface Resolving {
   movedLinkedIds?: ObjectId[];
   /** The two players its exchangeLife instruction named (even one no longer a legal target), and the life each lost doing it. */
   exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
+  /** The life its loseLife instructions took off life totals so far: "if no life is lost this way" (Blitzwing, Cruel Tormentor). */
+  lifeLost?: number;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   /**

@@ -246,6 +246,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "dig", n, count: n, upTo: false, required: true, into, rest: "graveyard", reveal: false, ...(who ? { who } : {}) }];
   }
 
+  // Omarthis, Ghostfire Initiate: "manifest a number of cards from the top of your library equal to the number of counters
+  // on it": counted as it resolves, then one at a time (rulings, CR 701.40e), all of them.
+  if ((m = /^[Mm]anifest a number of cards from the top of your library equal to (.+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx);
+    return n ? [{ type: "dig", n, count: 0, countAll: true, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false }] : null;
+  }
   // Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control."
   if (/^Put all commanders from the command zone onto the battlefield under your control$/.test(s)) return [{ type: "commandersOntoBattlefield" }];
   // "Manifest the top card of that player's library" (Orochi Soul-Reaver): their card, onto the battlefield face down under

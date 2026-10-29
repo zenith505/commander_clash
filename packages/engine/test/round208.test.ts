@@ -410,3 +410,23 @@ describe("bloodthirst X; a spell gains bloodthirst 3", () => {
     expect(s.objects[bearCard]!.counters["+1/+1"] ?? 0).toBe(0);
   });
 });
+
+const omarthisGhostfireInitiate = card("Omarthis, Ghostfire Initiate", "Legendary Creature — Spirit Snake", "{X}{X}", {"cmc":0,"power":"0","toughness":"0","keywords":["Manifest"],"oracleText":"Omarthis enters with X +1/+1 counters on it.\nWhenever you put one or more +1/+1 counters on another colorless creature, you may put a +1/+1 counter on Omarthis.\nWhen Omarthis dies, manifest a number of cards from the top of your library equal to the number of counters on it.","colors":[],"colorIdentity":[],"layout":"normal"});
+
+describe("when ~ dies, manifest a number of cards equal to the number of counters on it", () => {
+  it("compile", () => supported(omarthisGhostfireInitiate));
+
+  it("Omarthis: counts every counter it had as it died (CR 608.2h) and manifests that many", () => {
+    const { s: s0, ap } = setup([]);
+    const o = putOnBattlefield(s0, ap, omarthisGhostfireInitiate);
+    s0.objects[o]!.counters = { "+1/+1": 2, flying: 1 };
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "main1", ap);
+    const lib = s.players[ap]!.library.length;
+    s = dies(s, o);
+    expect(s.objects[o]!.zone).toBe("graveyard");
+    const fd = s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.objects[id]!.faceDown === "manifest");
+    expect(fd).toHaveLength(3);
+    expect(s.players[ap]!.library.length).toBe(lib - 3);
+  });
+});

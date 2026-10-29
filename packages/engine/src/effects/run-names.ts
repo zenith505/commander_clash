@@ -143,6 +143,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
           }),
         );
+      if (e.remember && s.resolving) s.resolving.created = found === "battlefield" ? hits.filter((id) => obj(s, id).zone === "battlefield") : [];
       for (const id of toHand) {
         log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it goes into ${p.name}'s hand.`);
         moveObject(s, id, "hand");

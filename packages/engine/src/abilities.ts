@@ -2765,6 +2765,8 @@ export type Effect =
       mayElseHand?: true;
       /** "You may put that card onto the battlefield. Then shuffle." (Hei Bai, Forest Guardian): `found` is "battlefield" if its controller chooses; if not, it stays in the library. */
       mayStay?: true;
+      /** Aspiring Champion: "If that creature is a Demon, ...": the permanent put onto the battlefield is remembered as this resolution's (ObjRef "created"). */
+      remember?: true;
       tapped?: true;
       /** "Onto the battlefield tapped and attacking" (Raph & Mikey, CR 508.4): during combat, attacking a player, planeswalker or battle its controller chooses (rulings). */
       attacking?: true;

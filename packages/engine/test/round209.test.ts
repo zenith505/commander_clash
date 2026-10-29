@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, activationCost, applyAction, characteristics, spellCost, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { abilitiesOf, activationCost, applyAction, cantBlockNow, characteristics, spellCost, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -463,5 +463,65 @@ describe("create a named legendary token with two quoted abilities", () => {
     s = run(s, planCast(s, ap, k2!, [tgt(jb[0]!)]));
     s = settleQ(s, [[tgt(oz)]]);
     expect(s.objects[oz]!.zone).toBe("hand");
+  });
+});
+
+const aspiringChampion = card("Aspiring Champion", "Creature — Astartes Warrior", "{3}{R}", {"cmc":4,"power":"3","toughness":"3","keywords":["Menace","Ruinous Ascension"],"oracleText":"Menace\nRuinous Ascension — When this creature deals combat damage to a player, sacrifice it. If you do, reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield, then shuffle the rest into your library. If that creature is a Demon, it deals damage equal to its power to each opponent.","colors":["R"],"colorIdentity":["R"],"layout":"normal"});
+
+describe("sacrifice it; if you do, reveal until a creature card, put it onto the battlefield, then shuffle", () => {
+  it("compile", () => supported(aspiringChampion));
+
+  it("Aspiring Champion: a Demon found deals damage equal to its power to each opponent; another creature doesn't", () => {
+    for (const demon of [true, false]) {
+      const { s: s0, ap, opp } = setup([]);
+      const ch = putOnBattlefield(s0, ap, aspiringChampion);
+      const found = into(s0, ap, demon ? card("Test Demon", "Creature — Demon", "{4}{B}", { cmc: 5, power: "4", toughness: "4" }) : bear({ name: "Test Bear" }), "library");
+      const l = into(s0, ap, land(), "library");
+      const life = Object.fromEntries(s0.turnOrder.map((p) => [p, s0.players[p]!.life]));
+      let s = attack(s0, ap, opp, [ch]);
+      s = passUntil(s, "combatDamage", ap);
+      s = settle(s);
+      expect(s.objects[ch]!.zone).toBe("graveyard");
+      expect(s.objects[found]!.zone).toBe("battlefield");
+      expect(s.objects[l]!.zone).toBe("library");
+      const extra = demon ? 4 : 0;
+      expect(s.players[opp]!.life).toBe(life[opp]! - 3 - extra);
+      for (const p of s.turnOrder.filter((p) => p !== opp && p !== ap)) expect(s.players[p]!.life).toBe(life[p]! - extra);
+      expect(s.players[ap]!.life).toBe(life[ap]);
+    }
+  });
+});
+
+const pursuedWhale = card("Pursued Whale", "Creature — Whale", "{5}{U}{U}", {"cmc":7,"power":"8","toughness":"8","keywords":[],"oracleText":"When this creature enters, each opponent creates a 1/1 red Pirate creature token with \"This token can't block\" and \"Creatures you control attack each combat if able.\"\nSpells your opponents cast that target this creature cost {3} more to cast.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+const relicRobber = card("Relic Robber", "Creature — Goblin Rogue", "{2}{R}", {"cmc":3,"power":"2","toughness":"2","keywords":["Haste"],"oracleText":"Haste\nWhenever this creature deals combat damage to a player, that player creates a 0/1 colorless Goblin Construct artifact creature token with \"This token can't block\" and \"At the beginning of your upkeep, this token deals 1 damage to you.\"","colors":["R"],"colorIdentity":["R"],"layout":"normal"});
+
+describe("a token with two quoted abilities, for other players", () => {
+  it("compile", () => supported(pursuedWhale, relicRobber));
+
+  it("Pursued Whale: each opponent gets a Pirate that can't block", () => {
+    const { s: s0, ap } = setup([pursuedWhale]);
+    let s = run(s0, planCast(s0, ap, inHand(s0, ap, pursuedWhale.name)[0]!));
+    s = settle(s);
+    for (const p of s.turnOrder.filter((p) => p !== ap)) {
+      const t = named(s, p, "Pirate Token");
+      expect(t.length).toBe(1);
+      expect(cantBlockNow(s, s.objects[t[0]!]!)).toBe(true);
+    }
+    expect(named(s, ap, "Pirate Token").length).toBe(0);
+  });
+
+  it("Relic Robber: the damaged player gets a Goblin Construct that can't block and pings them each upkeep", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const rr = putOnBattlefield(s0, ap, relicRobber);
+    let s = attack(s0, ap, opp, [rr]);
+    s = passUntil(s, "combatDamage", ap);
+    s = settle(s);
+    const t = named(s, opp, "Goblin Construct Token");
+    expect(t.length).toBe(1);
+    expect(cantBlockNow(s, s.objects[t[0]!]!)).toBe(true);
+    const life = s.players[opp]!.life;
+    s = passUntil(s, "upkeep", opp);
+    s = settle(s);
+    expect(s.players[opp]!.life).toBe(life - 1);
   });
 });

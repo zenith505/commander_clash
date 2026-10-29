@@ -1,6 +1,6 @@
 # Roadmap
 
-27,596 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,663 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
 9,979 (91%).
 
@@ -879,6 +879,27 @@ line blocks.
    hand" onto the battlefield at once needs a picker for one of each); Silverquill, the Disputant and Lorehold, the
    Historian (casualty and miracle granted to other spells and cards: both are read from the card's own text only);
    Dyadrine, Synthesis Amalgam ("remove a +1/+1 counter from each of two creatures you control. If you do").
+   Round 209 went on from the top: "exile the top card ... When you exile a (nonland) card this way, ... where X is that
+   card's mana value", a reflexive trigger (Cait Sith, Fortune Teller, Hidetsugu, Devouring Chaos); "reveal until a Shrine
+   card. You may put that card onto the battlefield. Then shuffle" (Hei Bai, Forest Guardian); "you may draw X cards ...
+   If you do, you lose X life" (Bebop, Skull & Crossbones); "... if you've completed a dungeon" and "... if you're the
+   monarch. Otherwise, ..." read as intervening conditions as it resolves (Barrowin of Clan Undurr, Regal Sliver); "exile
+   those tokens when ~ leaves the battlefield" (Mysterio, Master of Illusion); "reveal until a nonland card with mana
+   value 3 or less. You may cast that card without paying its mana cost" (Treasure Keeper); "its controller amasses
+   Goblins X" (Azog, Moria's Ruin); "you may pay {1}{W} any number of times. When you pay this cost one or more times,
+   ... that many", a new "how many times" prompt with a browser test (Intrepid, Primal, Spectral and Tainted Adversary);
+   "when you do" after putting counters on a target (Dimension X Pizzasaur); "the greatest mana value among instant and
+   sorcery spells you've cast this turn" (Rootha, Mastering the Moment); "costs {1} less if it has mutate" and its cast
+   trigger (Pollywog Symbiote); "enchanted artifact's activated abilities cost {2} less" (Power Artifact); a named
+   legendary token with two quoted abilities (Ozox, the Clattering King), and other tokens with two (Pursued Whale, Relic Robber);
+   "sacrifice it. If you do, reveal until a creature card. Put that card onto the battlefield, then shuffle ... If that
+   creature is a Demon, ..." (Aspiring Champion). +21 (27,663 of 31,936 with round 208 and Lane B round B38).
+   Out after round 209 (looked at, not done): Bloodthirsty Adversary (cast copies of several cards from the graveyard:
+   casting from among graveyard cards takes one target only); From Under the Floorboards, Avacyn's Judgment and Welcome
+   to the Fold (madness {X}: X in an alternative cost from exile); Citizen's Crowbar (a granted ability that sacrifices
+   the Aura's own source); Gluttonous Hellkite (counters for each creature sacrificed by its cast trigger); Insatiable
+   Frugivore ("repeat this process" after an optional exile); Broodguard Elite (warp {X}); Mog, Moogle Warrior (what each
+   player discarded decides two effects).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

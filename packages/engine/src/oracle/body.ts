@@ -3089,6 +3089,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // A target in it ("If you do, return target artifact card from your graveyard to the battlefield", Daretti) is
       // chosen as the ability is put on the stack, like any other (CR 601.2c).
       const back = /^return the chosen cards to the battlefield( tapped)?$/.exec(sacDo[1]!);
+      // Aspiring Champion: "sacrifice it. If you do, reveal cards ... until you reveal a creature card. Put that card onto
+      // the battlefield, then ...": all the rest of the ability, with no targets.
+      if (/^reveal cards from the top of your library until /.test(sacDo[1]!) && sacPrev?.type === "sacrifice") {
+        const rest = parseBody(`${[capital(sacDo[1]!), ...sentences.slice(si + 1).map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+        if (!rest || rest.targets.length) return null;
+        effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: rest.effects });
+        si = sentences.length;
+        continue;
+      }
       const inner: Effect[] | null = back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
@@ -9734,6 +9743,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!filter || filter.kind !== "card") return null;
       effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "bottom", exile: true, ...(exPut[1] ? { tapped: true as const } : {}) });
       si++;
+      continue;
+    }
+    // Aspiring Champion: "Put that card onto the battlefield, then shuffle the rest into your library. If that creature is a
+    // Demon, it deals damage equal to its power to each opponent": the permanent it put there, as it is now (CR 608.2c).
+    if (until && sentences[si + 1]?.replace(/\.$/, "") === "Put that card onto the battlefield, then shuffle the rest into your library" && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
+      const filter = parseSearchFilter(until[1]!);
+      if (filter?.kind !== "card" || filter.types?.length !== 1 || filter.types[0] !== "Creature" || filter.anyOf || mayUntil) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: "shuffle", remember: true });
+      si++;
+      const demon = /^If that creature is an? ([A-Z][a-z]+), it deals damage equal to its power to each opponent\.?$/.exec(sentences[si + 1] ?? "");
+      if (demon && CREATURE_TYPES.has(demon[1]!)) {
+        const is: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [demon[1]!], text: demon[1]! };
+        effects.push({ type: "if", cond: { kind: "putThisWayIs", filter: is }, effects: [{ type: "damage", amount: { count: { kind: "power", of: { ref: "created" } } }, to: { ref: "eachOpponent" }, by: "created" }] });
+        si++;
+      }
       continue;
     }
     // Hermit Druid: "Put that card into your hand and all other cards revealed this way into your graveyard."

@@ -37,7 +37,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   // color. Add an amount of mana of that color equal to ..." (Nykthos, Three Tree City: the color is chosen as it resolves,
   // CR 605.3b, like "X mana of any one color").
   const line = line0
-    .replace(/: For each color among permanents you control, add one mana of that color\./, ": Add one mana of each color among permanents you control.")
+    .replace(/: For each color among (monocolored )?permanents you control, add one mana of that color\./, ": Add one mana of each color among $1permanents you control.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to your devotion to that color\./, ": Add an amount of mana of the chosen color equal to your devotion to that color.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.")
     // "Choose a color. Add one mana of that color for each charge counter on ~." (Astral Cornucopia): the same.
@@ -381,6 +381,8 @@ function parseManaProduced(text: string): ManaProduce | null {
     return { kind: "colorsAmong", filter: { ...spec, text: `${yard[1]} cards in your graveyard` }, inYard: true };
   }
   if (text === "one mana of each color among permanents you control") return { kind: "eachColorAmong" };
+  // Tarnation Vista: "For each color among monocolored permanents you control": only permanents with exactly one color.
+  if (text === "one mana of each color among monocolored permanents you control") return { kind: "eachColorAmong", monocolored: true };
   if (text === "an amount of mana of the chosen color equal to your devotion to that color") return { kind: "devotion" };
   if (text === "as much again of each type of unspent mana you have") return { kind: "doublePool" };
   const each = /^(\{[WUBRGC]\}) for each (.+) you control$/.exec(text);

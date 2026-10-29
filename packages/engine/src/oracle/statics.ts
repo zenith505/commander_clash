@@ -748,6 +748,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const b = parseStaticCondition(`you control a non-${m[1]} creature`, st);
     return a && b ? { kind: "allOf", conds: [a, b] } : null;
   }
+  // ED-E, Lonesome Eyebot: "if the number of attacking creatures is greater than the number of quest counters on ~".
+  if ((m = /^the number of (.+) is greater than the number of (.+)$/.exec(text))) {
+    const a = parseCount(`the number of ${m[1]}`, null);
+    const b = parseCount(`the number of ${m[2]}`, null);
+    return a && typeof a === "object" && b && typeof b === "object" ? { kind: "amount", amount: a, moreThan: b } : null;
+  }
   // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
   if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
     const amount = parseCount("the number of cards in your graveyard", null);

@@ -107,6 +107,8 @@ export interface Ctx {
   lastCreatedAny?: boolean;
   /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
   lastDugLands?: boolean;
+  /** After "look at the top N cards ... You may put any number of them into your hand": "each card you put into your hand this way" (Count "dugToHand"). */
+  dugToHand?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
   /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
@@ -812,6 +814,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     return { ...body!, targets: [{ ...t, random: true, text: `${t.text} chosen at random` }], text };
   }
   const body = parseBodyText(text, opts);
+  // Search for Blex: "You lose 3 life for each card you put into your hand this way": the dig's prompt and the bots know
+  // what each card taken costs.
+  body?.effects.forEach((e, i) => {
+    const dig = body.effects[i - 1];
+    if (e.type === "loseLife" && e.who.ref === "you" && typeof e.n === "object" && "count" in e.n && e.n.count.kind === "dugToHand" && dig?.type === "dig") dig.lifeEach = e.n.times ?? 1;
+  });
   // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
   if (body && text.includes("each of that creature's colors") && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
   return body;
@@ -1096,6 +1104,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Sinkhole Surveyor: "you lose 1 life and ~ endures 1" (CR 701.63a), one after the other.
   text = text.replace(/^(you lose \d+ life) and ~ endures (\d+)\.$/, "$1. ~ endures $2.");
   text = text.replace(/^(put a \+1\/\+1 counter on that creature) and it gains ([a-z]+) until end of turn\.$/, "$1. That creature gains $2 until end of turn.");
+  // Cryptek: "Choose another target artifact creature you control. When that creature dies this turn, return it to the
+  // battlefield tapped under your control": choosing the target is targeting it (CR 115.1), so the same as Adarkar
+  // Valkyrie's "When target creature ... dies this turn, return that card ..." (sentences/permanents.ts).
+  text = text.replace(/^Choose (another target artifact creature you control)\. When that creature dies this turn, return it to the battlefield tapped under your control\.$/, "When $1 dies this turn, return that card to the battlefield tapped under your control.");
+  // First Day of Class: "put a +1/+1 counter on it and it gains haste until end of turn": the same, about "it".
+  text = text.replace(/^(put a \+1\/\+1 counter on it) and it gains ([a-z]+) until end of turn\.$/, "$1. It gains $2 until end of turn.");
   text = text.replace(/^[Mm]ill (two|three|four|five) cards, then you may put (an? [a-z]+(?: or [a-z]+)? card) from among the milled cards on top of your library\./, "Mill $1 cards. You may put $2 from among the milled cards on top of your library.");
   // Nalia de'Arnise: "put a +1/+1 counter on each creature you control and those creatures gain deathtouch until end of
   // turn": the same as two sentences, "those creatures" the same group.
@@ -6800,6 +6814,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Parting Gust: "Exile target nontoken creature. If the gift wasn't promised, return that card to the battlefield under
     // its owner's control with a +1/+1 counter on it at the beginning of the next end step": with the gift promised, an
     // exile; without, a blink that comes back with a delayed trigger (CR 702.174j, 603.7).
+    // Shirei, Shizo's Caretaker: "you may return that card to the battlefield at the beginning of the next end step if ~ is
+    // still on the battlefield": a delayed trigger about the card in the graveyard now (CR 603.7, 400.7), done then only
+    // while ~ is still the object whose ability made it (rulings), the choice made as it resolves.
+    if (ctx.subjectLeft && !ctx.spell && /^[Yy]ou may return that card to the battlefield at the beginning of the next end step if ~ is still on the battlefield$/.test(s)) {
+      effects.push({ type: "putOntoBattlefield", what: { ref: "subjectCard" }, atNextEndStep: true, ifSourceHere: true, mayThen: true });
+      continue;
+    }
     const giftBack = ctx.spell ? /^If the gift wasn't promised, (return (?:it|that card) to the battlefield under its owner's control(?: with an? [^ ]+ counter on it)? at the beginning of the next end step)$/.exec(s) : null;
     const giftExile = giftBack && effects[effects.length - 1];
     if (giftBack && giftExile && giftExile.type === "exile" && giftExile.what.ref === "target" && !giftExile.until && !giftExile.linked) {
@@ -7472,11 +7493,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Glacial Dragonhunt: "Draw a card, then you may discard a card. When you discard a nonland card this way, ~ deals 3
     // damage to target creature.": a reflexive trigger (CR 603.12), its target chosen then, if the card discarded is one.
-    const whenDiscarded = /^When you discard an? (.+? card) this way, (.+)$/.exec(s);
+    // Talion's Messenger: "draw a card, then discard a card. When you discard a card this way, ...": any card.
+    const whenDiscarded = /^When you discard (?:an? (.+? card)|(a card)) this way, (.+)$/.exec(s);
     if (whenDiscarded) {
       const yourDiscard = (es: Effect[]): boolean => es.some((e) => (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) || (e.type === "may" && !e.pay && yourDiscard(e.effects)));
-      const filter = parseSearchFilter(whenDiscarded[1]!);
-      const reflexive = filter && yourDiscard(effects) && !/that card/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx);
+      const filter: TargetSpec | null = whenDiscarded[2] ? { kind: "card", text: "card" } : (parseSearchFilter(whenDiscarded[1]!) ?? null);
+      whenDiscarded[2] = whenDiscarded[3]!;
+      const reflexive = filter && yourDiscard(effects) && !/\b(?:that card|its?)\b/.test(whenDiscarded[2]!) && reflexiveBody(whenDiscarded[2]!, ctx);
       if (!reflexive) return null;
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
@@ -7765,7 +7788,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(`${handThisWay[1]} card`);
       const before = ctx.targets.length;
       const inner = parseOne(capital(handThisWay[2]!), ctx);
-      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !inner || ctx.targets.length !== before || /(?:it|its|that card)/.test(handThisWay[2]!)) return null;
+      if (last?.type !== "chooseFromGraveyard" || !last.milled || last.dest || last.who || !filter || !inner || ctx.targets.length !== before || /\b(?:it|its|that card)\b/.test(handThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putIntoHandIs", filter }, effects: inner });
       continue;
     }
@@ -7809,7 +7832,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const last = effects[effects.length - 1];
       const filter = parseTargetPhrase(tokenIs[1]!);
       const inner = parseOne(capital(tokenIs[2]!), ctx);
-      if (last?.type !== "createTokenCopy" || last.each || last.n !== 1 || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(tokenIs[2]!)) return null;
+      if (last?.type !== "createTokenCopy" || last.each || last.n !== 1 || filter?.kind !== "object" || !inner || /\b(?:it|its|that)\b/.test(tokenIs[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
@@ -10297,6 +10320,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
   if (last && "what" in last && (last.what as ObjRef).ref === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
   // A clash moves no permanents: "those creatures" after it are still the tokens before it (Gilt-Leaf Ambush).
   if (last?.type === "clash") return;
+
   {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
@@ -10326,6 +10350,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // The creature that player chose is "that creature" (Imperial Edict).
     if (picked && pk.who.ref === "target") ctx.lastPut = true;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
+    ctx.dugToHand = last?.type === "dig" && last.into === "hand" && !last.each && !last.who;
     ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
     // "Each player discards a card. Each opponent who can't loses 3 life." (Liliana, Waker of the Dead): the same opponents.

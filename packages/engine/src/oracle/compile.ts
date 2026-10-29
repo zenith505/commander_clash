@@ -617,7 +617,8 @@ export function compile(d: CardDef): CompiledCard {
     // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
     // 714.2b) or a modal choice.
     // "10,000 Needles — " (Jumbo Cactuar) starts with a number.
-    const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
+    // "ED-E My Love — " (ED-E, Lonesome Eyebot) has the card's name in it, so it reads "~ My Love — ".
+    const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?|~ [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
     // "... faces a villainous choice — " (CR 701.55a) is the instruction itself.
     if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!) && !/\bfaces? a villainous choice$/.test(word[1]!)) line = line.slice(word[0].length);
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
@@ -1778,11 +1779,14 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Wrenn and Realmbreaker's emblem: "You may play lands and cast permanent spells from your graveyard." Any number,
     // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
-    const permYard = /^You may (play lands and )?cast permanent spells from your graveyard\.$/.exec(line);
-    if (permYard) {
+    // Zask, Skittering Swarmlord: "You may play lands and cast Insect spells from your graveyard": cards with that
+    // creature type (a changeling's too, CR 702.73a).
+    const permYard = /^You may (play lands and )?cast (permanent|[A-Z][a-z]+) spells from your graveyard\.$/.exec(line);
+    const yardFilter = permYard && parseTargetPhrase(`${permYard[2]} card from a graveyard`);
+    if (permYard && yardFilter?.kind === "card" && (permYard[2] === "permanent" || CREATURE_TYPES.has(permYard[2]!))) {
       if (permYard[1]) out.landsFromGraveyard = true;
-      const { owner: _, ...f } = parseTargetPhrase("permanent card from a graveyard")!;
-      (out.graveyardGrants ??= []).push({ filter: { ...f, text: "permanent cards" }, way: { kind: "permission", costs: [], exile: false } });
+      const { owner: _, ...f } = yardFilter;
+      (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${permYard[2]} cards` }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
     // The Necrobloom: "Land cards in your graveyard have dredge 2." (CR 702.52a): those cards have the keyword while it
@@ -3508,6 +3512,13 @@ export function compile(d: CardDef): CompiledCard {
       if (!cond || !conditionalAbility(d, `${costWhile[1]}.`, out, cond)) out.unsupported.push(raw);
       continue;
     }
+    // Hinata, Dawn-Crowned: "Spells you cast cost {1} less to cast for each target" (CR 601.2f, with the targets chosen in
+    // 601.2c).
+    const perTarget = /^Spells (you|your opponents) cast cost \{(\d+)\} (less|more) to cast for each target\.$/.exec(line);
+    if (perTarget) {
+      out.perTargetCost = [...(out.perTargetCost ?? []), { opponents: perTarget[1] !== "you", n: Number(perTarget[2]) * (perTarget[3] === "less" ? -1 : 1) }];
+      continue;
+    }
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
@@ -3926,7 +3937,12 @@ export function compile(d: CardDef): CompiledCard {
     // graveyard to the battlefield ..." (Blood on the Snow): the paragraph after the modes is done whichever mode was
     // chosen, after it (CR 700.2, 608.2c). With one mode chosen, that's the same as the end of each mode.
     const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
-    const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
+    // First Day of Class: "Whenever a creature you control enters this turn, ..." then "Learn." in its own paragraph: the
+    // delayed trigger's text ends with its paragraph (CR 603.7a); the next one is another instruction of the spell.
+    const floatingFirst = tail === undefined && !costSacrificedX && spellLines.length > 1 && /^Whenever [^,]+ this turn, /.test(spellLines[0]!) && !spellLines.some((l) => l.includes("•"));
+    const parts = floatingFirst ? [parseBody(spellLines[0]!, { spell: true }), parseBody(spellLines.slice(1).join(" "), { spell: true })] : [];
+    const joined: AbilityBody | null = parts.length && parts.every((b) => b && !b.targets.length && !b.modal && Object.keys(b).every((k) => k === "targets" || k === "effects" || k === "text")) ? { targets: [], effects: parts.flatMap((b) => b!.effects), text: spellLines.join(" ") } : null;
+    const body = floatingFirst ? joined : tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellBodyText(spellLines.join(" "), costSacrificedX), { spell: true, ...(costSacrificedX ? { costSacrificedX } : {}) }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     // Into the Time Vortex, Throes of Chaos: cascade and nothing else to do; the spell resolves doing nothing more (CR 608.2).

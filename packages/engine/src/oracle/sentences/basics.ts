@@ -176,6 +176,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (sr?.type !== "search" || sr.n !== 1 || sr.dest.zone !== "battlefield") return null;
     return [sr, { type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" } }];
   }
+  // Yavimaya Dryad: "Search your library for a Forest card, put it onto the battlefield tapped under target player's
+  // control, then shuffle": you own it, that player controls it (CR 108.3, 110.2); you may target yourself (rulings).
+  const under = /^(Search your library for an? [^,]+ card, put it onto the battlefield(?: tapped)?) under (target player|target opponent)'s control(, then shuffle)$/.exec(s);
+  if (under) {
+    const fx = parseSearch(under[1]! + under[3]!);
+    const sr = fx?.length === 1 ? fx[0]! : undefined;
+    if (sr?.type !== "search" || sr.n !== 1 || sr.upTo || sr.dest.zone !== "battlefield" || sr.others || sr.landTo || sr.cardTo) return null;
+    const who = parsePlayer(under[2]!, ctx);
+    return who ? [{ ...sr, dest: { ...sr.dest, under: who } }] : null;
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx), (ref) => sameNameRef(ref, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
@@ -604,7 +614,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const inner: Effect[] | null = sac ? (sacWhat ? [{ type: "sacrifice", what: sacWhat, ...(/controller/.test(sac[1]!) ? { byController: true as const } : {}) }] : null) : withSelfIt(() => parseSentence(m![1]!.replace(/^./, (c) => c.toUpperCase()), ctx));
     // Silent Assassin: "{3}{B}: Destroy target blocking creature at end of combat": the target chosen now, destroyed by the
     // delayed trigger (CR 603.7); made during the end of combat step, it waits for the next one (rulings).
-    const ownTarget = inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before });
+    // Vronos, Masked Inquisitor: "Up to two other target planeswalkers you control phase out at the beginning of the next
+    // end step": the same, the targets chosen as it's activated, each phasing out then if it's still the same object.
+    const ownTarget =
+      (inner?.length === 1 && inner[0]!.type === "destroy" && ctx.targets.length === before + 1 && m[2] === "end of combat" && JSON.stringify(inner[0]!.what) === JSON.stringify({ ref: "target", index: before })) ||
+      (inner?.length === 1 && inner[0]!.type === "phaseOut" && inner[0]!.what.ref === "target" && inner[0]!.what.index === before && ctx.targets.length > before && /^the beginning of the next end step$/.test(m[2]!));
     if (!inner || (ctx.targets.length !== before && !ownTarget)) return null;
     const refs = new Set<string>();
     const whats = new Set<string>();

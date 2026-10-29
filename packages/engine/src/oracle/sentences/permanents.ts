@@ -344,9 +344,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
   // doesn't return (rulings).
-  if ((m = /^When (another target creature|target creature) dies this turn, return that card to the battlefield under your control$/.exec(s)) && !ctx.spell) {
+  // Cryptek: "Choose another target artifact creature you control. When that creature dies this turn, return it to the
+  // battlefield tapped under your control" (rewritten in body.ts): the same, tapped.
+  if ((m = /^When (another target (?:artifact )?creature(?: you control)?|target creature) dies this turn, return that card to the battlefield( tapped)? under your control$/.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to the battlefield under your control", thisTurn: true }] : null;
+    return what?.ref === "target" && !what.n ? [{ type: "delayed", when: "dies", of: what, effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" }, ...(m[2] ? { tapped: true } : {}) }], text: `return that card to the battlefield${m[2] ?? ""} under your control`, thisTurn: true }] : null;
   }
   // Saffi Eriksdotter: "Sacrifice ~: When target creature is put into your graveyard this turn, return that card to the
   // battlefield": the same, only if it goes to your graveyard, so only one you own (CR 404.1, 400.3). Returned under your

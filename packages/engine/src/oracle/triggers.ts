@@ -101,6 +101,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
+  // The Master of Lake-town: any player, you included.
+  [/^Whenever a player loses life, (.+)$/, "playerLosesLife"],
   // Emet-Selch: once for life lost at the same time, however many opponents lost it.
   [/^Whenever one or more opponents lose life, (.+)$/, "opponentsLoseLife"],
   // Ob Nixilis, Captive Kingpin: the same, only if one of them lost exactly 1 life in that event (all the combat damage
@@ -397,7 +399,7 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
   if (render) {
     const spec = parseTargetPhrase(render[1]!);
     const body = parseBody(render[2]!);
-    if (spec?.kind !== "object" || spec.controller || !body || /(?:that|those|they|them|it)/.test(render[2]!)) return "fail";
+    if (spec?.kind !== "object" || spec.controller || !body || /\b(?:that|those|they|them|it)\b/.test(render[2]!)) return "fail";
     return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: render[1]! }, opponents: true, combat: true, anyController: true } };
   }
   const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
@@ -970,6 +972,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     const { orSelf: _, ...dies } = t.dies;
     return { ...t, dies: { ...dies, self: true } };
   }
+  // Psychomancer, Shard of the Void Dragon: "is put into a graveyard from the battlefield or is put into exile from the
+  // battlefield" is dying or being put into exile from it (CR 700.4).
+  line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into a graveyard from the battlefield or is put into exile from the battlefield, /, "$1 dies or is put into exile, ");
   // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
   // Curator's Ward: "When enchanted permanent leaves the battlefield, if it was historic, ...": to any zone (CR 603.6c),
   // historic as it last existed (CR 603.10a, 700.6).
@@ -987,7 +992,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever an artifact is put into your graveyard from the battlefield" (Daretti's emblem): one you own dies, as
   // cards go to their owners' graveyards (CR 404.2, 700.4).
   const yours = /^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into your graveyard from the battlefield, /.exec(line);
-  if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yours[1]} you own dies, ${line.slice(yours[0].length)}`;
+  // Shirei, Shizo's Caretaker: "a creature with power 1 or less is put into your graveyard ...": one you own with that power.
+  const yoursWith = yours && /^(When(?:ever)? (?:~ or another|another|an?) [a-z]+)( with .+)$/.exec(yours[1]!);
+  if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yoursWith ? `${yoursWith[1]} you own${yoursWith[2]}` : yours[1]} you own dies, ${line.slice(yours[0].length)}`.replace(/( with .+) you own dies, /, "$1 dies, ");
   // "Whenever an artifact is put into an opponent's graveyard from the battlefield" (Viridian Revel): one an opponent owns
   // dies, whoever controlled it (CR 404.2, 700.4).
   const theirs = /^(When(?:ever)? (?:another|an?) [a-z]+) is put into an opponent's graveyard from the battlefield, /.exec(line);
@@ -1800,6 +1807,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Polluted Cistern: "each opponent loses 1 life for each card type among those cards": the cards put there, card types
+  // only (CR 205.2a), each as it last existed in the graveyard if it has left (CR 608.2h).
+  if (/^each opponent loses 1 life for each card type among those cards\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && !batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eachOpponent" }, n: { count: { kind: "eventGroupCardTypes" } } }], text: rest.replace(/\.$/, "") } };
   // Colossal Grave-Reaver: "put one of them onto the battlefield": one you choose of those cards still in the graveyard
   // (CR 400.7), under your control.
   if (/^put one of them onto the battlefield\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
@@ -2044,6 +2055,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // ED-E, Lonesome Eyebot: "Whenever you attack, if ... quest counters on ~, put a quest counter on it": "it" can only be
+    // ~, the one object the trigger names.
+    .replace(/^(Whenever you attack, if [^,]* on ~, put an? [a-z]+ counter on) it\.$/, "$1 ~.")
     // Clockwork Beast: "At end of combat, if ~ attacked or blocked this combat, remove a +1/+0 counter from it": the
     // intervening if (CR 603.4) is about ~, and so is "it".
     .replace(/^(At end of combat, if ~ attacked or blocked this combat, remove an? \S+ counter from) it\.$/, "$1 ~.")
@@ -3147,6 +3161,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`When ~ enters, ${untapped[1]}`);
     return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifEnteredUntapped: true };
   }
+  // "Whenever ~ deals 4 or more damage, ..." (Spinneret and Spiderling): one damage event, all it deals at once to any
+  // number of recipients (CR 120.3, the event summed per source as for "whenever ~ deals damage"), at least that much.
+  const selfMin = /^Whenever ~ deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage, (.+)$/.exec(line);
+  if (selfMin) {
+    const t = parseTrigger(`Whenever ~ deals damage, ${selfMin[2]}`);
+    return !t || t === "fail" || t.event !== "selfDealsDamage" || t.minDamage ? "fail" : { ...t, minDamage: num(selfMin[1]!) };
+  }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {
@@ -3333,9 +3354,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!/^the other chosen player also loses that much life\.$/.test(text)) return "fail" as const;
         text = "that player loses that much life.";
       }
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfIsDealtNoncombatDamage" || event === "selfIsDealtCombatDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "playerLosesLife" || event === "youLoseLife" || event === "youUntapInUntapStep" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
+      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "playerLosesLife" && event !== "youLoseLife" && event !== "youUntapInUntapStep" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
@@ -3361,7 +3382,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line)) text = text.replace(/^((?:you may )?)return it to your hand\.$/, "$1return ~ to its owner's hand.");
       const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
       if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {
         const [tg, ...more] = body.targets;

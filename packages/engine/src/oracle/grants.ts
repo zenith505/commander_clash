@@ -156,8 +156,9 @@ export function parseGrants(text: string): Modification[] | null {
     }
     // Annihilator too (CR 702.86b): "has trample and annihilator 2" (Eldrazi Conscription); afflict (CR 702.130b) and
     // bushido (CR 702.45b) the same: "Artifact creatures you control have afflict 3" (Cyberman Patrol). Renown too (CR
-    // 702.112c): "Attacking creatures you control have first strike and renown 1" (Aragorn, Hornburg Hero).
-    if (/^(?:annihilator|afflict|bushido|renown) \d+$/i.test(w)) {
+    // 702.112c): "Attacking creatures you control have first strike and renown 1" (Aragorn, Hornburg Hero); frenzy (CR
+    // 702.68b): "All Sliver creatures have frenzy 1" (Frenzy Sliver).
+    if (/^(?:annihilator|afflict|bushido|renown|frenzy) \d+$/i.test(w)) {
       out.push({ kind: "addAbility", text: `${w.charAt(0).toUpperCase()}${w.slice(1).toLowerCase()}` });
       continue;
     }

@@ -867,6 +867,10 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.45a: "Whenever this creature blocks or becomes blocked, it gets +N/+N until end of turn."
       const n = Number(m[1]);
       out.triggers.push({ event: "selfBlocksOrBecomesBlocked", body: { targets: [], effects: [pumpSelf(n, n)], text: `Bushido ${n}: ~ gets +${n}/+${n} until end of turn.` } });
+    } else if ((m = /^frenzy (\d+)$/i.exec(p))) {
+      // CR 702.68a: "Whenever this creature attacks and isn't blocked, it gets +N/+0 until end of turn."
+      const n = Number(m[1]);
+      out.triggers.push({ event: "selfAttacksUnblocked", body: { targets: [], effects: [pumpSelf(n, 0)], text: `Frenzy ${n}: ~ gets +${n}/+0 until end of turn.` } });
     } else if (/^flanking$/i.test(p)) {
       // CR 702.25a: "Whenever a creature without flanking blocks this creature, the blocking creature gets -1/-1 until end of turn."
       out.triggers.push({

@@ -2555,7 +2555,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Two or more cards put on top (or the bottom) of a library at once: their owner arranges them (CR 401.4), as the
       // instruction ends.
       for (const [owner, cards] of Object.entries(moved))
-        if (cards.length > 1) (s.graveyardOrders ??= []).push({ owner: Number(owner), cards, library: { bottom: e.position === "bottom", shuffles: player(s, Number(owner)).shuffles ?? 0, source: src } });
+        if (cards.length > 1) (s.graveyardOrders ??= []).push({ owner: Number(owner), cards, library: { bottom: e.position === "bottom", shuffles: player(s, Number(owner)).shuffles ?? 0, source: src, ...(e.youOrder ? { by: ctx.controller } : {}) } });
       return;
     }
     case "exileGraveyard": {

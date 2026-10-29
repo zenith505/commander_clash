@@ -2600,24 +2600,46 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   dealt damage by that creature dying this turn), Thelon's Curse (each player's upkeep may-pay per tapped blue
   creature), Pick Up the Pace ("a creature you control that entered this turn attacks" and play "as long as you
   attacked this turn").
-- Next for Lane B, least played first: North Star, Silhouette, Suffocation.
-  Then up from about 25,300: Goblins of the Flarg (a state trigger), Tiger-Tribe Hunter (pack tactics), Oracle of
-  Dust (a card an opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent.
+- Round B36 (harder skipped cards, least played first): "put it on the bottom of its owner's library instead" of
+  dying (Nissa's Chosen; Gravebane Zombie's top shares it), "creature card put into your graveyard this way" after a
+  mill (Liliana's Indignation), "for each artifact or creature card in target opponent's graveyard" (Spoils of Evil),
+  "the number of cards that player discarded this turn" (Dream Salvage), "look at the top X cards ..., where X is"
+  (Information Dealer, Descendant of Soramaro), life total becomes "the total toughness of creatures you control"
+  (Loxodon Lifechanter), "creatures named A and B" (Mine Worker, Power Plant Worker, Tower Worker; this also fixes the
+  old misreading of "a creature named A and a creature named B" as one name), +1/+1 counters one, two and three
+  (Incremental Growth), cards from one opponent's graveyard on top of their library in the order its caster chooses
+  (Misinformation; the order prompt now names whose library; browser test), "target permanent of the chosen color"
+  (Pentarch Paladin), "card with a kicker ability" (Murasa Sproutling, multikicker included, CR 702.33c), "then
+  shuffle and put those cards on top in any order" (Scouting Trek, CR 401.4), "~ and each creature it's blocking"
+  into their owners' libraries (Gomazoa), "prevent all combat damage it would deal and it has defender" (Woolly
+  Razorback), frenzy N (Frenzy Sliver, CR 702.68a), "as long as ~ is enchanted or equipped" (Novice Knight, Warchanter
+  Skald), heroic counter plus "prevent all damage ... this turn" (Favored Hoplite), "it deals 4 damage" from a dying
+  source (Volatile Rig), X/X plus one with "the colors" (Fractalize), "becomes all colors" (Scrapbasket), "are the
+  chosen color" (Shifting Sky), "if you cast it during your main phase" (Sentinel's Mark, addendum, CR 207.2c).
+  +26 (27,547 of 31,936 with B35 and rounds 202 to 206).
+- Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
+  from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
+  opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent ("for each {U}{U}
+  spent"), Wall of Shadows ("spells that can target only Walls"), Fickle Efreet (a delayed flip at end of combat, then
+  an opponent gains control), Tam, Mindful First-Year (hexproof from each of its colors; its "becomes all colors"
+  line now parses), Dragon's Disciple (reveal a Dragon as it enters), Lamplight Phoenix (collect evidence as a dies
+  may), Enslaved Horror (each other player may return a creature), Outlaw Stitcher (counters per spell other than the
+  first), Kav Landseeker (Lander token sacrificed on your next turn), Deus of Calamity ("6 or more damage to an
+  opponent"), Chisei (remove a counter from a permanent as an upkeep cost), Throne of Makindi (mana only for kicked
+  spells), Mind Bomb (each player discards up to three), Stormwild Capridor (counters per damage prevented).
+- Next for Lane B, least played first: Goblins of the Flarg (a state trigger), Tiger-Tribe Hunter (pack tactics).
   Then up from about 21,900 (rounds B8 and B35 took the easier ones; these are left): Wall of Shadows, Fickle Efreet,
   Bill Ferny, Enkira, Bullseye, Rayami, Library of Lat-Nam, Resolute Strike, Boom Scholar, Splitting the Powerstone,
   Storm the Citadel, Undergrowth, Time to Feed, Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss,
-  Boros Battleshaper, Aura Graft, Alex Wilder, Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dralnu's
+  Boros Battleshaper, Aura Graft, Alex Wilder, Treva, Vivien's Invocation, Withering Wisps, Dralnu's
   Crusade.
   Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):
   Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
-  before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch
-  Paladin, Dragon's Disciple, Dream Salvage, Misinformation, Obscura Interceptor, Rewrite History, Wight, Frenzy Sliver,
-  Mondo Gecko, Liliana's Indignation, Nissa's Chosen, Cloaked Cadet, Favored Hoplite, Scouting Trek, Tokka &
-  Rahzar, Serene Master, Shifting Sky, Ruin Processor, Enslaved Horror, Lo and Li, Chisei,
-  Withercrown, Throne of Makindi, Stormwild Capridor, Sentinel's Mark, Mindlock Orb, Murasa Sproutling,
-  Lamplight Phoenix, Awesome Presence, Spoils of Evil, and in the 18,000s Kav Landseeker,
-  Gomazoa, Mine Worker, Woolly Razorback, Information Dealer, Fractalize, Loxodon Lifechanter,
-  Incremental Growth, Mind Bomb, Tragic Lesson and Volatile Rig.
+  before the end step), Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Dragon's Disciple,
+  Obscura Interceptor, Rewrite History, Wight, Mondo Gecko, Cloaked Cadet, Tokka & Rahzar, Serene Master, Ruin
+  Processor, Enslaved Horror, Lo and Li, Chisei, Withercrown, Throne of Makindi, Stormwild Capridor, Mindlock Orb,
+  Lamplight Phoenix, Awesome Presence, and in the 18,000s Kav Landseeker, Mind Bomb and Tragic Lesson (round B36 did
+  the rest of this list).
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,
   Revenge of the Hunted, Reweave, Kheru Mind-Eater, Day of the Dragons, Sparring Dummy, Bloodbond

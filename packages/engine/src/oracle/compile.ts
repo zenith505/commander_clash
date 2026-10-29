@@ -540,6 +540,9 @@ export function compile(d: CardDef): CompiledCard {
       })
       // Bartered Cow: "When ~ dies and when you discard ~, ...": two trigger events (CR 603.1), an ability for each.
       .replace(/^When ~ dies and when you discard ~, ([^\n]+)$/m, "When ~ dies, $1\nWhen you discard ~, $1")
+      // Woolly Razorback: "As long as ~ has an ice counter on it, prevent all combat damage it would deal and it has
+      // defender.": two statics with the one condition (combat damage dealt to it isn't prevented, rulings).
+      .replace(/^(As long as ~ has an? [a-z]+ counter on it), prevent all combat damage it would deal and it has ([a-z]+)\.$/m, "$1, prevent all combat damage that would be dealt by ~.\n$1, it has $2.")
       // The Genjus: "Enchant Forest" ... "Enchanted Forest becomes ...": the land it's attached to, which is a Forest while
       // it's legally attached (CR 303.4d); "enchanted land" says the same.
       .replace(/\b([Ee])nchanted (Forest|Island|Swamp|Mountain|Plains)(?= becomes | is put into a graveyard| is an? )/g, (x, e: string, t: string, _i, text: string) => (new RegExp(`^Enchant ${t}$`, "m").test(text) ? `${e}nchanted land` : x))
@@ -1721,8 +1724,9 @@ export function compile(d: CardDef): CompiledCard {
       else out.exileInsteadOfDying = { filter, reflexive: body };
       continue;
     }
-    if (line === "If ~ would die, put it on top of its owner's library instead.") {
-      out.libraryTopInsteadOfDying = true;
+    const libraryDies = /^If ~ would die, put it on (top|the bottom) of its owner's library instead\.$/.exec(line);
+    if (libraryDies) {
+      out.libraryInsteadOfDying = libraryDies[1] === "top" ? "top" : "bottom";
       continue;
     }
     // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)

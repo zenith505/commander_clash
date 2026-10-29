@@ -313,6 +313,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Heliod, the Warped Eclipse: "for each card your opponents have drawn this turn": all of them together.
   if (/^cards? your opponents have drawn this turn$/i.test(p)) return { count: { kind: "drawnThisTurn", who: { ref: "eachOpponent" } } };
   if (/^cards? you've discarded this turn$/i.test(p)) return { count: { kind: "discardedThisTurn", who: { ref: "you" } } };
+  // Dream Salvage: "the number of cards target opponent discarded this turn" (every discard this turn, CR 701.9a).
+  if ((m = /^(?:the number of )?cards? (target opponent|target player|that player) discarded this turn$/i.exec(p))) {
+    const who = whosePlayer(`${m[1]!.toLowerCase()}'s`, ctx);
+    return who && { count: { kind: "discardedThisTurn", who } };
+  }
   if ((m = /^cards? (you've|you have|they've|they have|that player has) drawn this turn$/i.exec(p))) {
     const who = /^you/i.test(m[1]!) ? ({ ref: "you" } as PlayerRef) : whosePlayer(/^they/i.test(m[1]!) ? "their" : "that player's", ctx);
     return who && { count: { kind: "drawnThisTurn", who } };
@@ -451,7 +456,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // cards that went there (one replaced to go elsewhere doesn't count, rulings).
   // Coerced Confession: "Target player mills four cards. You draw a card for each creature card put into their graveyard
   // this way": the same, the cards milled going to their owner's graveyard (CR 701.17a).
-  if (each && ctx?.afterAnyMill && (m = /^(.+? card) (?:put into (?:a|their) graveyard this way|milled this way)$/i.exec(p))) {
+  // Liliana's Indignation: "Mill X cards. Target player loses 2 life for each creature card put into your graveyard this
+  // way": your own mill.
+  if (each && ctx?.afterAnyMill && (m = /^(.+? card) (?:put into (a|their|your) graveyard this way|milled this way)$/i.exec(p)) && (m[2] !== "your" || ctx.afterMill)) {
     const filter = parseSearchFilter(m[1]!);
     return filter ? count({ kind: "milledThisWay", filter }) : null;
   }
@@ -555,7 +562,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
-  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
+  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|target opponent's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);
     if (!who) return null;
     const kinds = m[1]!.trim().replace(/ and /g, " or ");

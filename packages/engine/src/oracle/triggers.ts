@@ -140,6 +140,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^Whenever ~ becomes untapped, (.+)$/, "selfBecomesUntapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
+  // Relic Seeker (CR 702.112b).
+  [/^When ~ becomes renowned, (.+)$/, "selfBecomesRenowned"],
   [/^Whenever ~ evolves, (.+)$/, "selfEvolves"],
   [/^Whenever ~ becomes crewed, (.+)$/, "selfBecomesCrewed"],
   [/^Whenever ~ mutates, (.+)$/, "selfMutates"],
@@ -649,9 +651,11 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
   // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
   // "Whenever you cast your first spell during each opponent's turn" (Wavebreak Hippocamp): the first you cast in that turn.
+  // "Your third spell each turn" (Emeritus of Conflict, Captain Ripley Vance), "... in a turn" (Vance's Blasting Cannons):
+  // counting the spells you've cast this turn, whether they resolved or not (rulings).
   // Nev, the Practical Dean: "your first spell with {X} in its mana cost each turn": the first of those (TargetSpec.xInCost),
   // and "X" in what it does is the X that spell was cast with (CR 107.3a).
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second|third) (?:(.+?) )?spell( with \{X\} in its mana cost)? (each turn|in a turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, ...(nth[4] ? { xInCost: true as const } : {}), text: `${nth[3] ? `${nth[3]} spell` : "spell"}${nth[4] ?? ""}` };
@@ -666,7 +670,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body1 = body0 && youOpp ? { ...(JSON.parse(JSON.stringify(body0).replaceAll('{"ref":"eventPlayer"}', '{"ref":"activePlayer"}')) as typeof body0), text: body0.text } : body0;
     const body = body1 && spellX ? { ...replaceX(body1, { count: { kind: "castSpellX" } }), text: body1.text } : body1;
     const nth4 = nth[5];
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: ["first", "second", "third"].indexOf(nth[2]!) + 1, ...(nth[3] || nth[4] ? { nthOfKind: true as const } : {}), ...(nth4 === "during their turn" ? { ownTurn: true as const } : {}), ...(nth4 === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
   // "Whenever you cast a spell other than your first spell each turn" (Arcbound Tracker): its second or later this turn,
   // counting spells cast before this was on the battlefield (rulings).
@@ -2612,6 +2616,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const lost = { count: { kind: "lifeLostThisTurn", who: { ref: "eventPlayer" } }, times: -1, plus: n } as const;
     return { ...t, body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eventPlayer" }, n: lost }], text: `that player loses life equal to the difference between ${n} and the life they lost this turn.` }, ifCond: { kind: "eventPlayerLifeLost", max: n - 1 } };
   }
+  // "When this Equipment enters, if it was cast from your graveyard, ..." (Rocket-Powered Goblin Glider): the same kind of
+  // intervening if, a spell cast from its owner's graveyard by that player.
+  const castYard = /^(When ~ enters), if (?:it|~) was cast from your graveyard, (.+)$/.exec(line);
+  if (castYard) {
+    const t = parseTrigger(`${castYard[1]!}, ${castYard[2]!}`);
+    return !t || t === "fail" || t.event !== "selfEnters" || t.ifFromGraveyard ? "fail" : { ...t, ifFromGraveyard: "castYours" };
+  }
   // "Whenever ~ or another creature you control enters, if it entered from your graveyard or you cast it from your
   // graveyard, ..." (Grist, Voracious Larva; Prized Amalgam): how it entered can't change, so the intervening if (CR
   // 603.4) is part of the event: put onto the battlefield from its owner's graveyard, or a spell its owner cast from there.
@@ -2911,6 +2922,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (explores) {
     const body = parseBody(explores[2]!, { subjectIt: true });
     return body ? { event: "creatureYouControlExplores", body, ...(explores[1] ? { explored: explores[1] === " a land card" ? ("land" as const) : ("nonland" as const) } : {}) } : "fail";
+  }
+  // Valeron Wardens: "Whenever a creature you control becomes renowned, ..." (CR 702.112b), that creature the subject.
+  const renowned = /^Whenever a creature you control becomes renowned, (.+)$/.exec(line);
+  if (renowned) {
+    const body = parseBody(renowned[1]!, { subjectIt: true });
+    return body ? { event: "creatureYouControlBecomesRenowned", body } : "fail";
   }
   // Iron Monger, Ultron: "Whenever a creature you control connives, ..." (CR 701.50f), that creature the subject.
   const connives = /^Whenever a creature you control connives, (.+)$/.exec(line);

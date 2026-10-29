@@ -1,7 +1,7 @@
 # Roadmap
 
-27,255 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,056 of
+27,294 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,063 of
 9,979 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -777,6 +777,24 @@ line blocks.
    more Pirates to one player), Fatespinner (skipping a chosen step or phase), Pramikon, Sky Rampart (attack only the
    nearest opponent), Bargaining Table and Elite Arcanist (an X the text sets: an opponent's hand, a copy to cast),
    Summary Dismissal, Bioshift, Public Enemy, Bladegraft Aspirant, Archon of Valor's Reach.
+   Round 204 went on from the top: "target creature becomes prepared / unprepared" on any creature (CR 722.3a-b:
+   Skycoach Waypoint, Hexhaven Dueling Arena, Biblioplex Tomekeeper, Infinite Coursework; the bot aims it at its own
+   creature with a prepare spell), "you may exile N cards from your graveyard. If you do" with N above one (CR 609.3:
+   Emeritus of Ideation, Skywarp Skaab, Aegis Sculptor), "N or more artifact and/or creature cards in your graveyard"
+   (Lorehold Archivist, Mortal Combat, Scouring Swarm), "your third spell each turn / in a turn" (Emeritus of Conflict,
+   Captain Ripley Vance, Vance's Blasting Cannons), "whenever a creature attacks this turn" as a floating trigger
+   (CR 603.7b: The Revelations of Ezio, Origin of the Hidden Ones, Basri, Devoted Paladin, The Bloodsky Massacre, Ondu
+   Rising), "if it was cast from your graveyard" (Rocket-Powered Goblin Glider), renown triggers and "is renowned"
+   (CR 702.112b: Relic Seeker, Valeron Wardens, Scab-Clan Berserker, Honored Hierarch, Goblin Glory Chaser, Consul's
+   Lieutenant), "if it had N or more counters on it" as it last existed (CR 608.2h: Lost Isle Calling), "tap two other
+   untapped creatures you control" as a may (Tidal Terror, Gravelgill Scoundrel, Redcap Raiders, Civil Servant,
+   Meanders Guide, Saheeli, Filigree Master), "if you didn't cast it from your hand" (Epochrasite), Razzle-Dazzler,
+   Wicked Wolf, Triceraton Commander, Hope-Ender Coatl, Fall of the Thran, Rust Harvester. Kappa Cannoneer's "It can't
+   be blocked this turn" now means Kappa Cannoneer, not the artifact that entered. No new prompts.
+   Out after round 204 (looked at, not done): Codie, Ravenous Codex ("prepared spell" isn't defined yet), Glissa's
+   Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (a type-or-subtype filter), Behold the
+   Unspeakable (a pausing scry inside "Otherwise"), Song of Blood, Indulge // Excess, Harald Unites the Elves, Rent Is
+   Due, Search Elemental, Estinien Varlineau.
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

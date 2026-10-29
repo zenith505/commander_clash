@@ -745,8 +745,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
   // Spell mastery: "If there are two or more instant and/or sorcery cards in your graveyard" (each card counted once).
-  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+|instant and/or sorcery) cards in your graveyard$`).exec(text))) {
-    const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
+  // Mortal Combat: "if twenty or more creature cards are in your graveyard", the same.
+  if ((m = new RegExp(`^${NUM} or more (\\w+) cards are in your graveyard$`).exec(text))) return parseStaticCondition(`there are ${m[1]} or more ${m[2]} cards in your graveyard`, st);
+  // Lorehold Archivist: "three or more artifact and/or creature cards", the same.
+  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+|\\w+ and/or \\w+) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]!.replace(" and/or ", " and ")} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
@@ -1199,8 +1202,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^at least one creature is blocking ~$/.test(text)) return { kind: "self", is: "hasBlockers" };
   if (/^two or more creatures are blocking (?:~|it)$/.test(text)) return { kind: "self", is: "twoOrMoreBlockers" };
   // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
-  const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
-  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
+  const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous|renowned)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" | "renowned") };
   // Gatewatch Beacon: "if ~ has loyalty counters on it": one or more.
   if ((m = new RegExp(`^(?:~|it) has (?:an? ${COUNTER} counter|${COUNTER} counters) on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind((m[1] ?? m[2])!) };

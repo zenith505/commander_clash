@@ -7,7 +7,7 @@ import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenB
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
-import { becomePrepared } from "../prepare";
+import { becomePrepared, unprepare } from "../prepare";
 import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { exiledWithCounter } from "./run-choices";
@@ -330,7 +330,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     case "becomePrepared":
-      for (const o of objects(s, e.what, ctx)) becomePrepared(s, o);
+      for (const o of objects(s, e.what, ctx)) if (e.un) unprepare(s, o);
+      else becomePrepared(s, o);
       return;
     case "flip":
       for (const o of objects(s, e.what, ctx)) flipPermanent(s, o);
@@ -1071,7 +1072,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!o || o.renowned) return;
       putCounters(s, o, "+1/+1", e.n);
       o.renowned = true;
+      // "As long as ~ is renowned" (Honored Hierarch) reads it (CR 702.112b).
+      invalidateCharacteristics(s);
       log(s, `${characteristics(s, o).name} gets ${e.n} +1/+1 counter${e.n > 1 ? "s" : ""} and becomes renowned.`);
+      fireEvent(s, { type: "becameRenowned", id: o.id });
       return;
     }
     case "adapt": {

@@ -989,8 +989,11 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : bottom ? " and puts it on the bottom of its owner's library" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
-  if (item.kind === "spell" && s.resolving) s.resolving.spellCountered = true;
-  if (item.kind === "spell") fireEvent(s, { type: "spellCountered", by: ctx.controller });
+  if (item.kind === "spell" && s.resolving) {
+    s.resolving.spellCountered = true;
+    s.resolving.spellsCountered = (s.resolving.spellsCountered ?? 0) + 1;
+  }
+  if (item.kind === "spell") fireEvent(s, { type: "spellCountered", by: ctx.controller, caster: item.controller, ...(item.copy ? { copy: true as const } : {}) });
 }
 
 /**

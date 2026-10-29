@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power, realDefOf } from "../cards";
 import { nameLandBan } from "../names";
-import { graveyardWays, payableLife, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { graveyardWays, processCandidates, processExiled, payableLife, freeCastable, canPlayLandNow, loseLife, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -1664,13 +1664,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
       const done: ObjectId[] = [];
+      const at = s.nextTimestamp;
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
         if (o.zone !== "exile") continue;
         // Face down: only its controller may look, if the ability says so or lets them play it (CR 406.3; rulings on
         // Gonti: "you may look at and play").
-        o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look || e.play ? [p.id] : [], label: "Face down" };
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look || e.play ? [p.id] : [], label: "Face down", at };
         if (ctx.sourceId) ((s.linkedExile ??= {})[key] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         // The permission belongs to this object only (CR 400.7), and to the player who exiled it, whoever controls the
         // source later (rulings on Gonti).
@@ -2470,6 +2471,22 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${player(s, pid).name} returns ${mine.length} card${mine.length === 1 ? "" : "s"} they exiled to their hand (${src}).`);
         for (const c of mine) moveObject(s, c.id, "hand");
       }
+      return;
+    }
+    case "processExile": {
+      // The Eldrazi processors: cards an opponent owns in exile, chosen as it resolves; a face-down one by its group, then
+      // at random within it (rulings). Two cards can't be the same card (rulings on Ulamog's Despoiler).
+      const sc = (s.resolving!.scratch ??= {});
+      const cards = processCandidates(s, ctx.controller);
+      if (!sc.found) {
+        if (cards.length < e.n) return;
+        const what = e.n === 1 ? "a card an opponent owns" : `${e.n} cards your opponents own`;
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.n, max: e.n, exiled: true, dig: { looked: cards, to: e.n === 1 ? "to put into its owner's graveyard" : "to put into their owners' graveyards", rest: "stay in exile" } };
+        return "paused";
+      }
+      const found = sc.found.filter((id) => cards.includes(id));
+      sc.found = undefined;
+      processExiled(s, ctx.controller, found);
       return;
     }
     case "exiledToGraveyard": {

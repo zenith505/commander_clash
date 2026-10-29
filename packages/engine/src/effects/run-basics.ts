@@ -424,6 +424,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "loseAllCounters":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        if (e.poison) {
+          const n = p.poison ?? 0;
+          if (s.resolving) s.resolving.poisonLost = (s.resolving.poisonLost ?? 0) + n;
+          if (!n) continue;
+          p.poison = 0;
+          log(s, `${p.name} loses all poison counters.`);
+          continue;
+        }
         if (!p.poison && !p.energy && !p.experience && !p.rad) continue;
         p.poison = 0;
         p.energy = 0;

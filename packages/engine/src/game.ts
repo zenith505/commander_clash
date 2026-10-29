@@ -3960,6 +3960,8 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   // "Can't play lands this turn" wins over anything that lets them (CR 101.2).
   if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
+  // Territorial Dispute: "Players can't play lands."
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).playersCantPlayLands)) return 0;
   let n = 1;
   const extra = player(s, pid).extraLands;
   if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
@@ -6199,6 +6201,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : c.kind === "exileFromGraveyard" && c.linked
           ? linkedExileCards(s, o)
+          : c.kind === "exileFromGraveyard" && c.process
+          ? processCandidates(s, pid)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
       c.kind === "sacrifice"
@@ -6213,8 +6217,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : c.kind === "exileFromGraveyard" && c.linked
           ? `a card exiled with ${d.name}`
+          : c.kind === "exileFromGraveyard" && c.process
+          ? "a card an opponent owns from exile"
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? (c.orControl ? "behold" : "reveal") : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && (c.linked || c.process) ? "put into its owner's graveyard" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -6334,6 +6340,64 @@ export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
 }
 
 /**
+ * A card in exile face down (CR 406.3): foretold (CR 702.143a), hidden away (702.75a) or exiled face down by an effect;
+ * the group it was exiled in (what exiled it, and when), or undefined for a face-up card.
+ */
+export function faceDownExileGroup(o: GameObject): string | undefined {
+  if (o.zone !== "exile") return undefined;
+  if (o.foretold) return `foretold:${o.id}`; // each card is foretold on its own (CR 702.143a)
+  if (o.hiddenExile) return `${o.hiddenExile.by}@${o.hiddenExile.at ?? ""}`;
+  return undefined;
+}
+
+/** May `viewer` look at this card in exile? Not at someone else's foretold card, nor at one exiled face down they haven't seen (CR 406.3). */
+export function hiddenInExile(o: GameObject, viewer: PlayerId): boolean {
+  if (o.zone !== "exile") return false;
+  if (o.foretold) return o.owner !== viewer;
+  return !!o.hiddenExile && !o.hiddenExile.seen.includes(viewer);
+}
+
+/**
+ * The Eldrazi processors (BFZ): the cards `pid`'s opponents own in exile, any of which may be put into its owner's
+ * graveyard ("put a card an opponent owns from exile into that player's graveyard").
+ */
+export function processCandidates(s: GameState, pid: PlayerId): ObjectId[] {
+  return opponents(s, pid).flatMap((x) => player(s, x).exile.filter((id) => !obj(s, id).isToken));
+}
+
+/**
+ * The cards actually put into graveyards for processing `chosen`: a face-down card is chosen by its group, then the card
+ * is taken from that group at random (rulings on Ruin Processor), and a card can't be used twice (rulings on Ulamog's
+ * Despoiler).
+ */
+export function processPicks(s: GameState, pid: PlayerId, chosen: ObjectId[]): ObjectId[] {
+  const all = processCandidates(s, pid);
+  const out: ObjectId[] = [];
+  for (const id of chosen) {
+    const group = faceDownExileGroup(obj(s, id));
+    if (group === undefined || !hiddenInExile(obj(s, id), pid)) {
+      out.push(id);
+      continue;
+    }
+    const pool = all.filter((x) => faceDownExileGroup(obj(s, x)) === group && hiddenInExile(obj(s, x), pid) && !out.includes(x));
+    out.push(pool.length ? pool[Math.floor(nextRandom(s) * pool.length)]! : id);
+  }
+  return out;
+}
+
+/** Put the processed cards into their owners' graveyards, logged. */
+export function processExiled(s: GameState, pid: PlayerId, chosen: ObjectId[], moved?: string[]): ObjectId[] {
+  const ids = processPicks(s, pid, chosen);
+  for (const id of ids) {
+    moved?.push(defOf(s, obj(s, id)).name);
+    log(s, `${player(s, pid).name} puts ${nameOf(s, id)} from exile into ${player(s, obj(s, id).owner).name}'s graveyard.`);
+    moveObject(s, id, "graveyard");
+  }
+  closeZoneBatch(s);
+  return ids;
+}
+
+/**
  * What can be exiled for craft's materials (CR 702.167a-b): permanents `pid` controls that match (by their
  * characteristics), then cards in their graveyard that match (by their printed ones, CR 109.2), never `o`, the source.
  */
@@ -6376,6 +6440,11 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
 function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[], exiled?: { id: ObjectId; zc: number }[]) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
+    if (c.kind === "exileFromGraveyard" && c.process) {
+      // The Eldrazi processors: the chosen card an opponent owns, or one at random from a face-down group (rulings).
+      processExiled(s, p.id, choices.exileCards ?? [], moved);
+      continue;
+    }
     if (c.kind === "exileFromGraveyard" && c.linked) {
       // Jester's Scepter: the chosen card exiled with it goes to its owner's graveyard; "that card" is it (CR 608.2h).
       for (const id of choices.exileCards ?? []) {
@@ -6854,7 +6923,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
   const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
-  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && ab.keyword !== "Ninjutsu") return cost;
+  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast") return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
@@ -6872,6 +6941,12 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
     const src = obj(s, id);
     const n = controllerOf(s, src) === pid ? abilitiesOf(s, src).ninjutsuLess : undefined;
     if (n) less += n;
+  }
+  // "Boast abilities you activate cost {1} less to activate for each Dragon you control" (Dragonkin Berserker).
+  for (const id of ab.keyword === "Boast" ? s.battlefield : []) {
+    const src = obj(s, id);
+    const n = controllerOf(s, src) === pid ? abilitiesOf(s, src).boastLess : undefined;
+    if (n) less += Math.max(0, evalAmount(s, n, { controller: pid, sourceId: src.id }));
   }
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
   for (const id of ab.equip ? s.battlefield : []) {
@@ -7148,7 +7223,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

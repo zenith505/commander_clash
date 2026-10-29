@@ -342,6 +342,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.resolving?.exiledCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[id]!)))).length;
     case "sacrificedThisWayCount":
       return s.resolving?.sacrificedThisWay?.length ?? 0;
+    case "spellsCounteredThisWay":
+      return s.resolving?.spellsCountered ?? 0;
+    case "poisonLostThisWay":
+      return s.resolving?.poisonLost ?? 0;
     case "bouncedThisWayCount":
       return (s.resolving?.bouncedThisWay ?? []).filter((b) => b.returned).length;
     case "preventedByRule":
@@ -947,6 +951,10 @@ function describeCount(c: Count): string {
       return `#${c.filter ? `${c.filter.text}s` : "cards"} exiled`;
     case "sacrificedThisWayCount":
       return "#sacrificed";
+    case "spellsCounteredThisWay":
+      return "#spells countered";
+    case "poisonLostThisWay":
+      return "#poison counters lost";
     case "bouncedThisWayCount":
       return "#returned";
     case "preventedByRule":

@@ -97,6 +97,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you scry, (.+)$/, "youScry"],
   [/^Whenever you surveil, (.+)$/, "youSurveil"],
   [/^Whenever a spell or ability you control counters a spell, (.+)$/, "youCounterSpell"],
+  [/^Whenever a spell you've cast is countered, (.+)$/, "yourSpellCountered"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you fully unlock a Room, (.+)$/, "youFullyUnlockRoom"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
@@ -1093,6 +1094,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const wasType = attached?.[1] === "enchanted" && attachedM![2] === "creature" && attachedM![3] === "dies" ? /^if that creature was an? ([A-Z][a-z]+), (.+)$/.exec(bodyText) : null;
   if (wasType && !CREATURE_TYPES.has(wasType[1]!)) return "fail";
   if (wasType) bodyText = wasType[2]!;
+  // Creature Bond: "When enchanted creature dies, ~ deals damage equal to that creature's toughness to the creature's
+  // controller": that creature's, as it last existed.
+  if (attached?.[1] === "enchanted") bodyText = bodyText.replace(/(that creature's [^.]+ to) the creature's controller\.$/, "$1 that creature's controller.");
   const wasHistoric = attached && attachedM![3] === "leaves the battlefield" ? /^if it was historic, (.+)$/.exec(bodyText) : null;
   if (wasHistoric) bodyText = wasHistoric[1]!;
   // Koll, the Forgemaster: "if it was enchanted or equipped": what was attached to it as it last existed (CR 603.10a).
@@ -1918,6 +1922,12 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (ninja) {
     const body = parseBody(ninja[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", ninjutsu: true }, body } : "fail";
+  }
+  // Frenzied Raider: "Whenever you activate a boast ability" (CR 702.142a).
+  const boast = /^Whenever you activate a boast ability, (.+)$/.exec(line);
+  if (boast) {
+    const body = parseBody(boast[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", boast: true }, body } : "fail";
   }
   // Neerdiv, Devious Diver (as compile.ts splits it): "Whenever you activate an ability of a card in your graveyard":
   // mana abilities too, as nothing says otherwise.
@@ -3197,6 +3207,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(many[3]!.replace(/\b(\d{1,3}),(\d{3})\b/g, "$1$2"), { selfIt: true });
     const min = /^[\d,]+$/.test(many[1]!) ? Number(many[1]!.replace(/,/g, "")) : num(many[1]!);
     return body && Number.isInteger(min) && min > 0 ? { event: "state", state: { kind: "selfCounters", counter: many[2]!, min }, body } : "fail";
+  }
+  // Afiya Grove: "When ~ has no +1/+1 counters on it, sacrifice it." (CR 603.8).
+  const none = /^When ~ has no ([+-]1\/[+-]1|[a-z]+) counters on it, (.+)$/.exec(line);
+  if (none) {
+    const body = parseBody(none[2]!, { selfIt: true });
+    return body ? { event: "state", state: { kind: "selfCounters", counter: none[1]!, min: 0, max: 0 }, body } : "fail";
   }
   // Lurking Jackals: "When an opponent has 10 or less life", Opal Avenger: "When you have 10 or less life", Veiled
   // Crocodile: "When a player has no cards in hand", Hidden Predators: "When an opponent controls a creature with power 4

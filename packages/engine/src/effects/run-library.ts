@@ -90,6 +90,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of ids) moveObject(s, id, "graveyard");
       }
       return;
+    case "revealTopLandsToGraveyard": {
+      // Countryside Crusher: each land card revealed goes to the graveyard on its own (one event each), then the next is
+      // revealed; a nonland card stays on top, revealed.
+      const p = player(s, ctx.controller);
+      while (p.library.length) {
+        const id = p.library[0]!;
+        const land = isType(defOf(s, obj(s, id)), "Land");
+        log(s, `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library${land ? " and puts it into their graveyard" : ""}.`);
+        if (!land) break;
+        moveObject(s, id, "graveyard");
+      }
+      return;
+    }
     case "exileUntilTotalMv":
       // Tasha's Hideous Laughter: one card at a time, each player in turn order (CR 101.4), until the mana values of the
       // cards they exiled this way add up to the total (a land's is 0, a split card's both halves' added, CR 202.3), or

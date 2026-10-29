@@ -363,6 +363,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // it as it last existed on the battlefield (CR 603.10a, 608.2h).
   if (/^When that creature dies this turn, its controller gets a poison counter$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "poison", who: { ref: "subjectController" }, n: 1 }], text: "its controller gets a poison counter", thisTurn: true }];
+  // Burn Away: "When that creature dies this turn, exile its controller's graveyard": that player's, the one who
+  // controlled it as it last existed on the battlefield (CR 603.10a), its own card included.
+  if (/^When that creature dies this turn, exile its controller's graveyard$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "exileGraveyard", who: { ref: "subjectController" } }], text: "exile its controller's graveyard", thisTurn: true }];
   // Adarkar Valkyrie: "{T}: When target creature other than ~ dies this turn, return that card to the battlefield under
   // your control": a delayed trigger about the target (CR 603.7), the card it became in the graveyard (CR 400.7); a token
   // doesn't return (rulings).
@@ -812,8 +816,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = parseCount(m[2]!, ctx, true);
     return n ? [{ type: "removeCounters", what: { ref: "self" }, counter: counterKind(m[1]!), n }] : null;
   }
-  // Venarian Gold: "remove a sleep counter from that creature", the enchanted creature as it resolves.
-  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+|enchanted creature)$`, "i").exec(s))) {
+  // Venarian Gold: "remove a sleep counter from that creature", the enchanted creature as it resolves. Defiant Greatmaw:
+  // "remove a -1/-1 counter from another target creature you control".
+  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|(?:another )?target .+|enchanted creature)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
@@ -1294,7 +1299,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Zur, Eternal Schemer: "Target non-Aura enchantment you control becomes a creature in addition to its other types and has
   // base power and base toughness each equal to its mana value": no duration either (rulings).
   // Tatyova, Steward of Tides: "up to one target land you control becomes a 3/3 Elemental creature with haste": the same.
-  if ((m = /^((?:up to one )?target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
+  // Wall of Resurgence: "that land becomes a 0/0 Elemental creature with haste that's still a land": the land targeted.
+  if ((m = /^((?:up to one )?target .+?|It|[Tt]hat land|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+"|a creature in addition to its other types and has base power and base toughness each equal to its mana value)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

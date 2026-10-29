@@ -1374,6 +1374,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const me of e.source?.ref === "target" && e.source.n ? mine : mine.slice(0, 1)) {
         // Something that isn't an Equipment (or an Aura, for "attach target Aura") doesn't move (CR 701.3b).
         if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) continue;
+        // Haunted Plate Mail: its equip ability while it's "no longer an Equipment" does nothing (rulings, CR 701.3b).
+        if (!e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || t === "Aura" || t === "Fortification")) continue;
         attachTo(s, me, host, e.asCreature);
       }
       return;

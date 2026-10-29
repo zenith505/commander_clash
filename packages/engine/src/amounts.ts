@@ -372,6 +372,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "revealedUntilCount":
+      return s.resolving?.revealedUntilCount ?? 0;
     case "joinForcesPaid":
       return c.whose ? refPlayers(s, c.whose, ctx).reduce((a, pid) => a + (s.resolving?.joinForcesPaidBy?.[pid] ?? 0), 0) : (s.resolving?.joinForcesPaid ?? 0);
     case "manifestedThisWay":

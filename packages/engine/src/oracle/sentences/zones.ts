@@ -1,7 +1,7 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, capital, counterKind, num, singularWord } from "../words";
+import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, capital, counterKind, isGroup, num, singularWord } from "../words";
 import { CREATURE_TYPES } from "../../keywords";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
@@ -1221,7 +1221,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }];
   }
   // Flummoxed Cyclops: "~ can't block this combat": until the combat ends (CR 500.5a: "until end of combat").
-  if (/^~ can't block this combat$/.test(s)) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantBlock" }], duration: "endOfCombat" }];
+  // Forgestoker Dragon: "That creature can't block this combat", the one it just dealt damage to.
+  if ((m = /^(~|That creature|Target creature) can't block this combat$/.exec(s))) {
+    const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!.replace(/^That/, "that").replace(/^Target/, "target"), ctx);
+    return what && !isGroup(what) ? [{ type: "continuous", what, mods: [{ kind: "cantBlock" }], duration: "endOfCombat" }] : null;
+  }
   // Neyith of the Dire Hunt: "That creature must be blocked this combat if able": in the combat going on only.
   if ((m = /^(That creature|It|Target creature) must be blocked this combat if able$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);

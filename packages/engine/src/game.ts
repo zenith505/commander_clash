@@ -16,7 +16,7 @@ import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { countersBanned, countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
+import { countersBanned, countersStay, putCounters, putPlayerCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { rollDice } from "./effects/run-dice";
 import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -1651,8 +1651,13 @@ function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
     const rules = compileCard(defOf(s, src)).othersEnterTapped;
     if (!rules || !characteristics(s, src).hasPrintedAbilities) return false;
     const you = controllerOf(s, src);
-    // "Of the chosen quality" (Ashling's Prerogative): chosen as the source entered.
-    return rules.some((r) => objectMatches(s, bindChosen(r.filter, src.chosen), o, you, false));
+    // "Of the chosen quality" (Ashling's Prerogative): chosen as the source entered. "Enchanted player controls"
+    // (Radiant Restraints): the player the Aura is attached to now.
+    return rules.some((r) => {
+      if (r.filter.controller !== "enchanted") return objectMatches(s, bindChosen(r.filter, src.chosen), o, you, false);
+      const { controller: _, ...rest } = r.filter;
+      return src.attachedToPlayer !== undefined && objectMatches(s, { ...rest, controlledBy: src.attachedToPlayer }, o, you, false);
+    });
   });
 }
 
@@ -8403,6 +8408,24 @@ function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
     }
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
+    if (pend.poison) {
+      // "Ward—Get five poison counters": getting them is the payment (CR 118.3); ten or more loses as a state-based
+      // action (CR 704.5c).
+      const n = putPlayerCounters(s, p.id, "poison", pend.poison);
+      log(s, `${p.name} gets ${n} poison counter${n === 1 ? "" : "s"} for ${pend.source}.`);
+    }
+    if (pend.discardRandom) {
+      // "Ward—Discard a card at random" (CR 701.9c): the cards are chosen at random now and discarded as the counter
+      // effect carries on (see paidUnless).
+      if (p.hand.length < pend.discardRandom) throw new RulesError(`you don't have ${pend.discardRandom} card${pend.discardRandom === 1 ? "" : "s"} to discard`);
+      const pool = [...p.hand];
+      const chosen: ObjectId[] = [];
+      for (let k = 0; k < pend.discardRandom; k++) chosen.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: { [p.id]: chosen } };
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
     if (pend.sacrifice) {
       // Then which permanents to sacrifice, sacrificed as the counter effect carries on (see paidUnless).
       const options = sacrificeOptions;

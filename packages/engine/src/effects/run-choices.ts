@@ -907,6 +907,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "draw" && e.who.ref === "target" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && player(s, pid).library.length)) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
+    // "You may mill three cards" (Druidic Ritual): not with fewer cards in your library (CR 701.17b, rulings).
+    if (e.type === "mill" && e.who.ref === "you" && typeof e.n === "number" && player(s, ctx.controller).library.length < e.n) return false;
     // "You may discard a card or sacrifice a land" (Highway Robbery): only with one of them possible (rulings).
     if (e.type === "either" && e.onlyDoable && !e.options.some((o) => canDoNow(s, o, ctx))) return false;
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;

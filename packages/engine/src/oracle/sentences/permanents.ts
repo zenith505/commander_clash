@@ -274,6 +274,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[2]!.replace(/s$/, ""));
     return filter ? [{ type: "keepDestroyRest", filter: { ...filter, text: m[2]!.replace(/s$/, "") }, n: num(m[1]!) }] : null;
   }
+  // Deadly Vanity: "Choose a creature or planeswalker, then destroy all other creatures and planeswalkers": any player's,
+  // not targeted; one must be chosen if there is one (rulings).
+  if (/^Choose a creature or planeswalker, then destroy all other creatures and planeswalkers$/.test(s)) return [{ type: "keepDestroyRest", filter: { kind: "object", types: ["Creature", "Planeswalker"], notTypes: [], notColors: [], text: "creature or planeswalker" }, n: 1, exactly: true }];
   // Last One Standing: "Choose a creature at random, then destroy the rest": any player's, not targeted (rulings).
   if (/^Choose a creature at random, then destroy the rest$/.test(s)) return [{ type: "keepDestroyRest", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, n: 1, random: true }];
   // Fight to the Death: "Destroy all blocking creatures and all blocked creatures": all of them at once (CR 701.8a), each

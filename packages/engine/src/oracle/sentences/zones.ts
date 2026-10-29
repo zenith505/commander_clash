@@ -454,11 +454,21 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // Make a Wish: "Return two cards at random from your graveyard to your hand".
   if ((m = /^[Rr]eturn (two|three) cards at random from your graveyard to your hand$/.exec(s))) return [{ type: "randomFromGraveyard", dest: "hand", n: num(m[1]!) }];
+  // Reap the Past: "Return X cards at random from your graveyard to your hand" (the spell itself is still on the stack,
+  // rulings).
+  if (/^[Rr]eturn X cards at random from your graveyard to your hand$/.test(s)) return [{ type: "randomFromGraveyard", dest: "hand", n: { count: { kind: "x" } } }];
   // Tomb Tyrant: "Return a Zombie creature card at random from your graveyard to the battlefield": a creature card, so a
   // permanent card (CR 110.4b).
   if ((m = /^[Rr]eturn an? (.+? creature card) at random from your graveyard to the battlefield$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     return filter?.types?.includes("Creature") ? [{ type: "randomFromGraveyard", dest: "battlefield", filter }] : null;
+  }
+  // Druidic Ritual: "return up to one creature card and up to one land card from your graveyard to your hand": one choice
+  // for each, as it resolves (not targeted); a creature land card can be either one.
+  if ((m = /^[Rr]eturn up to one ([a-z]+ card) and up to one ([a-z]+ card) from your graveyard to your hand$/.exec(s))) {
+    const f1 = parseSearchFilter(m[1]!);
+    const f2 = parseSearchFilter(m[2]!);
+    return f1 && f2 ? [{ type: "chooseFromGraveyard", n: 1, upTo: true, filter: f1 }, { type: "chooseFromGraveyard", n: 1, upTo: true, filter: f2 }] : null;
   }
   // "Return a creature or planeswalker card from your graveyard to your hand" (Takenuma), "return up to two instant
   // and/or sorcery cards ...": chosen as it resolves, not targeted.

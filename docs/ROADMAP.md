@@ -1,7 +1,7 @@
 # Roadmap
 
-27,493 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,087 of
+27,514 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,089 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -836,6 +836,27 @@ line blocks.
    (a name change), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
    Entity (its "is turned face up" path).
+   Round 207 went on from the top: "each creature card in your graveyard has unearth {2}{B}" and the same for artifact
+   cards or "that's a Cleric, Rogue, Warrior, and/or Wizard" (Sedris, the Traitor King, Mishra, Tamer of Mak Fawa, Solemn
+   Doomguide) and "each outlaw creature card in your graveyard has encore {X}, where X is its mana value" (Graywater's
+   Fixer), abilities granted to cards in a graveyard while the permanent is on the battlefield; "ward—discard a card at
+   random" (Alpharael, Stonechosen) and "ward—get five poison counters" (The Serpent Society), with a browser test of
+   both prompts; "return X cards at random from your graveyard to your hand" (Reap the Past); "if it was a token, draw
+   a card" (Sunpearl Kirin); "it loses all abilities for as long as ~ remains on the battlefield" (The Wondrous Wasp);
+   "creatures enchanted player controls enter tapped" (Radiant Grace // Radiant Restraints); "choose a creature or
+   planeswalker, then destroy all other creatures and planeswalkers" (Selfless Glyphweaver // Deadly Vanity); "you may
+   mill three cards", which can't be chosen with fewer than three in the library (CR 701.17b), "then return up to one
+   creature card and up to one land card" (Druidic Ritual); "target player and each creature and planeswalker they
+   control" (Chandra, Bold Pyromancer); "populate. The token enters tapped and attacking", attacking the player you
+   choose (Ghired, Conclave Exile); "you may pay that much life. If you do, draw that many cards" (Niv-Mizzet, Ghost
+   Counsel); "unless any player pays {2}, search your library" (Rhystic Tutor); "target artifact, enchantment, or
+   legendary card from your graveyard" (Crystal Dragon // Rob the Hoard); "whenever a creature with skulk deals combat
+   damage to one of your opponents" (The Master, Mesmerist); "if this spell's sneak cost was paid, they enter tapped and
+   attacking" (The Last Ronin's Technique); "add one mana of that color for each different power among creatures you
+   control" (Selvala, Eager Trailblazer, Loot, the Nexus). +21 (27,514 of 31,936 with round 206).
+   Out after round 207 (looked at, not done): Varolz, the Scar-Striped and Young Deathclaws (scavenge for a */*
+   creature card needs its characteristic-defining power in the graveyard, and the layers only work it out on the
+   battlefield and in exile).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

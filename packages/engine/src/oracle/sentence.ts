@@ -282,6 +282,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const fx = parseSentence(`${remainsLand[1]} until end of turn`, ctx);
     return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "endOfTurn" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
   }
+  // The Wondrous Wasp: "tap up to one target creature. It loses all abilities for as long as ~ remains on the
+  // battlefield": the same as until end of turn, ending when ~ leaves instead (CR 611.2b).
+  const remainsLoses = !ctx.spell && /^((?:It|That creature|Target creature|Up to one target creature) loses all abilities) for as long as ~ remains on the battlefield$/.exec(s);
+  if (remainsLoses) {
+    const fx = parseSentence(`${remainsLoses[1]} until end of turn`, ctx);
+    return fx?.length === 1 && fx[0]!.type === "continuous" && fx[0].duration === "endOfTurn" ? [{ ...fx[0]!, duration: "whileControlled", whileOnBattlefield: true }] : null;
+  }
   // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
   // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.
   // Splinter, Aging Champion: "you and another target player": a player other than you, so an opponent (CR 102.3).

@@ -42,6 +42,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.")
     // "Choose a color. Add one mana of that color for each charge counter on ~." (Astral Cornucopia): the same.
     .replace(/: Choose a color\. Add one mana of that color for each ([^.]+? counter) on ~\./, ": Add X mana of any one color, where X is the number of $1s on ~.")
+    // Selvala, Eager Trailblazer: "Choose a color. Add one mana of that color for each different power among creatures
+    // you control.": the same, each power counted once (Golden Ratio's count).
+    .replace(/: Choose a color\. Add one mana of that color for each (different power among creatures you control)\./, ": Add X mana of any one color, where X is each $1.")
     // Meteor Crater: "Choose a color of a permanent you control. Add one mana of that color.": one of the colors among
     // them, never colorless (rulings), as for Mox Amber.
     .replace(/: Choose a color of a permanent you control\. Add one mana of that color\.$/, ": Add one mana of any color among permanents you control.")
@@ -349,7 +352,7 @@ function parseManaProduced(text: string): ManaProduce | null {
   }
   const xAny = /^X mana of any one color, where X is (.+)$/.exec(text);
   if (xAny) {
-    const n = parseCount(xAny[1]!, null);
+    const n = /^each different /.test(xAny[1]!) ? parseCount(xAny[1]!.slice(5), null, true) : parseCount(xAny[1]!, null);
     return n && { kind: "oneOf", options: ALL_COLORS, amount: 1, n };
   }
   // "Add X {G} or X {W}, where X is the number of other creatures you control" (Brigid, Doun's Mind): X mana, all of the

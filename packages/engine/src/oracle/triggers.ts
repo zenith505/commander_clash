@@ -1176,12 +1176,15 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   line = line.replace(/^Whenever (an?|another) creature you control (with (?:power|toughness) \d+ or (?:less|greater)) deals combat damage /, "Whenever $1 creature $2 you control deals combat damage ");
   // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
-  const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);
+  // The Master, Mesmerist: "Whenever a creature with skulk deals combat damage to one of your opponents, put a +1/+1
+  // counter on ~ and draw a card": with the keyword as it deals the damage.
+  const any = /^Whenever a creature( with (skulk|flying|menace|deathtouch|trample|lifelink|infect))? deals combat damage to one of your opponents, (.+)$/.exec(line);
   if (any) {
-    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[1]!)) return "fail";
-    const body = parseBody(any[1]!, { subjectIt: true, eventPlayer: true });
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[3]!)) return "fail";
+    const body = parseBody(any[3]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
-    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
+    const kw = any[2] ? { keywords: [any[2].replace(/^./, (c) => c.toUpperCase())] } : {};
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], ...kw, text: `creature${any[1] ?? ""}` }, anyone: true }, body, toOpponent: true };
   }
   // Archivist of Gondor: "When your commander deals combat damage to a player, if there is no monarch, you become the
   // monarch": the commander you own (CR 903.3), whoever controls it; an intervening "if" (CR 603.4).

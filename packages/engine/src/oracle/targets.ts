@@ -1021,6 +1021,14 @@ export function parseTargetPhrase(
     const head = parseTargetPhrase(drafted[1]!, opts);
     return head && head.kind === "object" ? { ...head, drafted: true, text: phrase } : null;
   }
+  // Rob the Hoard: "artifact, enchantment, or legendary card from your graveyard": a card that's any of them.
+  const typesOrLegendary = /^(artifact|creature|enchantment|instant|sorcery|land|planeswalker), (artifact|creature|enchantment|instant|sorcery|land|planeswalker), or legendary card( from (?:your|a) graveyard)$/.exec(phrase.trim());
+  if (typesOrLegendary) {
+    const head = parseTargetPhrase(`${typesOrLegendary[1]} or ${typesOrLegendary[2]} card${typesOrLegendary[3]}`, opts);
+    if (head?.kind !== "card" || head.types?.length !== 2) return null;
+    const anyOf: TargetSpec[] = [...head.types.map((t) => ({ kind: "card" as const, types: [t], text: t.toLowerCase() })), { kind: "card", types: [], supertypes: ["Legendary"], text: "legendary" }];
+    return { ...head, types: [], anyOf, text: phrase.trim() };
+  }
   // "Permanent you control but don't own" (Staff of Eden): another player's that you control (CR 108.3).
   const notOwned = /^(.+ you control) but don't own$/.exec(phrase.trim());
   if (notOwned) {

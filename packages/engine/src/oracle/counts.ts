@@ -151,9 +151,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return g && !g.other ? { count: { kind: "permanents", filter: { ...g.filter, text: m[1]! } } } : null;
   }
   // Arithmetic around a count.
-  if ((m = /^twice (.+)$/i.exec(p))) {
-    const c = parseCount(m[1]!, ctx);
-    return c && { ...c, times: 2 * (c.times ?? 1), ...(c.plus ? { plus: 2 * c.plus } : {}) };
+  // Rootwire Amalgam: "three times ~'s power".
+  if ((m = /^(twice|three times) (.+)$/i.exec(p))) {
+    const k = /^twice$/i.test(m[1]!) ? 2 : 3;
+    const c = parseCount(m[2]!, ctx);
+    return c && { ...c, times: k * (c.times ?? 1), ...(c.plus ? { plus: k * c.plus } : {}) };
   }
   if ((m = new RegExp(`^${NUM} plus (.+)$`, "i").exec(p))) {
     const c = parseCount(m[2]!, ctx);
@@ -425,6 +427,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^players? who controls? at least (one|two|three) more lands? than you$/i.exec(p))) return count({ kind: "players", moreLandsThanYou: num(m[1]!) });
   // Oreskos Explorer: "the number of players who control more lands than you" (at least one more), counted as it resolves.
   if (each && /^players? who controls? more lands than you$/i.test(p)) return count({ kind: "players", moreLandsThanYou: 1 });
+  // Priest of the Blessed Graf: "the number of opponents who control more lands than you", counted as it resolves.
+  if (each && /^opponents? who controls? more lands than you$/i.test(p)) return count({ kind: "players", opponents: true, moreLandsThanYou: 1 });
   // Great Unclean One: "for each opponent who has less life than you", counted as it resolves.
   // Anya, Merciless Angel: "for each opponent whose life total is less than half their starting life total" (CR 903.7:
   // 40 in Commander).

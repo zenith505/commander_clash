@@ -387,7 +387,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (dealt) return { ref: "damagedThisWay", ...(dealt[1]!.toLowerCase() !== "permanent" ? { filter: { kind: "object" as const, types: [dealt[1]![0]!.toUpperCase() + dealt[1]!.slice(1).toLowerCase()], text: dealt[1]!.toLowerCase() } } : {}) };
   // "~ and up to one other target creature can't be blocked this turn" (Martha Jones), "~ and another target creature each
   // get +1/+0": the source while it's still there (CR 611.2c), and the one target, other than the source.
-  const selfAndTarget = !ctx.spell && !ctx.selfCard && !cards && !ctx.targets.length ? /^~ and ((?:up to one other|another) target (?:creature|creature you control))$/i.exec(x) : null;
+  // Tatsunari, Toad Rider: "~ and target Frog you control can't be blocked this turn except by ...".
+  const selfAndTarget = !ctx.spell && !ctx.selfCard && !cards && !ctx.targets.length ? /^~ and ((?:up to one other|another) target (?:creature|creature you control)|target [A-Z][a-z]+ you control)$/.exec(x) : null;
   if (selfAndTarget) {
     const t = parseObjectNow(selfAndTarget[1]!, ctx, cards);
     return t?.ref === "target" && !t.n && !t.sameName && !t.sharesColor ? { ...t, andSelf: true } : null;
@@ -1557,9 +1558,9 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if (inGraveyard && (m = /(?:^| )with (cycling|awaken|foretell|mutate|flashback|madness)$/.exec(p))) {
+  } else if (inGraveyard && (m = /(?:^| )with (cycling(?= abilities$|$)|awaken$|foretell$|mutate$|flashback$|madness$)(?: abilities$)?/.exec(p))) {
     // Sacred Excavation: "cards with cycling from your graveyard": a card's printed keyword abilities, typecycling being
-    // cycling too (CR 702.29e; the card data lists "Cycling" with it).
+    // cycling too (CR 702.29e; the card data lists "Cycling" with it). Herald of the Forgotten: "with cycling abilities".
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
   } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {

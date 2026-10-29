@@ -587,7 +587,8 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 // "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
 // whose ability this is, so "another" changes nothing.
 // "An Aura, Equipment, or Vehicle spell" (Sram): a list, its commas before the spell's last word.
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
+// "A Pegasus, Unicorn, or Horse creature spell" (Thurid, Mare of Destiny) too.
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player|the chosen player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+(?: creature)? spell|an? [^,]*? with mana value, power, or toughness equal to the chosen number|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
 // "The chosen player" (Sewer Nemesis): the player chosen as the permanent entered.
 const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted", "the chosen player": "chosen" } as const;
@@ -2932,7 +2933,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (batch) return batch;
   // Midnight Clock: "When the twelfth hour counter is put on ~, ...": it triggers when counters put on it take it from
   // fewer than twelve to twelve or more (rulings), as a Saga's chapter does (CR 714.2b).
-  const nth = /^When the (second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth) ([a-z]+) counter is put on ~, (.+)$/.exec(line);
+  // Shang-Chi and the Ten Rings: "When the tenth +1/+1 counter is put on ~".
+  const nth = /^When the (second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth) (\+1\/\+1|[a-z]+) counter is put on ~, (.+)$/.exec(line);
   if (nth) {
     const reach = ["second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth"].indexOf(nth[1]!) + 2;
     const body = parseBody(nth[3]!, { selfIt: true });

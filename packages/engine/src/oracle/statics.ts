@@ -382,7 +382,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec; colored?: Color[] } } | { targetTax: number } | { targetDiscount: number } | { castTargetEnchantedPlayerLess: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | { opponentsTargetTax: { n: number; filter: TargetSpec; abilities?: true } } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -503,10 +503,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const what = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
   }
-  if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
-    const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
+  // Brush Off: "~ costs {1}{U} less to cast if it targets an instant or sorcery spell": the {U} off its colored mana.
+  if ((m = /^~ costs \{(\d+)\}((?:\{[WUBRG]\})*) less to cast if it targets (an? .+)$/.exec(text))) {
+    const filter = parseTargetPhrase(m[3]!.replace(/^an? /, ""));
+    const colored = [...m[2]!.matchAll(/\{([WUBRG])\}/g)].map((x) => x[1] as Color);
     // "If it targets a blue spell" (Mystical Dispute), "a creature spell" (Out of Air): a spell on the stack.
-    return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
+    return filter?.kind === "object" || (filter?.kind === "spell" && !filter.stackAbilities && !filter.targetsWhat) ? { lessIfTargets: { n: Number(m[1]), filter, ...(colored.length ? { colored } : {}) } } : "fail";
   }
   // "The first creature spell you cast each turn costs {2} less to cast", "The second spell you cast each turn ...".
   // Momo, Friendly Flier: "The first non-Lemur creature spell with flying you cast during each of your turns costs {1}
@@ -805,6 +807,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // enchantment, land and planeswalker (CR 110.4a).
   if ((m = new RegExp(`^there are ${NUM} or more permanent types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!), permanent: true };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
+  // Hundred-Battle Veteran: "there are three or more different kinds of counters among creatures you control", counted with
+  // the creatures as the layers have them so far.
+  if ((m = new RegExp(`^there are ${NUM} or more different kinds of counters among creatures you control$`).exec(text)))
+    return { kind: "amount", amount: { count: { kind: "permanents", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" }, counterKinds: true } }, min: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
   // Spell mastery: "If there are two or more instant and/or sorcery cards in your graveyard" (each card counted once).
@@ -1134,7 +1140,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^another ([A-Z][a-z]+) died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", subtype: m[1]!, yours: true } }, min: 1 };
   // Cult Conscript: "if a non-Skeleton creature died under your control this turn": not of that type as it last existed,
   // a token too (rulings).
-  if ((m = /^a non-([A-Z][a-z]+) creature died under your control this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, yours: true } }, min: 1 };
+  // Undead Sprinter: "if a non-Zombie creature died this turn", under anyone's control.
+  if ((m = /^a non-([A-Z][a-z]+) creature died( under your control)? this turn$/.exec(text)) && CREATURE_TYPES.has(m[1]!)) return { kind: "amount", amount: { count: { kind: "diedThisTurn", notSubtype: m[1]!, ...(m[2] ? { yours: true as const } : {}) } }, min: 1 };
   // Titan Hunter: "if no creatures died this turn".
   if (text === "no creatures died this turn") return { kind: "not", cond: { kind: "creatureDied" } };
   // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).

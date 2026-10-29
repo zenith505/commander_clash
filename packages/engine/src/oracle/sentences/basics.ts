@@ -288,6 +288,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // the trigger is about, its card types as it last existed (one permanent of any of them, rulings).
   if (/^[Ee]ach opponent sacrifices a permanent of their choice that shares a card type with it$/.test(s) && (ctx.subject || ctx.subjectIt))
     return [{ type: "pick", who: { ref: "eachOpponent" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSubject: true, text: "permanent that shares a card type with it" }, n: 1, action: "sacrifice" }];
+  // Fatal Grudge: "Each opponent chooses a permanent they control that shares a card type with the sacrificed permanent and
+  // sacrifices it": the permanent the spell's additional cost sacrificed, as it last existed (a copy uses the original's,
+  // rulings).
+  if (/^Each opponent chooses a permanent they control that shares a card type with the sacrificed permanent and sacrifices it$/.test(s) && ctx.spell)
+    return [{ type: "pick", who: { ref: "eachOpponent" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSacrificed: true, text: "permanent that shares a card type with the sacrificed permanent" }, n: 1, action: "sacrifice" }];
   // Punishers: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a
   // card", "that player loses 2 life unless they pay {2}" (see the punisher effect).
   if ((m = new RegExp(`^(.+?) (?:loses|lose) ${NUMX} life unless (?:they|that player|he or she) (.+)$`).exec(s))) {

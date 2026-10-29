@@ -806,6 +806,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // then the shuffle: the same as each search followed by its shuffle.
   const searchInstead = /^Search your library for (an? [^.,]+?) and put that card into your hand\. If ~ was cast from a graveyard, instead search your library for (two [^.,]+?) and put those cards into your hand\. Then shuffle\.$/.exec(text.trim());
   if (searchInstead) return parseBody(`Search your library for ${searchInstead[1]}, put that card into your hand, then shuffle. If ~ was cast from a graveyard, instead search your library for ${searchInstead[2]}, put those cards into your hand, then shuffle.`, opts);
+  // Volatile Arsonist: "it deals 1 damage to each of up to one target creature, up to one target player, and/or up to one
+  // target planeswalker": three targets, each optional, all dealt damage at the same time (one damage event, CR 120.2).
+  const eachOfThree = /^(?:~|[Ii]t) deals (\d+) damage to each of up to one target creature, up to one target player, and\/or up to one target planeswalker\.$/.exec(text.trim());
+  if (eachOfThree) {
+    const n = eachOfThree[1]!;
+    const b = parseBody(`~ deals ${n} damage to up to one target creature. ~ deals ${n} damage to up to one target player. ~ deals ${n} damage to up to one target planeswalker.`, opts);
+    const [a, ...rest] = b?.effects ?? [];
+    if (!b || b.targets.length !== 3 || b.effects.length !== 3 || !b.effects.every((e) => e.type === "damage" && e.to.ref === "target" && !e.also && !e.by)) return null;
+    return { targets: b.targets, effects: [{ ...(a as Extract<Effect, { type: "damage" }>), also: rest.map((e) => (e as Extract<Effect, { type: "damage" }>).to) }], text };
+  }
+  // Firemind's Foresight: "Search your library for an instant card with mana value 3, reveal it, and put it into your
+  // hand. Then repeat this process for instant cards with mana values 2 and 1. Then shuffle.": three searches, one after
+  // the other, then one shuffle.
+  const repeatSearch = /^Search your library for an? ([a-z]+) card with mana value (\d+), reveal it, and put it into your hand\. Then repeat this process for \1 cards with mana values (\d+) and (\d+)\. Then shuffle\.$/.exec(text.trim());
+  if (repeatSearch) {
+    const searches = [repeatSearch[2]!, repeatSearch[3]!, repeatSearch[4]!].map((mv) => parseBody(`Search your library for a ${repeatSearch[1]} card with mana value ${mv}, reveal it, put it into your hand, then shuffle.`, opts));
+    const fx = searches.map((b) => (b && !b.targets.length && b.effects.length === 1 && b.effects[0]!.type === "search" ? b.effects[0]! : null));
+    if (fx.some((x) => !x)) return null;
+    return { targets: [], effects: [...fx.map((x) => ({ ...x!, noShuffle: true as const })), { type: "shuffle", who: { ref: "you" }, ifSearched: true }], text };
+  }
   // Obzedat, Ghost Council: "You may exile ~. If you do, return it to the battlefield under its owner's control at the
   // beginning of your next upkeep. It gains haste.": one delayed trigger (CR 603.7), the card it became coming back with
   // haste for as long as it remains on the battlefield (rulings).
@@ -1125,6 +1145,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Oreskos Explorer: "Search your library for up to X Plains cards, where X is .... Reveal those cards, put them into your
   // hand, then shuffle." The same, into your hand.
   text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.]+)\. Reveal those cards, put them into your hand, then shuffle\./, "$1$2earch your library for up to X $3, reveal them, put them into your hand, then shuffle, where X is $4.");
+  // Dark Dabbling: "Regenerate target creature. Draw a card. If there are two or more instant and/or sorcery cards in your
+  // graveyard, also regenerate each other creature you control.": the others, checked as it resolves (rulings).
+  text = text.replace(/(\. If there are two or more instant and\/or sorcery cards in your graveyard, )also (regenerate each other creature you control\.)$/, "$1$2");
   // Kami's Flare: "~ also deals 2 damage to that permanent's controller if you control a modified creature": checked as it
   // resolves (CR 608.2c), the same as "If you control a modified creature, ~ deals 2 damage to ...".
   text = text.replace(/(^|\. )~ also deals (\d+) damage to that permanent's controller if (you control an? [a-z ]+ creature)\./, "$1If $3, ~ deals $2 damage to that permanent's controller.");
@@ -4498,6 +4521,22 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Osgood, Operation Double: "When you cast ~, create a token that's a copy of it, except it isn't legendary": a copy of
+    // the spell's copiable values, the card's (CR 707.2), as it last existed if it has left the stack (CR 608.2h).
+    const castCopy = ctx.selfCastSpell ? /^[Cc]reate a token that's a copy of it(, except it isn't legendary)?$/.exec(s) : null;
+    if (castCopy) {
+      effects.push({ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, ofSource: true, ...(castCopy[1] ? { except: { notLegendary: true } } : {}) });
+      continue;
+    }
+    // Galvanoth: "you may look at the top card of your library. You may cast it without paying its mana cost if it's an
+    // instant or sorcery spell." Cast from the library as this resolves (CR 608.2g); otherwise it stays on top, unrevealed
+    // (rulings). Looking at your own card changes nothing, so it's always looked at, and the casting is the choice. "Spell":
+    // an Adventure can be cast as one (CR 715.3).
+    if (/^(?:[Yy]ou may )?[Ll]ook at the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast it without paying its mana cost if it's an instant or sorcery spell") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, look: true, filter: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" }, asSpell: true, max: 1 });
+      si += 1;
+      continue;
+    }
     // Yennett, Cryptic Sovereign: "Reveal the top card of your library. You may cast it without paying its mana cost if its
     // mana value is odd. If you don't cast it, draw a card." Cast as this resolves or not at all; not cast, it stays on top
     // and is the card you draw (rulings). A land's mana value is 0, even.
@@ -6974,6 +7013,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const rest = parts.every(Boolean) ? parts.flatMap((x) => x!) : null;
       if (last?.type !== "counterSpell" || effects.length - prevStart !== 1 || filter?.kind !== "object" || !rest || ctx.targets.length !== curTargets) return null;
       effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "targetSpellTargets", index: last.index, filter }, effects: [last, ...rest], otherwise: [last] });
+      continue;
+    }
+    // Anticognition: "Counter target creature or planeswalker spell unless its controller pays {2}. If an opponent has eight
+    // or more cards in their graveyard, instead counter that spell, then scry 2.": checked as it resolves; then the
+    // controller gets no chance to pay.
+    const insteadCounter = /^If (an opponent has .+? cards in their graveyard), instead counter that spell, then (.+)$/.exec(s);
+    if (insteadCounter) {
+      const last = effects[effects.length - 1];
+      const cond = parseStaticCondition(insteadCounter[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const rest = parseOne(capital(insteadCounter[2]!), ctx);
+      if (last?.type !== "counterSpell" || !last.unless || effects.length - prevStart !== 1 || !cond || !rest || ctx.targets.length !== curTargets) return null;
+      const { unless: _, ...hard } = last;
+      effects.splice(effects.length - 1, 1, { type: "if", cond: { kind: "state", cond }, effects: [hard, ...rest], otherwise: [last] });
       continue;
     }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
@@ -11433,7 +11485,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
 
 // "Choose one —" and its bulleted modes; "choose one that hasn't been chosen [this turn] —" (GameObject.modesChosen) and
 // "choose one at random —". Spree's "+ {cost} —" modes, escalate, pawprints and repeated modes are read in compile.ts.
-const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
+const MODAL = /^[Cc]hoose (one|two|three|four|five|one or both|one or more|up to one|up to two|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
 
 /** How many modes each "Choose ..." allows (CR 700.2), given how many there are. */
 const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
@@ -11446,6 +11498,8 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
   "one or both": () => [1, 2],
   "one or more": (n) => [1, n],
   "up to one": () => [0, 1],
+  // Call Damage Control: "Choose up to two." on a spell: none, one or two (CR 700.2).
+  "up to two": () => [0, 2],
   // "Choose any number —" (Rankle and Torbran): none, some or all, in the order printed (rulings).
   "any number": (n) => [0, n],
 };

@@ -1,7 +1,7 @@
 # Roadmap
 
-27,554 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,083 of
+27,575 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -360,7 +360,7 @@ line blocks.
    Solitude (mana abilities only on your turn), Words of Waste, Kirtar's Wrath and Cleansing Meditation (threshold
    "instead" sweepers), Chandra, Heart of Fire, Lynde, Salt Road Ambushers, Origin of the Hidden Ones, Grab the Reins,
    Pyromancer Ascension, Verdant Mastery, Primal Adversary, Planar Void, In Too Deep, Dollhouse of Horrors, Harald
-   Unites the Elves, Peerless Samurai, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
+   Unites the Elves, Exquisite Archangel, Icewrought Sentry, Kellan, Planar
    Trailblazer, Najal, Rescue from the Underworld, Seal of the Guildpact, Fear of Infinity, Elderscale Wurm, Cradle of
    Vitality, Helm of Kaldra, Brilliant Ultimatum, Catastrophe, Will Kenrith, Cultural Exchange, Magus of the Order,
    Scheming Fence, Oath of Lieges, Helm of Obedience, Concerted Effort, Belbe's Portal, Edgewall Innkeeper, Simic
@@ -816,6 +816,26 @@ line blocks.
    (a loyalty ability that adds mana, an emblem counting mana spent), Sigurd, Jarl of Ravensthorpe ("whenever you put a
    lore counter on a Saga"), Ruxa, Patient Professor ("creatures with no abilities"), The Ruinous Powers ("When you cast
    a spell this way"), Curse of Hospitality ("creatures attacking enchanted player").
+   Round 206 went on from the top: "the next spell you cast this turn costs {1} less to cast" (Hardened Berserker,
+   Peerless Samurai) and "{X} less, where X is ... as this ability resolves" (Maelstrom Muse, Kaza, Roil Chaser), one
+   reduction used up by the next spell of that kind; "for each kind of counter on target permanent or player, give that
+   permanent or player another counter of that kind" (Maulfist Revolutionary, Powerful Broker, Skyship Plunderer);
+   "activate an ability of a card in your graveyard" (Neerdiv, Devious Diver); "a spell other than the first spell they
+   cast each turn or copies a spell" (Curse of Shaken Faith, Ichneumon Druid's "other than the first instant spell");
+   "tap enchanted creature and remove all counters from it" (Enchanted River's Grasp); "until your next turn, creatures
+   target player controls have base power and toughness 1/1" (Mass Diminish); "until your next turn, creatures can't
+   attack you" (Chronomantic Escape); "as ~ enters, it becomes your choice of a 3/3 creature, ..." as part of its
+   copiable values (CR 707.2: Primal Clay, Primal Plasma, Corrupted Shapeshifter), a new prompt with a browser test;
+   "you may cast target artifact / enchantment card from your graveyard this turn" as a trigger (Heiko and Norika
+   Yamazaki); "switch the power and toughness of each of up to two / any number of target creatures" (Invert // Invent
+   with "an instant card and/or a sorcery card", Inversion Behemoth); "each creature you control that didn't attack or
+   enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
+   Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
+   battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist ("remove all
+   counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Honest Work
+   (a name change), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
+   {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
+   Entity (its "is turned face up" path).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -2596,7 +2616,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Skald), heroic counter plus "prevent all damage ... this turn" (Favored Hoplite), "it deals 4 damage" from a dying
   source (Volatile Rig), X/X plus one with "the colors" (Fractalize), "becomes all colors" (Scrapbasket), "are the
   chosen color" (Shifting Sky), "if you cast it during your main phase" (Sentinel's Mark, addendum, CR 207.2c).
-  +26 (27,526 of 31,936 with B35 and rounds 202 to 205).
+  +26 (27,547 of 31,936 with B35 and rounds 202 to 206).
 - Out after round B36: North Star (spend mana as though any type for one spell), Silhouette (prevent damage only
   from sources whose spell or ability targets it), Suffocation (damage history of red spells), Oracle of Dust (a card an
   opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent ("for each {U}{U}
@@ -2621,7 +2641,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   untap" (Reveka), "a +1/+1 counter on ~ and ~ gains flying" (Machine Man), "can't block if it's black" (Hobble), Guan
   Yu's shuffle, "creatures named ~ on the battlefield" (Plague Rats), "discards all cards of that color" (Persecute;
   bots now name the opponents' colors for a discard), "chooses a card in their hand and discards the rest"
-  (Monomania). +28 (27,554 of 31,936 with B35, B36 and rounds 202 to 205).
+  (Monomania). +28 (27,575 of 31,936 with B35, B36 and rounds 202 to 206).
 - Out after round B37: Inquisitor's Snare (its prevention must keep working after the creature leaves the battlefield,
   rulings), Arashin Sovereign ("your choice of the top or bottom", the dying creature's controller choosing, not its
   owner).

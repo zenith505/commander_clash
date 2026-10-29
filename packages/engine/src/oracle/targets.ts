@@ -1301,6 +1301,13 @@ export function parseTargetPhrase(
     extra.enteredThisTurn = true;
     p = p.slice(0, entered.index);
   }
+  // The Fifth Doctor: "each creature you control that didn't attack or enter this turn": neither.
+  const neither = / that didn't attack or enter this turn$/.exec(p);
+  if (neither) {
+    extra.notEnteredThisTurn = true;
+    extra.combat = "didntAttackThisTurn";
+    p = p.slice(0, neither.index);
+  }
   // Let the Galaxy Burn: "each creature that didn't enter this turn".
   const notEntered = / that didn't enter (?:the battlefield )?this turn$/.exec(p);
   if (notEntered) {

@@ -331,6 +331,8 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // unless their controller pays {2} for each of those creatures" (CR 508.1g-h).
   if ((m = /^[Uu]ntil your next turn, creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+)\} for each of those creatures$/.exec(s)))
     return [{ type: "playerGains", keywords: [], attackTax: { n: Number(m[2]), ...(m[1] ? { planeswalkers: true as const } : {}) } }];
+  // Chronomantic Escape: "Until your next turn, creatures can't attack you" (CR 508.1c): you, not your planeswalkers.
+  if (/^[Uu]ntil your next turn, creatures can't attack you$/.test(s)) return [{ type: "playerGains", keywords: [], unattackable: true }];
   const whole = parseEveryPlayerZonesSentence(s, ctx);
   if (whole) return whole;
   // Perennation: "Return target permanent card from your graveyard to the battlefield with a hexproof counter and an

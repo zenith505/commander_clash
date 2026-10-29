@@ -2718,7 +2718,7 @@ export type Effect =
   /** `counter` "any": "move a counter" (Nesting Grounds), of a kind chosen as it resolves (rulings). */
   | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef }
   /** Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent." */
-  | { type: "counterOfKindOnIt"; what: ObjRef; /** "Choose a counter on target permanent or player. Give that permanent or player another counter of that kind." (Animation Module): this target, which may be a player. */ host?: number }
+  | { type: "counterOfKindOnIt"; what: ObjRef; /** "Choose a counter on target permanent or player. Give that permanent or player another counter of that kind." (Animation Module): this target, which may be a player. */ host?: number; /** "For each kind of counter on target permanent or player, give that permanent or player another counter of that kind" (Maulfist Revolutionary): one of each kind, no choice (rulings). */ eachKind?: true }
   /** "End the turn." (CR 724.1, Sundial of the Infinite): its last instruction; the rest happens as it finishes resolving. */
   | { type: "endTurn" }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
@@ -3530,7 +3530,7 @@ export type Effect =
   | { type: "topTurn"; top: FromTop }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
-  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true }
+  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true; /** "The next spell you cast this turn costs {1} less to cast" (Hardened Berserker): only the next such spell its controller casts this turn, used up as it becomes cast (CR 601.2f, 601.2i). */ next?: true; /** "Costs {X} less ..., where X is ~'s power as this ability resolves" (Maelstrom Muse): generic mana `mod.n` times this, counted as it resolves. */ times?: Amount }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -3688,6 +3688,8 @@ export type Effect =
        * for each of those creatures" (Summon: Yojimbo, Forbidding Spirit): see Player.attackTaxUntil (CR 508.1g-h).
        */
       attackTax?: { n: number; planeswalkers?: true };
+      /** "Until your next turn, creatures can't attack you" (Chronomantic Escape): see Player.unattackableUntil. */
+      unattackable?: true;
     }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the
@@ -3751,7 +3753,7 @@ export type ChoiceKind = "creatureType" | "color" | /** "The color or colors of 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead";
+export type EntersOption = /** "As ~ enters, pay any amount of life" (CompiledCard.entersPayLife). */ "lifeAsEnters" | "riot" | /** "Enters with your choice of a reach counter or a vigilance counter on it" (CompiledCard.entersCounterChoice). */ "counterChoice" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead" | "sacrificeInstead" | /** "As ~ enters, it becomes your choice of ..." (CompiledCard.entersForms). */ "form";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -4479,7 +4481,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "An ability with {X} in its activation cost": the mana symbol {X}, not another X (rulings on Unbound Flourishing). */ xCost?: true; /** "Whenever you activate a ninjutsu ability" (Satoru Umezawa): commander ninjutsu too (CR 702.49d). */ ninjutsu?: true; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true; /** "Whenever you activate an ability of a creature" (Elrond, Moon-Reader): mana abilities too (rulings). */ mana?: true; /** "Whenever you ... activate an ability of a card in your graveyard" (Neerdiv, Devious Diver): its source a card in its activator's graveyard as it's activated (CR 602.2). */ inYourGraveyard?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -5557,6 +5559,12 @@ export interface CompiledCard {
    * enters (CR 614.1c, 614.12), part of how it enters.
    */
   entersCounterChoice?: { counters: [CounterKind, CounterKind]; escaped?: true };
+  /**
+   * "As ~ enters, it becomes your choice of a 3/3 creature with flying, a 2/5 creature with vigilance, or a 0/12 creature
+   * with defender" (Corrupted Shapeshifter, Primal Clay): chosen as it enters (CR 614.12), part of its copiable values
+   * (CR 208.2b, 707.2), so a copy effect over what it is; `text` is the choice as offered.
+   */
+  entersForms?: { except: CopyExcept; text: string }[];
   /** Read ahead (CR 702.155): a Saga that enters with the chapter number its controller chooses in lore counters. */
   readAhead?: true;
   /** "As ~ enters, you may exchange ~'s text box and another creature's" (Deadpool, Trading Card; CR 612.5, 701.12h). */

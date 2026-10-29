@@ -744,7 +744,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "removeCounters", what, counter: m[1]!, n: "allButOne" }, ...(/gain 1 life/.test(s) ? [{ type: "gainLife" as const, who: { ref: "you" as const }, n: { count: { kind: "countersRemovedThisWay" as const } } }] : [])];
   }
   // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
-  if ((m = /^Remove all counters from (~|it|that creature|target .+|up to one target .+)$/i.exec(s))) {
+  if ((m = /^Remove all counters from (~|it|that creature|enchanted creature|target .+|up to one target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
@@ -1068,6 +1068,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
     return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host }];
   }
+  // Maulfist Revolutionary, Skyship Plunderer: "for each kind of counter on target permanent or player, give that
+  // permanent or player another counter of that kind": one of each kind it has, not double (rulings, CR 122.1).
+  if (/^[Ff]or each kind of counter on target permanent or player, give that permanent or player another counter of that kind$/.test(s)) {
+    const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: "target permanent or player" });
+    return [{ type: "counterOfKindOnIt", what: { ref: "target", index: host }, host, eachKind: true }];
+  }
   if ((m = /^Put another counter of a kind already on (target [a-z ]+?) on it$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "counterOfKindOnIt", what }] : null;
@@ -1113,6 +1119,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Switching power and toughness (layer 7d). Valakut Fireboar: "Whenever ~ attacks, switch its power and toughness".
   if (ctx.selfIt && /^[Ss]witch its power and toughness until end of turn$/.test(s)) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }];
+  // "Switch the power and toughness of each of up to two target creatures until end of turn" (Invert), "... of each of any
+  // number of target creatures ..." (Inversion Behemoth): each of them (CR 613.4d).
+  if ((m = /^[Ss]witch the power and toughness of each of ((?:up to (?:one|two|three)|any number of) target creatures) until end of turn$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }] : null;
+  }
   if ((m = /^Switch (.+?)'s? power and toughness until end of turn$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }] : null;

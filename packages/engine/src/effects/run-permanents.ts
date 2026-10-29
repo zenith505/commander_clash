@@ -853,6 +853,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const p = player(s, t.id);
         if (p.lost) return;
         const kinds = (["poison", "energy", "experience", "rad"] as const).filter((k) => (p[k] ?? 0) > 0);
+        if (e.eachKind) {
+          for (const k of kinds) {
+            const put = putPlayerCounters(s, p.id, k, 1);
+            log(s, `${src} gives ${p.name} ${put === 1 ? "a" : put} ${k} counter${put === 1 ? "" : "s"}.`);
+          }
+          return;
+        }
         const sc = (s.resolving!.scratch ??= {});
         if (kinds.length > 1 && sc.counterKind === undefined) {
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: [...kinds], labels: kinds.map((k) => `A ${k} counter`), prompt: `choose a kind of counter ${p.name} has to give them another of` };
@@ -868,6 +875,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const o = objects(s, e.what, ctx)[0];
       if (!o) return;
       const kinds = Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0);
+      if (e.eachKind) {
+        for (const k of kinds) {
+          const put = putCounters(s, o, k, 1);
+          invalidateCharacteristics(s);
+          log(s, `${src} puts ${put === 1 ? "a" : put} ${k} counter${put === 1 ? "" : "s"} on ${characteristics(s, o).name}.`);
+        }
+        return;
+      }
       const sc = (s.resolving!.scratch ??= {});
       if (kinds.length > 1 && sc.counterKind === undefined) {
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), prompt: `choose a kind of counter on ${characteristics(s, o).name} to put another of` };
@@ -1358,6 +1373,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (e.attackTax) {
         p.attackTaxUntil = [...(p.attackTaxUntil ?? []), e.attackTax];
         log(s, `Until ${p.name}'s next turn, creatures can't attack them${e.attackTax.planeswalkers ? " or planeswalkers they control" : ""} unless their controller pays {${e.attackTax.n}} for each.`);
+      }
+      if (e.unattackable) {
+        p.unattackableUntil = true;
+        log(s, `Until ${p.name}'s next turn, creatures can't attack them.`);
       }
       if (!keywords.length) return;
       if (e.untilYourNextTurn) p.gainedUntilNextTurn = [...new Set([...(p.gainedUntilNextTurn ?? []), ...keywords])];

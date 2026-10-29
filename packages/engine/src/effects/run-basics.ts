@@ -614,10 +614,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, of !== undefined ? `Creatures ${player(s, of).name} controls can't attack this turn.` : `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
       return;
     }
-    case "costModThisTurn":
-      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
-      log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);
+    case "costModThisTurn": {
+      // Maelstrom Muse's X, Mutated Cultist's "for each counter removed this way": counted as it resolves.
+      const k = e.times !== undefined ? Math.max(0, amountNow(s, e.times, ctx)) : 1;
+      if (e.times !== undefined && !k) return;
+      const mod = k === 1 ? e.mod : { ...e.mod, n: e.mod.n * k };
+      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}), ...(e.next ? { next: true as const } : {}) });
+      log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ").replace(/\{X\}/, `{${k}}`)}`);
       return;
+    }
     case "cantBlockRule": {
       // Eunuchs' Intrigues: the creatures that player controls now or later this turn, but the one they chose (a rule for
       // the turn, not a change to the creatures there now, CR 611.2c).

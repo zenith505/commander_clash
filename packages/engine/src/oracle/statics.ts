@@ -989,6 +989,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "As long as you've sacrificed a nontoken permanent this turn" (Evendo Brushrazer).
   if ((m = /^you(?:'ve)? sacrificed an? (nontoken )?(Food|Clue|Treasure|Blood|artifact|creature|enchantment|land|permanent) this turn$/.exec(text)))
     return { kind: "amount", amount: { count: { kind: "sacrificedThisTurn", ...(/^[A-Z]/.test(m[2]!) ? { subtype: m[2]! } : m[2] === "permanent" ? {} : { type: capital(m[2]!) }), ...(m[1] ? { nontoken: true as const } : {}) } }, min: 1 };
+  // "If you sacrificed three or more Clues this turn" (Havengul Laboratory, Briarbridge Patrol).
+  if ((m = /^you(?:'ve)? sacrificed (two|three|four|five) or more (Foods|Clues|Treasures|artifacts|creatures|permanents) this turn$/.exec(text))) {
+    const what = m[2]!.slice(0, -1);
+    return { kind: "amount", amount: { count: { kind: "sacrificedThisTurn", ...(/^[A-Z]/.test(what) ? { subtype: what } : what === "permanent" ? {} : { type: capital(what) }) } }, min: ["two", "three", "four", "five"].indexOf(m[1]!) + 2 };
+  }
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
   if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
   // Betor, Kin to All: "creatures you control have total toughness 10 or greater".

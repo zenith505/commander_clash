@@ -7653,7 +7653,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       const form = compileCard(defOf(s, o)).entersForms?.[Number(choice)];
       if (!form || !pend.options.includes(choice)) throw new RulesError("choose one of the offered forms");
       addCopyEffect(s, o, copyKey(s, copiableDef(s, o), form.except));
-      log(s, `${pend.source} enters as a ${form.text}.`);
+      log(s, `${pend.source} enters as ${form.text}.`);
     } else if (pend.what === "counterChoice") {
       // "Enters with your choice of a reach counter or a vigilance counter on it" (CR 614.1c, 614.12).
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
@@ -8235,7 +8235,7 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "form") {
       // "As ~ enters, it becomes your choice of ..." (CR 614.12): its controller picks one of them.
       const forms = compileCard(defOf(s, o)).entersForms ?? [];
-      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "form", options: forms.map((_, i) => String(i)), labels: forms.map((f) => `A ${f.text}`), objectId: o.id, prompt: `choose what ${defOf(s, o).name} becomes as it enters` };
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "form", options: forms.map((_, i) => String(i)), labels: forms.map((f) => f.text.charAt(0).toUpperCase() + f.text.slice(1)), objectId: o.id, prompt: `choose what ${defOf(s, o).name} becomes as it enters` };
       return true;
     }
     if (c.what === "counterChoice") {

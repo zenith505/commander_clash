@@ -1187,7 +1187,7 @@ export function compile(d: CardDef): CompiledCard {
       else
         out.entersForms = parsed.map((f) => ({
           except: { pt: [Number(f![1]), Number(f![2])] as [number, number], ...(f![5] ? { keywords: [capital(f![5])] } : {}), ...(f![3] ? { addSubtypes: [f![3]] } : {}) },
-          text: f![0].replace(/^an? /, ""),
+          text: f![0],
         }));
       continue;
     }

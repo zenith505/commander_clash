@@ -2746,6 +2746,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B41: Nimble Hobbit ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
   Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst, Sivvi's Valor, Treacherous Link,
   Kitesail Skirmisher, Bill Ferny, Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
+- Round B42 (harder skipped cards, least played first): the Dragons of Tarkir "you may reveal a Dragon card from your
+  hand ... If you revealed a Dragon card or controlled a Dragon as you cast this spell" cycle (Draconic Roar,
+  Dragonlord's Prerogative, Foul-Tongue Invocation, Orator of Ojutai, Silumgar's Scorn, Scaleguard Sentinels; control
+  is checked as the cast finishes, and a copy keeps the bonus only for a revealed card, rulings; the reveal offer is
+  skipped while you control a Dragon; browser test), "you may pay {1}{G} any number of times" (Taste of Paradise;
+  browser test), "the second spell cast this turn" (Second Guess), "damage to target spell's controller equal to that
+  spell's mana value" (Parallectric Feedback, Refuse // Cooperate), "with an additional -1/-1 counter on it" (Pyrrhic
+  Revival), "an artifact creature and a nonartifact creature" (Perilous Predicament), Metallic Mastery, "If a nonred
+  permanent is dealt damage this way" (Redcap Melee), Prophecy, False Memories, "a card with disturb" (Shipwreck
+  Sifters, Phantom Carriage), "Enchanted creature's controller can't cast creature spells" (Brand of Ill Omen; bots aim
+  it at an opponent's creature), "Creatures blocking or blocked by ~ have lifelink" (Alms Beast), "cards in your hand
+  minus the number of cards in that player's hand" (Bulwark), "for each Cave you control and each Cave card in your
+  graveyard" (Gargantuan Leech; Machinist's Dismissal, not Commander-legal, compiles with it too), Anthroplasm, Rock
+  Jockey, "When you play a card" (Juju Bubble), Coral Fighters. +26 (27,725 of 31,936).
+- Out after round B42: Visions (looking at another player's library needs a viewer), Primordial Ooze ("you may pay
+  {X}, where X is ...; If you don't"), Dragon's Fire (reveal a Dragon card or choose a Dragon you control: the damage
+  is that Dragon's power), Lichenthrope and Phytohydra (damage replaced by counters, not prevented), Tobias,
+  Whipkeeper, Rag Man, Howling Galefang, Swift Reckoning, Sewer Crocodile, Primitive Justice (each needs a new
+  mechanic or a new prompt).
 - Next for Lane B, least played first (up from about 19,600): Sacred Ground, Mana
   Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
   Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence. Then the unsupported ones above that, least played first

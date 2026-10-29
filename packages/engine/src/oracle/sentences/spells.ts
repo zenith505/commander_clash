@@ -662,6 +662,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = addTarget(ctx, { kind: "spell", text: "target spell", optional: true, distinctFrom: [a] });
     return [{ type: "counterSpell", index: a }, { type: "counterSpell", index: b }];
   }
+  // Parallectric Feedback: "~ deals damage to target spell's controller equal to that spell's mana value": its mana value
+  // with the X chosen for it (CR 202.3e), and the spell stays on the stack.
+  if (/^~ deals damage to target spell's controller equal to that spell's mana value$/.test(s)) {
+    const index = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell" });
+    return [{ type: "damage", amount: { count: { kind: "manaValue", of: { ref: "target", index } } }, to: { ref: "targetController", index } }];
+  }
+  // Second Guess: "Counter target spell that's the second spell cast this turn": the second cast by any player, as it was
+  // cast (CR 601.2i); a copy wasn't cast (CR 707.10).
+  if (/^Counter target spell that's the second spell cast this turn$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", castNth: 1, text: "target spell that's the second spell cast this turn" }) }];
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   // Unified Will: "Counter target spell if you control more creatures than that spell's controller": counted as it resolves
   // (CR 608.2c); a spell of yours is never countered by it.

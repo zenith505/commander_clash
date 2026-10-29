@@ -223,7 +223,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Sacrifice an artifact, a creature, and a land" (Tomb of Annihilation's Oubliette), "target player sacrifices an
   // artifact and a land of their choice": a different permanent for each (see the sacrificeEach effect).
-  if ((m = /^(?:(.+?) )?[Ss]acrifices? (an? \w+(?:, an? \w+)*,? and an? \w+)(?: of (?:their|his or her) choice)?$/.exec(s))) {
+  // Perilous Predicament: "an artifact creature and a nonartifact creature of their choice".
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? (an? \w+(?: creature)?(?:, an? \w+(?: creature)?)*,? and an? \w+(?: creature)?)(?: of (?:their|his or her) choice)?$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filters = m[2]!.split(/,? and |, /).map((x) => pickFilter(x.replace(/^an? /, "")));
     return who && filters.every(Boolean) ? [{ type: "sacrificeEach", who, filters: filters as TargetSpec[] }] : null;
@@ -656,6 +657,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // all graveyards under their owners' control.
   // "Each player returns all creature cards from their graveyard to the battlefield" (Twilight's Call), "... all creature
   // cards of a type chosen this way ..." (Patriarch's Bidding) likewise.
+  // Pyrrhic Revival: "... to the battlefield with an additional -1/-1 counter on it": each enters with one (CR 614.1c).
+  const withCounter = /^(Each player returns each creature card from their graveyard to the battlefield) with an additional (-1\/-1|\+1\/\+1) counter on it$/.exec(s);
+  if (withCounter) {
+    const fx = parseZonesSentence(withCounter[1]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "returnAllFromGraveyard") return null;
+    return [{ ...fx[0]!, counters: { [withCounter[2]!]: 1 } }];
+  }
   const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s) ?? /^Each player returns all (.+?) cards from their graveyard to the battlefield( tapped)?$/.exec(s);
   // Balthor the Defiled: "all black and all red creature cards": each card that is either.
   if (eachReturns) s = `Return all ${eachReturns[1]!.replace(/^(white|blue|black|red|green) and all (white|blue|black|red|green) creature$/, "$1 or $2 creature")} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;

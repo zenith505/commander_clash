@@ -2028,7 +2028,7 @@ function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
   const line = first ? `${first[1]}, ${line0.slice(first[0].length)}` : line0;
   // Anje Falkenrath: "Whenever you discard a card, if it has madness, ...": a card with madness, which it can't lose on
   // the way to exile or the graveyard, so the same as checking it again as the trigger resolves (CR 603.4).
-  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card(?: with madness)?), (.+)$/.exec(line.replace(/^(Whenever you discard a card), if it has madness, /, "$1 with madness, "));
+  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card(?: with (?:madness|disturb))?), (.+)$/.exec(line.replace(/^(Whenever you discard a card), if it has madness, /, "$1 with madness, "));
   if (!m) return null;
   let filter: TargetSpec | undefined;
   if (m[4] === "card with madness") filter = { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Madness"], text: "card with madness" };
@@ -2391,7 +2391,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
     return { ...t, cast: { ...t.cast, orLandEntersFromExile: true } };
   }
-  const playM = /^Whenever you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
+  // Juju Bubble: "When you play a card, sacrifice ~": "when" and "whenever" are the same here (CR 603.1).
+  const playM = /^When(?:ever)? you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
     const legendary = /legendary/.test(playM[1]!);
     const body = playM[4]!;

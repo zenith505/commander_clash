@@ -273,7 +273,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
     case "handMoreThanYou": {
       const theirs = refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
-      return Math.max(0, theirs - s.players[ctx.controller]!.hand.length);
+      const yours = s.players[ctx.controller]!.hand.length;
+      return Math.max(0, c.yoursMinus ? yours - theirs : theirs - yours);
     }
     case "greatestPowerExiled":
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
@@ -924,7 +925,7 @@ function describeCount(c: Count): string {
     case "cardsInHand":
       return "#cards in hand";
     case "handMoreThanYou":
-      return "#cards in their hand minus yours";
+      return c.yoursMinus ? "#cards in your hand minus theirs" : "#cards in their hand minus yours";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
     case "affectedKeywordCount":

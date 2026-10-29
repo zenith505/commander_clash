@@ -556,6 +556,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const item = s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined);
     if (!item) return false;
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
+    if (spec.castNth !== undefined && item.castNth !== spec.castNth) return false; // A copy that wasn't cast has no castNth (CR 707.10).
     if (spec.hasTargets && !(item.targets ?? []).some((x) => x.kind !== "none")) return false;
     // "Target triggered ability you control" (Strionic Resonator).
     const aims = !spec.targetsWhat || targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller));

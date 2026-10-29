@@ -479,6 +479,8 @@ export interface GameObject {
   tapsThisTurn?: { turn: number; zc: number; n: number };
   /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
   kicked?: number[];
+  /** With `kicked`: a Dragons of Tarkir spell's "controlled a Dragon as you cast it", which a copy doesn't get (rulings). */
+  kickedByControl?: true;
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
   /** How many Phyrexian symbols of its cost its caster paid with life (compleated, CR 702.150a); kept as it enters. */
@@ -910,6 +912,8 @@ export interface StackItem {
   asCast?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
+  /** The `kicked` is a Dragons of Tarkir spell's "controlled a Dragon as you cast it": not copied (rulings). */
+  kickedByControl?: true;
   /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */
   colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */

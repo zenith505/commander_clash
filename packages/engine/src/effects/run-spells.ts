@@ -56,7 +56,8 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   const o = newObject(s, except ? s.cards[copyKey(s, base, except)]! : base, controller, "stack");
   o.spellCopy = true;
   if (gains) o.copyGains = { mods: gains.mods, timestamp: s.nextTimestamp++, controller, source: gains.source };
-  o.kicked = card.kicked;
+  // A Dragons of Tarkir spell's bonus for controlling a Dragon as it was cast: the copy wasn't cast (rulings).
+  o.kicked = card.kickedByControl ? undefined : card.kicked;
   o.castAlt = card.castAlt;
   o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
   o.prototyped = card.prototyped; // and of a prototyped spell (CR 718.3c)
@@ -69,7 +70,8 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.gift = card.gift;
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
-  const { castNth: _, castInMain: _main, ...rest } = structuredClone(orig);
+  const { castNth: _, castInMain: _main, kickedByControl: _byControl, ...rest } = structuredClone(orig);
+  if (_byControl) delete rest.kicked;
   s.stack.push({ ...rest, id, objectId: o.id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
   fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true }); // magecraft: "cast or copy"
@@ -1017,6 +1019,8 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (compiled.cantBeCountered || (o.uncounterableCast && !item.copy) || item.uncounterable) return true;
   // Banefire: its X, chosen as it was cast (a copy has the same X, CR 707.10).
   if (compiled.cantBeCounteredX !== undefined && (item.x ?? 0) >= compiled.cantBeCounteredX) return true;
+  // Dragonlord's Prerogative: how it was cast, which a copy copies (CR 707.10).
+  if (compiled.cantBeCounteredKicked && item.kicked?.length) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).
   // "Can't be countered by blue or black spells this turn" (Autumn's Veil): the countering spell's colors as it resolves
   // (rulings); abilities still can.

@@ -138,6 +138,11 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[1]!);
     return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
   }
+  // Alms Beast: "Creatures blocking or blocked by ~ have lifelink": while they're in combat with it.
+  if ((m = /^Creatures blocking or blocked by ~ (have|get) (.+)$/.exec(text))) {
+    const mods = parseStaticMods(`${m[1]} ${m[2]}`);
+    return mods ? { affects: { kind: "inCombatWithSelf" }, mods, text: line } : null;
+  }
   // Sting, the Glinting Dagger: "Equipped creature has first strike as long as it's blocking or blocked by a Goblin or Orc":
   // blocking one or blocked by one (CR 509.1g-h); one removed from combat no longer counts (CR 506.4).
   if ((m = /^Equipped creature has ([a-z ]+) as long as it's blocking or blocked by an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && [m[2], m[3]].every((x) => !x || CREATURE_TYPES.has(x))) {

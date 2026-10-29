@@ -89,6 +89,14 @@ export function parseToken(power: number, toughness: number, desc: string, withT
     const kws = parseKeywordList(trig[1]!);
     return kws ? { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: kws, abilities: trig[2]!.charAt(0).toUpperCase() + trig[2]!.slice(1) } : null;
   }
+  // The Girl in the Fireplace: 'with vanishing 3 and "Prevent all damage that would be dealt to this token."': vanishing
+  // (CR 702.63a) written out as its ability too, before the quoted one.
+  const vanishing = kwText ? /^(?:(.+?),? and )?(vanishing \d+)$/.exec(kwText) : null;
+  if (vanishing && subtypes.length) {
+    const kws = vanishing[1] ? parseKeywordList(vanishing[1]) : [];
+    const text = [vanishing[2]!.charAt(0).toUpperCase() + vanishing[2]!.slice(1), ...(ability !== undefined ? [ability] : [])].join("\n");
+    return kws ? { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: kws, abilities: text } : null;
+  }
   const keywords = kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(ability !== undefined ? { abilities: ability } : {}) };

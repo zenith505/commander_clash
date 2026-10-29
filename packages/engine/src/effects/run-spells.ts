@@ -382,6 +382,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             ? (orig.castNth ?? 0)
             : e.n === "stormInstantSorcery"
               ? (s.castThisTurn ?? []).slice(0, orig.castNth ?? 0).filter((c) => c.player === orig.controller && s.cards[c.card] && (isType(s.cards[c.card]!, "Instant") || isType(s.cards[c.card]!, "Sorcery"))).length
+              : e.n === "otherInstantSorcery"
+              ? (s.castThisTurn ?? []).filter((c, i) => i !== orig.castNth && c.player === orig.controller && s.cards[c.card] && (isType(s.cards[c.card]!, "Instant") || isType(s.cards[c.card]!, "Sorcery"))).length
               : e.n === "kicked"
                 ? (orig.kicked?.length ?? 0)
                 : amountNow(s, e.n, ctx);

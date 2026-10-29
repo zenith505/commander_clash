@@ -12,7 +12,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, enchantOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilityCost, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility, manaLifeTax } from "./manaabilities";
 import { untapStepPhasing, releasePhased, phaseInUntil } from "./phasing";
-import { bindBound, cardPT, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
+import { bindBound, cardPT, linkedCards, manyX, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
@@ -142,6 +142,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   // The starting player's first turn (set after choosing them).
   s.players[first]!.turnBegan = s.turn;
   s.players[first]!.turnsTaken = 1;
+  s.lifeAsTurnBegan = s.players.map((p) => p.life);
   for (const p of s.players) draw(s, p.id, 7);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
   for (const p of s.players) delete p.draws;
@@ -1075,7 +1076,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   // Counted after its "as ~ enters, choose" is answered when it counts what's chosen (afterChoice, see chooseOption).
-  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice ? undefined : printedCounters;
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.notCastFromHand && castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -2942,6 +2943,8 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!s.handOnlyUntil?.length) s.handOnlyUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
+  s.monarchAsTurnBegan = s.monarch;
+  s.lifeAsTurnBegan = s.players.map((p) => p.life);
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
@@ -3609,9 +3612,32 @@ export function giveCitysBlessing(s: GameState, pid: PlayerId, any = false): boo
   return true;
 }
 
-/** Ascend on permanents (CR 702.131b) isn't a triggered ability: it applies any time its condition is true. */
+/**
+ * An enduring story (CR 702.195a): a player who controls a permanent with storied and three or more permanents that are
+ * artifacts, Sagas and/or legendary gets it for the rest of the game. Continuous effects see it at once (702.195c).
+ */
+function giveEnduringStory(s: GameState, pid: PlayerId): boolean {
+  const p = player(s, pid);
+  if (p.enduringStory || p.lost) return false;
+  const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid);
+  if (!mine.some((o) => objHasKeyword(s, o, "Storied"))) return false;
+  const storied = (o: GameObject) => {
+    const c = characteristics(s, o);
+    return c.types.includes("Artifact") || c.supertypes.includes("Legendary") || c.subtypes.includes("Saga");
+  };
+  if (mine.filter(storied).length < 3) return false;
+  p.enduringStory = true;
+  invalidateCharacteristics(s);
+  log(s, `${p.name} has an enduring story.`);
+  return true;
+}
+
+/**
+ * Ascend on permanents (CR 702.131b) isn't a triggered ability: it applies any time its condition is true. Neither is
+ * storied (CR 702.195a).
+ */
 export function checkAscend(s: GameState) {
-  for (const p of s.players) giveCitysBlessing(s, p.id);
+  for (const p of s.players) giveCitysBlessing(s, p.id), giveEnduringStory(s, p.id);
 }
 
 /**
@@ -4033,6 +4059,8 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
 
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId) {
   const o = obj(s, id);
+  // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
+  const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
   if (i === undefined) throw new RulesError(`${name} can't produce {${mana}} right now`);
@@ -4117,7 +4145,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
-  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -5510,7 +5538,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
+    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && !(c.duringTheirNextTurn && !(s.activePlayer === pid && (player(s, pid).turnBegan ?? 0) > c.turn)) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
@@ -6505,13 +6533,28 @@ const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
   (!!o && (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === true || (abilitiesOf(s, o).selfLoyaltyAtInstantSpeed === "enteredThisTurn" && o.enteredTurn === s.turn))) ||
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
-export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {
+/**
+ * The X an ability's own text sets (CR 107.3c), its controller not choosing it: Prototype Portal's "X is the mana value of
+ * that card", the card exiled with it (X in that card's mana cost as 0, CR 107.3g). Null with no such card: X isn't defined,
+ * so it can't be paid (rulings). Undefined for an ability whose X is chosen.
+ */
+export function definedX(s: GameState, o: GameObject, ab: ActivatedAbility): number | null | undefined {
+  if (ab.xIs !== "linkedCardMv") return undefined;
+  const card = linkedCards(s, o.id)[0];
+  return card ? defMv(defOf(s, obj(s, card.id))) : null;
+}
+
+export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices): string | null {
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
+  const fixedX = definedX(s, o, ab);
+  if (fixedX === null) return `no card is exiled with ${d.name}, so X isn't defined`;
+  if (fixedX !== undefined && x0 !== undefined && x0 !== fixedX) return `X is ${fixedX} for ${d.name}'s ability`;
+  const x = x0 ?? fixedX;
   // Stabilizer: "Players can't cycle cards" (typecycling too, CR 702.29f).
   if (ab.cycling) {
     const ban = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noCycling);
@@ -6523,6 +6566,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (ab.zone === "graveyard") {
     // Unearth works only while the card is in your graveyard (CR 702.84a).
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
+    // Ashes of the Abhorrent: no activated abilities of cards in graveyards (embalm, unearth, scavenge, ...; rulings).
+    const ashes = s.battlefield.find((b) => abilitiesOf(s, obj(s, b)).noGraveyardActivations);
+    if (ashes) return `${characteristics(s, obj(s, ashes)).name}: players can't activate abilities of cards in graveyards`;
   } else if (ab.zone === "command") {
     // Derevi: only from the command zone (rulings).
     if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
@@ -6758,7 +6804,9 @@ function equipAtInstantSpeed(s: GameState, pid: PlayerId): boolean {
 export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): boolean {
   if (!ab.equip || ab.costs?.length || ab.tap || s.turnLog?.equipped?.includes(pid)) return false;
   return s.battlefield.some((id) => {
-    const f = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).firstEquipFree : undefined;
+    const a = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    const f = a?.firstEquipFree;
+    if (a?.firstEquipFreeWhile && !staticConditionNow(s, a.firstEquipFreeWhile, id, pid)) return false;
     return f === "eachTurn" || (f === "yourTurn" && s.activePlayer === pid);
   });
 }
@@ -6897,10 +6945,12 @@ function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number
  * Activate an ability (CR 602.2). Returns whether it was a mana ability, which resolved right away instead of going on
  * the stack (CR 605.3b). `mana` and `extra`: for a mana ability, as for activateMana.
  */
-function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
+function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x0?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
   const o = obj(s, id);
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
+  // Prototype Portal: an X its text sets (CR 107.3c).
+  const x = x0 ?? (ab && definedX(s, o, ab)) ?? undefined;
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
@@ -6918,7 +6968,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
-  const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
+  const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
@@ -7038,7 +7088,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
     resolveManaAbility(s, item, body, manaPick.mana);
-    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(paid.treasure ? { treasure: paid.treasure } : {}) });
+    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}) });
     return true;
   }
   s.stack.push(item);
@@ -7691,6 +7741,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");
     st.pick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "timeTravel") {
+    const st = r.scratch?.timeTravel;
+    if (!st || !pend.about || !pend.options.includes(choice)) throw new RulesError("put a time counter on it, remove one, or leave it");
+    st.picks[pend.about] = choice;
     continueResolution(s);
     return;
   }
@@ -9911,6 +9968,7 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
     if (next !== undefined && livingPlayers(s).length > 1) takeInitiative(s, next);
   }
   if (livingPlayers(s).length <= 1) return true;
+  if (!s.mulligans) fireEvent(s, { type: "lostGame", player: pid });
   if (s.mulligans) {
     // Leaving before the game starts: the others carry on with their mulligans.
     s.mulligans.going = s.mulligans.going.filter((id) => id !== pid);
@@ -10355,7 +10413,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
   // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
   if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
-  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x);
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id);
   s.passedInSuccession = [];
 }
 
@@ -10363,7 +10421,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
  * Turns a face-down permanent face up. Its copiable values go back to the card's, or what a copy effect made it (CR
  * 708.8, 707.3); it's the same permanent, so nothing "enters". `megamorph`: its megamorph cost was paid (CR 702.37b).
  */
-function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0) {
+function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId) {
   o.faceDown = undefined;
   lockIfRoom(s, o);
   invalidateCharacteristics(s);
@@ -10374,7 +10432,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
   const up = compileCard(d).faceUpCounters;
   if (up) putCounters(s, o, up.counter, up.n);
-  fireEvent(s, { type: "turnedFaceUp", id: o.id, ...(x ? { x } : {}) });
+  fireEvent(s, { type: "turnedFaceUp", id: o.id, ...(x ? { x } : {}), ...(by !== undefined ? { by } : {}) });
 }
 
 /**
@@ -10382,7 +10440,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
  * (Unable to Scream); a manifested or cloaked instant or sorcery card is revealed and stays face down, and nothing
  * triggers (CR 701.40g, 701.58g). Whether it turned face up.
  */
-export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string): boolean {
+export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId): boolean {
   if (o.zone !== "battlefield" || !o.faceDown) return false;
   if (characteristics(s, o).cantTurnFaceUp) {
     log(s, `${src}: that face-down permanent can't be turned face up.`);
@@ -10393,7 +10451,7 @@ export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string): bo
     log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
     return false;
   }
-  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`);
+  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by);
   return true;
 }
 

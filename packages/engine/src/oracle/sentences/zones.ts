@@ -517,6 +517,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!filter || !filter.types?.includes("Creature")) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
   }
+  // Fall of the Thran: "Each player returns two land cards from their graveyard to the battlefield": each chooses their own
+  // as it resolves, all at the same time, the one card if they have only one (rulings).
+  if ((m = /^[Ee]ach player returns (an?|two|three) land cards? from their graveyard to the battlefield$/.exec(s)))
+    return [{ type: "chooseFromGraveyard", n: num(m[1]!.replace(/^an?$/, "one")), dest: "battlefield", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, who: { ref: "eachPlayer" } }];
   // Echoing Return: "Return target creature card and all other cards with the same name as that card from your graveyard to
   // your hand": all at once; nothing if the target is gone (rulings).
   if ((m = /^Return (target .+? card) and all other cards with the same name as that card from your graveyard to your hand$/.exec(s))) {
@@ -565,7 +569,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
   // (Decaying Soil): that player chooses as it resolves.
-  if ((m = /^(?:(Target player|Target opponent) exiles|[Ee]xile) (an?|one|two|three) (.+?) from (their|your) graveyard$/.exec(s)) && (m[4] === "their") === !!m[1]) {
+  // Emeritus of Ideation: "exile eight cards from your graveyard".
+  if ((m = new RegExp(`^(?:(Target player|Target opponent) exiles|[Ee]xile) ${NUM} (.+?) from (their|your) graveyard$`).exec(s)) && (m[4] === "their") === !!m[1]) {
     const who = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : undefined;
     const filter = parseSearchFilter(m[3]!);
     const n = num(m[2]!.replace(/^an?$/, "one"));

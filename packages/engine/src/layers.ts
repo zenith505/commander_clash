@@ -705,6 +705,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx));
     }
     case "monarch":
+      if (cond.asTurnBegan) return s.monarchAsTurnBegan === you;
       if (cond.none) return s.monarch === undefined;
       if (cond.eventPlayer) return eventPlayer !== undefined && s.monarch === eventPlayer;
       return cond.opponent ? s.monarch !== undefined && s.monarch !== you : (s.monarch === you) !== !!cond.not;
@@ -1126,6 +1127,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.lastTurn?.lostLife ?? []).some((p) => p !== you);
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
+    case "enduringStory":
+      return !!s.players[you]?.enduringStory !== !!cond.not;
     case "self": {
       if (cond.not) return !conditionMet(s, { kind: "self", is: cond.is }, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
       if (cond.is === "attacking") return src.attacking !== undefined;
@@ -1146,6 +1149,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
+      if (cond.is === "renowned") return !!src.renowned; // CR 702.112b
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;

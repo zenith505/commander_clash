@@ -10,7 +10,7 @@ import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, Ob
 import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
-import { evalAmount } from "../amounts";
+import { evalAmount, manaSymbolsOf } from "../amounts";
 import { objectMatches, bindBound, manyX, bindChosen, legalTargets, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, distinctModeCap, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
@@ -72,6 +72,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   for (const { id, again } of statics)
     for (const a of again) {
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
+      if (a.enduringStory && !s.players[controller]?.enduringStory) continue;
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
       if (emblem !== !!a.selfOrEmblems && !(a.selfOrEmblems && view.o.id === id)) continue;
@@ -197,6 +198,10 @@ export type TriggerSourceEvent =
   | { type: "crewed"; id: ObjectId }
   | { type: "crews"; id: ObjectId; vehicle: ObjectId }
   /** A permanent explored (CR 701.44b), `controller` controlling it then or as it last existed (701.44c). */
+  | { type: "connived"; id: ObjectId; controller: PlayerId }
+  /** It became renowned (CR 702.112b). */
+  | { type: "becameRenowned"; id: ObjectId }
+  | { type: "lostGame"; player: PlayerId }
   | { type: "explored"; id: ObjectId; controller: PlayerId; /** The card it revealed was a land card or not; unset with none revealed. */ revealed?: "land" | "nonland" }
   /** Its evolve ability put one or more +1/+1 counters on it (CR 702.100d). */
   | { type: "evolved"; id: ObjectId }
@@ -223,7 +228,7 @@ export type TriggerSourceEvent =
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
-  | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number }
+  | { type: "turnedFaceUp"; id: ObjectId; /** The X chosen for its morph or disguise cost (CR 702.37f, 702.168e). */ x?: number; /** Who turned it face up: the player taking the special action (CR 116.2b), or the controller of the effect that did. */ by?: PlayerId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
   | { type: "attacksAlone"; id: ObjectId }
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
@@ -339,6 +344,7 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
 function fromGraveyardMatches(s: GameState, how: NonNullable<TriggeredAbility["ifFromGraveyard"]>, entering: GameObject, you: PlayerId): boolean {
   if (how === "any") return !!entering.enteredFromGraveyard;
   if (entering.owner !== you) return false;
+  if (how === "castYours") return !!entering.castFromGraveyard && controllerOf(s, entering) === you;
   return !!entering.enteredFromGraveyard || (how === "yoursOrCast" && !!entering.castFromGraveyard && controllerOf(s, entering) === you);
 }
 
@@ -1004,6 +1010,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // Knights of the Black Rose: "Whenever an opponent becomes the monarch".
+      else if (ev.type === "becameMonarch" && opponents(s, controllerOf(s, o)).includes(ev.player)) add(o, controllerOf(s, o), (e) => e === "opponentBecomesMonarch", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
     // Voidwing Hybrid: "When you proliferate, return ~ from your graveyard to your hand": its owner's.
     if (ev.type === "proliferated") fromGraveyards((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player }));
@@ -1218,6 +1226,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
+  } else if (ev.type === "becameRenowned") {
+    // Relic Seeker, Valeron Wardens (CR 702.112b).
+    const o = obj(s, ev.id);
+    const you = controllerOf(s, o);
+    add(o, you, (e) => e === "selfBecomesRenowned");
+    if (objIsType(s, o, "Creature"))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) === you) add(w, you, (e) => e === "creatureYouControlBecomesRenowned", undefined, undefined, o);
+      }
   } else if (ev.type === "evolved") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfEvolves");
@@ -1230,6 +1248,23 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const id of s.battlefield) {
         const w = obj(s, id);
         if (controllerOf(s, w) === ev.controller) add(w, ev.controller, (e, t) => e === "creatureYouControlExplores" && (!t.explored || t.explored === ev.revealed), undefined, undefined, o);
+      }
+  } else if (ev.type === "lostGame") {
+    // "Whenever another player loses the game" (Sengir): the permanents still on the battlefield once they've left.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you !== ev.player) add(o, you, (e) => e === "anotherPlayerLosesGame", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "connived") {
+    // "Whenever a creature you control connives" (Iron Monger, Ultron): even one that has left the battlefield (Toluz
+    // rulings), as it last existed there (CR 701.50b).
+    const o = s.objects[ev.id];
+    const creature = o && (o.zone === "battlefield" ? objIsType(s, o, "Creature") : defOf(s, o).types.includes("Creature"));
+    if (o && creature)
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) === ev.controller) add(w, ev.controller, (e) => e === "creatureYouControlConnives", undefined, undefined, o);
       }
   } else if (ev.type === "mutates") {
     // "Whenever this creature mutates" (CR 702.140d): an ability of the merged permanent, from any of its components.
@@ -1251,7 +1286,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+      add(w, ctrl, (e, t) => e === "permanentTurnedFaceUp" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && (!t.turnedByYou || ev.by === ctrl), undefined, undefined, o);
     }
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
@@ -1755,6 +1790,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
         if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
+        // "With one or more blue mana symbols in its mana cost" (Namor): the same mana cost.
+        if (t.cast.manaSymbol && !(spell && manaSymbolsOf(defOf(s, spell).manaCost, [t.cast.manaSymbol]) > 0)) return false;
         // "A kicked spell": kicked as it was cast (CR 702.33d), or a copy of one (CR 707.10).
         // Not an optional cost paid like kicker, as "you may blight 1" (Burning Curiosity) or replicate.
         if (t.cast.kicked && !(item?.kicked?.length && (!spell || isRealKicker(compileCard(defOf(s, spell)).kicker)))) return false;
@@ -1924,7 +1961,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu)) return false;
+        if (e !== "abilityActivated" || !a || (ev.mana && !a.mana) || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost) || (a.ninjutsu && !ev.ninjutsu)) return false;
         if (a.equipped) {
           const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;

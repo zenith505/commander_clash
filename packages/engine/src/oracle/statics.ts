@@ -122,6 +122,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseConditionalStatic(`As long as ${ifControl[1]}, ~ doesn't untap during your untap step.`);
     return st && { ...st, text: line };
   }
+  // Bombur, Gentle Dreamer: "~ doesn't untap during your untap step unless you have an enduring story": as long as you
+  // don't (CR 702.195b).
+  if (/^~ doesn't untap during your untap step unless you have an enduring story\.$/.test(line)) {
+    const st = parseConditionalStatic("As long as you don't have an enduring story, ~ doesn't untap during your untap step.");
+    return st && { ...st, text: line };
+  }
   const text = line.replace(/^[A-Z][A-Za-z' -]+(?: \d+)? — /, "").replace(/\.$/, "");
   let statement: string | undefined;
   let cond: string | undefined;
@@ -780,8 +786,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
   // Spell mastery: "If there are two or more instant and/or sorcery cards in your graveyard" (each card counted once).
-  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+|instant and/or sorcery) cards in your graveyard$`).exec(text))) {
-    const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
+  // Mortal Combat: "if twenty or more creature cards are in your graveyard", the same.
+  if ((m = new RegExp(`^${NUM} or more (\\w+) cards are in your graveyard$`).exec(text))) return parseStaticCondition(`there are ${m[1]} or more ${m[2]} cards in your graveyard`, st);
+  // Lorehold Archivist: "three or more artifact and/or creature cards", the same.
+  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+|\\w+ and/or \\w+) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]!.replace(" and/or ", " and ")} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // Murasa Behemoth: "as long as there is a land card in your graveyard"; Windwright Mage: "as long as an artifact card is
@@ -986,6 +995,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you're not the monarch$/.test(text)) return { kind: "monarch", not: true };
+  // Knights of the Black Rose: "if you were the monarch as the turn began".
+  if (/^you were the monarch as the turn began$/.test(text)) return { kind: "monarch", asTurnBegan: true };
   if (/^there is no monarch$/.test(text)) return { kind: "monarch", none: true };
   if (/^that player is the monarch$/.test(text)) return { kind: "monarch", eventPlayer: true };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
@@ -1009,6 +1020,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(?:~|it)(?:'s| is) (not )?paired with (another creature|a creature with soulbond)$/.exec(text)) && st.affects.kind === "self")
     return { kind: "paired", ...(m[2] === "a creature with soulbond" ? { withKeyword: "Soulbond" } : {}), ...(m[1] ? { not: true as const } : {}) };
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
+  if ((m = /^you (have|don't have) an enduring story$/.exec(text))) return { kind: "enduringStory", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.195b
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
   if (/^you didn't attack with a creature this turn$/.test(text)) return { kind: "attackedThisTurn", not: true };
@@ -1244,8 +1256,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Warchanter Skald: "if it's enchanted or equipped": either.
   if (/^(?:~|it)(?:'s| is) enchanted or equipped$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "anyOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }] };
   // "Activate only if ~ is blocked" (Cinder Crawler), "only if ~ is attacking or blocking" (Sawback Manticore).
-  const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
-  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous") };
+  const self = /^(?:~|it)(?:'s| is) (attacking or blocking|attacking|blocking|blocked|enchanted|equipped|modified|tapped|untapped|monstrous|renowned)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] === "attacking or blocking" ? "attackingOrBlocking" : (self[1] as "attacking" | "blocking" | "blocked" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" | "renowned") };
   // Gatewatch Beacon: "if ~ has loyalty counters on it": one or more.
   if ((m = new RegExp(`^(?:~|it) has (?:an? ${COUNTER} counter|${COUNTER} counters) on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind((m[1] ?? m[2])!) };
@@ -1483,6 +1495,10 @@ export function parseAffected(subject: string): Affects | null {
     const anyOf: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact creature" }, { kind: "object", subtypes: [sub], text: `${sub} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", anyOf, text: `artifact creature or ${sub}` } };
   }
+  // Thorin Oakenshield: "Artifacts and creatures you control": permanents of either card type, an artifact creature once.
+  // Only that pair: the general path takes the other "X and Y you control" pairs.
+  const artCre = /^(other )?(?:artifacts and creatures|creatures and artifacts) you control$/i.exec(x);
+  if (artCre) return { kind: "filter", types: [], controller: "you", other: !!artCre[1], spec: { kind: "object", types: ["Artifact", "Creature"], text: "artifact or creature" } };
   // Serpent of Yawning Depths: "Krakens, Leviathans, Octopuses, and Serpents you control": creatures of any of those types.
   const typeList = /^((?:[A-Z][a-z]+, )+and [A-Z][a-z]+) you control$/.exec(x);
   if (typeList) {

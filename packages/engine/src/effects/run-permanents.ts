@@ -7,7 +7,7 @@ import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenB
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
-import { becomePrepared } from "../prepare";
+import { becomePrepared, unprepare } from "../prepare";
 import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { exiledWithCounter } from "./run-choices";
@@ -16,6 +16,7 @@ import { discardCards, discardToTop } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
 import { phaseOut } from "../phasing";
+import { isSuspended } from "./run-zones";
 import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
 
 /**
@@ -218,7 +219,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       return;
     case "turnFaceUp":
-      for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src);
+      for (const o of objects(s, e.what, ctx)) turnFaceUpByEffect(s, o, src, ctx.controller);
       return;
     case "tap":
     case "untap":
@@ -329,7 +330,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     case "becomePrepared":
-      for (const o of objects(s, e.what, ctx)) becomePrepared(s, o);
+      for (const o of objects(s, e.what, ctx)) if (e.un) unprepare(s, o);
+      else becomePrepared(s, o);
       return;
     case "flip":
       for (const o of objects(s, e.what, ctx)) flipPermanent(s, o);
@@ -474,6 +476,67 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (ids.length) phaseOut(s, ids);
       return;
     }
+    case "timeTravel": {
+      // CR 701.56a: "choose any number of permanents you control with one or more time counters on them and/or suspended
+      // cards you own in exile with one or more time counters on them and, for each of those objects, put a time counter
+      // on it or remove a time counter from it." Each is asked in turn, then the counters change together.
+      const you = ctx.controller;
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.timeTravel) {
+        const ids = [
+          ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && (obj(s, id).counters.time ?? 0) > 0),
+          ...player(s, you).exile.filter((id) => obj(s, id).owner === you && isSuspended(s, obj(s, id))),
+        ];
+        if (!ids.length) {
+          log(s, `${src}: ${player(s, you).name} time travels (nothing has a time counter).`);
+          return;
+        }
+        sc.timeTravel = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), picks: {} };
+      }
+      const st = sc.timeTravel;
+      const here = (x: { id: ObjectId; zc: number }) => s.objects[x.id] && (s.objects[x.id]!.zoneChanges ?? 0) === x.zc;
+      const next = st.ids.find((x) => st.picks[x.id] === undefined && here(x));
+      if (next) {
+        const o = obj(s, next.id);
+        const name = o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name;
+        const n = o.counters.time ?? 0;
+        const where = o.zone === "battlefield" ? "" : " (suspended)";
+        s.pending = {
+          kind: "chooseOption",
+          player: you,
+          source: src,
+          what: "timeTravel",
+          options: ["add", "remove", "none"],
+          labels: [`Put a time counter on ${name}`, `Remove a time counter from ${name}`, "Leave it"],
+          about: next.id,
+          prompt: `time travel: ${name}${where} has ${n} time counter${n === 1 ? "" : "s"}.`,
+        };
+        return "paused";
+      }
+      sc.timeTravel = undefined;
+      const changed: string[] = [];
+      const last: ObjectId[] = [];
+      for (const x of st.ids) {
+        const o = s.objects[x.id];
+        const pick = st.picks[x.id];
+        if (!o || !here(x) || !pick || pick === "none") continue;
+        const name = o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name;
+        if (pick === "add") {
+          if (putCounters(s, o, "time", 1)) changed.push(`+1 on ${name}`);
+        } else if (removableCounters(s, o, "time") > 0) {
+          const left = o.counters.time! - 1;
+          if (left > 0) o.counters.time = left;
+          else delete o.counters.time;
+          changed.push(`-1 on ${name}`);
+          if (!left) last.push(o.id);
+        }
+      }
+      invalidateCharacteristics(s);
+      log(s, `${src}: ${player(s, you).name} time travels${changed.length ? ` (${changed.join(", ")})` : ""}.`);
+      // Removing the last one triggers suspend's cast ability and vanishing's sacrifice (CR 702.62a, 702.63a).
+      for (const id of last) fireEvent(s, { type: "lastCounterRemoved", id, counter: "time" });
+      return;
+    }
     case "amass": {
       // CR 701.47a: with no Army, create a 0/0 black [subtype] Army first; then counters on an Army you control,
       // which becomes that subtype too. With several Armies, the one with the most counters is chosen.
@@ -546,11 +609,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return;
       }
       const o = id ? s.objects[id] : undefined;
-      if (nonland && o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc) {
+      const here = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc;
+      if (nonland && here) {
         invalidateCharacteristics(s);
         putCounters(s, o, "+1/+1", nonland);
         log(s, `${defOf(s, o).name} gets ${nonland} +1/+1 counter${nonland > 1 ? "s" : ""}.`);
       }
+      // It has connived now, whatever could be done (CR 701.50f), gone or not (Toluz rulings): "whenever a creature you
+      // control connives" triggers for its controller as it last existed (CR 701.50b).
+      if (o) fireEvent(s, { type: "connived", id: o.id, controller: here ? controllerOf(s, o) : pid });
       return;
     }
     case "skipUntap":
@@ -1016,7 +1083,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!o || o.renowned) return;
       putCounters(s, o, "+1/+1", e.n);
       o.renowned = true;
+      // "As long as ~ is renowned" (Honored Hierarch) reads it (CR 702.112b).
+      invalidateCharacteristics(s);
       log(s, `${characteristics(s, o).name} gets ${e.n} +1/+1 counter${e.n > 1 ? "s" : ""} and becomes renowned.`);
+      fireEvent(s, { type: "becameRenowned", id: o.id });
       return;
     }
     case "adapt": {

@@ -11,7 +11,7 @@ import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
-import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
+import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses, parseActivateCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
@@ -1770,9 +1770,12 @@ export function compile(d: CardDef): CompiledCard {
       out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
       continue;
     }
-    const firstEquip = /^You may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
-    if (firstEquip) {
-      out.firstEquipFree = firstEquip[1] === "each turn" ? "eachTurn" : "yourTurn";
+    // Kíli the Resourceful: "As long as you have an enduring story, you may pay {0} ...": only while that's so.
+    const firstEquip = /^(?:As long as ([^,]+), y|Y)ou may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
+    const firstEquipWhile = firstEquip?.[1] ? parseActivateCondition(firstEquip[1]) : undefined;
+    if (firstEquip && firstEquipWhile !== null) {
+      out.firstEquipFree = firstEquip[2] === "each turn" ? "eachTurn" : "yourTurn";
+      if (firstEquipWhile) out.firstEquipFreeWhile = firstEquipWhile;
       continue;
     }
     if (line === "You may play lands from your graveyard.") {
@@ -3070,6 +3073,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Playing a land from there is still allowed (rulings on Grafdigger's Cage): it isn't cast (CR 305.1).
+    // Ashes of the Abhorrent: "Players can't cast spells from graveyards or activate abilities of cards in graveyards."
+    if (line === "Players can't cast spells from graveyards or activate abilities of cards in graveyards.") {
+      out.cantCastFrom = { zones: ["graveyard"] };
+      out.noGraveyardActivations = true;
+      continue;
+    }
+    if (line === "Cards in graveyards can't be the targets of spells or abilities.") {
+      out.graveyardUntargetable = true;
+      continue;
+    }
     const noCasting = /^Players can't cast (spells|noncreature spells) from (graveyards|graveyards or libraries|graveyards or exile)\.$/.exec(line);
     if (noCasting) {
       out.cantCastFrom = { zones: noCasting[2]!.split(" or ").map((z) => (z === "graveyards" ? "graveyard" : z === "libraries" ? "library" : "exile")), ...(noCasting[1] === "noncreature spells" ? { noncreature: true as const } : {}) };
@@ -3306,17 +3319,19 @@ export function compile(d: CardDef): CompiledCard {
       // Hotheaded Giant: "... unless you've cast another red spell this turn", checked as it enters, not counting itself.
       const [, tapped, count, kind, each, where, ifText, unlessText] = ewc;
       const fromHand = ifText === "you cast it from your hand";
+      // Epochrasite: "... if you didn't cast it from your hand": put onto the battlefield, or cast from anywhere else.
+      const notFromHand = ifText === "you didn't cast it from your hand";
       // "If you cast it" (Nine-Lives Familiar): it enters from the stack as the spell it was, not a copy (CR 601.2i).
       const ifCast = ifText === "you cast it";
       const parsed = unlessText ? parseStaticCondition(unlessText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
       const unless = parsed?.kind === "castAnother" ? { kind: "castAnother" as const, entering: true as const, ...(parsed.color ? { color: parsed.color } : {}) } : parsed;
-      const cond = unless ? { kind: "not" as const, cond: unless } : unless === null ? null : ifText && !fromHand && !ifCast ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+      const cond = unless ? { kind: "not" as const, cond: unless } : unless === null ? null : ifText && !fromHand && !notFromHand && !ifCast ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
       const per = each ? parseCount(each, null, true) : null;
       const def = where ? parseCount(where, null) : null;
       const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);
       if ((each && !per) || (where && !def) || cond === null || !n || out.entersWithCounters) out.unsupported.push(raw);
       else {
-        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}), ...(ifCast ? { ifCast: true as const } : {}) };
+        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}), ...(notFromHand ? { notCastFromHand: true as const } : {}), ...(ifCast ? { ifCast: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
       continue;
@@ -3778,8 +3793,23 @@ export function compile(d: CardDef): CompiledCard {
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game." Rite of Harmony's "Whenever a creature or
     // enchantment you control enters this turn, draw a card" too (CR 603.7b).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^Whenever [^,]+ enters this turn, /.test(line) || /^Whenever an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)? attacks this turn, /.test(line) || /^Whenever you cast an? [a-z]+ spell this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
+      continue;
+    }
+    // Giott, King of the Dwarves: "Whenever ~ or another Dwarf you control enters and whenever an Equipment you control
+    // enters, ...": one ability, so a permanent that's both triggers it once (CR 603.2c); read as the Dwarf trigger and
+    // an Equipment trigger for an Equipment that isn't a Dwarf.
+    const dwarfOrGear = /^Whenever (~ or another ([A-Z][a-z]+) you control) enters and whenever an (Equipment|Aura|Vehicle) you control enters, (.+)$/.exec(line);
+    if (dwarfOrGear) {
+      const kin = parseTrigger(`Whenever ${dwarfOrGear[1]} enters, ${dwarfOrGear[4]}`);
+      const gear = parseTrigger(`Whenever an ${dwarfOrGear[3]} you control enters, ${dwarfOrGear[4]}`);
+      const f = gear && gear !== "fail" && gear.event === "permanentEnters" ? gear.enters?.filter : undefined;
+      if (!kin || kin === "fail" || !gear || gear === "fail" || f?.kind !== "object" || f.notSubtypes?.length) out.unsupported.push(raw);
+      else {
+        out.triggers.push(bindThisAbility(kin, line));
+        out.triggers.push(bindThisAbility({ ...gear, enters: { ...gear.enters!, filter: { ...f, notSubtypes: [dwarfOrGear[2]!] } } }, line));
+      }
       continue;
     }
     // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
@@ -4331,7 +4361,11 @@ function linkExile(out: CompiledCard) {
     const plain = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const exiles = plain.length ? plain : all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
-    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
+    // Prototype Portal: "Imprint — When ~ enters, you may exile an artifact card from your hand": its only exile.
+    const imprints = all.filter((e): e is Extract<Effect, { type: "takeFromHand" }> => e.type === "takeFromHand" && e.action === "exile");
+    const imprintOnly = !exiles.length && imprints.length === 1 && !imprints[0]!.until && out.triggers.some((t) => t.event === "selfEnters" && allEffects(t.body.effects).includes(imprints[0]!)) && !all.some((e) => e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
+    if (imprintOnly && !out.spell) imprints[0]!.linked = true;
+    else if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
     else exiles[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
@@ -4696,6 +4730,13 @@ export function parseFromTop(text: string): FromTop | null | undefined {
  * "if a triggered ability of a Ninja creature you control triggers, ..." (Splinter): CR 603.2d.
  */
 function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgain"]>[number] | null {
+  // Bifur, Melodic Rider: "As long as you have an enduring story, if a triggered ability of a Dwarf you control triggers,
+  // ..." (CR 702.195b).
+  const story = /^As long as you have an enduring story, if (.+)$/.exec(line);
+  if (story) {
+    const again = triggersAgainLine(`If ${story[1]!}`);
+    return again && !again.anchor ? { ...again, enduringStory: true } : null;
+  }
   // "Wolf or battle you control", "land or Bird you control": any of them.
   // "Colorless spell you control or another colorless permanent you control" (Echoes of Eternity): spells too, when
   // `spells`.

@@ -911,6 +911,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "either" && e.onlyDoable && !e.options.some((o) => canDoNow(s, o, ctx))) return false;
     if (e.type === "unlockDoor" && !e.what && !lockedDoors(s, ctx.controller).length) return false;
     if (e.type === "chooseFromGraveyard" && (e.dest === "exile" || (!e.dest && !e.fromExile && !e.upTo && !e.anyNumber)) && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
+    // "You may exile eight cards from your graveyard. If you do, ..." (Emeritus of Ideation): exiling fewer isn't doing it
+    // (CR 609.3).
+    if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !e.upTo && !e.nAmount && e.n > 1 && player(s, ctx.controller).graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))).length < e.n) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
     // "You may gain 1 life for each creature card in your graveyard. If you do, ..." (Skyfisher Spider): gaining no life,
     // or life that can't be gained, isn't gaining life (CR 119.7, 119.9).

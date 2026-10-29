@@ -1,7 +1,7 @@
 // Sentences about damage, drawing, life, energy, the monarch, prevention, and "at end of combat" delayed triggers.
 
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
-import { allEffects } from "../../abilities";
+import { ANY_COUNTER, allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, SameNameRef, TargetSpec } from "../../abilities";
 import { COLOR_WORDS, NUM, NUMX, X, amt, capital, isGroup, num, plainMana, sacrificeSelf, counterKind, singular, COUNTER } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
@@ -787,6 +787,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const pay = parsePayCost(m[2]!);
     if (!pay) return null;
     return [{ type: "may", effects: [], pay, otherwise: [{ type: "discard", who: { ref: "you" }, n: 1, ...(m[1] ? { random: true } : {}) }], keep: true, text: `Pay ${m[2]} not to discard a card${m[1] ?? ""}` }];
+  }
+  // Chisei, Heart of Oceans: "sacrifice ~ unless you remove a counter from a permanent you control": a permanent of yours
+  // with a counter on it chosen as it resolves, then one counter of any kind off it; with none, it's sacrificed.
+  if (/^[Ss]acrifice ~ unless you remove a counter from a permanent you control$/.test(s)) {
+    const filter: TargetSpec = { kind: "object", controller: "you", counter: ANY_COUNTER, text: "permanent you control with a counter on it" };
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", prompt: "click a permanent you control to remove a counter from it (to keep ~), then choose it." }, { type: "removeAnyCounters", what: { ref: "created" }, n: 1 }], otherwise: [sacrificeSelf], keep: true, text: "Remove a counter from a permanent you control to keep ~" }];
   }
   // "Sacrifice ~ unless you discard a card" (Masticore), "sacrifice it unless you discard a card at random" (Balduvian
   // Horde): the choice is made on resolution; with no card to discard, it's sacrificed (rulings).

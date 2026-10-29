@@ -195,7 +195,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
  * resolved as its other card type, its subtypes creature types.
  */
 /** An optional additional cost paid like kicker ("you may waterbend {2}", "you may blight 1", "you may behold a Dragon"). */
-const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|behold an? [A-Z][a-z]+(?: creature)?)\.$/m;
+const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|behold an? [A-Z][a-z]+(?: creature)?|pay (?:\{[^}]+\})+)\.$/m;
 const UNSUPPORTED_TYPES = ["Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES: string[] = [];
 
@@ -1382,6 +1382,17 @@ export function compile(d: CardDef): CompiledCard {
       else [out.amplify, out.amplifyFilter] = [1, { kind: "card", types: ["Artifact"], text: "artifact card" }];
       continue;
     }
+    // Dragon's Disciple: "As ~ enters, you may reveal a Dragon card from your hand. If you do or if you control a Dragon, ~
+    // enters with a +1/+1 counter on it." (CompiledCard.amplifyOne): one card at most, one counter either way.
+    const revealOne = /^As ~ enters, you may reveal an? ([A-Z][a-z]+) card from your hand\. If you do or if you control an? ([A-Z][a-z]+), ~ enters with a \+1\/\+1 counter on it\.$/.exec(line);
+    if (revealOne) {
+      if (out.amplify || revealOne[1] !== revealOne[2] || !CREATURE_TYPES.has(revealOne[1]!)) out.unsupported.push(raw);
+      else {
+        [out.amplify, out.amplifyFilter] = [1, { kind: "card", subtypes: [revealOne[1]!], text: `${revealOne[1]} card` }];
+        out.amplifyOne = { orControl: { kind: "object", subtypes: [revealOne[2]!], controller: "you", text: `${revealOne[2]} you control` } };
+      }
+      continue;
+    }
     // "As ~ enters, pay any amount of life." (Minion of the Wastes; CR 614.12, 119.4), with Nameless Race's "The amount you
     // pay can't be more than the total number of white nontoken permanents your opponents control plus the total number of
     // white cards in their graveyards."
@@ -1627,6 +1638,13 @@ export function compile(d: CardDef): CompiledCard {
     // "As an additional cost to cast this spell, you may blight 1", "you may behold a Dragon" (CR 601.2b, 701.68a,
     // 701.4a): an optional additional cost, chosen and paid like a kicker cost with no mana (CompiledCard.kicker.optional),
     // which isn't kicker for other cards. Not with no creature to blight (CR 701.68b) or nothing to behold.
+    // Undergrowth: "As an additional cost to cast this spell, you may pay {2}{R}": the same with mana, paid like a kicker cost.
+    const mayPay = /^As an additional cost to cast ~, you may pay ((?:\{[^}]+\})+)\.$/.exec(line);
+    if (mayPay) {
+      if (out.kicker || !plainMana(mayPay[1]!)) out.unsupported.push(raw);
+      else out.kicker = { costs: [mayPay[1]!], text: `pay ${mayPay[1]}`, optional: true };
+      continue;
+    }
     const mayCost = /^As an additional cost to cast ~, you may (blight \d+|behold an? [A-Z][a-z]+(?: creature)?)\.$/.exec(line);
     if (mayCost) {
       const cost = parseAdditionalCost(mayCost[1]!);
@@ -2791,6 +2809,16 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Lo and Li, Royal Advisors: "Whenever an opponent discards a card or mills one or more cards, ...": two events, each
+    // its own trigger (a discard is one card, CR 701.9a; a mill, all the cards that player milled at once, CR 701.17a).
+    const discardOrMill = /^Whenever an opponent discards a card or mills one or more cards, (.+)$/.exec(line);
+    if (discardOrMill && !/\b(?:that card|those cards|that player|they|them)\b/.test(discardOrMill[1]!)) {
+      const halves = [`Whenever an opponent discards a card, ${discardOrMill[1]}`, `Whenever an opponent mills one or more cards, ${discardOrMill[1]}`].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push(t as TriggeredAbility);
+        continue;
+      }
+    }
     // Unbound Flourishing: two events, each its own trigger; "if that spell's mana cost or that ability's activation cost
     // contains {X}" can't change after it's cast or activated, so it's checked as it triggers (CR 603.4).
     if (line === "Whenever you cast an instant or sorcery spell or activate an ability, if that spell's mana cost or that ability's activation cost contains {X}, copy that spell or ability. You may choose new targets for the copy.") {
@@ -3140,6 +3168,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Your opponents can't search libraries.") {
       out.opponentsCantSearch = true;
+      continue;
+    }
+    if (line === "Players can't search libraries.") {
+      out.playersCantSearch = true;
       continue;
     }
     if (line === "You control your opponents while they're searching their libraries.") {

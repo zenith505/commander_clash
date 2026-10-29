@@ -305,7 +305,7 @@ export type Count =
   | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
-  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true }
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec; /** "Spells they've cast this turn": the trigger's player's (Rug of Smothering). */ eventPlayer?: true; /** "Each other instant and sorcery spell you've cast this turn" (Lock and Load): not the resolving spell's own cast. */ other?: true; /** "From anywhere other than your hand" (Surge of Brilliance, paradox): cast from another zone, or a cast copy. */ notFromHand?: true; /** "Spells cast this turn" (Storm Entity): every player's. */ anyone?: true; /** Not the cast of the source itself (its GameObject.castNth), whatever is resolving. */ notSource?: true; /** "Each spell you've cast this turn other than the first" (Outlaw Stitcher): one fewer, never less than 0. */ beyondFirst?: true }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -4531,7 +4531,7 @@ export interface TriggeredAbility {
   damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true; /** "If any of that damage was dealt by a Warrior" (Mindblade Render): anyone's, not only yours (rulings). */ anyController?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
-  /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource" and "selfDealsDamage": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling). */
+  /** For "sourceYouControlDamagesOpponent", "opponentDealtDamageBySource", "selfDealsDamage" and "selfDealsDamageToPlayer": "deals 5 or more damage" at once (Dragonborn Champion, Spinneret and Spiderling, Deus of Calamity). */
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;
@@ -4571,7 +4571,7 @@ export interface TriggeredAbility {
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without
    * either, it sees itself enter if it matches (CR 603.6a).
    */
-  enters?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "Whenever an Aura you control enters, if you cast it" (Light-Paws): it entered from the stack as a resolving permanent spell, not a copy (an intervening if, CR 603.4; a permanent spell enters under its caster's control, CR 608.3). */ ifCast?: true };
+  enters?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "Whenever an Aura you control enters, if you cast it" (Light-Paws): it entered from the stack as a resolving permanent spell, not a copy (an intervening if, CR 603.4; a permanent spell enters under its caster's control, CR 608.3). */ ifCast?: true; /** With `ifCast`: "if you cast it from anywhere other than your hand" (Alex Wilder, Runaway). */ notFromHand?: true };
   /**
    * For "permanentDies": what has to die, as it last existed. `attached`: the creature this Aura or
    * Equipment is attached to; `damagedBySelf`: "a creature dealt damage by ~ this turn".
@@ -4839,6 +4839,8 @@ export interface ActivatedAbility {
   keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu" | "Craft" | "Forecast";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
+  /** "Activate no more times each turn than the number of snow Swamps you control" (Withering Wisps, CR 602.5b). */
+  maxPerTurnCount?: AmountExpr;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
   xMin?: number;
   /**
@@ -5616,6 +5618,12 @@ export interface CompiledCard {
    */
   amplifyFilter?: TargetSpec;
   /**
+   * Dragon's Disciple: "As ~ enters, you may reveal a Dragon card from your hand. If you do or if you control a Dragon, ~
+   * enters with a +1/+1 counter on it.": amplify's choice of at most one card (`amplifyFilter`), and one counter if one
+   * is revealed or you control a permanent like `orControl` as it would enter (CR 614.12; no reveal asked for then).
+   */
+  amplifyOne?: { orControl: TargetSpec };
+  /**
    * Devour N (CR 702.82a, c): "As this object enters, you may sacrifice any number of [creatures]. This permanent
    * enters with N +1/+1 counters on it for each [one] sacrificed this way." `n: "devoured"`: Thromok's "Devour X,
    * where X is the number of creatures devoured this way".
@@ -5905,6 +5913,8 @@ export interface CompiledCard {
    * still happens, but not after a "may" they can't choose (rulings).
    */
   opponentsCantSearch?: true;
+  /** Mindlock Orb: "Players can't search libraries." Stranglehold's rule for every player, its controller too. */
+  playersCantSearch?: true;
   /**
    * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
    * instead of into your graveyard." (CR 614.1a). Never a discard as a cost (rulings).

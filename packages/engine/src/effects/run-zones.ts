@@ -322,8 +322,8 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     }
     const cards = p.lost ? [] : p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && isPermanentCard(defOf(s, obj(s, id))));
     const max = Math.min(e.n, cards.length);
-    // Nothing to choose between: those are the ones.
-    if (!e.upTo && cards.length <= e.n) {
+    // Nothing to choose between: those are the ones (none at all, for a "may" with nothing there).
+    if ((!e.upTo && cards.length <= e.n) || !cards.length) {
       yp.picked[pid] = cards;
       yp.queue.shift();
       continue;
@@ -2204,7 +2204,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "chooseFromGraveyard": {
-      if (e.who?.ref === "eachPlayer") return eachFromGraveyard(s, e, ctx, src);
+      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent") return eachFromGraveyard(s, e, ctx, src);
       if (e.fromExile) {
         // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
         // Oblivion Sower: that player's face-up land cards in exile, onto the battlefield under your control.

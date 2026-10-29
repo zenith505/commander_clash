@@ -958,6 +958,28 @@ line blocks.
    Plasma Caster ("target creature that's blocking equipped creature"); Curie, Emergent Intelligence (base power and a
    copy with an extra ability); Spry and Mighty (the difference between two chosen creatures' powers); Eventide's Shadow
    (remove any number of counters from among permanents).
+   Round 212 took fresh cards from ranks 5,600 to 13,300: "manifest dread, then put ... counters on that creature"
+   (Underwater Tunnel // Slimy Aquarium, Moldering Gym // Weight Room, Experimental Lab) and "turn that creature face up
+   or put a +1/+1 counter on it" (Staff Room); "each player with exactly 13 life loses the game" (Triskaidekaphobia);
+   "enchanted by exactly one Aura ... base power and toughness 3/3" (Timber Paladin); "as long as ~'s power is even /
+   odd, you may cast noncreature / creature spells as though they had flash" (Kianne); "if you would scry, draw that
+   many cards instead" (Eligeth); "your opponents can't ... activate planeswalkers' loyalty abilities this turn" (Revel
+   in Silence); "counter up to four target spells and/or abilities" (Katara's Reversal); "equip Knight {0}" granted (Syr
+   Gwyn; a granted "Equip Knight" ability used to compile as nothing); Jaya Ballard's emblem; "sacrifices a creature
+   unless they discard a card" (The Long Reach of Night) and "creature cards in defending player's graveyard"; "you may
+   put a permanent card from among them onto the battlefield" (Mole Module); "Blitz—{2}{B}{B}, Pay 2 life" / "Discard a
+   card" and casting from the graveyard with its blitz ability, with browser tests (Tenacious Underdog, Sabin);
+   "Blood tokens / Clues / noncreature, non-Equipment artifacts you control are Equipment ... and equip {2}" (Arterial
+   Alchemy, Armed with Proof, Dan Lewis) and "artifacts you control are Clues / Foods in addition to their other types"
+   (Senator Peacock, Ragost, Gourmand's Talent); "{B}, Reveal this card from your hand" with prey counters, with a
+   browser test (Tetzimoc); "you may exile it. You may play that card from exile this turn" (Norin); "each opponent's
+   maximum hand size is equal to seven minus the number of those card types" (Winter, Misanthropic Guide). +24 (27,761
+   of 31,936 with round 211).
+   Out after round 212 (looked at, not done): Sheltering Ancient (cumulative upkeep putting a counter on an opponent's
+   creature); Power Sink ("tap all lands with mana abilities"); Zilortha (lethal damage by power everywhere); Ravenous
+   Slime (a die replacement); Astral Drift and Paranormal Analyst ("whenever you manifest dread" and cycling triggers);
+   Rowan, Scion of War; Aven Courier; Galactus. Eligeth with Kenessos: Kenessos's "scry one more" applies first (draws
+   n+1), not the controller's choice of order (CR 616.1).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -1456,7 +1478,7 @@ line blocks.
      Dungeon Crawler, Ellywick's "differently named dungeon" count.
    - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
      card), White Plume Adventurer ("untap a creature you control").
-   - Punishers still out: "sacrifices a permanent unless they discard" (Possessed Portal), "another nonland permanent" (Torment of Venom),
+   - Punishers still out: Possessed Portal (its punisher parses since round 212; its draw replacement doesn't), "another nonland permanent" (Torment of Venom),
      "that many permanents" (Archfiend of Spite), "any number of times" (Forbidden Ritual). Rottenmouth Viper's
      trigger works; its "sacrifice any number of nonland permanents, costs {1} less for each" additional cost doesn't
      (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless

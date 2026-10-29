@@ -1944,7 +1944,8 @@ export interface TurnRule {
    * "seeHexproof": Detection Tower's "your opponents and creatures your opponents control with hexproof can be the targets
    * of spells and abilities you control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too).
    */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof";
+  /** "noLoyalty": Revel in Silence's "your opponents can't ... activate planeswalkers' loyalty abilities this turn" (CR 606.3). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof" | "noLoyalty";
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
   byColors?: Color[];
 }
@@ -2205,6 +2206,7 @@ export interface Resolving {
     forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
+    scryDrew?: true; // Eligeth: the scry became a draw, which may have stopped for dredge
     /** Elder Brain: the hand was exiled (a draw after it that stopped for dredge is finished by the answer). */
     handExiled?: true;
     digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)

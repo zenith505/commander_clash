@@ -581,8 +581,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = m[1] ? parseTargetPhrase(`${m[1].trim()} card from a graveyard`, { chosen: true }) : { kind: "card" as const, types: [], notTypes: [], notColors: [], text: "card" };
     return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${m[1] ?? ""}card that was put there from the battlefield this turn` } }) : null;
   }
-  // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
-  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|target opponent's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
+  // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's. "Creature cards in defending player's
+  // graveyard" (Animus of Night's Reach): the player its attack trigger is about.
+  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|target opponent's|their|your opponents'|the chosen player's|defending player's) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);
     if (!who) return null;
     const kinds = m[1]!.trim().replace(/ and /g, " or ");

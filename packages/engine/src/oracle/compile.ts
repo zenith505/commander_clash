@@ -1871,6 +1871,18 @@ export function compile(d: CardDef): CompiledCard {
       (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${permYard[2]} cards` }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
+    // Jaya Ballard's emblem: "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be
+    // put into your graveyard, exile it instead." Any number, paying their costs and following the usual timing rules; a
+    // spell cast this way that's countered goes to exile too (CR 614.1a), one that leaves the stack another way doesn't.
+    if (line === "You may cast instant and sorcery spells from your graveyard. If a spell cast this way would be put into your graveyard, exile it instead.") {
+      const f = parseTargetPhrase("instant or sorcery card from a graveyard");
+      if (f?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...rest } = f;
+        (out.graveyardGrants ??= []).push({ filter: { ...rest, text: "instant and sorcery cards" }, way: { kind: "permission", costs: [], exile: false, exileIfToGraveyard: true } });
+      }
+      continue;
+    }
     // The Necrobloom: "Land cards in your graveyard have dredge 2." (CR 702.52a): those cards have the keyword while it
     // applies, so they can replace their owner's draws.
     const dredgeGrant = /^(.+?) cards? in your graveyard (?:has|have) dredge (\d+)\.$/.exec(line);
@@ -2166,6 +2178,10 @@ export function compile(d: CardDef): CompiledCard {
     // player who looks can put each of them back on top in the same order, so they're always looked at here.
     if (line === "If you would scry a number of cards, scry that many cards plus one instead.") {
       out.scryMore = (out.scryMore ?? 0) + 1;
+      continue;
+    }
+    if (line === "If you would scry a number of cards, draw that many cards instead.") {
+      out.scryToDraw = true;
       continue;
     }
     const surveilMore = new RegExp(`^You may look at an additional ${NUM} cards each time you surveil\\.$`).exec(line);
@@ -2796,6 +2812,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
       continue;
     }
+    // Winter, Misanthropic Guide: "Delirium — As long as there are four or more card types among cards in your graveyard,
+    // each opponent's maximum hand size is equal to seven minus the number of those card types" (CR 402.2, 205.2a).
+    if (/^(?:Delirium — )?As long as there are four or more card types among cards in your graveyard, each opponent's maximum hand size is equal to seven minus the number of those card types\.$/.test(line)) {
+      (out.handSize ??= []).push({ who: "opponents", set: 7, minus: { count: { kind: "graveyardCardTypes", who: { ref: "you" } } }, if: { kind: "graveyardTypes", n: 4 } });
+      continue;
+    }
     if (/^Players have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = "all";
       continue;
@@ -2862,6 +2884,15 @@ export function compile(d: CardDef): CompiledCard {
     const flashCond = flashWhile ? parseStaticCondition(flashWhile[1]!, { affects: { kind: "self" }, mods: [], text: line }) : null;
     if (flashCond) {
       (out.flashWhile ??= []).push(flashCond);
+      continue;
+    }
+    // Kianne, Corrupted Memory: "As long as ~'s power is even, you may cast noncreature spells as though they had flash":
+    // those spells, while the condition holds as the spell is proposed (CR 702.8a, 601.2).
+    const flashForWhile = /^As long as ([^,]+), you may cast ((?:non)?creature) spells as though they had flash\.$/.exec(line);
+    const ffwCond = flashForWhile ? parseStaticCondition(flashForWhile[1]!, { affects: { kind: "self" }, mods: [], text: line }) : null;
+    const ffwSpec = flashForWhile ? parseTargetPhrase(`${flashForWhile[2]} spell`) : null;
+    if (ffwCond && ffwSpec?.kind === "spell" && !ffwSpec.controller) {
+      (out.flashForWhile ??= []).push({ filter: { ...ffwSpec, text: `${flashForWhile![2]} spells` }, condition: ffwCond });
       continue;
     }
     // "Any player may cast Sliver spells as though they had flash" (Quick Sliver), "... spells ..." (Tidal Barracuda): every

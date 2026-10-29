@@ -296,6 +296,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // The Long Reach of Night: "Each opponent sacrifices a creature of their choice unless they discard a card": each
+  // chooses in APNAP order (a punisher); one with no card in hand can't choose to discard.
+  if ((m = /^(.+?) sacrifices? an? ([a-z]+) of their choice unless (?:they|that player) discards? a card$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[2]!);
+    if (!who || who.ref === "you" || filter?.kind !== "object") return null;
+    return [{ type: "punisher", who, options: [{ discard: 1 }], effects: [{ type: "pick", who: { ref: "punished" }, filter, n: 1, action: "sacrifice" }], penalty: `Sacrifice a ${m[2]}` }];
+  }
   // Rhystic Syphon: "Unless target player pays {3}, that player loses 5 life and you gain 5 life": that player decides as
   // it resolves (CR 608.2d); the rest happens only if they don't pay.
   if ((m = /^Unless (target player|target opponent) (pays (?:\{[^}]+\})+), that player (loses \d+ life) and (you gain \d+ life)$/.exec(s))) {
@@ -1125,6 +1133,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // until the turn ends, which wins over anything that says they can (CR 101.2).
   // "Players can't cast creature or planeswalker spells until the end of your next turn" (Single Combat): until the end
   // of this effect's controller's next turn.
+  // Revel in Silence: "Your opponents can't cast spells or activate planeswalkers' loyalty abilities this turn" (CR 606.3).
+  if (/^Your opponents can't cast spells or activate planeswalkers' loyalty abilities this turn$/.test(s)) return [{ type: "cantCast", who: { ref: "eachOpponent" } }, { type: "turnRules", rules: ["noLoyalty"], opponents: true }];
   if ((m = /^(.+?) can't cast (?:(noncreature|creature|instant|sorcery|artifact|creature or planeswalker) )?spells (this turn|until the end of your next turn)$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null = w === "players" ? { ref: "eachPlayer" } : w === "your opponents" ? { ref: "eachOpponent" } : w === "players dealt damage this way" ? { ref: "damagedThisWay" } : parsePlayer(w, ctx);

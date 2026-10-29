@@ -58,6 +58,9 @@ export function parseGraveyardKeyword(
   // "You may cast this card from your graveyard using its warp ability" (Timeline Culler): a permission to cast it from
   // there only for its warp cost (CR 702.185a), so it's exiled at the next end step and may be cast from exile later.
   if (/^You may cast (?:~|this card) from your graveyard using its warp ability\.?$/.test(line)) return /^Warp—/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "warp" } } : "fail";
+  // "You may cast this card from your graveyard using its blitz ability" (Tenacious Underdog): the same, for its blitz cost
+  // (CR 702.152a); a blitzed creature is sacrificed at the next end step, so it may be cast this way again.
+  if (/^You may cast (?:~|this card) from your graveyard using its blitz ability\.?$/.test(line)) return /^Blitz[— ]/m.test(d.oracleText) ? { fromGraveyard: { kind: "permission", costs: [], exile: false, alt: "blitz" } } : "fail";
   if (/^You may cast (?:~|this card) from your graveyard or from exile\.?$/.test(line)) return { fromExile: true, fromGraveyard: { kind: "permission", costs: [], exile: false } };
   if ((m = /^You may cast (?:~|this card|this creature) from your graveyard(?: (?:as long as|if) (.+?))?(?: by (.+?) in addition to paying its other costs)?$/.exec(line.replace(/\.$/, "")))) {
     const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
@@ -339,6 +342,13 @@ export function parseCostKeyword(
     const cost = parseAdditionalCost(m[2]!);
     if (!plainMana(m[1]!) || cost?.kind !== "payLife" || !d.types.some((ty) => ["Creature", "Artifact", "Enchantment", "Planeswalker", "Battle"].includes(ty))) return "fail";
     return { alt: { kind: "warp", mana: m[1]!, costs: [cost], text: m[2]!.replace(/^P/, "p") } };
+  }
+  // "Blitz—{2}{B}{B}, Pay 2 life." (Tenacious Underdog), "Blitz—{2}{R}{R}, Discard a card." (Sabin, Master Monk): the
+  // life or the discard is part of the blitz cost, paid with its mana (CR 702.152a, 118.9, 601.2h).
+  if ((m = /^Blitz—((?:\{[^}]+\})+), (Pay \d+ life|Discard a card)\.?$/.exec(line))) {
+    const cost = parseAdditionalCost(m[2]!);
+    if (!plainMana(m[1]!) || (cost?.kind !== "payLife" && cost?.kind !== "discard") || !d.types.includes("Creature")) return "fail";
+    return { alt: { kind: "blitz", mana: m[1]!, costs: [cost], text: m[2]!.replace(/^[PD]/, (c) => c.toLowerCase()) } };
   }
   if ((m = /^(Blitz|Warp)(?: |—)(.+?)\.?$/.exec(line))) {
     const mana = m[2]!;

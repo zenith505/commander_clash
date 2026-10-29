@@ -678,6 +678,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "opponentsWithPoison":
       return opponents(s, ctx.controller).filter((p) => (player(s, p).poison ?? 0) >= ref.n);
+    case "playersWithLife":
+      return livingPlayers(s).filter((p) => player(s, p).life === ref.n);
     case "opponentsEmptyHanded":
       return opponents(s, ctx.controller).filter((p) => !player(s, p).hand.length);
     case "opponentsCombatDamagedByName": {

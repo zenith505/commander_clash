@@ -451,8 +451,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).
   const putFromHand = effectText === "Put ~ from your hand onto the battlefield.";
   // Forecast: revealing the card is its cost, and the card stays in its owner's hand (CR 702.57b); only with the keyword.
+  // Tetzimoc, Primal Death: "{B}, Reveal ~ from your hand: ..." without the keyword: from its owner's hand only, as often
+  // as its other costs can be paid (CR 113.6k, 602.2b).
   const forecast = keyword === "Forecast";
-  if (forecast !== costs.split(", ").includes("Reveal ~ from your hand") || (forecast && (tap || untapSelf || /~/.test(costs.replace("Reveal ~ from your hand", "")) || putFromHand || inYard))) return "fail";
+  const revealHand = costs.split(", ").includes("Reveal ~ from your hand");
+  if ((forecast && !revealHand) || (revealHand && (tap || untapSelf || /~/.test(costs.replace("Reveal ~ from your hand", "")) || putFromHand || inYard))) return "fail";
   // Derevi: "{1}{G}{W}{U}: Put ~ onto the battlefield from the command zone": it works only from the command zone (CR
   // 113.6k, rulings); it isn't cast, so no commander tax.
   const putFromCommand = effectText === "Put ~ onto the battlefield from the command zone.";
@@ -538,7 +541,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(bottomOwn ? { returnSelf: true as const, toLibraryBottom: true as const } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(exileFromHand ? { zone: "hand" as const, exileSelf: true } : {}),
-    ...(putFromHand || forecast ? { zone: "hand" as const } : {}),
+    ...(putFromHand || revealHand ? { zone: "hand" as const } : {}),
     ...(putFromCommand ? { zone: "command" as const } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(onceEver ? { onceEver: true as const } : {}),

@@ -38,6 +38,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(fu[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "turnFaceUp", what }] : null;
   }
+  // Staff Room: "turn that creature face up or put a +1/+1 counter on it", its controller's choice as it resolves (CR
+  // 608.2d). A face-down instant or sorcery card can't be turned face up (rulings), so that option does nothing then.
+  if ((fu = /^[Tt]urn (that creature) face up or (put an? \+1\/\+1 counter on it)$/.exec(s)) && ctx.subject) {
+    const what = parseObject(fu[1]!, ctx);
+    const put = what?.ref === "subject" ? parseSentence(fu[2]!.replace(/^p/, "P"), ctx) : null;
+    return put ? [{ type: "either", options: [[{ type: "turnFaceUp", what: what! }], put], labels: ["Turn it face up", "Put a +1/+1 counter on it"] }] : null;
+  }
   if ((fu = /^[Tt]urn an? (face-down (?:creature|permanent) you control) face up$/.exec(s))) {
     const filter = parseTargetPhrase(fu[1]!);
     return filter?.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, text: fu[1]! }, n: 1, action: "choose" }, { type: "turnFaceUp", what: { ref: "created" } }] : null;

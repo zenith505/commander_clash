@@ -1,8 +1,8 @@
 # Roadmap
 
-27,452 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,063 of
-9,979 (90%).
+27,472 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,081 of
+9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -810,7 +810,7 @@ line blocks.
    Thief, Boss Uramon, Mordor Trebuchet), granted renown and "a renowned creature" (CR 702.112: Aragorn, Hornburg Hero),
    "creatures you control with base power 0 ... equal to the damage dealt" (Primo, the Unbounded). Fixed: Fire Navy
    Trebuchet's token got "Ballistic Boulder that's tapped and attacking" as its name and entered untapped. No new prompts.
-   +21, 20 of them legal (27,314 of 31,936).
+   +21, 20 of them legal (27,472 of 31,936 with rounds 202 to 204 and Lane B rounds B27 to B34).
    Out after round 205 (looked at, not done): Brimaz, Blight of Oreskos (which spells it means), Osgir, the Reconstructor
    (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (granting demonstrate), Chandra, Dressed to Kill
    (a loyalty ability that adds mana, an emblem counting mana spent), Sigurd, Jarl of Ravensthorpe ("whenever you put a

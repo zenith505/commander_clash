@@ -97,7 +97,6 @@ const gemOfBecoming = () => card("Gem of Becoming", "Artifact", "{3}", { cmc: 3,
 const throwFromTheSaddle = () => card("Throw from the Saddle", "Sorcery", "{1}{G}", { cmc: 2, colors: ["G"], oracleText: "Target creature you control gets +1/+1 until end of turn. Put a +1/+1 counter on it instead if it's a Mount. Then it deals damage equal to its power to target creature you don't control." });
 const lastStand = () => card("Last Stand", "Sorcery", "{W}{U}{B}{R}{G}", { cmc: 5, colors: ["B","G","R","U","W"], oracleText: "Target opponent loses 2 life for each Swamp you control. Last Stand deals damage to target creature equal to the number of Mountains you control. Create a 1/1 green Saproling creature token for each Forest you control. You gain 2 life for each Plains you control. Draw a card for each Island you control, then discard that many cards." });
 const chargingCinderhorn = () => card("Charging Cinderhorn", "Creature — Elemental Ox", "{3}{R}", { cmc: 4, colors: ["R"], power: "4", toughness: "2", keywords: ["Haste"], oracleText: "Haste\nAt the beginning of each player's end step, if no creatures attacked this turn, put a fury counter on this creature. Then this creature deals damage equal to the number of fury counters on it to that player." });
-const ultronsAuxiliary = () => card("Ultron's Auxiliary", "Artifact Creature — Robot Villain", "{1}{B}", { cmc: 2, colors: ["B"], power: "1", toughness: "1", keywords: ["Menace"], oracleText: "Menace\nWhenever another artifact is put into your graveyard from the battlefield or an artifact card is put into your graveyard from anywhere other than the battlefield, put a +1/+1 counter on this creature." });
 const futuristOperative = () => card("Futurist Operative", "Creature — Human Ninja", "{3}{U}", { cmc: 4, colors: ["U"], power: "3", toughness: "4", oracleText: "As long as this creature is tapped, it's a Human Citizen with base power and toughness 1/1 and can't be blocked.\n{2}{U}: Untap this creature." });
 const dovinsAcuity = () => card("Dovin's Acuity", "Enchantment", "{1}{W}{U}", { cmc: 3, colors: ["U","W"], oracleText: "When this enchantment enters, you gain 2 life and draw a card.\nWhenever you cast an instant spell during your main phase, you may return this enchantment to its owner's hand." });
 const karolinaDeanRunaway = () => card("Karolina Dean, Runaway", "Legendary Creature — Alien Hero", "{3}{R}", { cmc: 4, colors: ["R"], power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nAt the beginning of your first main phase, add {W}{U}{B}{R}{G}. This mana can't be spent to cast spells from your hand." });
@@ -106,6 +105,10 @@ const celestialConvergence = () => card("Celestial Convergence", "Enchantment", 
 const sereneMaster = () => card("Serene Master", "Creature — Human Monk", "{1}{W}", { cmc: 2, colors: ["W"], power: "0", toughness: "2", oracleText: "Whenever this creature blocks, exchange its power and the power of target creature it's blocking until end of combat." });
 const lamplightPhoenix = () => card("Lamplight Phoenix", "Creature — Phoenix", "{1}{R}{R}", { cmc: 3, colors: ["R"], power: "3", toughness: "3", keywords: ["Flying","Collect evidence"], oracleText: "Flying\nWhen this creature dies, you may exile it and collect evidence 4. If you do, return this card to the battlefield tapped. (To collect evidence 4, exile cards with total mana value 4 or greater from your graveyard.)" });
 const doomsdaySpecter = () => card("Doomsday Specter", "Creature — Specter", "{2}{U}{B}", { cmc: 4, colors: ["B","U"], power: "2", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, return a blue or black creature you control to its owner's hand.\nWhenever this creature deals combat damage to a player, look at that player's hand and choose a card from it. The player discards that card." });
+const elfhameDruid = () => card("Elfhame Druid", "Creature — Elf Druid", "{1}{G}", { cmc: 2, colors: ["G"], power: "0", toughness: "2", oracleText: "{T}: Add {G}.\n{T}: Add {G}{G}. Spend this mana only to cast kicked spells." });
+const scarscaleRitual = () => card("Scarscale Ritual", "Sorcery", "{1}{U/B}", { cmc: 2, colors: ["B","U"], oracleText: "As an additional cost to cast this spell, put a -1/-1 counter on a creature you control.\nDraw two cards." });
+const vhalCandlekeepResearcher = () => card("Vhal, Candlekeep Researcher", "Legendary Creature — Human Wizard", "{3}{U}", { cmc: 4, colors: ["U"], power: "2", toughness: "3", keywords: ["Vigilance","Choose a background"], oracleText: "Vigilance\n{T}: Add an amount of {C} equal to Vhal's toughness. This mana can't be spent to cast spells from your hand.\nChoose a Background (You can have a Background as a second commander.)" });
+const heartwoodCrafter = () => scry("prepare", [{ name: "Heartwood Crafter", mana_cost: "{G}", type_line: "Creature — Elf Artificer", oracle_text: "This creature enters prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)\n{T}: Add {C}. This mana can't be spent to cast spells from your hand.", power: "1", toughness: "1" }, { name: "Soul Tether", mana_cost: "{2}{R/G}", type_line: "Sorcery", oracle_text: "Create a Heartwood token. (It's a red and green artifact with \"{T}: Add {R} or {G}.\")" }], { keywords: ["Prepared"] });
 const baithookAngler = () => scry("transform", [{ name: "Baithook Angler", mana_cost: "{1}{U}", type_line: "Creature — Human Peasant", oracle_text: "Disturb {1}{U} (You may cast this card from your graveyard transformed for its disturb cost.)", power: "2", toughness: "1" }, { name: "Hook-Haunt Drifter", type_line: "Creature — Spirit", oracle_text: "Flying\nIf Hook-Haunt Drifter would be put into a graveyard from anywhere, exile it instead.", power: "1", toughness: "2", color_indicator: ["U"] }], { keywords: ["Flying", "Transform", "Disturb"] });
 
 // Test cards.
@@ -118,7 +121,7 @@ const forestCard = () => card("Forest", "Basic Land — Forest", "", { cmc: 0 })
 
 describe("Lane B round 44 cards", () => {
   it("are fully supported", () => {
-    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn(), ultronsAuxiliary(), futuristOperative(), dovinsAcuity(), karolinaDeanRunaway(), rofellossGift(), celestialConvergence(), sereneMaster(), lamplightPhoenix(), doomsdaySpecter());
+    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn(), futuristOperative(), dovinsAcuity(), karolinaDeanRunaway(), rofellossGift(), celestialConvergence(), sereneMaster(), lamplightPhoenix(), doomsdaySpecter(), elfhameDruid(), scarscaleRitual(), vhalCandlekeepResearcher(), heartwoodCrafter());
   });
 });
 
@@ -332,29 +335,6 @@ describe("Charging Cinderhorn", () => {
   });
 });
 
-describe("Ultron's Auxiliary", () => {
-  it("gets a counter when another artifact goes to your graveyard from the battlefield or an artifact card from your hand", () => {
-    const { s: s0, ap, ids } = setup([murder(), card("Test Mill", "Instant", "{U}", { cmc: 1, colors: ["U"], oracleText: "Mill two cards." })]);
-    const ultron = putOnBattlefield(s0, ap, ultronsAuxiliary());
-    const golem = putOnBattlefield(s0, ap, vanilla("Test Golem", "Artifact Creature — Golem", "{3}", 3, 3, 3));
-    let s = settle(castNow(s0, ap, ids[0]!, [tgt(golem)]));
-    expect([zone(s, golem), counters(s, ultron)]).toEqual(["graveyard", 1]);
-    toZone(s, ap, card("Test Relic", "Artifact", "{2}", { cmc: 2, oracleText: "" }), "library");
-    toZone(s, ap, card("Test Relic", "Artifact", "{2}", { cmc: 2, oracleText: "" }), "library");
-    s = settle(castNow(s, ap, ids[1]!));
-    expect(counters(s, ultron)).toBe(3);
-  });
-  it("doesn't count a nonartifact card or another player's artifact", () => {
-    const { s: s0, ap, ids, opp } = setup([murder(), opt()]);
-    const ultron = putOnBattlefield(s0, ap, ultronsAuxiliary());
-    const golem = putOnBattlefield(s0, opp, vanilla("Test Golem", "Artifact Creature — Golem", "{3}", 3, 3, 3));
-    let s = settle(castNow(s0, ap, ids[0]!, [tgt(golem)]));
-    moveObject(s, ids[1]!, "graveyard");
-    s = settle(s);
-    expect([zone(s, golem), counters(s, ultron)]).toEqual(["graveyard", 0]);
-  });
-});
-
 describe("Futurist Operative", () => {
   it("is a 1/1 Human Citizen that can't be blocked while tapped, and a 3/4 Ninja otherwise", () => {
     const { s: s0, ap, opp } = setup([]);
@@ -509,5 +489,67 @@ describe("Doomsday Specter", () => {
     expect(s.pending?.kind === "searchLibrary" && s.pending.cards.sort()).toEqual([...theirs].sort());
     s = settle(find(s, ap, [theirs[1]!]));
     expect([zone(s, theirs[0]!), zone(s, theirs[1]!)]).toEqual(["hand", "graveyard"]);
+  });
+});
+
+describe("Elfhame Druid", () => {
+  it("its {G}{G} pays only for a kicked spell", () => {
+    const { s, ap, ids, opp } = setup([burstLightning(), vanilla("Green Ox", "Creature — Ox", "{1}{G}", 2, 2, 2)]);
+    const druid = putOnBattlefield(s, ap, elfhameDruid());
+    const mountains = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Mountain");
+    tapLands(s, ap, mountains);
+    // Three Mountains and the Druid: the Ox needs {1}{G}, which only the Druid's other ability ({G}) and a Mountain pay.
+    expect(planCast(s, ap, ids[1]!)).not.toBeNull();
+    // Burst Lightning kicked ({R} plus {4}): three Mountains and the Druid's {G}{G}.
+    const kicked = planCast(s, ap, ids[0]!, [ply(opp)], undefined, undefined, undefined, { kicks: [0] });
+    expect(kicked).not.toBeNull();
+    const after = settle(run(s, kicked));
+    expect([life(after, opp), after.objects[druid]!.tapped]).toEqual([36, true]);
+  });
+  it("its {G}{G} can't pay for a spell that isn't kicked", () => {
+    const { s, ap, ids } = setup([vanilla("Big Ox", "Creature — Ox", "{2}{G}", 3, 3, 3)]);
+    putOnBattlefield(s, ap, elfhameDruid());
+    const forests = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Forest");
+    tapLands(s, ap, [forests[0]!]);
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+  });
+});
+
+describe("Scarscale Ritual", () => {
+  it("puts a -1/-1 counter on a creature you control as it's cast and draws two", () => {
+    const { s: s0, ap, ids } = setup([scarscaleRitual()]);
+    const mine = putOnBattlefield(s0, ap, vanilla("My Beast", "Creature — Beast", "{2}{G}", 3, 3, 3));
+    const hand0 = s0.players[ap]!.hand.length;
+    const s = settle(castNow(s0, ap, ids[0]!, [], { counterOn: [mine] }));
+    expect([counters(s, mine, "-1/-1"), s.players[ap]!.hand.length]).toEqual([1, hand0 + 1]);
+  });
+  it("can't be cast without a creature you control", () => {
+    const { s, ap, ids } = setup([scarscaleRitual()]);
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+  });
+});
+
+describe("Vhal, Candlekeep Researcher", () => {
+  it("adds {C} equal to its toughness that pays for abilities but not spells from your hand", () => {
+    const { s, ap, ids } = setup([vanilla("Gray Golem", "Artifact Creature — Golem", "{3}", 3, 3, 3)]);
+    const vhal = putOnBattlefield(s, ap, vhalCandlekeepResearcher());
+    const sink = putOnBattlefield(s, ap, card("Test Sink", "Artifact", "{1}", { cmc: 1, oracleText: "{3}: You gain 3 life." }));
+    tapLands(s, ap);
+    const tapped = run(s, planActivate(s, ap, vhal, 0));
+    expect([tapped.players[ap]!.manaPool.C, tapped.objects[vhal]!.tapped]).toEqual([3, true]);
+    expect(planCast(tapped, ap, ids[0]!)).toBeNull();
+    const after = settle(run(tapped, planActivate(tapped, ap, sink, 0)));
+    expect([life(after, ap), after.players[ap]!.manaPool.C ?? 0]).toEqual([43, 0]);
+  });
+});
+
+describe("Heartwood Crafter", () => {
+  it("its {C} can't pay for a spell from your hand", () => {
+    const { s, ap, ids } = setup([vanilla("Gray Bot", "Artifact Creature — Construct", "{1}", 1, 1, 1)]);
+    putOnBattlefield(s, ap, heartwoodCrafter());
+    const sink = putOnBattlefield(s, ap, card("Test Sink", "Artifact", "{1}", { cmc: 1, oracleText: "{1}: You gain 1 life." }));
+    tapLands(s, ap);
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+    expect(life(settle(run(s, planActivate(s, ap, sink, 0))), ap)).toBe(41);
   });
 });

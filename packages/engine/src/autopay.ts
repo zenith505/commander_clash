@@ -1,14 +1,14 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { MANA_ABILITY_OFFSET, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, activatedAsMana, payableActivatedMana, manaAbilityCost, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty, manaLifeTax } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, spellHow, definedX, firstArtifactLess, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, endableEffect, endEffectProblem, crewCandidates, crewPower, faceUpCost, faceUpManaCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { printedMatches } from "./effects/targeting";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
-import type { AdditionalCost, SpentReq, TargetChoice } from "./abilities";
+import type { AdditionalCost, ManaSpend, SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
@@ -75,7 +75,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
           return { id: o.id, ...x, cost: ab.manaCost ? manaAbilityCost(s, pid, o, ab.manaCost) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}), ...(ab.spendOnly?.notGeneric ? { colorOnly: true as const } : {}) };
         });
-      if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
+      if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o).filter((x) => (!x.spendOnly || spendAllows(s, pid, boundSpend(o, x.spendOnly), use)) && (!only || x.adds.every((m) => only.includes(m)))));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
       return { id: o.id, options, colors: makes.length, makes, creature: isCreature(o.id) };
     })
@@ -85,10 +85,11 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
 }
 
 /** The activated mana abilities (CR 605.1a) a payment can use, as options. */
-function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): Option[] {
+function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): (Option & { spendOnly?: ManaSpend })[] {
   return payableActivatedMana(s, pid, o).flatMap(({ ab, options, penalty }) => {
     const cost = ab.manaCost ? manaAbilityCost(s, pid, o, ab.manaCost) : null;
-    return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...x, cost, penalty, activated: true as const }));
+    const spendOnly = activatedAsMana(ab)?.spendOnly;
+    return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...x, cost, penalty, activated: true as const, ...(spendOnly ? { spendOnly, restricted: true } : {}) }));
   });
 }
 

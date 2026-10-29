@@ -10253,7 +10253,9 @@ export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; c
   if (!o.faceDown) return [];
   const ways: { kind: FaceDownKind; cost: string; costs?: AdditionalCost[]; text?: string }[] = [];
   const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
-  if (fd) ways.push(fd);
+  // Exiled Doomsayer: "All morph costs cost {2} more" (a megamorph cost is a morph cost, CR 702.37b).
+  const tax = fd && (fd.kind === "morph" || fd.kind === "megamorph") ? s.battlefield.reduce((n, id) => n + (abilitiesOf(s, s.objects[id]!).morphTax ?? 0), 0) : 0;
+  if (fd) ways.push(tax ? { ...fd, cost: moreGeneric(fd.cost, tax) } : fd);
   if (o.faceDown === "manifest" || o.faceDown === "cloak") {
     const card = realDefOf(s, o);
     if (isType(card, "Creature") && card.manaCost) ways.push({ kind: o.faceDown, cost: card.manaCost.replace(/\{X\}/g, "") || "{0}" });
@@ -10285,6 +10287,12 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way
   return null;
 }
 
+/** A mana cost with `n` more generic mana: "{1}{U}" and 2 is "{3}{U}", "" (no mana) is "{2}". */
+function moreGeneric(cost: string, n: number): string {
+  const generic = /\{(\d+)\}/.exec(cost);
+  return generic ? cost.replace(generic[0], `{${Number(generic[1]) + n}}`) : `{${n}}${cost}`;
+}
+
 /** The cost of turning a face-down permanent face up the `way`-th way, if it has one. */
 export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s, o)[way];
 
@@ -10301,7 +10309,8 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   // The whole cost is shown, then paid (CR 702.37e); the permanent is turned face up after.
   const name = defOf(s, { ...o, faceDown: undefined }).name;
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
-  else spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
+  // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
+  if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
   turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x);
   s.passedInSuccession = [];
 }

@@ -900,6 +900,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host !== "orSelf" && anyBlocker(t), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         add(o, you, (e, t) => (e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked") && t.host === "orSelf", undefined, undefined, o, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
+        // Barreling Attack: "When that creature becomes blocked this turn" (a delayed trigger, CR 603.7b).
+        for (const d of s.delayed ?? []) if (d.when === "becomesBlocked" && d.thisTurn === s.turn && d.subject.id === o.id && d.subject.zc === (o.zoneChanges ?? 0)) s.triggerQueue.push({ sourceId: o.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body });
         const bearer = isRingBearer(s, o);
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
@@ -2022,6 +2024,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Made during that step, "the next end step" or "end of combat" is a later one (CR 603.7c, 511.2).
       // "The next cleanup step": every one made before this one began, so also during an earlier cleanup step of
       // this turn (CR 514.3a).
+      // "When that creature becomes blocked this turn": only blocks trigger it, and this turn is over.
+      if (d.when === "becomesBlocked") {
+        if (d.thisTurn !== s.turn) s.delayed = s.delayed!.filter((x) => x !== d);
+        continue;
+      }
       // "That combat" never came this turn: it never will.
       if (d.when === "thatCombat" && d.turn !== s.turn) {
         s.delayed = s.delayed!.filter((x) => x !== d);

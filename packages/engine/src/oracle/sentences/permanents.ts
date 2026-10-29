@@ -316,6 +316,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // of this turn, whatever zone it goes to; ~ is this ability's source as it is now (a new object after a zone change).
   if (/^When (?:that|the) creature leaves the battlefield this turn, sacrifice ~$/.test(s) && ctx.lastObjectTarget !== undefined && !ctx.spell && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
     return [{ type: "delayed", when: "leaves", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "sacrifice", what: { ref: "self" } }], text: "sacrifice ~", thisTurn: true }];
+  // Barreling Attack: "When that creature becomes blocked this turn, it gets +1/+1 until end of turn for each creature
+  // blocking it": a delayed trigger about the target (CR 603.7), its blockers counted as it resolves (rulings).
+  if ((m = /^When that creature becomes blocked this turn, it gets ([+-]\d+)\/([+-]\d+) until end of turn for each creature blocking it$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && !ctx.targets[ctx.lastObjectTarget]?.many)
+    return [{ type: "delayed", when: "becomesBlocked", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "pumpPerBlocker", what: { ref: "subject" }, power: Number(m[1]), toughness: Number(m[2]), beyondFirst: false }], text: `it gets ${m[1]}/${m[2]} until end of turn for each creature blocking it`, thisTurn: true }];
   // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
   // the graveyard (CR 400.7, 603.7c).
   if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
@@ -778,7 +782,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = parseCount(m[2]!, ctx, true);
     return n ? [{ type: "removeCounters", what: { ref: "self" }, counter: counterKind(m[1]!), n }] : null;
   }
-  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
+  // Venarian Gold: "remove a sleep counter from that creature", the enchanted creature as it resolves.
+  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+|enchanted creature)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
@@ -1214,9 +1219,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // artifact. That token gains haste." (Cogwork Assembler), "Populate. The token created this way gains haste." (Determined
   // Iteration), "Those tokens gain haste" (Mirror March): keywords with no duration last for as long as it stays on
   // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
-  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
+  // Cocoon: "that creature gains flying", the creature it enchants (locked in as it resolves, CR 611.2c).
+  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They|Those tokens|The token created this way|Enchanted creature) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
-    const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
+    const mods = what && (what.ref === "target" || what.ref === "created" || (what.ref === "attached" && m[1] === "Enchanted creature")) ? parseChanges(m[2]!) : null;
     // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).
     if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || (x.kind === "addAbility" && what.ref === "created"))) return [{ type: "continuous", what, mods, duration: "game" }];
   }

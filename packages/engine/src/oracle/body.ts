@@ -4764,6 +4764,36 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Cocoon: "remove a pupa counter from ~. If you can't, sacrifice it, put a +1/+1 counter on enchanted creature, and
+    // that creature gains flying.": the rest only if none could be removed, "it" being ~ and "that creature" the one it
+    // enchanted, as it last existed once ~ is gone (CR 608.2h). Flying with no duration lasts indefinitely (CR 611.2a).
+    const removeOwn = /^[Rr]emove an? ([a-z]+) counter from ~$/.exec(s);
+    const cantRemove = removeOwn && /^If you can't, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (removeOwn && cantRemove) {
+      const parts = cantRemove[1]!.replace(/^sacrifice it, /, "sacrifice ~, ").split(/, (?:and )?/).map((p) => p.replace(/^that creature /, "enchanted creature "));
+      const rest: Effect[] = [];
+      for (const p of parts) {
+        const fx = parseOne(capital(p), ctx);
+        if (!fx || fx.some((e) => pauses(e))) return null;
+        rest.push(...fx);
+      }
+      effects.push({ type: "removeSelfCounter", counter: removeOwn[1]! }, { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: rest });
+      si++;
+      continue;
+    }
+    // Paroxysm: "At the beginning of the upkeep of enchanted creature's controller, that player reveals the top card of their
+    // library. If that card is a land card, destroy that creature. Otherwise, it gets +3/+3 until end of turn.": that
+    // player's library (CR 701.20a); "it" is the creature, not the card.
+    const thatReveal = /^[Tt]hat player reveals the top card of their library$/.test(s) && /^If that card is an? [a-z]+ card, /.test(sentences[si + 1] ?? "");
+    if (thatReveal) {
+      const who = parsePlayer("that player", ctx);
+      const rest = sentences.map((x, i) => (i === si + 2 ? x.replace(/^Otherwise, it gets /, "Otherwise, enchanted creature gets ") : x));
+      const r = who && parseRevealedIf(rest, si + 1, ctx);
+      if (!r) return null;
+      effects.push({ type: "revealTop", who: who! }, r.effect);
+      si = r.next - 1;
+      continue;
+    }
     // Petra Sphinx, Vexing Arcanix: "Target player chooses a card name, then reveals the top card of their library. If that
     // card has the chosen name, that player puts it into their hand. If it doesn't, the player puts it into their
     // graveyard." / "Otherwise, they put it into their graveyard and ~ deals 2 damage to them.": the target player names a
@@ -5625,6 +5655,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(capital(toxicThen[1]!), ctx);
       if (!fx?.length || ctx.targets.length !== before || fx.some((e) => mentionsTarget(e, i))) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], toxic: true, text: "with toxic" } }, effects: fx });
+      continue;
+    }
+    // Rapid Fire: "If it doesn't have rampage, that creature gains rampage 2 until end of turn.": the target as this
+    // resolves (CR 608.2c), with the abilities the effects before gave it.
+    const lacksKw = /^If (?:it|that creature) doesn't have ([a-z]+(?: [a-z]+)?), (.+)$/.exec(s);
+    const lackedKw = lacksKw && (lacksKw[1] === "rampage" ? "Rampage" : keywordOf(lacksKw[1]!));
+    if (lacksKw && lackedKw) {
+      const last = effects[effects.length - 1];
+      const i = ctx.lastObjectTarget;
+      const t = i !== undefined ? ctx.targets[i] : undefined;
+      if (i === undefined || t?.kind !== "object" || t.many || t.optional || !last || !mentionsTarget(last, i)) return null;
+      const before = ctx.targets.length;
+      const fx = parseOne(capital(lacksKw[2]!), ctx);
+      if (!fx?.length || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], notKeywords: [lackedKw], text: `without ${lacksKw[1]}` } }, effects: fx });
       continue;
     }
     // Wakandan Royal Guard: "If that creature is another Hero, ...": a Hero other than ~ (TargetSpec.notSource).
@@ -7943,6 +7988,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
+      // Spitting Slug: "you may pay {1}{G}. If you do, ~ gains first strike until end of turn. Otherwise, each creature
+      // blocking or blocked by ~ gains first strike until end of turn.": whether it was paid (CR 608.2c).
+      if (prev?.type === "may" && prev.pay && !prev.payX && !prev.payLife && !prev.otherwise && prev.effects.length && / If you do, /.test(prev.text)) {
+        const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
+        if (!inner || inner.some((e) => pauses(e))) return null;
+        prev.otherwise = inner;
+        prev.text = `${prev.text}. Otherwise, ${otherwise[1]}`;
+        continue;
+      }
       // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
       // "If your life total is greater than your starting life total, draw a card. Otherwise, you gain 2 life." (Cosmos Elixir).
       // "If you control a Demon, each opponent loses 2 life and you gain 2 life. Otherwise, you lose 2 life." (Unholy Annex).
@@ -8359,11 +8413,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       // "You may put a land card from your hand onto the battlefield. If you don't, draw a card." (Hakbal of the Surging
-      // Soul): whether a card was put.
-      if (ifDid[1] === "don't" && prev?.type === "putFromHand" && prev.may && !prev.who && !prev.any && prev.upTo === undefined && !prev.drawRepeat) {
+      // Soul): whether a card was put. Metathran Aerostat: "You may put a creature card with mana value X from your hand onto
+      // the battlefield. If you do, return ~ to its owner's hand." the same.
+      if (prev?.type === "putFromHand" && prev.may && !prev.who && !prev.any && prev.upTo === undefined && !prev.drawRepeat) {
         const inner = parseOne(capital(ifDid[2]!), ctx);
         if (!inner) return null;
-        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+        effects.push(ifDid[1] === "don't" ? { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner } : { type: "if", cond: { kind: "youDid" }, effects: inner });
+        continue;
+      }
+      const putMay = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 ? prev.effects[0] : undefined;
+      if (ifDid[1] === "do" && putMay?.type === "putFromHand" && !putMay.may && !putMay.who && !putMay.any && putMay.upTo === undefined && !putMay.drawRepeat) {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        effects[effects.length - 1] = { ...putMay, may: true };
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
         continue;
       }
       // "You may ... If you do, X. If you don't, Y." (Slicer, Hired Muscle): Y is the other branch of the same check.
@@ -8785,6 +8848,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     if (/^If you have the city's blessing, you may put that permanent on top of its owner's library instead$/.test(s) && effects.length - prevWhole === 1 && last?.type === "bounce" && last.what.ref === "target" && !last.what.n) {
       const back = effects.pop()!;
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "citysBlessing" } }, effects: [{ type: "may", effects: [{ type: "putInLibrary", what: last.what, position: "top" }], otherwise: [back], text: "put that permanent on top of its owner's library instead" }], otherwise: [back] });
+      continue;
+    }
+    // Consuming Ferocity: "put a +1/+0 counter on enchanted creature. If that creature has three or more +1/+0 counters on
+    // it, it deals damage equal to its power to its controller, then destroy that creature and it can't be regenerated.":
+    // the creature as this resolves (CR 608.2c); "it" is that creature.
+    const auraCounted = /^If (?:that|enchanted) creature has (\w+ or more [^,]+ counters? on it), (.+)$/.exec(s);
+    const putOnHost = effects[effects.length - 1];
+    if (auraCounted && putOnHost?.type === "counters" && putOnHost.what.ref === "attached") {
+      const cond = parseStaticCondition(`that creature has ${auraCounted[1]}`, { affects: { kind: "self" }, mods: [], text: "" });
+      if (cond?.kind !== "subjectCounter") return null;
+      const fx: Effect[] = [];
+      for (const part of auraCounted[2]!.split(/, then /)) {
+        const noRegen = /^destroy (?:that|enchanted) creature and it can't be regenerated$/.test(part);
+        const one = parseOne(capital(noRegen ? "destroy enchanted creature" : part.replace(/^it deals /, "enchanted creature deals ")), ctx);
+        const got = noRegen ? (one?.length === 1 && one[0]!.type === "destroy" ? [{ ...one[0]!, noRegen: true } as Effect] : null) : one;
+        if (!got || got.some((e) => pauses(e))) return null;
+        fx.push(...got);
+      }
+      effects.push({ type: "if", cond: { kind: "state", cond, subject: { ref: "attached" } }, effects: fx });
       continue;
     }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);

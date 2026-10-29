@@ -572,6 +572,7 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
   if (d.prevent && !preventing) return false;
   if (d.combat && (d.combat === "only") !== !!e.combat) return false;
   if (d.atMost !== undefined && e.n > d.atMost) return false;
+  if (d.atLeast !== undefined && e.n < d.atLeast) return false;
   // Ojer Axonil: only damage less than its power, compared once as it would be dealt (rulings).
   if (d.op === "raiseTo" && (e.n <= 0 || e.n >= modExtra(s, m))) return false;
   const ref = e.src.ref;
@@ -619,6 +620,7 @@ function modAmount(s: GameState, m: LiveMod, n: number): number {
   if (d.op === "minus") return Math.max(0, n - modExtra(s, m));
   if (d.op === "allBut") return Math.min(n, d.n ?? 0);
   if (d.op === "raiseTo") return Math.max(n, modExtra(s, m));
+  if (d.op === "setTo") return modExtra(s, m);
   return 0;
 }
 
@@ -630,7 +632,7 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "plus" ? `Add ${modExtra(s, m)}`
     : d.op === "minus" ? (d.prevent ? `Prevent ${modExtra(s, m)} of it` : `Take ${modExtra(s, m)} away`)
     : d.op === "allBut" ? `Prevent all but ${d.n} of it`
-    : d.op === "raiseTo" ? `Make it ${modExtra(s, m)}`
+    : d.op === "raiseTo" || d.op === "setTo" ? `Make it ${modExtra(s, m)}`
     : "Prevent it";
   return `${what} (${m.card})`;
 }

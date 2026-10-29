@@ -506,6 +506,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       return item?.x ?? 0;
     }
+    case "castSpellKicked": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      return item?.kicked?.length ?? 0;
+    }
     case "castSpellColors": {
       const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
@@ -1106,6 +1110,8 @@ function describeCount(c: Count): string {
       return "colors of mana spent";
     case "castSpellX":
       return "that spell's X";
+    case "castSpellKicked":
+      return "times that spell was kicked";
     case "castSpellColors":
       return "that spell's colors";
     case "colorsOf":

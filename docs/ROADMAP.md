@@ -2387,9 +2387,29 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Trap Runner ("becomes blocked" by an effect), Kill-Suit Cultist (a destroy-instead damage shield), Rock Jockey,
   Explosion of Riches, Power Pack, Cinderheart Giant (chosen at random as it resolves, not targeted), Juju Bubble ("play
   a card"), Curse Artifact, Erithizon (a target chosen by the defending player), Selfless Exorcist, Cut the Tethers.
-- Next for Lane B, least played first, with what blocks each: Heroism (a pay-or-prevent per creature),
-  Sheltering Prayers (shroud by each player's land count), Graxiplon (creatures sharing a type),
-  Exiled Doomsayer (morph cost tax), Forethought Amulet.
+- Round B32 (harder skipped cards, least played first): "you may pay ... If you do ... Otherwise, ..." (Spitting
+  Slug), "each permanent with fading you control" (Parallax Inhibitor), "a land with a trap counter on it" as a
+  sacrifice cost (Trap Digger), "If it doesn't have rampage, that creature gains rampage 2" (Rapid Fire; rampage as a
+  granted keyword, CR 702.23), "that player reveals the top card of their library. If that card is a land card ...
+  Otherwise" (Paroxysm), sleep and pupa counters that keep the enchanted creature tapped (Venarian Gold, Cocoon: "remove
+  a pupa counter from ~. If you can't, sacrifice it, ..."), "Activate only during combat and only if defending player
+  controls ..." (Kjeldoran Guard, Arcum's Sleigh: with several defending players the controller picks one, CR 802.2a),
+  "You may put a creature card with mana value X from your hand onto the battlefield. If you do, return ~"
+  (Metathran Aerostat), "Basic lands each player controls have shroud as long as that player controls three or fewer
+  lands" (Sheltering Prayers), "can't be blocked unless defending player controls three or more creatures that share a
+  creature type" (Graxiplon; changelings count with every type), "All morph costs cost {2} more" (Exiled Doomsayer, also
+  megamorph, CR 702.37b), "If an instant or sorcery source would deal 3 or more damage to you, it deals 2 damage to you
+  instead" (Forethought Amulet), "the number of times that spell was kicked" (Rumbling Aftershocks), "If that creature
+  has three or more +1/+0 counters on it, it deals damage equal to its power to its controller, then destroy that
+  creature and it can't be regenerated" (Consuming Ferocity), "When that creature becomes blocked this turn, it gets
+  +1/+1 until end of turn for each creature blocking it" (Barreling Attack). +17 (27,305 of 31,936 with main and Lane A round 200).
+- Known limits there: Paroxysm with an empty library takes the "Otherwise" branch (nothing is revealed).
+- Out after round B32: Ceaseless Searblades (activating a mana ability of an Elemental must trigger it; mana
+  activations don't report their source), Yare ("target creature defending player controls" on a spell, with several
+  defending players), Mercenaries ("Any player may activate this ability"), Heroism (a pay-or-prevent per creature).
+- Next for Lane B, least played first: Illusionary Presence (a land type chosen each upkeep), Elkin Bottle, Mangara's
+  Equity, Storm Elemental, Dralnu's Pet, Sound the Call, Grim Reminder, Mindreaver, Cycle of Life, Thelon's Curse,
+  North Star, Silhouette, Suffocation.
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
   cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Storm Entity

@@ -1347,11 +1347,11 @@ export function parseTargetPhrase(
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
   }
-  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creature you control with a level counter on it" (Time of Heroes), "creatures with ice counters on them", "creature you control with a counter on
+  // "creature with a +1/+1 counter on it", "creature with a bounty counter on it" (Shay Cormac), "creature you control with a level counter on it" (Time of Heroes), "a land with a trap counter on it" (Trap Digger), "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
   // "Target creature that has a -1/-1 counter on it" (Banewhip Punisher): the same as "with".
   p = p.replace(/ that has (an? (?:[+-]1\/[+-]1|fate) counter on it)$/, " with $1");
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|fate|level|trap) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin|bounty|divinity|stun|bribery|oil|level) counters on (?:them|it)|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -1504,10 +1504,10 @@ export function parseTargetPhrase(
     // cycling too (CR 702.29e; the card data lists "Cycling" with it).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index);
-  } else if ((m = / with (modular|flanking)( you control)?$/.exec(p))) {
+  } else if ((m = / with (modular|flanking|fading)( you control)?$/.exec(p))) {
     // Arcbound Overseer: "each creature you control with modular": modular as the card data lists it (CR 702.43a), on
     // the battlefield's characteristics (lost with all abilities, layer 6). Telim'Tor: "attacking creatures with
-    // flanking" (CR 702.25a), granted flanking too.
+    // flanking" (CR 702.25a), granted flanking too. Parallax Inhibitor: "each permanent with fading you control" (CR 702.32a).
     extra.keywords = [capital(m[1]!)];
     p = p.slice(0, m.index) + (m[2] ?? "");
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {

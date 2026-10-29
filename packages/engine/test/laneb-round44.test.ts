@@ -104,6 +104,8 @@ const karolinaDeanRunaway = () => card("Karolina Dean, Runaway", "Legendary Crea
 const rofellossGift = () => card("Rofellos's Gift", "Sorcery", "{G}", { cmc: 1, colors: ["G"], oracleText: "Reveal any number of green cards in your hand. Return an enchantment card from your graveyard to your hand for each card revealed this way." });
 const celestialConvergence = () => card("Celestial Convergence", "Enchantment", "{2}{W}{W}", { cmc: 4, colors: ["W"], oracleText: "This enchantment enters with seven omen counters on it.\nAt the beginning of your upkeep, remove an omen counter from this enchantment. If there are no omen counters on this enchantment, the player with the highest life total wins the game. If two or more players are tied for highest life total, the game is a draw." });
 const sereneMaster = () => card("Serene Master", "Creature — Human Monk", "{1}{W}", { cmc: 2, colors: ["W"], power: "0", toughness: "2", oracleText: "Whenever this creature blocks, exchange its power and the power of target creature it's blocking until end of combat." });
+const lamplightPhoenix = () => card("Lamplight Phoenix", "Creature — Phoenix", "{1}{R}{R}", { cmc: 3, colors: ["R"], power: "3", toughness: "3", keywords: ["Flying","Collect evidence"], oracleText: "Flying\nWhen this creature dies, you may exile it and collect evidence 4. If you do, return this card to the battlefield tapped. (To collect evidence 4, exile cards with total mana value 4 or greater from your graveyard.)" });
+const doomsdaySpecter = () => card("Doomsday Specter", "Creature — Specter", "{2}{U}{B}", { cmc: 4, colors: ["B","U"], power: "2", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, return a blue or black creature you control to its owner's hand.\nWhenever this creature deals combat damage to a player, look at that player's hand and choose a card from it. The player discards that card." });
 const baithookAngler = () => scry("transform", [{ name: "Baithook Angler", mana_cost: "{1}{U}", type_line: "Creature — Human Peasant", oracle_text: "Disturb {1}{U} (You may cast this card from your graveyard transformed for its disturb cost.)", power: "2", toughness: "1" }, { name: "Hook-Haunt Drifter", type_line: "Creature — Spirit", oracle_text: "Flying\nIf Hook-Haunt Drifter would be put into a graveyard from anywhere, exile it instead.", power: "1", toughness: "2", color_indicator: ["U"] }], { keywords: ["Flying", "Transform", "Disturb"] });
 
 // Test cards.
@@ -116,7 +118,7 @@ const forestCard = () => card("Forest", "Basic Land — Forest", "", { cmc: 0 })
 
 describe("Lane B round 44 cards", () => {
   it("are fully supported", () => {
-    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn(), ultronsAuxiliary(), futuristOperative(), dovinsAcuity(), karolinaDeanRunaway(), rofellossGift(), celestialConvergence(), sereneMaster());
+    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn(), ultronsAuxiliary(), futuristOperative(), dovinsAcuity(), karolinaDeanRunaway(), rofellossGift(), celestialConvergence(), sereneMaster(), lamplightPhoenix(), doomsdaySpecter());
   });
 });
 
@@ -463,5 +465,49 @@ describe("Serene Master", () => {
     s = goUntil(s, (x) => x.step === "main2");
     expect([zone(s, master), zone(s, giant), s.objects[master]?.damage ?? 0]).toEqual(["battlefield", "battlefield", 0]);
     expect([pt(s, master), s.objects[giant]!.damage]).toEqual(["0/2", 5]);
+  });
+});
+
+describe("Lamplight Phoenix", () => {
+  it("exiles itself and collects evidence 4 from other cards to return to the battlefield tapped", () => {
+    const { s: s0, ap, ids } = setup([murder()]);
+    const bird = putOnBattlefield(s0, ap, lamplightPhoenix());
+    const yard = [toZone(s0, ap, murder(), "graveyard"), toZone(s0, ap, opt(), "graveyard")];
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(bird)]), at("collectEvidence", ap));
+    expect(s.pending).toMatchObject({ kind: "collectEvidence", player: ap, n: 4, not: bird });
+    expect(() => act(s, { type: "collectEvidence", player: ap, ids: [yard[0]!, bird] })).toThrow();
+    s = settle(act(s, { type: "collectEvidence", player: ap, ids: yard }));
+    expect([zone(s, bird), s.objects[bird]!.tapped, ...yard.map((id) => zone(s, id))]).toEqual(["battlefield", true, "exile", "exile"]);
+  });
+  it("can't count itself toward the evidence", () => {
+    // Test Bolt (mana value 1) is the only other card there; with the Phoenix's own 3 it would make 4.
+    const { s: s0, ap, ids } = setup([bolt()]);
+    const bird = putOnBattlefield(s0, ap, lamplightPhoenix());
+    const s = settle(castNow(s0, ap, ids[0]!, [tgt(bird)]), at("collectEvidence", ap));
+    expect([s.pending?.kind, zone(s, bird), zone(s, ids[0]!)]).toEqual([undefined, "graveyard", "graveyard"]);
+  });
+  it("stays in the graveyard if you collect no evidence", () => {
+    const { s: s0, ap, ids } = setup([murder()]);
+    const bird = putOnBattlefield(s0, ap, lamplightPhoenix());
+    toZone(s0, ap, murder(), "graveyard");
+    toZone(s0, ap, opt(), "graveyard");
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(bird)]), at("collectEvidence", ap));
+    s = settle(act(s, { type: "collectEvidence", player: ap, ids: [] }));
+    expect(zone(s, bird)).toBe("graveyard");
+  });
+});
+
+describe("Doomsday Specter", () => {
+  it("looks at the hand of the player it dealt combat damage to and makes them discard the card you choose", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const specter = putOnBattlefield(s0, ap, doomsdaySpecter());
+    const theirs = [toZone(s0, opp, opt(), "hand"), toZone(s0, opp, bolt(), "hand")];
+    onlyHand(s0, opp, theirs);
+    let s = toBlocks(attackWith(s0, [specter], opp));
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [] });
+    s = goUntil(s, at("searchLibrary", ap));
+    expect(s.pending?.kind === "searchLibrary" && s.pending.cards.sort()).toEqual([...theirs].sort());
+    s = settle(find(s, ap, [theirs[1]!]));
+    expect([zone(s, theirs[0]!), zone(s, theirs[1]!)]).toEqual(["hand", "graveyard"]);
   });
 });

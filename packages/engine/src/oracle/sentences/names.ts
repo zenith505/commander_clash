@@ -81,6 +81,12 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = base && m[3] ? { ...base, chosen: "type" as const, text: `${base.text} of the chosen type` } : base;
     return who && filter ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter }] : null;
   }
+  // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the color chosen
+  // as it resolves, every card of it there (no choice).
+  if ((m = /^(Target player|Target opponent) reveals their hand and discards all cards of the chosen color$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } }] : null;
+  }
   // "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
   // (Conjurer's Ban), "Opponents can't cast spells with the chosen name until your next turn" (Academic Probation).
   if (/^Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played$/.test(s)) return [{ type: "banName", lands: true }];

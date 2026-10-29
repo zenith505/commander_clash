@@ -347,6 +347,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!fx || !options || ctx.targets.length !== before + 1) return null;
     return [{ type: "punisher", who: { ref: "targetController", index: before }, options, effects: fx }];
   }
+  // Essence Vortex: "Destroy target creature unless its controller pays life equal to its toughness": its toughness as the
+  // choice is offered (CR 608.2h); only with that much life (CR 119.4).
+  if ((m = /^(Destroy target creature) unless its controller pays life equal to its toughness$/.exec(s))) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(m[1]!, ctx);
+    if (fx?.length !== 1 || fx[0]!.type !== "destroy" || ctx.targets.length !== before + 1) return null;
+    return [{ type: "punisher", who: { ref: "targetController", index: before }, options: [{ pay: { cost: "", lifeAmount: { count: { kind: "toughness", of: { ref: "target", index: before } } } } }], effects: fx }];
+  }
   // Rhystic Deluge: "Tap target creature unless its controller pays {1}", Excise: "Exile target attacking creature unless its
   // controller pays {X}", Plague Fiend: "destroy that creature unless its controller pays {2}" (the creature it dealt combat
   // damage to): that creature's controller decides as it resolves (CR 608.2d), as it last existed if it has left.
@@ -1142,7 +1150,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
   if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
     const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
-    const what = p && /^(~|it|that creature|(?:another )?target .+|up to (?:one|two|three) target creatures?)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    // Soul Parry: "Prevent all damage one or two target creatures would deal this turn": each of them.
+    const what = p && /^(~|it|that creature|(?:another )?target .+|up to (?:one|two|three) target creatures?|one or two target creatures)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
   }
   // Gatta and Luzzu: "If damage would be dealt to target creature you control this turn, prevent that damage and put

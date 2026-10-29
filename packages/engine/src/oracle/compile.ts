@@ -505,6 +505,9 @@ export function compile(d: CardDef): CompiledCard {
       .replace(/\b([Ii])f ~'s additional cost was paid\b/g, (x, i: string, _i, text: string) => (MAY_COST.test(text) ? `${i}f ~ was kicked` : x))
       .replace(/\bIf an? ([A-Z][a-z]+(?: creature)?) was beheld\b/g, (x, what: string, _i, text: string) => (new RegExp(`^As an additional cost to cast ~, you may behold an? ${what}\\.$`, "m").test(text) ? "If ~ was kicked" : x))
       .replace(/\bunless (?:her|his|its|~'s) additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "unless ~'s waterbend cost was paid" : x))
+      // Guan Yu, Sainted Warrior: "When ~ is put into your graveyard from the battlefield, you may shuffle ~ into your
+      // library": a card goes to its owner's graveyard (CR 400.3), so "your" library is its owner's.
+      .replace(/^(When ~ is put into your graveyard from the battlefield, you may shuffle ~ into) your library\.$/m, "$1 its owner's library.")
       // Staff of the Death Magus: "Whenever you cast a black spell or a Swamp you control enters, you gain 1 life": one
       // ability with two trigger events (CR 603.1), the same as an ability for each. "Whenever you cast a green spell and
       // whenever a Forest you control enters, ..." (Necklace of Girion) too.
@@ -3915,11 +3918,16 @@ export function compile(d: CardDef): CompiledCard {
       // face up, ...": entering and turning face up are never one event (CR 708.8). Case of the Pilfered Proof: "Whenever a
       // Detective you control enters or is turned face up".
       /^Whenever ((?:~ or )?another [A-Z][a-z]+ you control) enters and whenever (an? [A-Z][a-z]+ you control) is turned face up, (.+)$/.exec(line) ??
-      /^Whenever (an? [A-Z][a-z]+ you control) enters or is turned face up, (.+)$/.exec(line);
+      /^Whenever (an? [A-Z][a-z]+ you control) enters or is turned face up, (.+)$/.exec(line) ??
+      // The Shrines: "At the beginning of your upkeep and whenever you cast a black spell, put a charge counter on ~": a step
+      // and a cast are never one event.
+      /^(At the beginning of your upkeep) and (whenever you cast an? (?:white|blue|black|red|green) spell), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^Whenever a creature (?:you control )?attacks or blocks, /.test(line)
         ? ((who) => [`Whenever ${who} attacks, ${effect}`, `Whenever ${who} blocks, ${effect}`])(/ you control /.test(line) ? "a creature you control" : "a creature")
+        : /^At the beginning of your upkeep and whenever /.test(line)
+        ? [`${twice[1]}, ${effect}`, `W${twice[2]!.slice(1)}, ${effect}`]
         : /^When you cast ~ and whenever/.test(line)
         ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
         : /^When you cast ~ and when ~ dies, /.test(line)

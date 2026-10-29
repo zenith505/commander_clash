@@ -1409,7 +1409,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (you === ev.controller) continue;
         for (const t of abilitiesOf(s, o).triggers) {
           if (t.event !== "opponentAttacksYou" || !t.attacksYou) continue;
-          const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers));
+          // Mila, Crafty Companion: "attacks one or more planeswalkers you control": only those attacking a planeswalker.
+          const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers) && (!t.attacksYou!.walkersOnly || !!obj(s, x).attackingPermanent));
           if (at.length < t.attacksYou.min) continue;
           const group = at.map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
           const info = { player: ev.controller, group, amount: at.length, ...(t.attacksYou.recheck ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
@@ -1750,7 +1751,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     })();
     const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
       add(o, you, (e, t) => {
-        if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
+        if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy) || (!ev.copy && t.cast.onlyCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller) || (by === "chosen" && o.chosen?.player !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;

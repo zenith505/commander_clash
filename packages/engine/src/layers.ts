@@ -973,6 +973,20 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.wasCast;
       return cond.not ? !cast : cast;
     }
+    case "subjectPowerNotBase": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const c = sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc ? chars.get(sub.id) : undefined;
+      if (c) return c.power !== ([...c.pt].reverse().find((p) => p.kind === "set")?.power ?? c.printedPower);
+      // Gone (Jason Bright's "dies"): as it last existed on the battlefield (CR 603.10a), named there or in its new zone.
+      const lk = subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      const same = !!lk && (lk.zc === subjectZc || (lk.zc + 1 === subjectZc && sub?.zoneChanges === subjectZc));
+      return same && lk!.basePower !== undefined && lk!.power !== lk!.basePower;
+    }
+    case "subjectFirstTapThisTurn": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const taps = sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc ? sub.tapsThisTurn : undefined;
+      return !!taps && taps.turn === s.turn && taps.zc === subjectZc && taps.n === 1;
+    }
     case "subjectPutBySelf": {
       const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
       const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;

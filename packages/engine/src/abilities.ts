@@ -777,7 +777,7 @@ export interface TargetSpec {
    */
   /** "Goaded creature" (Vengeful Ancestor): goaded by any player now (CR 701.15). */
   /** "Enchanted by an Aura you control" (Eriette of the Charmed Apple): `enchantedByYours`. */
-  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted" | "goaded" | "enchantedByYours" | /** "With a legendary Equipment attached to it" (Kassandra, Eagle Bearer). */ "legendaryEquipped";
+  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted" | "goaded" | /** CR 702.112b. */ "renowned" | "enchantedByYours" | /** "With a legendary Equipment attached to it" (Kassandra, Eagle Bearer). */ "legendaryEquipped";
   /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
   attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
@@ -1012,6 +1012,8 @@ export type ObjRef =
       attachedToo?: { filter: TargetSpec; only?: true };
       /** "~ and that creature each get +2/+0" (Gogo, Mysterious Mime): the source too, while it's still that permanent. */
       andSelf?: true;
+      /** "Return ~ and target land card from your graveyard to the battlefield" (Sandman, Shifting Scoundrel): this card too, while it's still the object whose ability this is (CR 400.7). */
+      andSelfCard?: true;
       /** "Each of those creatures you don't control" (Lost in the Maze): only the targets another player controls as it resolves. */
       notYours?: true;
       /**
@@ -1663,6 +1665,10 @@ export type StaticCondition =
   | { kind: "subjectCastFromHand"; not?: true }
   /** Preston, the Vanisher: "if it wasn't cast", about the entering permanent (GameObject.wasCast). */
   | { kind: "subjectWasCast"; not?: true }
+  /** "If it's the first time that creature has become tapped this turn" (Captain America, Living Legend): the trigger's subject, as the same object (GameObject.tapsThisTurn). */
+  | { kind: "subjectFirstTapThisTurn" }
+  /** "If its power was different from its base power" (Jason Bright, Glowing Prophet): the trigger's subject now, or as it last existed (CR 608.2h). */
+  | { kind: "subjectPowerNotBase" }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**
@@ -2391,6 +2397,8 @@ export type Effect =
       haste?: "endOfTurn" | "game";
       /** "Exile it at the beginning of the next end step", "Sacrifice it ...": a delayed trigger for it (CR 603.7), while it's that object. */
       atEndStep?: "exile" | "sacrifice";
+      /** "Exile it at the beginning of your next upkeep" (Lukka, Wayward Bonder): the same, at that upkeep. */
+      exileAtYourNextUpkeep?: true;
       /** With `counters`: only if it enters as a creature (Recommission, CR 614.12). */
       countersIfCreature?: true;
       /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
@@ -3936,6 +3944,8 @@ export type SpellCondition =
   | { kind: "revealedTopIs"; filter: TargetSpec }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
   | { kind: "milledIs"; filter: TargetSpec }
+  /** "If two cards that share all their card types were milled this way" (Demonic Covenant): the two cards the mill before put there have the same card types (rulings). */
+  | { kind: "milledShareTypes" }
   /** "If you exiled a land card this way" after exiling the top cards to play (Bonehoard Dracosaur): one of them is. */
   | { kind: "impulsedIs"; filter: TargetSpec }
   /** "If you didn't create a token this way" (Springheart Nantuko): this resolution hasn't created any. */
@@ -4438,7 +4448,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted" | "chosen"; spell: TargetSpec; orCopy?: boolean; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** "A spell other than your first spell each turn" (Arcbound Tracker): its caster's second or later spell this turn. */ notFirst?: true; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** Alania: "if it's the first instant spell, the first sorcery spell, or the first Otter spell other than ~ you've cast this turn": the first of any of these kinds (`notSelfName`: not counting spells with this permanent's name). */ firstOfKinds?: { spec: TargetSpec; notSelfName?: true }[]; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "Whenever an opponent casts a spell during your turn" (Voice of Resurgence): only while this ability's controller is the active player. */ yourTurn?: true; /** "A kicked spell" (Lullmage's Familiar): its kicker cost was paid (CR 702.33d). */ kicked?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** Dragonlord Kolaghan: "a ... spell with the same name as a card in their graveyard", as it's cast (after its costs: delve can exile them, rulings). */ nameInCasterYard?: true; /** "A creature spell that has an Adventure" (Garenbrig Squire): an adventurer card (CR 715.2). */ adventure?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "A noncreature spell with one or more blue mana symbols in its mana cost" (Namor the Sub-Mariner): hybrid and Phyrexian symbols of the color count. */ manaSymbol?: Color; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /** Faldorn: "or a land you control enters from exile" triggers it too (CR 603.6a). */ orLandEntersFromExile?: true; /**
+  cast?: { by: "you" | "opponent" | "any" | "enchanted" | "chosen"; spell: TargetSpec; orCopy?: boolean; /** With `orCopy`: "Whenever you copy an instant spell" (Kalamax, the Stormsire): only a copy. */ onlyCopy?: true; /** Vesuvan Duplimancy: with `targetsOnly`, that one permanent is the trigger's subject ("that artifact or creature"), as the spell was cast. */ subjectTarget?: true; /** "That targets only ~" (Zada), "... only a single Golem" (Precursor Golem): every target it has is one object, ~ or one matching this (rulings: several targets all naming it count). */ targetsOnly?: "self" | TargetSpec; nth?: number; /** "A spell other than your first spell each turn" (Arcbound Tracker): its caster's second or later spell this turn. */ notFirst?: true; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** Alania: "if it's the first instant spell, the first sorcery spell, or the first Otter spell other than ~ you've cast this turn": the first of any of these kinds (`notSelfName`: not counting spells with this permanent's name). */ firstOfKinds?: { spec: TargetSpec; notSelfName?: true }[]; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** "If the amount of mana spent to cast it was less than its mana value" (Ancient Cellarspawn). */ spentLessThanMv?: true; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "During each opponent's turn" (Wavebreak Hippocamp): not in its caster's own turn. */ opponentsTurn?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "Whenever an opponent casts a spell during your turn" (Voice of Resurgence): only while this ability's controller is the active player. */ yourTurn?: true; /** "A kicked spell" (Lullmage's Familiar): its kicker cost was paid (CR 702.33d). */ kicked?: true; /** "While ~ is attacking" (Fire Lord Azula): only while this permanent is attacking. */ selfAttacking?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell they don't own" (Gonti, Night Minister): its owner isn't its caster. */ notOwned?: true; /** Dragonlord Kolaghan: "a ... spell with the same name as a card in their graveyard", as it's cast (after its costs: delve can exile them, rulings). */ nameInCasterYard?: true; /** "A creature spell that has an Adventure" (Garenbrig Squire): an adventurer card (CR 715.2). */ adventure?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "A spell with {X} in its mana cost" (Zaxara, Unbound Flourishing). */ xInCost?: true; /** "A noncreature spell with one or more blue mana symbols in its mana cost" (Namor the Sub-Mariner): hybrid and Phyrexian symbols of the color count. */ manaSymbol?: Color; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec; /** Faldorn: "or a land you control enters from exile" triggers it too (CR 603.6a). */ orLandEntersFromExile?: true; /**
    * "If it shares a card type with the exiled card" (Cemetery Protector): the spell or land played shares one with a card
    * this permanent's linked ability exiled (CR 607.2a), an intervening "if" checked again as it resolves (CR 603.4).
    */ sharesTypeWithLinked?: true };
@@ -4551,7 +4561,7 @@ export interface TriggeredAbility {
   /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
   anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
-  attacksYou?: { min: number; orPlaneswalkers?: true; /** Mangara's intervening "if two or more of those creatures are attacking you": checked again as it resolves (CR 603.4). */ recheck?: true };
+  attacksYou?: { min: number; orPlaneswalkers?: true; /** With `orPlaneswalkers`: "attacks one or more planeswalkers you control" (Mila, Crafty Companion), not you. */ walkersOnly?: true; /** Mangara's intervening "if two or more of those creatures are attacking you": checked again as it resolves (CR 603.4). */ recheck?: true };
   /**
    * For "permanentEnters": what has to enter (the subject, "that creature"), relative to this permanent's
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without
@@ -6234,6 +6244,8 @@ export interface CompiledCard {
     maxMv?: number;
     /** Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has this ability (GameObject.entersGaining). */
     gains?: string;
+    /** Edgar, Master Machinist: "If you cast a spell this way, that artifact enters tapped" (CR 614.1c). */
+    entersTapped?: true;
     /** Only while this holds: a station symbol's (Exploration Broodship's 8+, CR 721.2a). */
     if?: StaticCondition;
   }[];

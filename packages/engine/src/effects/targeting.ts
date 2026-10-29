@@ -245,6 +245,7 @@ function untargetableBy(u: Untargetable & { of: PlayerId }, controller: PlayerId
 function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonNullable<TargetSpec["status"]>, view?: (o: GameObject) => Characteristics | undefined, you?: PlayerId): boolean {
   if (status === "unenchanted") return !hasStatus(s, o, c, "enchanted", view);
   if (status === "goaded") return !!c.goaded; // not "as though it were goaded" (Kardur)
+  if (status === "renowned") return !!o.renowned; // CR 702.112b
   if (status === "modified" && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return true;
   // A permanent that has left: what was attached to it as it last existed (CR 603.10a).
   for (const id of o.lastAttachments ?? s.battlefield) {

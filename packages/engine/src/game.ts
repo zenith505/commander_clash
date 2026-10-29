@@ -897,7 +897,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, ...(o.tapped ? { tapped: true as const } : {}), power: last.power, toughness: last.toughness, basePower: [...last.pt].reverse().find((p) => p.kind === "set")?.power ?? last.printedPower, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(o.blocking?.length ? { blocking: [...o.blocking] } : {}), ...(o.blockedBy?.length ? { blockedBy: [...o.blockedBy] } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, ...(last.supertypes.length ? { supertypes: last.supertypes } : {}), ...(last.allCreatureTypes ? { allCreatureTypes: true } : {}), keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1104,6 +1104,9 @@ export function moveObject(
   if (merged && partsTo === "library") noteMergedToLibrary(s, o.owner, [{ id, zc: o.zoneChanges ?? 0 }, ...o.movedWith!], !opts.top);
   // A countered Serra Paragon spell doesn't keep the ability for later (CR 400.7).
   if (to !== "battlefield" && to !== "stack") o.entersGaining = undefined;
+  // Edgar's "that artifact enters tapped": only the permanent the spell becomes (CR 400.7).
+  const castTapped = to === "battlefield" && fromZone === "stack" && !!o.castEntersTapped;
+  if (to !== "stack") o.castEntersTapped = undefined;
   if (to === "battlefield") {
     // Mystic Reflection: a creature or planeswalker enters as a copy (CR 614.1c, 707.5), before the rest of how it enters.
     const reflected = reflectionKey(s, o);
@@ -1125,7 +1128,7 @@ export function moveObject(
     o.entersGaining = undefined;
     const sunburstGained = fromZone === "stack" ? (o.sunburstGained ?? 0) : 0;
     o.sunburstGained = undefined;
-    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped || castTapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1937,6 +1940,9 @@ function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
 export function tapPermanent(s: GameState, o: GameObject, /** Tapped as it's declared as an attacker (CR 508.1f). */ attacking?: true) {
   if (o.tapped) return;
   o.tapped = true;
+  const zc = o.zoneChanges ?? 0;
+  const before = o.tapsThisTurn?.turn === s.turn && o.tapsThisTurn.zc === zc ? o.tapsThisTurn.n : 0;
+  o.tapsThisTurn = { turn: s.turn, zc, n: before + 1 };
   if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id, ...(attacking ? { attacking } : {}) });
 }
 
@@ -5320,6 +5326,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     choices = { ...choices, permit }; // its costs are paid below
     const gains = permitGains(s, permit);
     if (gains) o.entersGaining = gains;
+    if (permitEntersTapped(s, permit)) o.castEntersTapped = true;
     // The Tomb of Aclazotz: "If you do, it enters with a finality counter on it and is a Vampire in addition to its other
     // types": the spell, and the permanent it becomes (rulings, CR 614.1c, 400.7a).
     const rider = s.graveGrants?.find((g) => g.key === permit)?.rider;
@@ -5710,6 +5717,12 @@ export function pickPermit(s: GameState, o: GameObject, permits: string[], chose
 function permitGains(s: GameState, key: string): string | undefined {
   const src = s.objects[key.split("@")[0]!];
   return src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once && g.gains)?.gains : undefined;
+}
+
+/** Edgar, Master Machinist: whether a spell cast with this once-each-turn permission enters tapped. */
+function permitEntersTapped(s: GameState, key: string): boolean {
+  const src = s.objects[key.split("@")[0]!];
+  return !!src && !!abilitiesOf(s, src).graveyardGrants?.some((g) => g.once && g.entersTapped);
 }
 
 function permitExiles(s: GameState, key: string): boolean {

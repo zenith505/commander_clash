@@ -909,6 +909,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         }
         return [{ type: "chooseOption", player: pid, choice: String(best) }];
       }
+      // Localized Destruction: "each creature you control with power equal to the amount of {E} paid this way gains
+      // indestructible": the power that saves the most of ours.
+      const saved = may?.effects.length === 1 && may.effects[0]!.type === "continuous" && may.effects[0]!.what.ref === "each" && may.effects[0]!.what.filter.kind === "object" && may.effects[0]!.what.filter.bound?.key === "power" ? may.effects[0]!.what.filter : undefined;
+      if (saved) {
+        let best = 0;
+        let bestScore = 0;
+        for (let n = 1; n <= most; n++) {
+          const score = s.battlefield.map((id) => s.objects[id]!).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) === n).reduce((a, o) => a + worth(s, pid, o), 0);
+          if (score > bestScore) [best, bestScore] = [n, score];
+        }
+        return [{ type: "chooseOption", player: pid, choice: String(best) }];
+      }
       const t = s.resolving?.item.targets?.find((x) => x.kind === "object");
       const o = t?.kind === "object" ? s.objects[t.id] : undefined;
       const theirs = !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;

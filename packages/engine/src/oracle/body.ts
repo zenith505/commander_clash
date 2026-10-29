@@ -4944,6 +4944,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Rejoin the Fight: "Then starting with the next opponent in turn order, each opponent chooses a creature card in your
+    // graveyard that hasn't been chosen. Return each card chosen this way to the battlefield under your control."
+    const rejoin = /^(?:Then )?starting with the next opponent in turn order, each opponent chooses an? (.+? card) in your graveyard that hasn't been chosen$/i.exec(s);
+    if (rejoin && /^Return each card chosen this way to the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(rejoin[1]!);
+      if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachOpponent" }, underYours: true, fromYours: true });
+      si++;
+      continue;
+    }
     const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
     if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const filter = parseSearchFilter(eachYard[1]!);
@@ -6784,6 +6794,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(energyX, ctx);
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true }, text: `pay any amount of {E}. ${energyUse}` });
+      si++;
+      continue;
+    }
+    // Localized Destruction: "You may pay one or more {E}. If you do, each creature you control with power equal to the
+    // amount of {E} paid this way gains indestructible until end of turn": X energy, at least one to have paid (CR 107.14).
+    const oneOrMoreEnergy = ctx.spell && /^[Yy]ou may pay one or more \{E\}$/.test(s) ? /^If you do, (.+) with power equal to the amount of \{E\} paid this way (.+?)\.?$/.exec(sentences[si + 1] ?? "") : null;
+    if (oneOrMoreEnergy && !/\b(?:X|that)\b/.test(oneOrMoreEnergy[1]! + oneOrMoreEnergy[2]!)) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(`${oneOrMoreEnergy[1]} with power X ${oneOrMoreEnergy[2]}`), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "may", effects: inner, pay: {}, payX: { energy: true, atLeastOne: true }, text: `pay one or more {E}. If you do, ${oneOrMoreEnergy[1]} with power equal to the amount of {E} paid this way ${oneOrMoreEnergy[2]}` });
       si++;
       continue;
     }

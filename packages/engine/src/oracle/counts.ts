@@ -512,6 +512,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "commandersMv", onBattlefieldOrCommand: true, ...(m[1] === "they" ? { who: { ref: "eachOne" } as const } : {}) });
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
   if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
+  if (each && /^\{E\}(?: \(energy counter\))? you've paid or lost this turn$/i.test(p)) return count({ kind: "energyLostThisTurn" });
   if (each ? /^1 life you(?:'ve| have)? gained this turn$/i.test(p) : /^the (?:total )?amount of life you(?:'ve| have)? gained this turn$/i.test(p)) return count({ kind: "lifeGainedThisTurn" });
   // Willowdusk, Essence Seer: "the amount of life you gained this turn or the amount of life you lost this turn, whichever
   // is greater".

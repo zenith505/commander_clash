@@ -1484,6 +1484,8 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /** Energy counters each player paid or lost in total (Blaster Hulk). */
+  energyLost?: Record<number, number>;
   /** Life each player lost in total, paid life included (CR 119.4): "the total amount of life your opponents have lost this turn". */
   lifeLost?: Record<number, number>;
   /**

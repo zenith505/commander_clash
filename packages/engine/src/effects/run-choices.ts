@@ -2,7 +2,7 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, processCandidates, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, loseEnergy, processCandidates, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, staticConditionNow } from "../layers";
 import type { Color, GameState, ObjectId, PlayerId } from "../types";
@@ -62,9 +62,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         const n = Number(sc.payX);
         const p = player(s, ctx.controller);
-        p.energy = (p.energy ?? 0) - n;
-        log(s, `${p.name} pays ${n} energy for ${src}.`);
-        sc.may = true;
+        if (n || !e.payX.atLeastOne) {
+          loseEnergy(s, p.id, n);
+          log(s, `${p.name} pays ${n} energy for ${src}.`);
+        }
+        sc.may = n > 0 || !e.payX.atLeastOne;
       }
       // "You may pay {1}{W} any number of times" (Intrepid Adversary): how many times first, at most as many as the player
       // could pay, then the whole payment at once.

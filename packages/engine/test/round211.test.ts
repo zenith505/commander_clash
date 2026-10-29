@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { nextRandom } from "../src/rng";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { applyAction, characteristics, compileCard, controllerOf, destroyPermanent, objHasKeyword, planActivate, power, invalidateCharacteristics, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { applyAction, spellCost, characteristics, compileCard, controllerOf, destroyPermanent, objHasKeyword, planActivate, power, invalidateCharacteristics, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -549,5 +549,92 @@ describe("mill a card, then exile a card from your graveyard at random; you may 
     expect(s.objects[t]!.mayPlay).toMatchObject({ player: ap });
     s = act(s, { type: "playLand", player: ap, objectId: t });
     expect(s.objects[t]!.zone).toBe("battlefield");
+  });
+});
+
+const rejoinTheFight = card("Rejoin the Fight", "Sorcery", "{5}{B}", {"cmc":6,"keywords":["Mill"],"oracleText":"Mill three cards. Then starting with the next opponent in turn order, each opponent chooses a creature card in your graveyard that hasn't been chosen. Return each card chosen this way to the battlefield under your control.","colors":["B"],"colorIdentity":["B"],"layout":"normal"});
+
+describe("starting with the next opponent, each opponent chooses a creature card in your graveyard that hasn't been chosen (Rejoin the Fight)", () => {
+  it("compile", () => supported(rejoinTheFight));
+
+  it("Rejoin the Fight: mills three, each opponent in turn order picks a different creature card, all return under your control", () => {
+    const { s: s0, ap } = setup([rejoinTheFight]);
+    const r = inHand(s0, ap, rejoinTheFight.name);
+    s0.players[ap]!.manaPool.B = 6;
+    const [o1, o2, o3] = [1, 2, 3].map((k) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + k) % 4]!) as [PlayerId, PlayerId, PlayerId];
+    const milled = into(s0, ap, bear({ name: "Milled Bear" }), "library");
+    into(s0, ap, card("Mill Land A", "Land"), "library");
+    into(s0, ap, card("Mill Land B", "Land"), "library");
+    const yard = [into(s0, ap, bear({ name: "Bear One" }), "graveyard"), into(s0, ap, bear({ name: "Bear Two" }), "graveyard")];
+    const theirs = into(s0, o1, bear({ name: "Their Bear" }), "graveyard");
+    let s = settle(run(s0, planCast(s0, ap, r)));
+    expect(s.objects[milled]!.zone).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: o1, fromGraveyard: "battlefield" });
+    expect((s.pending as { cards: ObjectId[] }).cards.sort()).toEqual([milled, ...yard].sort());
+    s = act(s, { type: "searchLibrary", player: o1, found: [yard[0]!] });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: o2 });
+    expect((s.pending as { cards: ObjectId[] }).cards.sort()).toEqual([milled, yard[1]!].sort());
+    s = settle(act(s, { type: "searchLibrary", player: o2, found: [milled] }));
+    // The third opponent has only the last card left.
+    for (const id of [milled, ...yard]) {
+      expect(s.objects[id]!.zone).toBe("battlefield");
+      expect(controllerOf(s, s.objects[id]!)).toBe(ap);
+    }
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(o3).not.toBe(ap);
+  });
+});
+
+const localizedDestruction = card("Localized Destruction", "Sorcery", "{3}{W}{W}", {"cmc":5,"keywords":[],"oracleText":"You get {E} (an energy counter), then you may pay one or more {E}. If you do, each creature you control with power equal to the amount of {E} paid this way gains indestructible until end of turn.\nDestroy all creatures.","colors":["W"],"colorIdentity":["W"],"layout":"normal"});
+
+describe("you may pay one or more {E}; creatures you control with that power gain indestructible; destroy all creatures (Localized Destruction)", () => {
+  it("compile", () => supported(localizedDestruction));
+
+  it("Localized Destruction: paying 2 saves your 2-power creatures only", () => {
+    const { s: s0, ap, opp } = setup([localizedDestruction]);
+    const c = inHand(s0, ap, localizedDestruction.name);
+    s0.players[ap]!.energy = 2;
+    s0.players[ap]!.manaPool.W = 5;
+    const two = putOnBattlefield(s0, ap, bear());
+    const big = putOnBattlefield(s0, ap, card("Test Giant", "Creature — Giant", "{4}", { power: "5", toughness: "5" }));
+    const theirs = putOnBattlefield(s0, opp, bear());
+    let s = settle(run(s0, planCast(s0, ap, c)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payEnergy", numberRange: { min: 0, max: 3 } });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "2" }));
+    expect(s.objects[two]!.zone).toBe("battlefield");
+    expect(s.objects[big]!.zone).toBe("graveyard");
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.energy).toBe(1);
+  });
+
+  it("Localized Destruction: paying none is not paying, so nothing is saved", () => {
+    const { s: s0, ap } = setup([localizedDestruction]);
+    const c = inHand(s0, ap, localizedDestruction.name);
+    s0.players[ap]!.manaPool.W = 5;
+    const zero = putOnBattlefield(s0, ap, card("Zero Wall", "Creature — Wall", "{1}", { power: "0", toughness: "4" }));
+    let s = settle(run(s0, planCast(s0, ap, c)));
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "0" }));
+    expect(s.objects[zero]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.energy).toBe(1);
+  });
+});
+
+const blasterHulk = card("Blaster Hulk", "Artifact Creature — Pirate", "{6}{R}{R}", {"cmc":8,"power":"8","toughness":"8","keywords":["Haste"],"oracleText":"This spell costs {1} less to cast for each {E} (energy counter) you've paid or lost this turn.\nHaste\nWhenever this creature attacks, you get {E}{E}, then you may pay eight {E}. When you do, this creature deals 8 damage divided as you choose among up to eight targets.","colors":["R"],"colorIdentity":["R"],"layout":"normal"});
+
+describe("costs {1} less for each {E} you've paid or lost this turn (Blaster Hulk)", () => {
+  it("compile", () => supported(blasterHulk));
+
+  it("Blaster Hulk: energy paid to Localized Destruction and energy lost both cut its cost, for this turn only", () => {
+    const { s: s0, ap } = setup([blasterHulk, localizedDestruction]);
+    const h = inHand(s0, ap, blasterHulk.name);
+    const before = spellCost(s0, ap, s0.objects[h]!).extra;
+    s0.players[ap]!.energy = 2;
+    s0.players[ap]!.manaPool.W = 5;
+    let s = settle(run(s0, planCast(s0, ap, inHand(s0, ap, localizedDestruction.name))));
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "3" }));
+    expect(s.players[ap]!.energy).toBe(0);
+    expect(before - spellCost(s, ap, s.objects[h]!).extra).toBe(3);
+    s = passUntil(s, "upkeep");
+    expect(spellCost(s, ap, s.objects[h]!).extra).toBe(before);
   });
 });

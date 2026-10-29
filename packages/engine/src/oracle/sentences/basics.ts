@@ -611,6 +611,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // about the source or about the object the trigger was about, with no targets of its own.
   // "At the beginning of the next end step, sacrifice it" (Apprentice Necromancer, Momo's Heist): the same instruction.
   if ((m = /^At the beginning of (the|your) next end step, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[2]!)) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} at the beginning of ${m[1]} next end step`, ctx);
+  // Time Elemental: "When ~ attacks or blocks, at end of combat, sacrifice it and it deals 5 damage to you": both then; the
+  // damage even if you can't sacrifice it any more (rulings), dealt by it as it last existed.
+  if ((m = /^[Aa]t end of combat, sacrifice it and it deals (\d+) damage to you$/.exec(s)) && ctx.selfIt && ctx.lastObjectTarget === undefined && !ctx.targets.length)
+    return [{ type: "delayed", when: "endOfCombat", effects: [{ type: "sacrifice", what: { ref: "subject" } }, { type: "damage", amount: Number(m[1]), to: { ref: "you" }, by: "subject" }], text: `sacrifice it and it deals ${m[1]} damage to you` }];
+  // Contempt: "When enchanted creature attacks, return it and ~ to their owners' hands at end of combat": one delayed
+  // trigger about both as they are now (CR 603.7c, 400.7); either one that left stays where it went.
+  if (/^[Rr]eturn it and ~ to their owners' hands at end of combat$/.test(s) && !ctx.targets.length && ctx.lastObjectTarget === undefined) {
+    const it = parseObject("it", ctx);
+    if (it?.ref !== "subject") return null;
+    return [{ type: "delayed", when: "endOfCombat", each: "subject", withSource: true, effects: [{ type: "bounce", what: { ref: "subject" } }, { type: "bounce", what: { ref: "self" } }], text: "return it and ~ to their owners' hands" }];
+  }
   // Casey Jones, Vigilante: "At the beginning of your next upkeep, discard three cards at random.": the same, for your
   // next upkeep (only instructions about you, below).
   if ((m = /^At the beginning of your next upkeep, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[1]!)) return parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} at the beginning of your next upkeep`, ctx);

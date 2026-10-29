@@ -362,6 +362,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.objects?.({ ref: "self" })[0]?.blocking?.length ?? 0;
     case "dugToHand":
       return s.resolving?.dugToHand ?? 0;
+    case "dugToHandMv":
+      return (s.resolving?.dugToHandCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "returnedToYourHand":
       return (s.resolving?.returnedToHand ?? []).filter((id) => s.objects[id]?.zone === "hand" && s.objects[id]!.owner === ctx.controller).length;
     case "milledManaValue":
@@ -972,6 +974,8 @@ function describeCount(c: Count): string {
       return "#creatures it's blocking";
     case "dugToHand":
       return "#cards put into your hand";
+    case "dugToHandMv":
+      return "that card's mana value";
     case "returnedToYourHand":
       return "#cards returned to your hand";
     case "milledManaValue":

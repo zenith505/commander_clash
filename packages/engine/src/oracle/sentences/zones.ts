@@ -1126,6 +1126,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Wormfang Behemoth: "When ~ enters, exile all cards from your hand." Face up (CR 406.3); compile() links them to its
   // leaves ability.
   if (/^[Ee]xile all cards from your hand$/.test(s)) return [{ type: "exileHand" }];
+  // Hypnox: "exile all cards from target opponent's hand": the same for that player's hand, face up (CR 406.3).
+  if ((m = /^[Ee]xile all cards from (target opponent|target player)'s hand$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "exileHand", who }] : null;
+  }
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one

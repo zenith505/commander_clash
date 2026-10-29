@@ -1910,7 +1910,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileHand": {
-      const p = player(s, ctx.controller);
+      const whose = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (whose === undefined) return;
+      const p = player(s, whose);
       const ids = [...p.hand];
       for (const id of ids) {
         moveObject(s, id, "exile");

@@ -1314,6 +1314,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   }
   // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).
   if (printed.entersPrepared) becomePrepared(s, o);
+  // Heightened Awareness: "As ~ enters, discard your hand" (CR 614.1c), before what its entering triggers.
+  if (printed.entersDiscardHand) discardCards(s, controllerOf(s, o), [...player(s, controllerOf(s, o)).hand]);
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
   // Read ahead granted by another permanent (Barbara Wright) applies as it enters too (CR 614.12).
@@ -7402,6 +7404,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
+  if (pend.among && ids.some((id) => !pend.among!.includes(id))) throw new RulesError("choose one of the cards just drawn");
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;

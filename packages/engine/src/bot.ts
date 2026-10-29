@@ -291,7 +291,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (wb) return [...wb.taps, { type: "payUnless", player: pid, pay: true, tap: wb.tapped }];
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
-    if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo) }];
+    if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo, pend.among) }];
     // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
     // that wants the graveyard (madness, flashback and the like).
     if (pend.kind === "handToTop" && pend.discarding) {
@@ -3867,7 +3867,7 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
 
 /** Which cards to discard: extra lands once we have enough, otherwise what we're furthest from casting. */
 /** `upTo`: "discard any number of cards" (then draw that many): only the cards hardly worth keeping. */
-function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: string, filter?: TargetSpec, upTo?: boolean): string[] {
+function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: string, filter?: TargetSpec, upTo?: boolean, among?: string[]): string[] {
   const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
   const keepScore = (id: string) => {
     const d = defOf(s, obj(s, id));
@@ -3875,7 +3875,7 @@ function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: str
     return 8 - Math.max(0, mv(s, id) - lands);
   };
   return player(s, pid)
-    .hand.filter((id) => id !== except && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!upTo || keepScore(id) <= 2))
+    .hand.filter((id) => id !== except && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!among || among.includes(id)) && (!upTo || keepScore(id) <= 2))
     .sort((a, b) => keepScore(a) - keepScore(b))
     .slice(0, count);
 }

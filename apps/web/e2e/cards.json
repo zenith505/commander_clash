@@ -16744,6 +16744,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1f612df3-53b6-4317-9d63-1f903ee3f0c4",
+  "name": "Soldevi Sage",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{T}, Sacrifice two lands: Draw three cards, then discard one of them.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dcb9c2a7-ae54-4ddc-a567-640bf4bf4366",
   "name": "Solitude",
   "manaCost": "{3}{W}{W}",

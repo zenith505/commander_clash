@@ -663,7 +663,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Imperial Edict: "Target opponent chooses a creature they control. Destroy that creature.": that player picks as it
   // resolves (not targeted); "that creature" is the one picked.
-  if ((m = /^(Target opponent|Target player) chooses (an? [a-z]+) they control$/.exec(s))) {
+  if ((m = /^([Tt]arget opponent|[Tt]arget player) chooses (an? [a-z]+) they control$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     const filter = pickFilter(m[2]!.replace(/^an? /i, ""));
     return who?.ref === "target" && filter ? [{ type: "pick", who, filter, n: 1, action: "choose" }] : null;
@@ -791,9 +791,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Remove up to three counters from target permanent" (Glissa Sunslayer), "Remove X counters from target permanent,
   // where X is ..." (Thornmantle Striker), "Remove a counter from target nonland permanent" (Thrull Parasite).
-  if ((m = new RegExp(`^Remove (up to )?(a|${NUMX.slice(1, -1)}) counters? from (~|it|target .+)$`, "i").exec(s))) {
+  if ((m = new RegExp(`^Remove (up to )?(a|${NUMX.slice(1, -1)}) counters? from (~|it|(?:another )?target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAnyCounters", what, n: /^a$/i.test(m[2]!) ? 1 : amt(m[2]!), ...(m[1] ? { upTo: true as const } : {}) }] : null;
+  }
+  // Gremlin Mine: "Remove up to four charge counters from target noncreature artifact": as many of them as its controller
+  // chooses as it resolves, none to four (only that kind).
+  if ((m = new RegExp(`^Remove up to (${NUM.slice(1, -1)}) ${COUNTER} counters from (target .+)$`, "i").exec(s))) {
+    const what = parseObject(m[3]!, ctx);
+    return what && !isGroup(what) ? [{ type: "removeAnyCounters", what, n: num(m[1]!), upTo: true, kinds: [counterKind(m[2]!)] }] : null;
   }
   // The Ozolith: "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).

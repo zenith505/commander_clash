@@ -366,12 +366,13 @@ export interface GameObject {
    * "yourNextEndStep": until that player's next end step begins (Yasmin Khan). "adventure": a card that went on an
    * adventure (CR 715.3d), for as long as it stays exiled, but not cast as an Adventure again this way. "duringNextTurn":
    * only during that player's next turn (Galvanic Relay). "whileControlled": while that player controls `source`, ended
-   * for good the first time they don't (Lightning, Security Sergeant).
+   * for good the first time they don't (Lightning, Security Sergeant). "yourNextUpkeep": until that player's next upkeep
+   * begins (Elkin Bottle), so during the rest of this turn and the turns before it.
    */
   mayPlay?: {
     player: PlayerId;
     zc: number;
-    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled";
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure" | "duringNextTurn" | "whileControlled" | "yourNextUpkeep";
     turn: number;
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */

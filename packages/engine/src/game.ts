@@ -3137,6 +3137,12 @@ function beginStep(s: GameState, step: Step): void {
       const p = player(s, ap);
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
+      // "Until the beginning of your next upkeep, you may play that card" (Elkin Bottle): over as that upkeep begins.
+      for (const q of s.players)
+        for (const id of q.exile) {
+          const m = obj(s, id).mayPlay;
+          if (m?.until === "yourNextUpkeep" && m.player === ap) obj(s, id).mayPlay = undefined;
+        }
       (s.turnLog ??= {}).upkeeps = (s.turnLog.upkeeps ?? 0) + 1;
       // "Until your next upkeep" (Erhnam Djinn): it ends as that player's next upkeep begins, before its triggers; for a
       // player who left the game, at the next upkeep (CR 800.4m).
@@ -6422,7 +6428,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else if (c.kind === "mill" && c.exile) {
       const ids = p.library.slice(0, c.n);
       log(s, `${p.name} exiles the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library: ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
-      for (const id of ids) moveObject(s, id, "exile");
+      for (const id of ids) {
+        moveObject(s, id, "exile");
+        exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+      }
     } else if (c.kind === "mill") {
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);

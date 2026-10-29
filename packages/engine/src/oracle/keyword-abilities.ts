@@ -654,7 +654,9 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   // "Tap an untapped creature you control" (Lashknife), "tap four untapped creatures you control with flying" (Sephara).
   // "Tap an untapped red creature you control other than ~" (Impelled Giant): not the source.
   if ((m = new RegExp(`^tap ${NUM} untapped (.+?) you control( with .+?)?( other than ~)?$`, "i").exec(text))) {
-    const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? m[2]!.split(" ").map(singularWord).join(" ") : m[2]}${m[3] ?? ""}`);
+    // Warlord's Elite: "tap two untapped artifacts, creatures, and/or lands you control": any two, each one of them.
+    const kinds = m[2]!.replace(/,? and\/or /, ", or ").replace(/^([a-z]+), or ([a-z]+)$/, "$1 or $2");
+    const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? kinds.split(" ").map((w) => (w.endsWith(",") ? `${singularWord(w.slice(0, -1))},` : singularWord(w))).join(" ") : kinds}${m[3] ?? ""}`);
     return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}${m[4] ? " other than ~" : ""}` }, n: num(m[1]!), ...(m[4] ? { other: true } : {}) } : null;
   }
   // "Collect evidence 3" (CR 701.59a): exile cards from your graveyard with total mana value 3 or more.

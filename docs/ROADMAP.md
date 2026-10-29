@@ -2431,9 +2431,30 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
 - Out after round B32: Ceaseless Searblades (activating a mana ability of an Elemental must trigger it; mana
   activations don't report their source), Yare ("target creature defending player controls" on a spell, with several
   defending players), Mercenaries ("Any player may activate this ability"), Heroism (a pay-or-prevent per creature).
-- Next for Lane B, least played first: Illusionary Presence (a land type chosen each upkeep), Elkin Bottle, Mangara's
-  Equity, Storm Elemental, Dralnu's Pet, Sound the Call, Grim Reminder, Mindreaver, Cycle of Life, Thelon's Curse,
-  North Star, Silhouette, Suffocation.
+- Round B33 (harder skipped cards, least played first): a card's own name in an ability it grants is a name, not the
+  object with the ability (CR 201.4b: Sound the Call, Deathpact Angel, Rekindling Phoenix, Food Fight), "If the exiled
+  card is a snow land" after an exile-the-top-card cost (Storm Elemental), "tap two untapped artifacts, creatures,
+  and/or lands you control" as an additional cost to cast (Warlord's Elite, Fear of Exposure, Guardian of the Great
+  Door; the lands tapped for it aren't also tapped for mana, and bots tap the ones they don't need), "When you do, ~
+  deals X damage ..., where X is the number of card types the discarded card has" (Mount Velus Manticore), "Put a
+  +1/+1 counter on ~ or ~ gains flying, first strike, or trample" for good (Flowstone Sculpture, CR 611.2a; browser
+  test), "Remove up to four charge counters" (Gremlin Mine) and "remove up to three counters from another target"
+  (Mabel, Bitter Recluse), "put all of them with that name into your hand. Exile the rest" (Desperate Research), "X
+  target lands become Forests" (Deepwood Elder), "Until the beginning of your next upkeep, you may play that card"
+  (Elkin Bottle), "can't be blocked by creatures that don't have a name" (Pompous Gadabout: face-down creatures),
+  "target opponent chooses a creature they control. Destroy that creature" in a trigger (Wei Assassins), "loses your
+  choice of flying, first strike, or trample" (Walking Sponge; browser test), Hail Storm's two amounts at once (an
+  attacking creature of yours is dealt 3), "Target Assembly-Worker creature" (the type, not the card's name). +20
+  (27,347 of 31,936 with B32 and rounds 199-201).
+- Out after round B33: Mangara's Equity (damage to "you or a white creature" grouped per event), Thick-Skinned Goblin
+  (echo paid as {0} inside the upkeep's may-pay), Grim Reminder (a search that reveals and leaves the card in the
+  library, then a check against the names of spells each opponent cast this turn), Cycle of Life (a target "creature
+  you cast this turn", "has base power and toughness 0/1 until your next upkeep", and a delayed counter at that
+  upkeep), Soldevi Sage ("draw three cards, then discard one of them": only the cards just drawn).
+- Next for Lane B, least played first: Illusionary Presence (a land type chosen each upkeep), Dralnu's Pet,
+  Mindreaver, Thelon's Curse, North Star, Silhouette, Suffocation, Radiant Kavu (prevent the damage creatures of two
+  colors would deal), Aboroth (cumulative upkeep that is -1/-1 counters), Elephant Resurgence (each player's own token
+  counting its controller's graveyard), Volcanic Eruption ("the number of Mountains put into a graveyard this way").
   Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
   trigger), Tiger-Tribe Hunter (pack tactics), Horn of Plenty, Oracle of Dust (a card an opponent owns from exile as a
   cost), Haphazard Bombardment (aim counters), Crowd of True Believers ("attacking alone"), Storm Entity

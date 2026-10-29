@@ -2793,10 +2793,14 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "tap") {
       // "Tap an untapped creature you control" (Lashknife): the least valuable ones, not something it targets.
+      // "Tap two untapped artifacts, creatures, and/or lands you control" (Warlord's Elite): what can't pay the spell's
+      // mana first, then lands whose basic types make none of the colors its cost asks for.
+      const colors = new Set((d.manaCost ?? "").match(/[WUBRG]/g) ?? []);
+      const needed = (o: GameObject) => (manaAbilitiesOn(s, o).some((m) => m.tap) ? 1 + Number(characteristics(s, o).subtypes.some((t) => colors.has(({ Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" } as Record<string, string>)[t] ?? ""))) : 0);
       const pool = tapCostCandidates(s, pid, obj(s, id), c)
         .map((x) => obj(s, x))
         .filter((o) => !targeted.has(o.id) && o.attacking === undefined)
-        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+        .sort((a, b) => needed(a) - needed(b) || worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.tap = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "exileFromHand" && c.anyNumber) {

@@ -883,8 +883,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, aff
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }
-        : // "Gains your choice of menace or lifelink": the keyword chosen as it resolved.
-          m.kind === "addKeywords" && m.keywords.includes(CHOSEN_KEYWORD)
+        : // "Gains your choice of menace or lifelink", "loses your choice of flying, first strike, or trample" (Walking
+          // Sponge): the keyword chosen as it resolved.
+          (m.kind === "addKeywords" || m.kind === "removeKeywords") && m.keywords.includes(CHOSEN_KEYWORD)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_KEYWORD ? [k] : s.resolving?.chosen?.keyword ? [s.resolving.chosen.keyword] : [])) }
         : // "Becomes the creature type of your choice": the type chosen as it resolved.
           (m.kind === "setSubtypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_TYPE)

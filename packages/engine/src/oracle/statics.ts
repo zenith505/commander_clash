@@ -1928,6 +1928,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Azure Fleet Admiral: "can't be blocked by creatures the monarch controls" (CR 509.1b, 725).
   if (/^can't be blocked by creatures the monarch controls$/.test(rest)) return [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], monarchControls: true, text: "creatures the monarch controls" } }];
+  // Pompous Gadabout: "can't be blocked by creatures that don't have a name": face-down ones (CR 708.2, rulings), checked
+  // as blockers are declared (CR 509.1b).
+  if (/^can't be blocked by creatures that don't have a name$/.test(rest)) return [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], faceDown: true, text: "creatures that don't have a name" } }];
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".

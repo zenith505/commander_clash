@@ -1,4 +1,6 @@
-// Round 208: "Draw four cards. When you do, ..." (The Royal Scions).
+// Round 208: The Royal Scions, Mosswood Dreadknight, Hildibrand Manderville, Abigale, Transmogrant's Crown, Kaya, Origin of
+// Spider-Man, Captain America, Kolodin, Guidelight Matrix, Tariel, Slimefoot and Squee, Hazoret, bloodthirst X, Omarthis, The
+// Balrog, Zimone, Glamdring, Cantankerous Keepers, Blitzwing.
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";

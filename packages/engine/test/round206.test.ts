@@ -5,7 +5,10 @@
 // first spell they cast each turn or copies a spell" (Curse of Shaken Faith, Ichneumon Druid), "tap enchanted creature and
 // remove all counters from it" (Enchanted River's Grasp), "until your next turn, creatures target player controls have
 // base power and toughness 1/1" (Mass Diminish), "until your next turn, creatures can't attack you" (Chronomantic Escape),
-// "as ~ enters, it becomes your choice of ..." (Primal Clay, Primal Plasma, Corrupted Shapeshifter).
+// "as ~ enters, it becomes your choice of ..." (Primal Clay, Primal Plasma, Corrupted Shapeshifter), "you may cast target
+// artifact card from your graveyard this turn" as a trigger (Heiko and Norika Yamazaki), "switch the power and toughness of
+// each of up to two target creatures" (Invert // Invent, Inversion Behemoth), "each creature you control that didn't attack
+// or enter this turn" (The Fifth Doctor).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -363,5 +366,124 @@ describe("as it enters, it becomes your choice of", () => {
     expect(`${power(s, c)}/${toughness(s, c)}`).toBe("1/6");
     expect(objHasKeyword(s, c, "Defender")).toBe(true);
     expect(objHasKeyword(s, c, "Flying")).toBe(true);
+  });
+});
+
+const heikoYamazakiTheGeneral = card("Heiko Yamazaki, the General", "Legendary Creature — Human Samurai", "{3}{R}", {"cmc":4,"power":"3","toughness":"3","keywords":["Trample"],"oracleText":"Trample\nWhenever a Samurai or Warrior you control attacks alone, you may cast target artifact card from your graveyard this turn.","colors":["R"],"colorIdentity":["R"],"layout":"normal"});
+const norikaYamazakiThePoet = card("Norika Yamazaki, the Poet", "Legendary Creature — Human Samurai", "{2}{W}", {"cmc":3,"power":"3","toughness":"2","keywords":["Vigilance"],"oracleText":"Vigilance\nWhenever a Samurai or Warrior you control attacks alone, you may cast target enchantment card from your graveyard this turn.","colors":["W"],"colorIdentity":["W"],"layout":"normal"});
+const invertInvent = card("Invert // Invent", "Instant // Instant", "{U/R} // {4}{U}{R}", {
+  cmc: 7,
+  layout: "split",
+  oracleText: "Switch the power and toughness of each of up to two target creatures until end of turn.",
+  faces: [
+    { name: "Invert", manaCost: "{U/R}", typeLine: "Instant", supertypes: [], types: ["Instant"], subtypes: [], oracleText: "Switch the power and toughness of each of up to two target creatures until end of turn.", colors: ["U", "R"] },
+    { name: "Invent", manaCost: "{4}{U}{R}", typeLine: "Instant", supertypes: [], types: ["Instant"], subtypes: [], oracleText: "Search your library for an instant card and/or a sorcery card, reveal them, put them into your hand, then shuffle.", colors: ["U", "R"] },
+  ],
+});
+const inversionBehemoth = card("Inversion Behemoth", "Creature — Eldrazi", "{2}{C}{C}", {"cmc":4,"power":"2","toughness":"9","keywords":[],"oracleText":"At the beginning of combat on your turn, switch the power and toughness of each of any number of target creatures until end of turn.","colors":[],"colorIdentity":[],"layout":"normal"});
+const theFifthDoctor = card("The Fifth Doctor", "Legendary Creature — Time Lord Doctor", "{2}{W}{U}", {"cmc":4,"power":"2","toughness":"2","keywords":["Peaceful Coexistence"],"oracleText":"Peaceful Coexistence — At the beginning of your end step, put a +1/+1 counter on each creature you control that didn't attack or enter this turn. Untap those creatures.","colors":["U","W"],"colorIdentity":["U","W"],"layout":"normal"});
+const wall = (n = "Test Wall") => card(n, "Creature — Wall", "{1}", { cmc: 1, power: "1", toughness: "4" });
+const charm = (n = "Test Charm") => card(n, "Enchantment", "{1}{W}", { cmc: 2, oracleText: "" });
+
+describe("whenever a Samurai or Warrior you control attacks alone, you may cast target card from your graveyard this turn", () => {
+  it("compile", () => supported(heikoYamazakiTheGeneral, norikaYamazakiThePoet));
+  const via = { via: "permission" as const };
+
+  it("Heiko: an artifact card from your graveyard, cast this turn paying its cost; not an attack with two", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const h = putOnBattlefield(s0, ap, heikoYamazakiTheGeneral);
+    const r = into(s0, ap, rock(), "graveyard");
+    expect(planCast(s0, ap, r, undefined, undefined, undefined, undefined, via)).toBeNull();
+    let s = settle(attack(s0, ap, opp, [h]), { targets: [tgt(r)] });
+    s = toStep(s, "main2", ap);
+    s = settle(run(s, planCast(s, ap, r, undefined, undefined, undefined, undefined, via)));
+    expect(s.objects[r]!.zone).toBe("battlefield");
+  });
+
+  it("Heiko: two attackers is not alone; the permission ends with the turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const h = putOnBattlefield(s0, ap, heikoYamazakiTheGeneral);
+    const sam = putOnBattlefield(s0, ap, samurai());
+    const r = into(s0, ap, rock(), "graveyard");
+    let s = attack(s0, ap, opp, [h, sam]);
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    s = toStep(s, "main2", ap);
+    expect(planCast(s, ap, r, undefined, undefined, undefined, undefined, via)).toBeNull();
+  });
+
+  it("Norika: another Samurai attacking alone lets you cast an enchantment card, not an artifact", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, norikaYamazakiThePoet);
+    const sam = putOnBattlefield(s0, ap, samurai());
+    const e = into(s0, ap, charm(), "graveyard");
+    const r = into(s0, ap, rock(), "graveyard");
+    let s = settle(attack(s0, ap, opp, [sam]), { targets: [tgt(e)] });
+    s = toStep(s, "main2", ap);
+    expect(planCast(s, ap, r, undefined, undefined, undefined, undefined, via)).toBeNull();
+    s = settle(run(s, planCast(s, ap, e, undefined, undefined, undefined, undefined, via)));
+    expect(s.objects[e]!.zone).toBe("battlefield");
+  });
+});
+
+describe("switch the power and toughness of each of target creatures", () => {
+  it("compile", () => supported(invertInvent, inversionBehemoth));
+
+  it("Invert: each of two targets switches its own power and toughness until end of turn", () => {
+    const { s: s0, ap, opp, ids } = setup([invertInvent]);
+    const w = putOnBattlefield(s0, opp, wall());
+    const o = putOnBattlefield(s0, ap, ogre());
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [tgt(w), tgt(b)], undefined, "auto", undefined, { face: 0 })));
+    const pt = (id: ObjectId) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
+    expect(pt(w)).toBe("4/1");
+    expect(pt(o)).toBe("4/4");
+    expect(pt(b)).toBe("2/2");
+    s = toStep(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    expect(pt(w)).toBe("1/4");
+  });
+
+  it("Invent: an instant card and a sorcery card from your library into your hand", () => {
+    const { s: s0, ap, ids } = setup([invertInvent]);
+    const i = into(s0, ap, instant(), "library");
+    const so = into(s0, ap, sorcery(), "library");
+    const o = into(s0, ap, ogre(), "library");
+    s0.players[ap]!.manaPool.U = 1;
+    s0.players[ap]!.manaPool.R = 1;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { face: 1 })));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [i, so] }));
+    expect([s.objects[i]!.zone, s.objects[so]!.zone, s.objects[o]!.zone]).toEqual(["hand", "hand", "library"]);
+  });
+
+  it("Inversion Behemoth: at the beginning of combat on your turn, any number of targets, itself included", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const ib = putOnBattlefield(s0, ap, inversionBehemoth);
+    const w = putOnBattlefield(s0, opp, wall());
+    let s = settle(toStep(s0, "beginCombat", ap), { targets: [tgt(ib), tgt(w)] });
+    const pt = (id: ObjectId) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
+    expect(pt(ib)).toBe("9/2");
+    expect(pt(w)).toBe("4/1");
+  });
+});
+
+describe("The Fifth Doctor", () => {
+  it("compile", () => supported(theFifthDoctor));
+
+  it("end step: a counter on each creature that neither attacked nor entered this turn, and untaps them", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, theFifthDoctor);
+    const attacker = putOnBattlefield(s0, ap, bear({ name: "Attacking Bear" }));
+    const tapped = putOnBattlefield(s0, ap, bear({ name: "Tapped Bear" }));
+    s0.objects[tapped]!.tapped = true;
+    let s = settle(attack(s0, ap, opp, [attacker]));
+    s = toStep(s, "main2", ap);
+    const fresh = putOnBattlefield(s, ap, bear({ name: "New Bear" }));
+    s.objects[fresh]!.enteredTurn = s.turn;
+    s = settle(toStep(s, "end", ap));
+    expect(s.objects[tapped]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[tapped]!.tapped).toBe(false);
+    expect(s.objects[attacker]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[attacker]!.tapped).toBe(true);
+    expect(s.objects[fresh]!.counters["+1/+1"] ?? 0).toBe(0);
   });
 });

@@ -2491,7 +2491,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
     // for that card, paying its costs and following the normal timing (rulings).
-    const yardTarget = /^You may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    const yardTarget = /^[Yy]ou may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardTarget) {
       const before = ctx.targets.length;
       const what = parseCardTarget(`${yardTarget[1]} from your graveyard`, ctx, "you");

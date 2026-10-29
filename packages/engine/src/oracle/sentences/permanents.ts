@@ -1079,6 +1079,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
   // Switching power and toughness (layer 7d).
+  // "Switch the power and toughness of each of up to two target creatures until end of turn" (Invert), "... of each of any
+  // number of target creatures ..." (Inversion Behemoth): each of them (CR 613.4d).
+  if ((m = /^[Ss]witch the power and toughness of each of ((?:up to (?:one|two|three)|any number of) target creatures) until end of turn$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }] : null;
+  }
   if ((m = /^Switch (.+?)'s? power and toughness until end of turn$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }] : null;

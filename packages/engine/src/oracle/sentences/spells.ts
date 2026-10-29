@@ -559,6 +559,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Wild Ricochet: "You may choose new targets for target instant or sorcery spell. Then copy that spell."
   if (!ctx.castSpell && !ctx.selfCastSpell && /^(?:Then )?copy that spell$/i.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" && !ctx.targets[ctx.lastObjectTarget]!.stackAbilities)
     return [{ type: "copySpell", spell: { target: ctx.lastObjectTarget }, n: 1, newTargets: false }];
+  // Aether Spike: "Choose target spell. ... Counter that spell unless its controller pays {1} for each {E} paid this way"
+  // (body.ts makes the payment {X}, the energy paid): the spell chosen first.
+  if (!ctx.castSpell && !ctx.selfCastSpell && (m = /^Counter that spell unless its controller pays (.+)$/.exec(s)) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" && !ctx.targets[ctx.lastObjectTarget]!.stackAbilities) {
+    const unless = parseUnlessPays(m[1]!, ctx);
+    return unless ? [{ type: "counterSpell", index: ctx.lastObjectTarget, unless }] : null;
+  }
   // "When you cast this spell, any player may sacrifice a creature of their choice. If a player does, counter ~" (Brain Gorgers).
   if (ctx.selfCastSpell && /^[Cc]ounter (?:~|it|this spell)$/.test(s)) return [{ type: "counterSpell", index: -1, cause: true }];
   // Storm of Saruman: "copy it, except the copy isn't legendary" (CR 707.9b; a permanent spell's copy becomes a

@@ -1789,6 +1789,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         }
         if (t.cast.spentLessThanMv && !(item && !ev.copy && (ev.manaSpent ?? 0) < spellManaValue(s, item))) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
+        if (t.cast.sharesNoTypeWithYours) {
+          if (!spell) return false;
+          const kinds = creatureTypesOf(s, spell);
+          const mine = [...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && objIsType(s, obj(s, id), "Creature")), ...player(s, you).graveyard.filter((id) => defOf(s, obj(s, id)).types.includes("Creature"))];
+          if (mine.some((id) => shareCreatureType(kinds, creatureTypesOf(s, obj(s, id))))) return false;
+        }
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
         // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.

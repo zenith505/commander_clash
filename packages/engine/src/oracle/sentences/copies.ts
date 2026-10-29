@@ -49,7 +49,8 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // (Wyll's Reversal): a spell or ability on the stack that later sentences name.
     const onStack = /^target (spell or ability|spell)( with one or more targets)?$/.exec(m[1]!);
     if (onStack) {
-      addTarget(ctx, { ...stackSpec(onStack[1]!), ...(onStack[2] ? { hasTargets: true as const } : {}), text: m[1]! });
+      // A plain "target spell" is a spell only, not an ability (Aether Spike, Silent Extraction).
+      addTarget(ctx, { ...(onStack[1] === "spell" ? { kind: "spell" as const } : stackSpec(onStack[1]!)), ...(onStack[2] ? { hasTargets: true as const } : {}), text: m[1]! });
       return [];
     }
     // "Choose target card in a graveyard other than a basic land card. Search its owner's ..." (Surgical Extraction).

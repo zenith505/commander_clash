@@ -883,6 +883,32 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // player's creature or planeswalker (all of it if that's not enough), nothing for one of ours.
     if (pend.kind === "chooseOption" && pend.what === "payEnergy") {
       const most = pend.numberRange?.max ?? 0;
+      // Aether Spike: "Counter that spell unless its controller pays {1} for each {E} paid this way": more than its
+      // controller could pay, for another player's spell.
+      const spell = s.resolving?.item.targets?.find((x) => x.kind === "stack");
+      if (spell?.kind === "stack") {
+        const it = s.stack.find((x) => x.id === spell.id);
+        return [{ type: "chooseOption", player: pid, choice: String(!it || it.controller === pid ? 0 : Math.min(most, availableMana(s, it.controller) + 1)) }];
+      }
+      // Wrath of the Skies: "Destroy each artifact, creature, and enchantment with mana value less than or equal to the
+      // amount of {E} paid this way": the amount that takes the most of the others' worth for the least of ours.
+      const may = s.resolving && allEffects(s.resolving.body.effects).find((x): x is Extract<Effect, { type: "may" }> => x.type === "may" && !!x.payX?.energy);
+      const wipe = may?.effects.length === 1 && may.effects[0]!.type === "destroy" && may.effects[0]!.what.ref === "each" ? may.effects[0]!.what.filter : undefined;
+      if (wipe?.kind === "object" && !s.resolving?.item.targets?.length) {
+        let best = 0;
+        let bestScore = 0;
+        for (let n = 1; n <= most; n++) {
+          let score = 0;
+          for (const id of s.battlefield) {
+            const o = s.objects[id]!;
+            const c = characteristics(s, o);
+            if (c.manaValue > n || !(wipe.types ?? []).some((t) => c.types.includes(t))) continue;
+            score += (controllerOf(s, o) === pid ? -1.5 : 1) * worth(s, pid, o);
+          }
+          if (score > bestScore) [best, bestScore] = [n, score];
+        }
+        return [{ type: "chooseOption", player: pid, choice: String(best) }];
+      }
       const t = s.resolving?.item.targets?.find((x) => x.kind === "object");
       const o = t?.kind === "object" ? s.objects[t.id] : undefined;
       const theirs = !!o && o.zone === "battlefield" && controllerOf(s, o) !== pid;

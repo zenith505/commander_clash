@@ -1909,7 +1909,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "mayCastFromGraveyard": {
       // The permission is this object's only (CR 400.7), and ends with the turn (cleanup, like an exiled card's).
       for (const o of objects(s, e.what, ctx)) {
-        if (o.zone !== "graveyard") continue;
+        if (o.zone !== (e.inExile ? "exile" : "graveyard")) continue;
         // Mosswood Dreadknight: as its Adventure, until the end of its controller's next turn (cleanup ends it).
         if (e.asAdventure) {
           if (layoutOf(s, o) !== "adventure") continue;
@@ -1918,7 +1918,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           continue;
         }
         o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}) };
-        log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from their graveyard this turn.`);
+        log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from ${e.inExile ? "exile" : "their graveyard"} this turn.`);
       }
       return;
     }

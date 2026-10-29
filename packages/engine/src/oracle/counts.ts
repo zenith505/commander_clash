@@ -575,6 +575,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
+  // Revivify: "the number of creature cards in your graveyard that were put there from the battlefield this turn".
+  if ((m = /^(?:the number of )?([a-z]+ )?cards? in your graveyard that (?:was|were) put there from the battlefield this turn$/i.exec(p))) {
+    const spec = m[1] ? parseTargetPhrase(`${m[1].trim()} card from a graveyard`, { chosen: true }) : { kind: "card" as const, types: [], notTypes: [], notColors: [], text: "card" };
+    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who: { ref: "you" }, filter: { ...spec, fromBattlefieldThisTurn: true, text: `${m[1] ?? ""}card that was put there from the battlefield this turn` } }) : null;
+  }
   // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
   if ((m = /^(.*?)cards? in (your|all|that player's|target player's|target opponent's|their|your opponents'|the chosen player's) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);

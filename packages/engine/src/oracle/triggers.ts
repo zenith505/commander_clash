@@ -758,6 +758,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // a changeling having every one (CR 702.73a).
   const shares = / that shares a creature type with ~$/.exec(what);
   if (shares) what = what.slice(0, shares.index);
+  // Volo, Guide to Monsters: "a creature spell that doesn't share a creature type with a creature you control or a creature
+  // card in your graveyard", as it's cast.
+  const sharesNone = / that doesn't share a creature type with a creature you control or a creature card in your graveyard$/.exec(what);
+  if (sharesNone) what = what.slice(0, sharesNone.index);
   // "Whenever you cast a spell that targets a creature you control" (Season of Growth), "an instant or sorcery spell that
   // targets a creature" (repartee), "... that targets an opponent or a creature an opponent controls" (Danitha): what
   // one of its targets is as it's cast. "That targets only ..." isn't modeled.
@@ -869,7 +873,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(sharesNone ? { sharesNoTypeWithYours: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**

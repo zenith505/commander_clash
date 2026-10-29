@@ -18,7 +18,7 @@ import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
-import { asFace, defMv, registerFace, sameName, transformedFace } from "../faces";
+import { asFace, defMv, layoutOf, registerFace, sameName, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -1897,6 +1897,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // The permission is this object's only (CR 400.7), and ends with the turn (cleanup, like an exiled card's).
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "graveyard") continue;
+        // Mosswood Dreadknight: as its Adventure, until the end of its controller's next turn (cleanup ends it).
+        if (e.asAdventure) {
+          if (layoutOf(s, o) !== "adventure") continue;
+          o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "nextTurn", turn: s.turn, castOnly: true, face: 1 };
+          log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} from their graveyard as an Adventure until the end of their next turn.`);
+          continue;
+        }
         o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}) };
         log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from their graveyard this turn.`);
       }
@@ -2191,7 +2198,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "randomFromGraveyard": {
-      const p = player(s, ctx.controller);
+      const from = e.from ? players(s, e.from, ctx)[0] : ctx.controller;
+      if (from === undefined) return;
+      const p = player(s, from);
       const pool = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, s.objects[id]!)));
       // Reap the Past: "X cards at random", none for an X of 0.
       const count = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
@@ -2217,7 +2226,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "exile");
         if (o.zone === "exile") o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
       } else if ((e.dest === "battlefield" || isPermanentCard(d)) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
-        log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
+        log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield${p.id === ctx.controller ? "" : ` under ${player(s, ctx.controller).name}'s control`}.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
       } else if (e.dest === "creatureOrHand") {
         log(s, `${src}: ${d.name} is chosen at random and put into ${p.name}'s hand.`);
@@ -2418,7 +2427,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.sameNameAs !== undefined && name === undefined) return;
         // "Cards of the chosen type" (Creeping Renaissance): the type chosen as it resolved.
         const filter = bindChosen(e.filter, ctx.chosen);
-        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(filter, defOf(s, obj(s, id))) && (name === undefined || sameName(defOf(s, obj(s, id)).name, name)) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn)));
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(filter, defOf(s, obj(s, id))) && (name === undefined || sameName(defOf(s, obj(s, id)).name, name)) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn) && (!e.filter.fromBattlefieldThisTurn || obj(s, id).fromBattlefieldTurn === s.turn) && (!e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc))));
         if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${e.who.ref === "you" ? `${player(s, ctx.controller).name}'s hand` : "their owners' hands"}.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;
@@ -2497,6 +2506,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of cards) moveObject(s, id, "graveyard");
       // Only what got there (not what a replacement effect sent elsewhere) was put there this way.
       s.resolving!.movedLinked = cards.filter((id) => s.objects[id]?.zone === "graveyard").length;
+      return;
+    }
+    case "exileRemembered": {
+      const ids = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
+      if (ids.length) log(s, `${src} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      for (const id of ids) moveObject(s, id, "exile");
       return;
     }
     case "putAllOnBottom": {

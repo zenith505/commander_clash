@@ -250,6 +250,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "dig", n, count: n, upTo: false, required: true, into, rest: "graveyard", reveal: false, ...(who ? { who } : {}) }];
   }
 
+  // Omarthis, Ghostfire Initiate: "manifest a number of cards from the top of your library equal to the number of counters
+  // on it": counted as it resolves, then one at a time (rulings, CR 701.40e), all of them.
+  if ((m = /^[Mm]anifest a number of cards from the top of your library equal to (.+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx);
+    return n ? [{ type: "dig", n, count: 0, countAll: true, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false }] : null;
+  }
   // Tevesh Szat: "Put all commanders from the command zone onto the battlefield under your control."
   if (/^Put all commanders from the command zone onto the battlefield under your control$/.test(s)) return [{ type: "commandersOntoBattlefield" }];
   // "Manifest the top card of that player's library" (Orochi Soul-Reaver): their card, onto the battlefield face down under
@@ -419,7 +425,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Sandman, Shifting Scoundrel: "{3}{G}{G}: Return ~ and target land card from your graveyard to the battlefield tapped":
   // the card and the target enter at the same time (CR 608.2c); with the target illegal the ability doesn't resolve, so
   // the card stays too (CR 608.2b).
-  if (ctx.selfCard && ctx.activated && !ctx.targets.length && (m = /^Return ~ and (target [a-z]+ card) from your graveyard to the battlefield( tapped)?$/.exec(s))) {
+  // Slimefoot and Squee: "Return this card and up to one other target creature card ...": with no target chosen, only
+  // the card (rulings).
+  if (ctx.selfCard && ctx.activated && !ctx.targets.length && (m = /^Return ~ and ((?:up to one other )?target [a-z]+ card) from your graveyard to the battlefield( tapped)?$/.exec(s))) {
     const what = parseObject(`${m[1]} from your graveyard`, ctx, true);
     return what?.ref === "target" && !what.n && ctx.targets[what.index]?.kind === "card" && ctx.targets[what.index]?.owner === "you" ? [{ type: "putOntoBattlefield", what: { ...what, andSelfCard: true }, ...(m[2] ? { tapped: true } : {}) }] : null;
   }
@@ -475,6 +483,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Rr]eturn an? (.+? creature card) at random from your graveyard to the battlefield$/.exec(s))) {
     const filter = parseSearchFilter(m[1]!);
     return filter?.types?.includes("Creature") ? [{ type: "randomFromGraveyard", dest: "battlefield", filter }] : null;
+  }
+  // Tariel, Reckoner of Souls: "Put a creature card chosen at random from target opponent's graveyard onto the battlefield
+  // under your control": chosen as it resolves (rulings); the opponent is the only target.
+  if (/^Put a creature card chosen at random from target opponent's graveyard onto the battlefield under your control$/.test(s)) {
+    const from = parsePlayer("target opponent", ctx);
+    return from?.ref === "target" ? [{ type: "randomFromGraveyard", dest: "battlefield", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, from }] : null;
   }
   // Druidic Ritual: "return up to one creature card and up to one land card from your graveyard to your hand": one choice
   // for each, as it resolves (not targeted); a creature land card can be either one.

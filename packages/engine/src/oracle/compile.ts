@@ -976,6 +976,7 @@ export function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: kw.entersCounter.counter, n: kw.entersCounter.n };
       }
       if (kw.bloodthirst) out.bloodthirst = (out.bloodthirst ?? 0) + kw.bloodthirst;
+      if (kw.bloodthirstX) out.bloodthirstX = true;
       if (kw.sunburst) {
         if (out.sunburst) {
           out.unsupported.push(raw); // two sunburst abilities: not modeled
@@ -2300,6 +2301,17 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push({ ...youAndSelf, text: line });
       continue;
     }
+    // Captain America, Super-Soldier: "As long as ~ has a shield counter on him, you and other Heroes you control have
+    // hexproof": you have it while that's true, and so do they (CR 702.11d, 611.3a).
+    const youAndIf = !out.youHave ? /^As long as (~ has an? [a-z]+ counter on) ~, you and ((?:other )?[^,]+ you control) have (hexproof|shroud)\.$/.exec(line) : null;
+    const youAndIfCond = youAndIf ? parseStaticCondition(`${youAndIf[1]} it`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const youAndIfSt = youAndIfCond ? parseConditionalStatic(`As long as ${youAndIf![1]} it, ${youAndIf![2]} have ${youAndIf![3]}.`) : null;
+    if (youAndIfCond && youAndIfSt) {
+      out.youHave = youAndIf![3] as "hexproof" | "shroud";
+      out.youHaveIf = youAndIfCond;
+      out.statics.push({ ...youAndIfSt, text: line });
+      continue;
+    }
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
     if (youHave && !out.youHave) {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
@@ -2436,6 +2448,14 @@ export function compile(d: CardDef): CompiledCard {
     const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
     if (activationLess && lessFilter?.kind === "object") {
       (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
+      continue;
+    }
+    // Power Artifact: "Enchanted artifact's activated abilities cost {2} less to activate. This effect can't reduce the mana
+    // in that cost to less than one mana.": the permanent it enchants (CR 303.4), generic mana only (CR 601.2f, 602.2b).
+    const enchantedLess = /^Enchanted (artifact|creature|permanent)'s activated abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    if (enchantedLess && d.subtypes.includes("Aura")) {
+      const t = capital(enchantedLess[1]!);
+      (out.activationLess ??= []).push({ n: Number(enchantedLess[2]), filter: { kind: "object", types: t === "Permanent" ? [] : [t], notTypes: [], notColors: [], text: `enchanted ${enchantedLess[1]}` }, enchanted: true, ...(enchantedLess[3] ? { atLeastOne: true as const } : {}) });
       continue;
     }
     // Winter Orb, Winter Moon, Smoke, Static Orb, Mungha Wurm: a limit on what untaps in the untap step (CR 502.3).
@@ -3517,6 +3537,22 @@ export function compile(d: CardDef): CompiledCard {
         ...(lessEach ? { costLess: { ...lessEach, times: (lessEach.times ?? 1) * Number(equipLessEach![2]) } } : {}),
         ...(equipOnce ? { oncePerTurn: true } : {}),
       });
+      continue;
+    }
+    // Transmogrant's Crown: "Equip {2} or {B}": either cost attaches it the same way, so it's an equip ability for each
+    // cost, any of which may be activated (CR 702.6a, 702.6d), as for Bloodthorn Flail below.
+    const equipTwo = /^Equip ((?:\{[^}]+\})+) or ((?:\{[^}]+\})+)$/.exec(line);
+    if (equipTwo && d.subtypes.includes("Equipment")) {
+      for (const cost of [equipTwo[1]!, equipTwo[2]!])
+        out.activated.push({
+          manaCost: cost,
+          tap: false,
+          sacrificeSelf: false,
+          sorcerySpeed: true,
+          body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
+          text: `Equip ${cost}`,
+          equip: true,
+        });
       continue;
     }
     // Luxior, Giada's Gift: "Equip planeswalker {1}" means "{1}: Attach this permanent to target planeswalker you control as

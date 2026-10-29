@@ -1,6 +1,6 @@
 # Roadmap
 
-27,596 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,692 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
 9,979 (91%).
 
@@ -857,6 +857,49 @@ line blocks.
    Out after round 207 (looked at, not done): Varolz, the Scar-Striped and Young Deathclaws (scavenge for a */*
    creature card needs its characteristic-defining power in the graveyard, and the layers only work it out on the
    battlefield and in exile).
+   Round 208 went on from the top: "draw four cards. When you do, ..." only if all four were drawn (The Royal Scions);
+   "you may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight,
+   Hildibrand Manderville), a permission for the Adventure face only, with a browser test; "up to one other target creature loses all
+   abilities", then keyword counters on it (Abigale, Eloquent First-Year); "equip {2} or {B}", two equip abilities
+   (Transmogrant's Crown, CR 702.6d); "if it wasn't an Aura, create a token that's a copy of it, except it's a 1/1 white
+   Spirit creature with flying in addition to its other types" (Kaya, Intangible Slayer; the copy's "with flying" no
+   longer becomes subtypes); "it becomes a legendary Spider Hero in addition to its other types" (Origin of
+   Spider-Man); "as long as ~ has a shield counter on him, you and other Heroes you control have hexproof" (Captain
+   America, Super-Soldier); "becomes saddled until end of turn" (Kolodin, Triumph Caster, Guidelight Matrix); "a creature
+   card at random from target opponent's graveyard" (Tariel, Reckoner of Souls); "return ~ and up to one other target
+   creature card" (Slimefoot and Squee); "can't attack or block unless you have max speed" (Hazoret, Godseeker);
+   bloodthirst X (Indoraptor, Petrified Wood-Kin) and a spell that "gains bloodthirst 3" (Bloodlord of Vaasgoth);
+   "manifest a number of cards equal to the number of counters on it" (Omarthis, Ghostfire Initiate); "for each
+   permanent sacrificed this turn", by any player (The Balrog, Durin's Bane); "the first spell you cast with {X} in its
+   mana cost each turn costs {1} less for each +1/+1 counter" (Zimone, Infinite Analyst); "where X is equipped
+   creature's power" and "put all instant and sorcery cards from among them into your hand" (Glamdring, Foe-hammer //
+   Gleam of Death, Cantankerous Keepers); "if no life is lost this way, convert ~" and "choose flying or indestructible
+   at random" (Blitzwing). +23 (27,642 of 31,936 with round 207 and Lane B round B38).
+   Out after round 208 (looked at, not done): Michelangelo, Improviser ("a creature card and/or a land card from your
+   hand" onto the battlefield at once needs a picker for one of each); Silverquill, the Disputant and Lorehold, the
+   Historian (casualty and miracle granted to other spells and cards: both are read from the card's own text only);
+   Dyadrine, Synthesis Amalgam ("remove a +1/+1 counter from each of two creatures you control. If you do").
+   Round 209 went on from the top: "exile the top card ... When you exile a (nonland) card this way, ... where X is that
+   card's mana value", a reflexive trigger (Cait Sith, Fortune Teller, Hidetsugu, Devouring Chaos); "reveal until a Shrine
+   card. You may put that card onto the battlefield. Then shuffle" (Hei Bai, Forest Guardian); "you may draw X cards ...
+   If you do, you lose X life" (Bebop, Skull & Crossbones); "... if you've completed a dungeon" and "... if you're the
+   monarch. Otherwise, ..." read as intervening conditions as it resolves (Barrowin of Clan Undurr, Regal Sliver); "exile
+   those tokens when ~ leaves the battlefield" (Mysterio, Master of Illusion); "reveal until a nonland card with mana
+   value 3 or less. You may cast that card without paying its mana cost" (Treasure Keeper); "its controller amasses
+   Goblins X" (Azog, Moria's Ruin); "you may pay {1}{W} any number of times. When you pay this cost one or more times,
+   ... that many", a new "how many times" prompt with a browser test (Intrepid, Primal, Spectral and Tainted Adversary);
+   "when you do" after putting counters on a target (Dimension X Pizzasaur); "the greatest mana value among instant and
+   sorcery spells you've cast this turn" (Rootha, Mastering the Moment); "costs {1} less if it has mutate" and its cast
+   trigger (Pollywog Symbiote); "enchanted artifact's activated abilities cost {2} less" (Power Artifact); a named
+   legendary token with two quoted abilities (Ozox, the Clattering King), and other tokens with two (Pursued Whale, Relic Robber);
+   "sacrifice it. If you do, reveal until a creature card. Put that card onto the battlefield, then shuffle ... If that
+   creature is a Demon, ..." (Aspiring Champion). +21 (27,692 of 31,936 with round 208 and Lane B rounds B38 and B39).
+   Out after round 209 (looked at, not done): Bloodthirsty Adversary (cast copies of several cards from the graveyard:
+   casting from among graveyard cards takes one target only); From Under the Floorboards, Avacyn's Judgment and Welcome
+   to the Fold (madness {X}: X in an alternative cost from exile); Citizen's Crowbar (a granted ability that sacrifices
+   the Aura's own source); Gluttonous Hellkite (counters for each creature sacrificed by its cast trigger); Insatiable
+   Frugivore ("repeat this process" after an optional exile); Broodguard Elite (warp {X}); Mog, Moogle Warrior (what each
+   player discarded decides two effects).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -867,7 +910,7 @@ line blocks.
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
-   the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
+   the Wild Hunt, Audacious Reshapers, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
    Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
@@ -2702,8 +2745,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hatchling's escape cost), "draw a card for each spell countered this way" (Swift Silence), "Whenever a spell you've
   cast is countered" (Multani's Presence), "the number of creatures that died this way" (Hellfire), Soulquake, "loses
   all poison counters ... that much damage" (Leeches), "the milled card's mana value" (Heed the Mists), "~ is
-  colorless" (Ghostfire), "exile it, then shuffle all creature cards" (Barishi). +29 (27,649 of 31,936 with B35 to B38
-  and rounds 202 to 207).
+  colorless" (Ghostfire), "exile it, then shuffle all creature cards" (Barishi). +29 (27,671 of 31,936 with B35 to B38
+  and rounds 202 to 208).
 - Out after round B39: Ulamog's Despoiler ("As ~ enters, you may put two cards ... If you do, it enters with four
   +1/+1 counters": an enters-option picker for exile), Arni Brokenbrow ("base power becomes 1 plus the greatest power
   among other creatures you control"), Inquisitor's Snare still (the prevention must follow the creature after it
@@ -2723,7 +2766,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   (Tribute to Urborg), morbid "instead that player reveals their hand, you choose two cards" (Gruesome Discovery),
   "Whenever you cast an Aura spell that targets ~" (Druid of Horns), "at end of combat, sacrifice it and it deals 5
   damage to you" (Time Elemental), "return it and ~ to their owners' hands at end of combat" (Contempt), "exile all
-  cards from target opponent's hand" (Hypnox). +20 (27,669 of 31,936).
+  cards from target opponent's hand" (Hypnox). +20 (27,712 of 31,936 with round 209).
 - Out after round B40: Erosion, Insubordination and Aggression (the enchanted creature is locked in as the upkeep
   trigger triggers, rulings), Bramble Elemental (no "becomes attached" event), Hipparion (a cost to block), Agonizing
   Memories ("in any order"), Noggin Whack and Pulse of the Dross (the target player chooses which cards to reveal),

@@ -918,7 +918,7 @@ line blocks.
    a legendary enchantment" (Altar of the Pantheon); "that player or that planeswalker's controller discards seven cards,
    then sacrifices seven permanents" (Nicol Bolas, Planeswalker); "cast target instant or sorcery card with mana value 3 or
    less from your graveyard" as it resolves, paying for it (Chandra, Acolyte of Flame); "put five cards from your
-   graveyard on top of your library in any order" (Stillness in Motion). +24 (27,716 of 31,936 with round 209 and Lane B round B39); the same text also covers Winter Soldier, Icy Assassin, Fendeep
+   graveyard on top of your library in any order" (Stillness in Motion). +24 (27,766 of 31,936 with round 209 and Lane B rounds B39 to B41); the same text also covers Winter Soldier, Icy Assassin, Fendeep
    Summoner, In the Eye of Chaos and Afflicted Deserter // Werewolf Ransacker.
    Out after round 210 (looked at, not done): Eivor, Battle-Ready ("a Saga card and/or a land card from among them" needs
    a one-of-each picker); Puca's Mischief (a second target's mana value bound by the first one's, chosen as a set);
@@ -2781,11 +2781,43 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lumengrid Augur and Desecrator Hag (what the chosen or discarded card was), Canker Abomination (counters for the
   chosen opponent's creatures), Drake Familiar ("unless you return an enchantment"), Cabal Slaver ("Whenever a Goblin
   deals combat damage to a player"), Aven Warcraft (threshold choice of a color).
-- Next for Lane B, least played first (up from about 21,900): Fickle Efreet, Bill Ferny, Bullseye, Rayami, Boom
-  Scholar, Hypnox, Hankyu, The Abyss, Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
+- Round B40 (harder skipped cards, least played first): "draw N cards, then discard one of them" picks only among the
+  cards just drawn (Soldevi Sage, Casting of Bones, Krovikan Sorcerer; browser test), "discard any number of creature
+  cards ... for each card discarded this way" (Mind Maggots), "if you discard a creature card this way ... that card's
+  power" (Cragganwick Cremator), Reviving Vapors ("that card's mana value"), "As ~ enters, discard your hand"
+  (Heightened Awareness), "Sacrifice an artifact or another creature" as a cost (Malevolent Noble), "a land card of each
+  basic land type" (Gaea's Balance), rhystic payments: "unless ... pays {2}. If they do, ..." (Rhystic Lightning),
+  "Then if any player pays {2}" (Rhystic Scrying), "unless any player pays {X}" (Soul Strings); "the number of Islands
+  tapped this way" (Monsoon), "each of those creatures with flying" (Winter Blast), "gets an additional" after kicker
+  (Tribute to Urborg), morbid "instead that player reveals their hand, you choose two cards" (Gruesome Discovery),
+  "Whenever you cast an Aura spell that targets ~" (Druid of Horns), "at end of combat, sacrifice it and it deals 5
+  damage to you" (Time Elemental), "return it and ~ to their owners' hands at end of combat" (Contempt), "exile all
+  cards from target opponent's hand" (Hypnox). +20 (27,712 of 31,936 with round 209).
+- Out after round B40: Erosion, Insubordination and Aggression (the enchanted creature is locked in as the upkeep
+  trigger triggers, rulings), Bramble Elemental (no "becomes attached" event), Hipparion (a cost to block), Agonizing
+  Memories ("in any order"), Noggin Whack and Pulse of the Dross (the target player chooses which cards to reveal),
+  Fickle Efreet ("an opponent gains control of ~" after a lost coin flip), The Abyss (the active player chooses the
+  target), Retribution, Barrin's Spite, Vicious Betrayal, Sacred Guide, Scrounge.
+- Round B41 (harder skipped cards, least played first): "Whenever you activate an exhaust ability" (Afterburner
+  Expert, Adrenaline Jockey, Rangers' Aetherhive, Rangers' Refueler), "Exhaust abilities you activate cost {1} less"
+  (Boom Scholar), "Whenever you activate ~'s outlast ability" (Herald of Anafenza), "if it had no time counters on it"
+  as it dies (Deadly Grub, Chronozoa, Lost Auramancers), "each player who controls the most lands" (Tectonic Hellion),
+  "each player other than target player" (Death by Dragons), "Loyalty abilities ... cost {1} more" (Eidolon of
+  Obstruction), graveyard triggers "if ~ is in your graveyard, you may (pay ...) return it / put it on top of your
+  library" (Pyrewild Shaman, Moss-Pit Skeleton, Dungeon Crawler, Auntie's Snitch, Blood Operative), "you may have her
+  deal 2 damage to you. When you do" (Elektra), "That artifact deals damage equal to its mana value to ~" as it last
+  existed (Goblin Tinkerer), "During your turn, ~ is a Bear with base power and toughness 4/2" (Circle of the Moon
+  Druid), "can't attack if there's another creature on the battlefield" (Shauku), "put that permanent on the
+  bottom of its owner's library instead" after kicker (Rona's Vortex), "If that permanent is black, exile it instead"
+  of phasing out (Divine Smite), Heated Argument, Monoist Circuit-Feeder, "return it ... and it loses all abilities"
+  (Retched Wretch), Sudden Reclamation, Mind Bomb (each player discards up to three), Renounce ("sacrifice any number
+  of permanents"), "If a card is put into exile this way" (Corpse Appraiser). +30 (27,742 of 31,936 with round 209 and B40).
+- Out after round B41: Nimble Hobbit ("sacrifice a Food or pay {2}{W}": an either cost with a mana payment), Cadaverous
+  Bloom and Rasputin (mana abilities with non-tap costs), Bullseye, Lava Burst, Sivvi's Valor, Treacherous Link,
+  Kitesail Skirmisher, Bill Ferny, Rayami, Hankyu, Boros Battleshaper, Aura Graft (each needs a new mechanic).
+- Next for Lane B, least played first (up from about 19,600): Sacred Ground, Mana
   Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
-  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence, and in the 18,000s Mind Bomb
-  (each player discards up to three). Then the unsupported ones above that, least played first
+  Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence. Then the unsupported ones above that, least played first
   (`npm run popular -- --least`).
   Then up from about 17,100 (round B10 took the easier ones up to about 15,000; about 490 are still unsupported
   there, its skips included, mostly multi-line cards and new mechanics): Mirror Match, Trickster's Talisman,

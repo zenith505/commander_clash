@@ -165,6 +165,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (poisoned) return { ref: "opponentsWithPoison", n: num(poisoned[1]!) };
   if (/^each opponent dealt combat damage this game by a creature named ~$/.test(x)) return { ref: "opponentsCombatDamagedByName" };
   if (x === "each player who controls the most creatures") return { ref: "mostCreatures" };
+  if (x === "each player who controls the most lands") return { ref: "mostCreatures", lands: true };
+  // Death by Dragons: "Each player other than target player creates ...".
+  if (x === "each player other than target player") {
+    const index = addTarget(ctx, { kind: "player", text: "target player" });
+    ctx.lastPlayerTarget = index;
+    return { ref: "otherThanTarget", index };
+  }
   // Fade from History: "Each player who controls an artifact or enchantment creates a 2/2 green Bear creature token".
   const controlling = /^each player who controls an? (.+)$/.exec(x);
   // Bonder's Ornament: "Each player who controls a permanent named ~".
@@ -379,6 +386,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.tappedThisWay && /^each permanent tapped this way$/i.test(x)) return { ref: "tappedThisWay" };
   // Lost in the Maze: "Tap X target creatures. Put a stun counter on each of those creatures you don't control."
   if (/^each of those creatures you don't control$/i.test(x) && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, notYours: true };
+  // Winter Blast: "Tap X target creatures. ~ deals 2 damage to each of those creatures with flying."
+  const withKw = /^each of those creatures with (flying|reach|trample|haste)$/i.exec(x);
+  if (withKw && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: ["Creature"], keywords: [withKw[1]!.charAt(0).toUpperCase() + withKw[1]!.slice(1).toLowerCase()], text: `creature with ${withKw[1]!.toLowerCase()}` } };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);

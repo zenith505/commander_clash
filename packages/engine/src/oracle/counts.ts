@@ -441,6 +441,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx && each && /^card returned to your hand this way$/.test(p)) return { count: { kind: "returnedToYourHand" } };
   // Search for Blex: "You lose 3 life for each card you put into your hand this way", after its look at the top cards.
   if (ctx?.dugToHand && each && /^card you put into your hand this way$/.test(p)) return { count: { kind: "dugToHand" } };
+  // Reviving Vapors: "put one of them into your hand. You gain life equal to that card's mana value."
+  if (ctx?.dugOneToHand && /^that card's mana value$/.test(p)) return { count: { kind: "dugToHandMv" } };
   // Reaper's Scythe: "for each player who lost life this turn", you too.
   if (each && /^player who lost life this turn$/i.test(p)) return count({ kind: "players", lostLife: true });
   // The Master of Lake-town: "for each graveyard with seven or more cards in it": each player's graveyard (CR 404.1), of

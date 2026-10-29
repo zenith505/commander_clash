@@ -434,6 +434,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "target" && b?.ref === "target" && !a.n && !b.n ? [{ type: "bite", a, b, times: 2 }] : null;
   }
+  // Goblin Tinkerer: "Destroy target artifact. That artifact deals damage equal to its mana value to ~": from the artifact
+  // as it last existed on the battlefield (CR 608.2h), destroyed or not (an indestructible one is still there).
+  if (/^That artifact deals damage equal to its mana value to ~$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.lastObjectTarget === ctx.targets.length - 1) {
+    const spec = ctx.targets[ctx.lastObjectTarget]!;
+    if (spec.kind !== "object" || spec.many || spec.types?.join() !== "Artifact") return null;
+    const a = { ref: "target" as const, index: ctx.lastObjectTarget };
+    return [{ type: "damage", amount: { count: { kind: "manaValue", of: a } }, to: { ref: "self" }, by: { target: a.index, lastKnown: true } }];
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).

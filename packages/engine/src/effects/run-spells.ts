@@ -213,6 +213,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.each === "subject") {
         const subj = objects(s, { ref: "subject" }, ctx)[0];
         if (subj) addDelayed(s, e.when, ctx.controller, subj, body, cardIdOf(s.objects[id ?? ""] ?? subj));
+        // Contempt: "return it and ~ ... at end of combat": ~ as it is now, too; if it left, it's a new object (CR 400.7).
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (subj && e.withSource && me) s.delayed![s.delayed!.length - 1]!.source = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
         return;
       }
       const o = id ? s.objects[id] : undefined;

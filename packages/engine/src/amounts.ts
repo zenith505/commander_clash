@@ -834,7 +834,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
-      return (s.castThisTurn ?? []).reduce((n, x, i) => n + (x.player === ctx.controller && i !== self ? (x.mv ?? 0) : 0), 0);
+      const mvs = (s.castThisTurn ?? []).flatMap((x, i) => (x.player === ctx.controller && i !== self && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!))) ? [x.mv ?? 0] : []));
+      return c.greatest ? Math.max(0, ...mvs) : mvs.reduce((n, v) => n + v, 0);
     }
     case "colorsAmongPermanents": {
       const colors = new Set<string>();

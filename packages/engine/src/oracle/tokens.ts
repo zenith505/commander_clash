@@ -72,6 +72,14 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   }
   // 'with "Sacrifice ~: Add {C}."': an ability of its own (CR 111.3); 'with flying, haste, and "When this creature dies,
   // ..."': keywords and then one.
+  // Ozox, the Clattering King: 'with "Jumblebones can't block" and "When Jumblebones leaves the battlefield, ..."': two
+  // abilities of its own.
+  const two = withText ? /^"([^"]+)" and "([^"]+)"$/.exec(withText) : null;
+  if (two) {
+    const texts = [innerQuotes(two[1]!), innerQuotes(two[2]!)];
+    if (!subtypes.length || !texts.every((t) => compileQuoted(t))) return null;
+    return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: texts.join("\n") };
+  }
   const quoted = withText && /^(?:(.+?),? and )?"([^"]+)"$/.exec(withText);
   const ability = quoted ? innerQuotes(quoted[2]!) : undefined;
   if (ability !== undefined && !compileQuoted(ability)) return null;

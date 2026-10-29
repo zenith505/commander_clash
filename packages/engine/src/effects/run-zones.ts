@@ -2506,6 +2506,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.resolving!.movedLinked = cards.filter((id) => s.objects[id]?.zone === "graveyard").length;
       return;
     }
+    case "exileRemembered": {
+      const ids = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "battlefield" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
+      if (ids.length) log(s, `${src} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      for (const id of ids) moveObject(s, id, "exile");
+      return;
+    }
     case "putAllOnBottom": {
       const sc = (s.resolving!.scratch ??= {});
       const all = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));

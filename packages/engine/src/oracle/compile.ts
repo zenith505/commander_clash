@@ -2445,6 +2445,14 @@ export function compile(d: CardDef): CompiledCard {
       (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
       continue;
     }
+    // Power Artifact: "Enchanted artifact's activated abilities cost {2} less to activate. This effect can't reduce the mana
+    // in that cost to less than one mana.": the permanent it enchants (CR 303.4), generic mana only (CR 601.2f, 602.2b).
+    const enchantedLess = /^Enchanted (artifact|creature|permanent)'s activated abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    if (enchantedLess && d.subtypes.includes("Aura")) {
+      const t = capital(enchantedLess[1]!);
+      (out.activationLess ??= []).push({ n: Number(enchantedLess[2]), filter: { kind: "object", types: t === "Permanent" ? [] : [t], notTypes: [], notColors: [], text: `enchanted ${enchantedLess[1]}` }, enchanted: true, ...(enchantedLess[3] ? { atLeastOne: true as const } : {}) });
+      continue;
+    }
     // Winter Orb, Winter Moon, Smoke, Static Orb, Mungha Wurm: a limit on what untaps in the untap step (CR 502.3).
     const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
     if (untapLimit) {

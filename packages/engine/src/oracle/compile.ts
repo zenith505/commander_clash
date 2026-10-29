@@ -4393,6 +4393,16 @@ export function compile(d: CardDef): CompiledCard {
   // "Target ... card not named ~" (Staff of Eden): this card's name (CR 201.5).
   for (const b of [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])])
     b.targets = b.targets.map((t) => (t.notNamed === "~" ? { ...t, notNamed: d.name } : t));
+  // Dutiful Replicator: a reflexive trigger's target too ("When you do, ... target token you control not named ~").
+  const nestedNotNamed = (x: unknown): void => {
+    if (Array.isArray(x)) x.forEach(nestedNotNamed);
+    else if (x && typeof x === "object") {
+      const o = x as Record<string, unknown>;
+      if (o.type === "reflexive" && o.body) for (const t of (o.body as AbilityBody).targets) if (t.notNamed === "~") t.notNamed = d.name;
+      Object.values(o).forEach(nestedNotNamed);
+    }
+  };
+  nestedNotNamed([out.triggers, out.activated, out.spell]);
   // "Target ... of the chosen type": the creature type chosen as this permanent entered (CR 614.12), bound on its
   // abilities (cards.ts abilitiesOf). Not on a spell, nor with a choice made while it resolves (after its targets).
   // Mirror of the Forebears: a copy of a creature whose own abilities read "the chosen type" has no type chosen for them

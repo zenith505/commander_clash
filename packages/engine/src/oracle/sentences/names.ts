@@ -83,7 +83,8 @@ export function parseNamesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   }
   // Persecute: "Choose a color. Target player reveals their hand and discards all cards of that color.": the color chosen
   // as it resolves, every card of it there (no choice).
-  if ((m = /^(Target player|Target opponent) reveals their hand and discards all cards of the chosen color$/.exec(s))) {
+  // Crosis, the Purger: "that player" (the one dealt combat damage).
+  if ((m = /^(Target player|Target opponent|[Tt]hat player) reveals their hand and discards all cards of the chosen color$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }, { type: "discard", who, n: 0, hand: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], chosen: "color", text: "card of the chosen color" } }] : null;
   }

@@ -150,6 +150,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "each player") return { ref: "eachPlayer" };
   // Blightning: "... to target player or planeswalker. That player or that planeswalker's controller discards two cards":
   // the player it targets, or the planeswalker's controller.
+  // Acorn Catapult: "~ deals 1 damage to any target. That permanent's controller or that player creates ...": the player
+  // targeted, or the targeted permanent's controller (as it last existed, CR 608.2h).
+  if (x === "that permanent's controller or that player") {
+    const i = ctx.targets.length - 1;
+    return ctx.targets.length === 1 && ctx.targets[i]?.kind === "any" ? { ref: "targetOrController", index: i } : null;
+  }
   if (x === "that player or that planeswalker's controller") {
     const i = ctx.targets.length - 1;
     const t = ctx.targets[i];
@@ -260,6 +266,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // "Exile target creature card from a graveyard. Its owner creates ..." (Pharika): whose card it is (CR 108.3).
   const lastCard = ctx.targets.length - 1;
   if ((x === "its owner" || x === "that card's owner") && ctx.targets[lastCard]?.kind === "card" && ctx.targets.filter((t) => t.kind === "card").length === 1 && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
+  // "Put target creature card from an opponent's graveyard onto the battlefield ..., then exile that player's graveyard"
+  // (Nurgle's Conscription): the opponent whose graveyard held the card, its owner (CR 404.2).
+  if (x === "that player" && ctx.lastPlayerTarget === undefined && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && ctx.targets[0]!.owner === "opponent" && !ctx.targets[0]!.many) return { ref: "targetOwner", index: 0 };
   // "Destroy target creature. Its owner gains 4 life" (Path of Peace): whose it is, whoever controls it (rulings, CR 108.3).
   if (x === "its owner" && ctx.lastObjectTarget === lastCard && ctx.targets[lastCard]?.kind === "object" && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
   // "Destroy target land. ~ deals 2 damage to that land's controller" (Melt Terrain): as it last existed (CR 608.2h).
@@ -980,7 +989,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word; so is a static
   // ability's subject, "Other Merfolk get +1/+1" (Lord of Atlantis), whose verb is plural.
   // "Destroy all Plains" (Flashfires): the basic land type is the same word in the plural.
-  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)) || (!!all && w === "Plains"));
+  // "Mice you control get +1/+0" (Flowerfoot Swordmaster): an irregular plural.
+  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || ((/s$/.test(w) || /^(?:Mice|Oxen|Pegasi)$/.test(w)) && CREATURE_TYPES.has(singular(capital(w)))) || ((!!all || bare) && SAME_PLURAL.has(w)) || (!!all && w === "Plains"));
   if (!plural && !(all && all[1]!.toLowerCase() === "each")) return null;
   head = words
     .map((w) => PLURAL_TYPES[w.toLowerCase()] ?? (/^[A-Z]/.test(w) && w !== "Plains" && CREATURE_TYPES.has(singular(w)) ? singular(w) : w))
@@ -1252,6 +1262,11 @@ export function parseTargetPhrase(
   if (opts.target && /^[a-z ]+ card not named ~ from /.test(p)) {
     extra.notNamed = "~";
     p = p.replace(/ not named ~(?= from )/, "");
+  }
+  // Dutiful Replicator: "target token you control not named ~": a permanent with any other name.
+  if (opts.target && /^[a-z ]*token you control not named ~$/.test(p)) {
+    extra.notNamed = "~";
+    p = p.replace(/ not named ~$/, "");
   }
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:(?:the chosen|that) (creature type|type|color)|(a type chosen this way))/.exec(p);

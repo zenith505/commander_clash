@@ -518,6 +518,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Progenitor's Icon: "The next spell of the chosen type you cast this turn can be cast as though it had flash" (CR
   // 702.8a): the type chosen as the source entered, bound as this resolves; the first such spell uses it up.
+  // Scout's Warning: "The next creature card you play this turn can be played as though it had flash": a creature card
+  // is only ever cast, so the next creature spell (CR 702.8a).
+  if (/^[Tt]he next creature card you play this turn can be played as though it had flash$/.test(s)) s = "The next creature spell you cast this turn can be cast as though it had flash";
   if ((m = /^[Tt]he next (spell of the chosen type|(?:[a-z]+ )?spell) you cast this turn can be cast as though it had flash$/.exec(s))) {
     const filter: TargetSpec | null = m[1] === "spell of the chosen type" ? { kind: "spell", chosen: "type", text: "spell of the chosen type" } : parseTargetPhrase(m[1]!);
     return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can be cast as though it had flash`, flash: true }] : null;

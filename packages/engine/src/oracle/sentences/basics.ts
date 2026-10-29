@@ -1140,6 +1140,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // of this effect's controller's next turn.
   // Revel in Silence: "Your opponents can't cast spells or activate planeswalkers' loyalty abilities this turn" (CR 606.3).
   if (/^Your opponents can't cast spells or activate planeswalkers' loyalty abilities this turn$/.test(s)) return [{ type: "cantCast", who: { ref: "eachOpponent" } }, { type: "turnRules", rules: ["noLoyalty"], opponents: true }];
+  // Abeyance: "Until end of turn, target player can't cast instant or sorcery spells, and that player can't activate
+  // abilities that aren't mana abilities": both for that player until the turn ends; mana abilities and spells already
+  // cast aren't touched (rulings).
+  if ((m = /^(?:Until end of turn, )?(target player|target opponent) can't cast instant or sorcery spells, and that player can't activate abilities that aren't mana abilities(?: until end of turn)?$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = parseTargetPhrase("instant or sorcery spell");
+    if (!who || filter?.kind !== "spell") return null;
+    return [{ type: "cantCast", who, filter: { ...filter, text: "instant or sorcery spell" } }, { type: "turnRules", rules: ["noActivations"], who }];
+  }
   if ((m = /^(.+?) can't cast (?:(noncreature|creature|instant|sorcery|artifact|creature or planeswalker) )?spells (this turn|until the end of your next turn)$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null = w === "players" ? { ref: "eachPlayer" } : w === "your opponents" ? { ref: "eachOpponent" } : w === "players dealt damage this way" ? { ref: "damagedThisWay" } : parsePlayer(w, ctx);

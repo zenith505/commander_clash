@@ -548,6 +548,8 @@ export interface TargetSpec {
   subtypes?: string[];
   /** Or one of these subtypes instead of one of `types`: "creature or Vehicle". */
   orSubtypes?: string[];
+  /** Or a card that has an Adventure instead of one of `types`: "instant cards, sorcery cards, and/or have an Adventure" (Frantic Firebolt; rulings: an adventurer card in any zone but the stack). */
+  orAdventure?: true;
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
   /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
   anyOf?: TargetSpec[];
@@ -2585,6 +2587,12 @@ export type Effect =
   | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec; move?: true }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
+  /**
+   * Tyrant of Discord: "target opponent chooses a permanent they control at random and sacrifices it. If a nonland
+   * permanent is sacrificed this way, repeat this process." Each of `who` in turn, a permanent chosen at random among
+   * those they control (CR 701.21a), again while the last one sacrificed wasn't a land (`repeatNonland`).
+   */
+  | { type: "sacrificeRandom"; who: PlayerRef; repeatNonland?: true }
   | { type: "sacrifice"; what: ObjRef; byController?: true; /** "That player sacrifices that creature" (Lingering Death): only if the trigger's player controls it (CR 701.21a). */ byEventPlayer?: true }
   /**
    * Exploit (CR 702.110a-b): "you may sacrifice a creature". If the source is still on the battlefield as this
@@ -3549,7 +3557,7 @@ export type Effect =
   | { type: "noLifeGainForGame"; who: PlayerRef }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
   /** `everyone`: "Players can't lose life this turn" (Everybody Lives!), each player in the game as it resolves. */
-  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "That player can't activate abilities that aren't mana abilities" (Abeyance): for these players. */ who?: PlayerRef; /** For each opponent of its controller (Revel in Silence). */ opponents?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec; /** "You may cast creature spells this turn as though they had flash" (Winding Canyons): until this turn ends instead. */ thisTurn?: true }
   /**
@@ -4594,6 +4602,8 @@ export interface TriggeredAbility {
   anyoneAttacks?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack a player", once for each player attacked (CR 508.3e); the event's player is that player. */
   perPlayer?: true;
+  /** With `perPlayer`: "Whenever you attack a player or planeswalker with ..." (Rigo, Streetwise Mentor): once for each planeswalker attacked too. */
+  perWalker?: true;
   /**
    * With `anyoneAttacks`: "Whenever one or more creatures attack one of your opponents (or a planeswalker they control)"
    * (Frontier Warmonger): once for each of its controller's opponents attacked; the event's player is that opponent, its

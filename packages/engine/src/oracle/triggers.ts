@@ -1490,10 +1490,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let perPlayer = false;
   // "When you attack with three or more creatures, transform ~" (Legion's Landing): "when" and "whenever" trigger alike.
   line = line.replace(/^When you attack with /, "Whenever you attack with ");
-  const youAttackAPlayer = /^Whenever you attack a player( with one or more [^,]+)?, /.exec(line);
+  // Rigo, Streetwise Mentor: "Whenever you attack a player or planeswalker with one or more creatures with power 1 or
+  // less": once for each player and each planeswalker those creatures attack (CR 508.3a, 508.3e), not a battle.
+  const youAttackAPlayer = /^Whenever you attack a player( or planeswalker)?( with one or more [^,]+)?, /.exec(line);
+  const perWalker = !!youAttackAPlayer?.[1];
   if (youAttackAPlayer) {
     perPlayer = true;
-    line = `Whenever you attack${youAttackAPlayer[1] ?? ""}, ${line.slice(youAttackAPlayer[0].length)}`;
+    line = `Whenever you attack${youAttackAPlayer[2] ?? ""}, ${line.slice(youAttackAPlayer[0].length)}`;
   }
   // "Whenever one or more Halflings you control attack a player" (Meriadoc Brandybuck, Attuma, Crimson Cowl): likewise
   // once for each player those creatures attack, not a planeswalker or battle (rulings on Meriadoc Brandybuck).
@@ -1660,6 +1663,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "they" are those attackers, as they were declared.
   if (event === "creaturesYouControlAttack" && m[1] && !min && /^they (?:gain|get) [^.]+ until end of turn\.?$/.test(bodyText) && !/\b(?:they|them|their)\b/.test(bodyText.slice(5)))
     bodyText = `those creatures ${bodyText.slice(5)}`;
+  // Vrestin, Menoptra Leader: "Whenever you attack with one or more Insects, put a +1/+1 counter on each of them": the
+  // attackers of the group, as they were declared.
+  if (event === "creaturesYouControlAttack" && phrase && !anyone && !perPlayer && /^put an? [^.]+ counter on each of them\.?$/.test(bodyText)) bodyText = bodyText.replace(/each of them/, "each of those creatures");
   // The attackers as a group aren't modeled. Mishra's meld sentence's "them" is Mishra and the other creature it names.
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
@@ -1714,7 +1720,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(perWalker ? { perWalker: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}), ...(selfAnd ? { selfAnd } : {}), ...(minTotalPower ? { minTotalPower } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */

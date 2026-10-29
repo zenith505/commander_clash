@@ -67,7 +67,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.objectId !== undefined && o.id !== spec.objectId) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
-  if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
+  if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && s.cards[o.cardId]?.layout === "adventure" && !o.copyOf)) return false;
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
   if (spec.notTypes?.some((t) => c.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
@@ -368,7 +368,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
   if (spec.bound || spec.drafted || spec.mostCommonColor !== undefined) return false; // not worked out yet (see objectMatches); nothing noted in a draft; permanents only
-  if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
+  if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype) && !(spec.orAdventure && d.layout === "adventure")) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => d.colors.includes(col))) return false;

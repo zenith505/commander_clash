@@ -478,8 +478,21 @@ describe("the first spell you cast with {X} in its mana cost each turn costs {1}
 
 const glamdringFoehammer = scry("adventure", [{"name":"Glamdring, Foe-hammer","type_line":"Legendary Artifact — Equipment","mana_cost":"{2}","oracle_text":"Instant and sorcery spells you cast cost {X} less to cast, where X is equipped creature's power.\nEquip {2}"},{"name":"Gleam of Death","type_line":"Sorcery — Adventure","mana_cost":"{3}{U}","oracle_text":"Mill six cards, then put all instant and sorcery cards from among them into your hand. (Then exile this card. You may cast the artifact later from exile.)"}], { keywords: ["Equip","Mill"], color_identity: ["U"] });
 
+const cantankerousKeepers = card("Cantankerous Keepers", "Creature — Elf Soldier", "{5}{G}", {"cmc":6,"power":"4","toughness":"3","keywords":["Affinity","Mill"],"oracleText":"Affinity for Elves (This spell costs {1} less to cast for each Elf you control.)\nWhen this creature enters, mill four cards, then put all Elf cards from among them into your hand.","colors":["G"],"colorIdentity":["G"],"layout":"normal"});
+
 describe("spells cost {X} less, where X is equipped creature's power; put all ... cards from among the milled ones into your hand", () => {
-  it("compile", () => supported(glamdringFoehammer));
+  it("compile", () => supported(glamdringFoehammer, cantankerousKeepers));
+
+  it("Cantankerous Keepers: the Elf cards among the four milled go to your hand", () => {
+    const { s: s0, ap } = setup([cantankerousKeepers]);
+    let s = passUntil(s0, "main1", ap);
+    const k = s.players[ap]!.hand.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Cantankerous Keepers")!;
+    const elf = into(s, ap, card("Test Elf", "Creature — Elf Druid", "{G}", { cmc: 1, power: "1", toughness: "1" }), "library");
+    const other = into(s, ap, bear(), "library");
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, G: 1, C: 5 };
+    s = settle(run(s, planCast(s, ap, k)));
+    expect([s.objects[elf]!.zone, s.objects[other]!.zone]).toEqual(["hand", "graveyard"]);
+  });
 
   it("Glamdring: instants and sorceries cost {1} less for each point of the equipped creature's power, generic only", () => {
     const { s: s0, ap } = setup([]);

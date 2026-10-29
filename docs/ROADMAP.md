@@ -2733,9 +2733,31 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   specs), Library of Lat-Nam (an opponent chooses the mode), Serene Master (exchanging power with values locked in, as
   for "exchange life totals"), Kav Landseeker ("at the beginning of the end step on your next turn": there is only
   "your next end step", which can be this turn's).
+- Round B39 (harder skipped cards, least played first): the Eldrazi processors, "put a card an opponent owns from exile
+  into that player's graveyard" as a cast or enters trigger's "you may ... If you do" (Ruin Processor, Blight Herder
+  with two cards, Murk Strider, Mind Raker, Ulamog's Reclaimer, Wasteland Strangler, Ulamog's Nullifier), as an
+  activated ability's cost (Cryptic Cruiser, Oracle of Dust, Void Attendant) and as a spell's additional cost
+  (Processor Assault); a face-down card is chosen by its group and taken at random within it, and shows its back in the
+  picker (rulings; browser test). Boast triggers and cost cuts (Axgard Braggart, Frenzied Raider, Dragonkin Berserker),
+  "Players can't play lands" (Territorial Dispute), "When ~ has no +1/+1 counters on it" (Afiya Grove), "If a white
+  creature dies this way" (Cinder Cloud), "the creature's controller" (Creature Bond), "exile a creature you control"
+  and "discard a card and sacrifice a creature" as additional costs (Necrotic Fumes, Ruthless Disposal; also Lunar
+  Hatchling's escape cost), "draw a card for each spell countered this way" (Swift Silence), "Whenever a spell you've
+  cast is countered" (Multani's Presence), "the number of creatures that died this way" (Hellfire), Soulquake, "loses
+  all poison counters ... that much damage" (Leeches), "the milled card's mana value" (Heed the Mists), "~ is
+  colorless" (Ghostfire), "exile it, then shuffle all creature cards" (Barishi). +29 (27,671 of 31,936 with B35 to B38
+  and rounds 202 to 208).
+- Out after round B39: Ulamog's Despoiler ("As ~ enters, you may put two cards ... If you do, it enters with four
+  +1/+1 counters": an enters-option picker for exile), Arni Brokenbrow ("base power becomes 1 plus the greatest power
+  among other creatures you control"), Inquisitor's Snare still (the prevention must follow the creature after it
+  leaves the battlefield, rulings), Skulking Killer ("if that opponent controls no other creatures" as it resolves),
+  Wicked Guardian ("have it deal 2 damage to another creature you control", chosen as it resolves), Graveyard Shovel,
+  Lumengrid Augur and Desecrator Hag (what the chosen or discarded card was), Canker Abomination (counters for the
+  chosen opponent's creatures), Drake Familiar ("unless you return an enchantment"), Cabal Slaver ("Whenever a Goblin
+  deals combat damage to a player"), Aven Warcraft (threshold choice of a color).
 - Next for Lane B, least played first (up from about 21,900): Fickle Efreet, Bill Ferny, Bullseye, Rayami, Boom
   Scholar, Hypnox, Hankyu, The Abyss, Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
-  Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Ruin Processor, Throne of Makindi,
+  Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
   Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence, and in the 18,000s Mind Bomb
   (each player discards up to three). Then the unsupported ones above that, least played first
   (`npm run popular -- --least`).

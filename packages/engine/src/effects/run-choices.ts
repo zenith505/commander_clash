@@ -2,10 +2,10 @@ import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
+import { autoEvidence, processCandidates, availableMana, canGainLife, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType, whileControlledHolds } from "../game";
 import { abilitiesOf, cardIdOf, defOf, isType, objIsType, power } from "../cards";
 import { characteristics, controllerOf, staticConditionNow } from "../layers";
-import type { GameState, ObjectId, PlayerId } from "../types";
+import type { Color, GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches, targetsMatch } from "./targeting";
 import { tokenDef } from "./run-tokens";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
@@ -591,7 +591,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "atRandom"
             ? nextRandom(s) < 0.5
             : e.cond.kind === "destroyedThisWay"
-            ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)))
+            ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)) && (!(e.cond as { color?: Color }).color || d.ch.colors.includes((e.cond as { color: Color }).color)))
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.some((k) => (!(e.cond as { you?: true }).you || k.controller === ctx.controller) && (!(e.cond as { commander?: true }).commander || !!k.commander) && (!(e.cond as { subtype?: string }).subtype || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))
             : e.cond.kind === "anotherDied"
@@ -960,6 +960,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "noCombatDamage" && !objects(s, e.what, ctx).some((o) => o.zone === "battlefield")) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
+    // A processor's "you may put two cards your opponents own from exile ...": not with fewer there (rulings).
+    if (e.type === "processExile" && processCandidates(s, ctx.controller).length < e.n) return false;
     if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
     if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;

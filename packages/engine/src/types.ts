@@ -563,7 +563,7 @@ export interface GameObject {
    * Exiled face down by hideaway (CR 702.75a): only players who controlled `by`, the permanent that exiled it, may look
    * at it (`seen`). Gone when it changes zones.
    */
-  hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string };
+  hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string; /** When: the cards one instruction exiled face down together share it, a group a processor chooses from (rulings on Ruin Processor). */ at?: number };
   /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
   encoded?: { id: ObjectId; zc: number }[];
   /**
@@ -2106,6 +2106,10 @@ export interface Resolving {
   unlessPaid?: boolean;
   /** A spell this countered (Fold into Aether's "If that spell is countered this way"). */
   spellCountered?: true;
+  /** How many spells it countered (Swift Silence). */
+  spellsCountered?: number;
+  /** How many poison counters its loseAllCounters instruction removed (Leeches). */
+  poisonLost?: number;
   /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
   endTurn?: true;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */

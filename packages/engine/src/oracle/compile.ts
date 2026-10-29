@@ -3327,7 +3327,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     const combatCap = /^No more than (one|two) creatures? can (attack|block)( you| ~)? each combat\.$/.exec(line);
-    if (combatCap && !(combatCap[3] && combatCap[2] === "block") && (combatCap[3] !== " ~" || d.types.includes("Planeswalker") || d.types.includes("Battle"))) {
+    if (combatCap && !(combatCap[3] && combatCap[2] === "block") && (combatCap[3] !== " ~" || d.types.includes("Planeswalker") || d.types.includes("Battle") || d.oracleId.startsWith("granted:"))) {
       (out.combatLimit ??= {})[combatCap[3] === " you" ? "attackYou" : combatCap[3] ? "attackSelf" : (combatCap[2] as "attack" | "block")] = combatCap[1] === "one" ? 1 : 2;
       continue;
     }

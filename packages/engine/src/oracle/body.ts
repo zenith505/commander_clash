@@ -1143,7 +1143,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "it" is ~.
   text = text.replace(/\b(put an? [a-z]+ counter on ~, then) it deals damage equal to the number of ([a-z]+) counters on it to\b/gi, "$1 ~ deals damage equal to the number of $2 counters on ~ to");
   // Herald of Ilharg: "~ deals damage equal to the number of counters on it to each opponent": "it" is ~.
-  text = text.replace(/(^|\. |, )~ deals damage equal to the number of ((?:[+-]?[a-z0-9/+-]+ )?)counters on it to\b/g, "$1~ deals damage equal to the number of $2counters on ~ to");
+  // Charging Cinderhorn: "Then ~ deals damage ...".
+  text = text.replace(/(^|\. |, |\. Then )~ deals damage equal to the number of ((?:[+-]?[a-z0-9/+-]+ )?)counters on it to\b/g, "$1~ deals damage equal to the number of $2counters on ~ to");
   // Midnight Tilling: "Mill four cards, then you may return a permanent card from among them to your hand": the same as
   // "You may put ... from among them into your hand", the milled cards (CR 701.17b).
   text = text.replace(/^Mill (two|three|four|five) cards, then you may return (an? [a-z]+ card) from among them to your hand\./, "Mill $1 cards. You may put $2 from among them into your hand.");
@@ -1968,6 +1969,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\bSearch your library for two cards\. Put one (into your hand|onto the battlefield) and the other into your graveyard\. Then shuffle\./g, "Search your library for two cards, put one $1 and the other into your graveyard, then shuffle.");
   // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
   text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
+  // Last Stand: "Draw a card for each Island you control, then discard that many cards": the same count for both, which
+  // nothing in between changes (CR 608.2h).
+  text = text.replace(/(^|\. )Draw a card for each (Plains|Island|Swamp|Mountain|Forest) you control, then discard that many cards\./, "$1Draw a card for each $2 you control. Discard a card for each $2 you control.");
   // "Sacrifice ~, search your library for up to two creature cards, put those cards onto the battlefield, then shuffle"
   // (Defense of the Heart): the sacrifice, then the search.
   text = text.replace(/^([Ss])acrifice ~, search your library /, "$1acrifice ~. Search your library ");
@@ -6078,6 +6082,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseOne(capital(lacksKw[2]!), ctx);
       if (!fx?.length || ctx.targets.length !== before) return null;
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [], notTypes: [], notColors: [], notKeywords: [lackedKw], text: `without ${lacksKw[1]}` } }, effects: fx });
+      continue;
+    }
+    // Throw from the Saddle: "Target creature you control gets +1/+1 until end of turn. Put a +1/+1 counter on it instead if
+    // it's a Mount.": one or the other, by the creature as this resolves (CR 608.2c).
+    const counterInstead = /^Put an? \+1\/\+1 counter on it instead if it's an? ([A-Z][a-z]+)$/.exec(s);
+    const counterPrev = effects.at(-1);
+    if (counterInstead && counterPrev?.type === "continuous" && counterPrev.what.ref === "target" && !counterPrev.what.n && counterPrev.duration === "endOfTurn" && counterPrev.mods.length === 1 && counterPrev.mods[0]!.kind === "modifyPT" && counterPrev.mods[0]!.power === 1 && counterPrev.mods[0]!.toughness === 1 && CREATURE_TYPES.has(counterInstead[1]!)) {
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [counterInstead[1]!], text: counterInstead[1]! };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: counterPrev.what.index, filter }, effects: [{ type: "counters", what: counterPrev.what, counter: "+1/+1", n: 1 }], otherwise: [counterPrev] };
       continue;
     }
     // Wakandan Royal Guard: "If that creature is another Hero, ...": a Hero other than ~ (TargetSpec.notSource).

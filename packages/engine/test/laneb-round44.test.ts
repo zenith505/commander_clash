@@ -87,6 +87,12 @@ const dreadlightMonstrosity = () => card("Dreadlight Monstrosity", "Creature —
 const throneOfMakindi = () => card("Throne of Makindi", "Land", "", { cmc: 0, oracleText: "{T}: Add {C}.\n{1}, {T}: Put a charge counter on this land.\n{T}, Remove a charge counter from this land: Add two mana of any one color. Spend this mana only to cast kicked spells." });
 const unblinkingObserver = () => card("Unblinking Observer", "Creature — Homunculus", "{1}{U}", { cmc: 2, colors: ["U"], power: "2", toughness: "1", oracleText: "{T}: Add {U}. Spend this mana only to pay a disturb cost or cast an instant or sorcery spell." });
 const burstLightning = () => card("Burst Lightning", "Instant", "{R}", { cmc: 1, colors: ["R"], keywords: ["Kicker"], oracleText: "Kicker {4} (You may pay an additional {4} as you cast this spell.)\nBurst Lightning deals 2 damage to any target. If this spell was kicked, it deals 4 damage instead." });
+const tomikOrzhovLawmage = () => card("Tomik, Orzhov Lawmage", "Legendary Creature — Human Advisor", "{1}{W}", { cmc: 2, colors: ["W"], power: "2", toughness: "1", keywords: ["Flying"], oracleText: "Flying\nPlaneswalkers you control have \"No more than one creature can attack this planeswalker each combat.\"\n{T}: Target creature with a +1/+1 counter on it gains flying until end of turn." });
+const shardConvergence = () => card("Shard Convergence", "Sorcery", "{3}{G}", { cmc: 4, colors: ["G"], oracleText: "Search your library for a Plains card, an Island card, a Swamp card, and a Mountain card. Reveal those cards, put them into your hand, then shuffle." });
+const gemOfBecoming = () => card("Gem of Becoming", "Artifact", "{3}", { cmc: 3, oracleText: "{3}, {T}, Sacrifice this artifact: Search your library for an Island card, a Swamp card, and a Mountain card. Reveal those cards, put them into your hand, then shuffle." });
+const throwFromTheSaddle = () => card("Throw from the Saddle", "Sorcery", "{1}{G}", { cmc: 2, colors: ["G"], oracleText: "Target creature you control gets +1/+1 until end of turn. Put a +1/+1 counter on it instead if it's a Mount. Then it deals damage equal to its power to target creature you don't control." });
+const lastStand = () => card("Last Stand", "Sorcery", "{W}{U}{B}{R}{G}", { cmc: 5, colors: ["B","G","R","U","W"], oracleText: "Target opponent loses 2 life for each Swamp you control. Last Stand deals damage to target creature equal to the number of Mountains you control. Create a 1/1 green Saproling creature token for each Forest you control. You gain 2 life for each Plains you control. Draw a card for each Island you control, then discard that many cards." });
+const chargingCinderhorn = () => card("Charging Cinderhorn", "Creature — Elemental Ox", "{3}{R}", { cmc: 4, colors: ["R"], power: "4", toughness: "2", keywords: ["Haste"], oracleText: "Haste\nAt the beginning of each player's end step, if no creatures attacked this turn, put a fury counter on this creature. Then this creature deals damage equal to the number of fury counters on it to that player." });
 const baithookAngler = () => scry("transform", [{ name: "Baithook Angler", mana_cost: "{1}{U}", type_line: "Creature — Human Peasant", oracle_text: "Disturb {1}{U} (You may cast this card from your graveyard transformed for its disturb cost.)", power: "2", toughness: "1" }, { name: "Hook-Haunt Drifter", type_line: "Creature — Spirit", oracle_text: "Flying\nIf Hook-Haunt Drifter would be put into a graveyard from anywhere, exile it instead.", power: "1", toughness: "2", color_indicator: ["U"] }], { keywords: ["Flying", "Transform", "Disturb"] });
 
 // Test cards.
@@ -99,7 +105,7 @@ const forestCard = () => card("Forest", "Basic Land — Forest", "", { cmc: 0 })
 
 describe("Lane B round 44 cards", () => {
   it("are fully supported", () => {
-    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver());
+    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn());
   });
 });
 
@@ -212,5 +218,103 @@ describe("Unblinking Observer", () => {
     expect(disturb).not.toBeNull();
     const after = settle(run(s, disturb));
     expect(zone(after, ids[2]!)).toBe("battlefield");
+  });
+});
+
+describe("Tomik, Orzhov Lawmage", () => {
+  it("lets no more than one creature attack each planeswalker its controller controls", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, tomikOrzhovLawmage());
+    const pw = putOnBattlefield(s0, opp, card("Test Walker", "Legendary Planeswalker — Testwalker", "{3}", { cmc: 3, loyalty: "5", oracleText: "+1: You gain 1 life." }));
+    s0.objects[pw]!.counters.loyalty = 5;
+    const a = putOnBattlefield(s0, ap, vanilla("Bear A", "Creature — Bear", "{1}{G}", 2, 2, 2));
+    const b = putOnBattlefield(s0, ap, vanilla("Bear B", "Creature — Bear", "{1}{G}", 2, 2, 2));
+    let s = s0;
+    for (let i = 0; i < 50 && s.pending?.kind !== "declareAttackers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp, planeswalker: pw }, { attacker: b, defender: opp, planeswalker: pw }] })).toThrow(/no more than one creature can attack Test Walker/);
+    const ok = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp, planeswalker: pw }, { attacker: b, defender: opp }] });
+    expect([ok.objects[a]!.attacking, ok.objects[b]!.attacking]).not.toContain(undefined);
+  });
+});
+
+describe("Shard Convergence", () => {
+  it("finds a Plains, an Island, a Swamp and a Mountain card", () => {
+    const { s: s0, ap, ids } = setup([shardConvergence()]);
+    const lands = ["Plains", "Island", "Swamp", "Mountain"].map((n) => toZone(s0, ap, card(n, `Basic Land — ${n}`, "", { cmc: 0 }), "library"));
+    let s = settle(castNow(s0, ap, ids[0]!), (x) => x.pending?.kind === "searchLibrary");
+    expect(s.pending?.kind).toBe("searchLibrary");
+    s = settle(find(s, ap, lands));
+    expect(lands.map((id) => zone(s, id))).toEqual(["hand", "hand", "hand", "hand"]);
+  });
+  it("doesn't take two cards of one land type", () => {
+    const { s: s0, ap, ids } = setup([shardConvergence()]);
+    const two = [toZone(s0, ap, card("Island", "Basic Land — Island", "", { cmc: 0 }), "library"), toZone(s0, ap, card("Island", "Basic Land — Island", "", { cmc: 0 }), "library")];
+    const s = settle(castNow(s0, ap, ids[0]!), (x) => x.pending?.kind === "searchLibrary");
+    expect(() => find(s, ap, two)).toThrow();
+  });
+});
+
+describe("Gem of Becoming", () => {
+  it("finds an Island, a Swamp and a Mountain card", () => {
+    const { s: s0, ap } = setup([]);
+    const gem = putOnBattlefield(s0, ap, gemOfBecoming());
+    const lands = ["Island", "Swamp", "Mountain"].map((n) => toZone(s0, ap, card(n, `Basic Land — ${n}`, "", { cmc: 0 }), "library"));
+    let s = settle(run(s0, planActivate(s0, ap, gem, 0)), (x) => x.pending?.kind === "searchLibrary");
+    s = settle(find(s, ap, lands));
+    expect([...lands.map((id) => zone(s, id)), zone(s, gem)]).toEqual(["hand", "hand", "hand", "graveyard"]);
+  });
+});
+
+describe("Throw from the Saddle", () => {
+  it("pumps a creature that isn't a Mount, then it deals damage equal to its power", () => {
+    const { s: s0, ap, ids, opp } = setup([throwFromTheSaddle()]);
+    const mine = putOnBattlefield(s0, ap, vanilla("My Bear", "Creature — Bear", "{1}{G}", 2, 2, 2));
+    const theirs = putOnBattlefield(s0, opp, vanilla("Their Beast", "Creature — Beast", "{2}{G}", 3, 3, 3));
+    const s = settle(castNow(s0, ap, ids[0]!, [tgt(mine), tgt(theirs)]));
+    expect([pt(s, mine), counters(s, mine), zone(s, theirs)]).toEqual(["3/3", 0, "graveyard"]);
+  });
+  it("puts a +1/+1 counter on a Mount instead", () => {
+    const { s: s0, ap, ids, opp } = setup([throwFromTheSaddle()]);
+    const mount = putOnBattlefield(s0, ap, vanilla("My Horse", "Creature — Horse Mount", "{1}{G}", 2, 2, 2));
+    const theirs = putOnBattlefield(s0, opp, vanilla("Their Wall", "Creature — Wall", "{2}{G}", 0, 4, 4));
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(mount), tgt(theirs)]));
+    expect([pt(s, mount), counters(s, mount), s.objects[theirs]!.damage]).toEqual(["3/3", 1, 3]);
+    s = goUntil(s, (x) => x.activePlayer !== ap);
+    expect(pt(s, mount)).toBe("3/3");
+  });
+});
+
+describe("Last Stand", () => {
+  it("counts each basic land type you control for its own part", () => {
+    const { s: s0, ap, ids, opp } = setup([lastStand()]);
+    onlyHand(s0, ap, ids);
+    const theirs = putOnBattlefield(s0, opp, vanilla("Their Giant", "Creature — Giant", "{4}{R}", 5, 5, 5));
+    const hand0 = s0.players[ap]!.hand.length;
+    // Lands: 3 Mountains, 3 Islands, 3 Forests, 3 Plains, 2 Swamps (setup).
+    const s = settle(castNow(s0, ap, ids[0]!, [ply(opp), tgt(theirs)]));
+    const saprolings = s.battlefield.filter((id) => s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]!.name === "Saproling Token");
+    expect([life(s, opp), s.objects[theirs]!.damage, saprolings.length, life(s, ap)]).toEqual([36, 3, 3, 46]);
+    expect([s.players[ap]!.hand.length, s.players[ap]!.graveyard.length]).toEqual([hand0 - 1, 4]);
+  });
+});
+
+describe("Charging Cinderhorn", () => {
+  it("at each end step with no attacks gets a fury counter, then deals that much damage to the active player", () => {
+    const { s: s0, ap } = setup([]);
+    const ox = putOnBattlefield(s0, ap, chargingCinderhorn());
+    let s = goUntil(s0, (x) => x.step === "cleanup" && x.activePlayer === ap);
+    expect([counters(s, ox, "fury"), life(s, ap)]).toEqual([1, 39]);
+    const next = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!;
+    const before = life(s, next);
+    s = goUntil(s, (x) => x.step === "cleanup" && x.activePlayer === next);
+    expect([counters(s, ox, "fury"), life(s, next)]).toEqual([2, before - 2]);
+  });
+  it("doesn't trigger in a turn a creature attacked", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const ox = putOnBattlefield(s0, ap, chargingCinderhorn());
+    const bear = putOnBattlefield(s0, ap, vanilla("Bear", "Creature — Bear", "{1}{G}", 2, 2, 2));
+    let s = attackWith(s0, [bear], opp);
+    s = goUntil(s, (x) => x.step === "cleanup" && x.activePlayer === ap);
+    expect([counters(s, ox, "fury"), life(s, ap)]).toEqual([0, 40]);
   });
 });

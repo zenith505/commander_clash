@@ -1946,7 +1946,7 @@ export type StaticCondition =
   /** "If an opponent has eight or more cards in their graveyard" (Sheoldred // The True Scriptures): one still in the game. */
   | { kind: "opponentGraveyard"; n: number; /** "If a graveyard has twenty or more cards in it" (Visions of Beyond): yours too. */ anyone?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
-  | { kind: "attackedThisTurn"; not?: true }
+  | { kind: "attackedThisTurn"; not?: true; /** "If no creatures attacked this turn" (Charging Cinderhorn): any player's attack. */ anyone?: true }
   /** The Chain Veil: "if you didn't activate a loyalty ability of a planeswalker this turn" (`not`). */
   | { kind: "activatedLoyaltyThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */

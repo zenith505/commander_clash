@@ -1083,6 +1083,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
   if (/^you didn't attack with a creature this turn$/.test(text)) return { kind: "attackedThisTurn", not: true };
+  // Charging Cinderhorn, Keldon Twilight: "if no creatures attacked this turn": declared as attackers by anyone (CR 508.1).
+  if (/^no creatures attacked this turn$/.test(text)) return { kind: "attackedThisTurn", not: true, anyone: true };
   if ((m = /^you (didn't )?activate(?:d)? a loyalty ability of a planeswalker this turn$/.exec(text))) return { kind: "activatedLoyaltyThisTurn", ...(m[1] ? { not: true as const } : {}) };
   if (/^you've committed a crime this turn$/.test(text)) return { kind: "committedCrime" }; // CR 700.13
   if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };

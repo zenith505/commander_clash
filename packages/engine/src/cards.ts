@@ -579,6 +579,10 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     // instance adds its own.
     const tax = (base.targetTax ?? 0) + extra.reduce((n, x) => n + (x.targetTax ?? 0), 0);
     if (tax) hit.targetTax = tax;
+    // Tomik, Orzhov Lawmage's granted "No more than one creature can attack this planeswalker each combat" (CR 508.1c): the
+    // smallest limit it has.
+    const caps = [base.combatLimit?.attackSelf, ...extra.map((x) => x.combatLimit?.attackSelf)].filter((n): n is number => n !== undefined);
+    if (caps.length) hit.combatLimit = { ...base.combatLimit, attackSelf: Math.min(...caps) };
     byKey.set(key, hit);
   }
   return hit;

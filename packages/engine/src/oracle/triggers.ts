@@ -683,6 +683,15 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(notFirst[2]!, { castSpell: true, eventPlayer: true });
     return body ? { event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" }, notFirst: true, ...(notFirst[1] ? { ownTurn: true as const } : {}) }, body } : "fail";
   }
+  // Curse of Shaken Faith: "Whenever enchanted player casts a spell other than the first spell they cast each turn"
+  // (as compile.ts splits it from "or copies a spell"); Ichneumon Druid: "Whenever an opponent casts an instant spell
+  // other than the first instant spell that player casts each turn": their second or later one of the kind this turn.
+  const notFirstOf = /^Whenever (enchanted player|an opponent|a player) casts an? (instant |sorcery |creature |noncreature )?spell other than the first (instant |sorcery |creature |noncreature )?spell (?:they cast|that player casts) each turn, (.+)$/.exec(line);
+  if (notFirstOf && notFirstOf[2] === notFirstOf[3]) {
+    const kind = notFirstOf[2] ? parseTargetPhrase(`${notFirstOf[2]}spell`) : { kind: "spell" as const, text: "spell" };
+    const body = kind?.kind === "spell" ? parseBody(theyAreThatPlayer(notFirstOf[4]!), { castSpell: true, eventPlayer: true }) : null;
+    return body ? { event: "castSpell", cast: { by: CAST_BY[notFirstOf[1] as keyof typeof CAST_BY], spell: { ...kind!, text: `${notFirstOf[2] ?? ""}spell` }, notFirst: true, ...(notFirstOf[2] ? { nthOfKind: true as const } : {}) }, body } : "fail";
+  }
   // Alania, Divergent Storm: "Whenever you cast a spell, if it's the first instant spell, the first sorcery spell, or the
   // first Otter spell other than ~ you've cast this turn, ...": one trigger if it's the first of any of those kinds (an
   // intervening if, CR 603.4, true at resolution too); "other than ~" leaves out spells with its name.
@@ -700,9 +709,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // Kalamax, the Stormsire: "Whenever you copy an instant spell": a copy of a spell put on the stack (CR 707.10), as
   // magecraft's "cast or copy" without the cast; copying a card isn't copying a spell (rulings).
-  const copies = /^Whenever you copy (an? .+? spell), (.+)$/.exec(line);
+  // Curse of Shaken Faith: "Whenever enchanted player copies a spell" (as compile.ts splits it) the same way.
+  const copies = /^Whenever (you copy|enchanted player copies) (an? (?:.+? )?spell), (.+)$/.exec(line);
   if (copies) {
-    const t = parseCastTrigger(`Whenever you cast or copy ${copies[1]}, ${copies[2]}`);
+    const t = parseCastTrigger(`Whenever ${copies[1] === "you copy" ? "you cast or copy" : "enchanted player casts or copies"} ${copies[2]}, ${copies[3]}`);
     return t && t !== "fail" && t.event === "castSpell" && t.cast?.orCopy && !t.ifCond ? { ...t, cast: { ...t.cast, onlyCopy: true } } : "fail";
   }
   // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
@@ -1901,6 +1911,13 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (ninja) {
     const body = parseBody(ninja[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", ninjutsu: true }, body } : "fail";
+  }
+  // Neerdiv, Devious Diver (as compile.ts splits it): "Whenever you activate an ability of a card in your graveyard":
+  // mana abilities too, as nothing says otherwise.
+  const yard = /^Whenever you activate an ability of a card in your graveyard, (.+)$/.exec(line);
+  if (yard) {
+    const body = parseBody(yard[1]!, { activatedAbility: true });
+    return body ? { event: "abilityActivated", activates: { by: "you", inYourGraveyard: true, mana: true }, body } : "fail";
   }
   // Elrond, Moon-Reader: "Whenever you activate an ability of a creature, ..." with nothing about mana abilities: mana
   // abilities too (rulings).

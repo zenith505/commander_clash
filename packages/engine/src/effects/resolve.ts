@@ -348,6 +348,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       const me = objects(s, { ref: "self" }, ctx)[0];
       if (me && !out.includes(me)) out.unshift(me);
     }
+    if (ref.andSelfCard) {
+      const me = objects(s, { ref: "selfCard" }, ctx)[0];
+      if (me && !out.includes(me)) out.unshift(me);
+    }
     return out;
   }
   if (ref.ref === "tokensCreatedWithSelf")

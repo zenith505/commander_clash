@@ -628,6 +628,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.impulsed ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedTopIs"
             ? ((f) => (s.resolving!.revealedUntil ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(((f) => (f.named === "~" ? { ...f, named: ctx.sourceDef.name } : f))((e.cond as { filter: TargetSpec }).filter))
+            : e.cond.kind === "milledShareTypes"
+            ? ((ds) => ds.length === 2 && [...ds[0]!.types].sort().join() === [...ds[1]!.types].sort().join())((s.resolving!.milled ?? []).map(({ id }) => defOf(s, s.objects[id]!)))
             : e.cond.kind === "milledIs"
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"

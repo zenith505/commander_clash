@@ -1,8 +1,8 @@
 # Roadmap
 
-27,294 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,063 of
-9,979 (90%).
+27,314 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,081 of
+9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -795,6 +795,27 @@ line blocks.
    Retriever (a mandatory "exile it. When you do"), Leaves from the Vine (a type-or-subtype filter), Behold the
    Unspeakable (a pausing scry inside "Otherwise"), Song of Blood, Indulge // Excess, Harald Unites the Elves, Rent Is
    Due, Search Elemental, Estinien Varlineau.
+   Round 205 went on from the top: "if it's the first time that creature has become tapped this turn" (CR 603.4: Captain
+   America, Living Legend), "an opponent attacks one or more planeswalkers you control" (Mila, Crafty Companion) and Lukka,
+   Wayward Bonder ("draw two cards instead", "Exile it at the beginning of your next upkeep"), "whenever you copy an
+   instant spell" (CR 707.10: Kalamax, the Stormsire), "two cards that share all their card types" (Demonic Covenant),
+   "that player exiles the top card of their library" played from exile (CR 607.2a: Nightveil Specter), "Return this
+   card and target land card" (Sandman, Shifting Scoundrel), "that artifact enters tapped" (Edgar, Master Machinist), "if
+   its power was different from its base power" as it last existed (CR 608.2h: Jason Bright, Glowing Prophet), "a nonland
+   card of an opponent's choice" (Tasigur, the Golden Fang), "~ or a legendary creature" and "sacrifice X Foods"
+   (Campsite Cuisine), "If the sacrificed permanent was a Treasure / Vehicle" (Evereth, Viceroy of Plunder, Hellish
+   Sideswipe), "up to eight target permanents" (Lorthos, the Tidemaker), "Desert lands from your graveyard" (Hazezon,
+   Shaper of Sand), "attacking modified creatures" (Iron Man, Armored Avenger), "any number of legendary and/or enchantment
+   cards" (Nashi, Searcher in the Dark), "Scouts, Pirates, and/or Rogues" and "You may cast it. If you don't" (Vaan, Street
+   Thief, Boss Uramon, Mordor Trebuchet), granted renown and "a renowned creature" (CR 702.112: Aragorn, Hornburg Hero),
+   "creatures you control with base power 0 ... equal to the damage dealt" (Primo, the Unbounded). Fixed: Fire Navy
+   Trebuchet's token got "Ballistic Boulder that's tapped and attacking" as its name and entered untapped. No new prompts.
+   +21, 20 of them legal (27,314 of 31,936).
+   Out after round 205 (looked at, not done): Brimaz, Blight of Oreskos (which spells it means), Osgir, the Reconstructor
+   (an X exile cost and copies of that card), Eivor, The Twelfth Doctor (granting demonstrate), Chandra, Dressed to Kill
+   (a loyalty ability that adds mana, an emblem counting mana spent), Sigurd, Jarl of Ravensthorpe ("whenever you put a
+   lore counter on a Saga"), Ruxa, Patient Professor ("creatures with no abilities"), The Ruinous Powers ("When you cast
+   a spell this way"), Curse of Hospitality ("creatures attacking enchanted player").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to

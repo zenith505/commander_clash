@@ -8771,6 +8771,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b72fde5e-862a-45e8-9880-f2c16975a9ac",
+  "name": "Intrepid Adversary",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Scout",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Scout"
+  ],
+  "oracleText": "Lifelink\nWhen this creature enters, you may pay {1}{W} any number of times. When you pay this cost one or more times, put that many valor counters on this creature.\nCreatures you control get +1/+1 for each valor counter on this creature.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3c9faba7-f2d3-4978-be94-020dc8003dc0",
   "name": "Intuition",
   "manaCost": "{2}{U}",
@@ -11782,6 +11815,77 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "5783facf-d26e-4aae-a753-b9dc553361c1",
+  "name": "Mosswood Dreadknight // Dread Whispers",
+  "manaCost": "{1}{G} // {1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Knight // Sorcery — Adventure",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Trample\nWhen this creature dies, you may cast it from your graveyard as an Adventure until the end of your next turn.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "rare",
+  "layout": "adventure",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Mosswood Dreadknight",
+    "manaCost": "{1}{G}",
+    "typeLine": "Creature — Human Knight",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Knight"
+    ],
+    "oracleText": "Trample\nWhen this creature dies, you may cast it from your graveyard as an Adventure until the end of your next turn.",
+    "power": "3",
+    "toughness": "2",
+    "colors": [
+     "G"
+    ]
+   },
+   {
+    "name": "Dread Whispers",
+    "manaCost": "{1}{B}",
+    "typeLine": "Sorcery — Adventure",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [
+     "Adventure"
+    ],
+    "oracleText": "You draw a card and you lose 1 life. (Then exile this card. You may cast the creature later from exile.)",
+    "colors": [
+     "B"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "7cb9e29f-835f-4155-a2a5-4b778866c773",

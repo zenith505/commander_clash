@@ -94,10 +94,12 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Songbirds' Blessing: "You may put that card onto the battlefield. If you don't, put it into your hand." Asked first;
       // nothing has moved yet, so resuming reveals the same cards.
       const sc = (s.resolving!.scratch ??= {});
-      if (e.mayElseHand && hits.length && sc.may === undefined) {
-        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, hits[0]!)).name} onto the battlefield`, otherwise: "If you don't, it goes into your hand.", source: src, card: hits[0]! };
+      // Hei Bai, Forest Guardian: "You may put that card onto the battlefield. Then shuffle.": if you don't, it stays.
+      if ((e.mayElseHand || e.mayStay) && hits.length && sc.may === undefined) {
+        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${defOf(s, obj(s, hits[0]!)).name} onto the battlefield`, otherwise: e.mayStay ? "If you don't, it stays in your library." : "If you don't, it goes into your hand.", source: src, card: hits[0]! };
         return "paused";
       }
+      const declined = e.mayStay && !sc.may ? hits.splice(0) : [];
       const found = e.mayElseHand && !sc.may ? "hand" : e.found;
       // An Aura found for the battlefield: its new controller chooses what it enchants as it enters (CR 303.4f), or it
       // stays in the library (303.4g); with a hand to go to instead, it goes there (rulings on Songbirds' Blessing).
@@ -141,11 +143,13 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
           }),
         );
+      if (e.remember && s.resolving) s.resolving.created = found === "battlefield" ? hits.filter((id) => obj(s, id).zone === "battlefield") : [];
       for (const id of toHand) {
         log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it goes into ${p.name}'s hand.`);
         moveObject(s, id, "hand");
       }
       if (e.mayElseHand && found === "hand") for (const id of hits) log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand.`);
+      for (const id of declined) log(s, `${p.name} leaves ${defOf(s, obj(s, id)).name} in their library.`);
       const rest = seen.filter((id) => !hits.includes(id) && !stays.includes(id) && !toHand.includes(id));
       if (e.rest === "bottom") {
         // "The rest on the bottom of your library in a random order" (CR 701.20a), every one of them if none was found.

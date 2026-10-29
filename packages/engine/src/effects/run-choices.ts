@@ -565,6 +565,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!(s.resolving!.wonClash ?? ctx.event?.wonClash)
             : e.cond.kind === "wonFlip"
             ? !!s.resolving!.flipped && s.resolving!.flipped.won !== !!e.cond.lost
+            : e.cond.kind === "atRandom"
+            ? nextRandom(s) < 0.5
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.some((d) => (!(e.cond as { died?: true }).died || d.died) && (!(e.cond as { you?: true }).you || d.ch.controller === ctx.controller) && (!(e.cond as { cardType?: string }).cardType || d.ch.types.includes((e.cond as { cardType: string }).cardType)) && (!(e.cond as { color?: Color }).color || d.ch.colors.includes((e.cond as { color: Color }).color)))
             : e.cond.kind === "sacrificedThisWay"

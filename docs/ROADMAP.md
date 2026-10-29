@@ -857,6 +857,28 @@ line blocks.
    Out after round 207 (looked at, not done): Varolz, the Scar-Striped and Young Deathclaws (scavenge for a */*
    creature card needs its characteristic-defining power in the graveyard, and the layers only work it out on the
    battlefield and in exile).
+   Round 208 went on from the top: "draw four cards. When you do, ..." only if all four were drawn (The Royal Scions);
+   "you may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight,
+   Hildibrand Manderville), a permission for the Adventure face only, with a browser test; "up to one other target creature loses all
+   abilities", then keyword counters on it (Abigale, Eloquent First-Year); "equip {2} or {B}", two equip abilities
+   (Transmogrant's Crown, CR 702.6d); "if it wasn't an Aura, create a token that's a copy of it, except it's a 1/1 white
+   Spirit creature with flying in addition to its other types" (Kaya, Intangible Slayer; the copy's "with flying" no
+   longer becomes subtypes); "it becomes a legendary Spider Hero in addition to its other types" (Origin of
+   Spider-Man); "as long as ~ has a shield counter on him, you and other Heroes you control have hexproof" (Captain
+   America, Super-Soldier); "becomes saddled until end of turn" (Kolodin, Triumph Caster, Guidelight Matrix); "a creature
+   card at random from target opponent's graveyard" (Tariel, Reckoner of Souls); "return ~ and up to one other target
+   creature card" (Slimefoot and Squee); "can't attack or block unless you have max speed" (Hazoret, Godseeker);
+   bloodthirst X (Indoraptor, Petrified Wood-Kin) and a spell that "gains bloodthirst 3" (Bloodlord of Vaasgoth);
+   "manifest a number of cards equal to the number of counters on it" (Omarthis, Ghostfire Initiate); "for each
+   permanent sacrificed this turn", by any player (The Balrog, Durin's Bane); "the first spell you cast with {X} in its
+   mana cost each turn costs {1} less for each +1/+1 counter" (Zimone, Infinite Analyst); "where X is equipped
+   creature's power" and "put all instant and sorcery cards from among them into your hand" (Glamdring, Foe-hammer //
+   Gleam of Death, Cantankerous Keepers); "if no life is lost this way, convert ~" and "choose flying or indestructible
+   at random" (Blitzwing). +23 (27,642 of 31,936 with round 207 and Lane B round B38).
+   Out after round 208 (looked at, not done): Michelangelo, Improviser ("a creature card and/or a land card from your
+   hand" onto the battlefield at once needs a picker for one of each); Silverquill, the Disputant and Lorehold, the
+   Historian (casualty and miracle granted to other spells and cards: both are read from the card's own text only);
+   Dyadrine, Synthesis Amalgam ("remove a +1/+1 counter from each of two creatures you control. If you do").
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -867,7 +889,7 @@ line blocks.
    Taskmaster, Mercenary Mimic, Gideon Blackblade, Kolvori, God of Kinship, Fisher's Talent, Niko, Light of Hope,
    Stick Together, Activated Sleeper, Taii Wakeen, Perfect Shot, Angel's Trumpet, Summoner's Sending, Urianger
    Augurelt, Quintorius, Loremaster, Quantum Riddler, Model of Unity, The Flood of Mars, Sigarda's Vanguard, Master of
-   the Wild Hunt, Audacious Reshapers, Guidelight Matrix, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
+   the Wild Hunt, Audacious Reshapers, Mists of Lórien, Kiora, Sovereign of the Deep, Quest for
    Ula's Temple; the ones skipped in rounds 182, 181, 180, 179, 178, 177 and 176 (above); the ones skipped in round 175: Detention Sphere, Tangle Wire,
    Steward of the Harvest, Solitary Sanctuary, Werewolf Pack Leader, Agent's Toolkit, Heroes in a Half Shell, Ran and
    Shaw, Rampaging Aetherhood, Unstable Glyphbridge, Flitterwing Nuisance, Curious Forager, From the Catacombs, Loki,
@@ -2702,8 +2724,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Hatchling's escape cost), "draw a card for each spell countered this way" (Swift Silence), "Whenever a spell you've
   cast is countered" (Multani's Presence), "the number of creatures that died this way" (Hellfire), Soulquake, "loses
   all poison counters ... that much damage" (Leeches), "the milled card's mana value" (Heed the Mists), "~ is
-  colorless" (Ghostfire), "exile it, then shuffle all creature cards" (Barishi). +29 (27,649 of 31,936 with B35 to B38
-  and rounds 202 to 207).
+  colorless" (Ghostfire), "exile it, then shuffle all creature cards" (Barishi). +29 (27,671 of 31,936 with B35 to B38
+  and rounds 202 to 208).
 - Out after round B39: Ulamog's Despoiler ("As ~ enters, you may put two cards ... If you do, it enters with four
   +1/+1 counters": an enters-option picker for exile), Arni Brokenbrow ("base power becomes 1 plus the greatest power
   among other creatures you control"), Inquisitor's Snare still (the prevention must follow the creature after it

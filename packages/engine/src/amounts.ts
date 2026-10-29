@@ -104,8 +104,10 @@ function selfObject(s: GameState, ctx: AmountCtx): GameObject | undefined {
 
 function refObjects(s: GameState, ref: ObjRef, ctx: AmountCtx): GameObject[] {
   if (ctx.objects) return ctx.objects(ref);
-  const o = ref.ref === "self" ? selfObject(s, ctx) : ref.ref === "ringBearer" ? ringBearer(s, ctx.controller) : undefined;
-  return o ? [o] : [];
+  // "Equipped creature's power" in a static ability (Glamdring, Foe-hammer): what the source is attached to.
+  const host = ref.ref === "attached" ? selfObject(s, ctx)?.attachedTo : undefined;
+  const o = ref.ref === "self" ? selfObject(s, ctx) : ref.ref === "ringBearer" ? ringBearer(s, ctx.controller) : host !== undefined ? s.objects[host] : undefined;
+  return o && (ref.ref !== "attached" || o.zone === "battlefield") ? [o] : [];
 }
 
 function refPlayers(s: GameState, ref: PlayerRef, ctx: AmountCtx): PlayerId[] {
@@ -301,7 +303,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "totalPowerOf":
       return refObjects(s, c.of, ctx).filter((o) => o.zone === "battlefield").reduce((n, o) => n + (view(o)?.power ?? 0), 0);
     case "lifeLostThisWay":
-      return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
+      return c.byLoss ? (s.resolving?.lifeLost ?? 0) : (s.resolving?.exchanged?.lost[ctx.controller] ?? 0);
     case "exchangedLifeDifference": {
       const ps = s.resolving?.exchanged?.players ?? [];
       return ps.length === 2 ? Math.abs(s.players[ps[0]!]!.life - s.players[ps[1]!]!.life) : 0;
@@ -454,7 +456,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.turnLog?.entered ?? []).filter((e) => !(sub && e.id === sub.id && e.zc === (sub.zoneChanges ?? 0)) && e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype)) && (!c.anySubtype || c.anySubtype.some((t) => !!e.subtypes?.includes(t))) && !(c.nontoken && e.token)).length;
     }
     case "sacrificedThisTurn":
-      return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
+      return (s.turnLog?.sacrificed ?? []).filter((t) => (c.anyPlayer || t.player === ctx.controller) && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type)) && !(c.nontoken && t.token)).length;
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
     case "youAttackedWithThisTurn": {
@@ -1014,7 +1016,7 @@ function describeCount(c: Count): string {
     case "totalPowerOf":
       return "the total power of those creatures";
     case "lifeLostThisWay":
-      return "the life you lost";
+      return c.byLoss ? "the life lost this way" : "the life you lost";
     case "exchangedLifeDifference":
       return "the difference between their life totals";
     case "votes":
@@ -1066,7 +1068,7 @@ function describeCount(c: Count): string {
     case "enteredThisTurn":
       return `#${c.nontoken ? "nontoken " : ""}${c.anySubtype?.join("/") ?? c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
     case "sacrificedThisTurn":
-      return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s you sacrificed this turn`;
+      return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s ${c.anyPlayer ? "" : "you "}sacrificed this turn`;
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
     case "youAttackedWithThisTurn":

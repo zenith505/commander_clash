@@ -448,3 +448,30 @@ describe("~ costs {1} less to cast for each permanent sacrificed this turn", () 
     expect(s.objects[b]!.zone).toBe("battlefield");
   });
 });
+
+const zimoneInfiniteAnalyst = card("Zimone, Infinite Analyst", "Legendary Creature — Human Wizard", "{1}{G}{U}", {"cmc":3,"power":"0","toughness":"4","keywords":[],"oracleText":"The first spell you cast with {X} in its mana cost each turn costs {1} less to cast for each +1/+1 counter on Zimone.\nWhenever you cast your first spell with {X} in its mana cost each turn, put two +1/+1 counters on Zimone.","colors":["G","U"],"colorIdentity":["G","U"],"layout":"normal"});
+
+describe("the first spell you cast with {X} in its mana cost each turn costs {1} less for each +1/+1 counter on ~", () => {
+  it("compile", () => supported(zimoneInfiniteAnalyst));
+
+  it("Zimone: only the first {X} spell each turn, by the counters before its own trigger", () => {
+    const { s: s0, ap } = setup([]);
+    const z = putOnBattlefield(s0, ap, zimoneInfiniteAnalyst);
+    s0.objects[z]!.counters = { "+1/+1": 3 };
+    invalidateCharacteristics(s0);
+    const xs = card("Test X Draw", "Sorcery", "{X}{U}", { cmc: 1, oracleText: "Draw X cards." });
+    let s = passUntil(s0, "main1", ap);
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    const a = into(s, ap, xs, "hand");
+    const b = into(s, ap, xs, "hand");
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, U: 1 };
+    // X=3: {3}{U}, three less.
+    s = settle(run(s, planCast(s, ap, a, [], undefined, undefined, 3)));
+    expect(s.objects[a]!.zone).toBe("graveyard");
+    expect(s.objects[z]!.counters["+1/+1"]).toBe(5);
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, U: 1 };
+    expect(planCast(s, ap, b, [], undefined, undefined, 1)).toBeNull();
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, U: 1, C: 1 };
+    expect(planCast(s, ap, b, [], undefined, undefined, 1)).not.toBeNull();
+  });
+});

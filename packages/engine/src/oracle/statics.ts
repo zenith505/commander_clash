@@ -508,11 +508,20 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // Momo, Friendly Flier: "The first non-Lemur creature spell with flying you cast during each of your turns costs {1}
   // less to cast": the spell's own flying (as Warden of Evos Isle's), only during your turn; one that matches but has
   // no generic mana to reduce still uses it up (rulings).
-  if ((m = /^The (first|second) (.*?)spell( with (?:flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace))? you cast (each turn|during each of your turns) costs \{(\d+)\} less to cast$/.exec(text))) {
+  // Zimone, Infinite Analyst: "The first spell you cast with {X} in its mana cost each turn costs {1} less to cast for each
+  // +1/+1 counter on ~": that many less, counted as the spell is cast (CR 601.2f); spells with {X} cast earlier this turn
+  // count even before ~ was on the battlefield (rulings).
+  if ((m = /^(The first spell you cast with \{X\} in its mana cost each turn costs \{\d+\} less to cast) for each (.+)$/.exec(text))) {
+    const base = parseCostChange(m[1]!);
+    const c = parseCount(m[2]!, null, true);
+    if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
+    return { costMod: { ...base.costMod, times: c, text: line } };
+  }
+  if ((m = /^The (first|second) (.*?)spell( with (?:flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace))? you cast( with \{X\} in its mana cost)? (each turn|during each of your turns) costs \{(\d+)\} less to cast$/.exec(text)) && !(m[3] && m[4])) {
     const filter = m[2] ? parseTargetPhrase(`${m[2]}spell`) : { kind: "spell" as const, text: "spell" };
     if (!filter || filter.kind !== "spell") return "fail";
-    const kw = m[3] ? { keywords: [capital(m[3].slice(6))] } : {};
-    return { costMod: { who: "you", filter: { ...filter, ...kw, text: `${m[2]}spells${m[3] ?? ""}` }, n: -Number(m[5]), nth: m[1] === "first" ? 1 : 2, ...(m[4] === "each turn" ? {} : { turn: "yours" as const }), text: line } };
+    const kw = m[3] ? { keywords: [capital(m[3].slice(6))] } : m[4] ? { xInCost: true as const } : {};
+    return { costMod: { who: "you", filter: { ...filter, ...kw, text: `${m[2]}spells${m[3] ?? ""}${m[4] ? " with {X} in their mana costs" : ""}` }, n: -Number(m[6]), nth: m[1] === "first" ? 1 : 2, ...(m[5] === "each turn" ? {} : { turn: "yours" as const }), text: line } };
   }
   // Warden of Evos Isle: "Creature spells with flying you cast cost {1} less to cast": the spell's own printed flying, not
   // flying it would get on the battlefield (rulings).

@@ -112,6 +112,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.revealedFromHand = true;
     return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
   }
+  // "Reveal a creature card in your hand" (Assembly Hall), "Reveal a card from your hand" (Infernal Tutor): one, chosen as
+  // it resolves, if you have one (not a "may"); "that card" is it for the search after ("with the same name as that card").
+  if ((m = /^[Rr]eveal an? (?:(.+?) )?card (?:in|from) your hand$/.exec(s)) && !ctx.revealedFromHand) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (m[1] && !filter)) return null;
+    ctx.revealedFromHand = true;
+    return [{ type: "revealFromHand", ...(filter ? { filter } : {}), one: true, must: true }];
+  }
   // Parley: "Each player reveals the top card of their library." Then "For each nonland card revealed this way, you create
   // a Treasure token" is "create a Treasure token for each nonland card revealed this way" (Selvala's "add {G} and you gain
   // 1 life" is split in parseBody).
@@ -650,6 +658,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(`${m[1]} or ${m[2]} card`);
     return filter ? [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...filter, text: `${m[1]} and ${m[2]} card` }, toHand: true }] : null;
   }
+  // Infernal Caretaker: "return all Zombie cards from all graveyards to their owners' hands": each card with that creature
+  // type (a changeling card too, CR 702.73a), to its owner's hand.
+  if ((m = /^[Rr]eturn all ([A-Z][a-z]+) cards from all graveyards to their owners' hands$/.exec(s)) && CREATURE_TYPES.has(m[1]!)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", subtypes: [m[1]!], text: `${m[1]} card` }, toHand: true }];
+  }
   // Demigod of Revenge: "return all cards named ~ from your graveyard to the battlefield" (its cast trigger): the source's
   // name (CR 201.5); the spell itself is on the stack, not there (rulings).
   if (/^[Rr]eturn all cards named ~ from your graveyard to the battlefield$/.test(s)) {
@@ -749,8 +762,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Pendant of Prosperity: "~'s owner may put a land card from their hand onto the battlefield": that player chooses.
   // Braids, Conjurer Adept: "At the beginning of each player's upkeep, that player may put an artifact, creature, or land
   // card from their hand onto the battlefield": the player whose upkeep it is, under their control.
-  if ((m = /^(~'s owner|[Tt]hat player) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
-    const who = parsePlayer(m[1]!.replace(/^T/, "t"), ctx);
+  // Fold into Aether: "its controller may put a creature card from their hand onto the battlefield": the countered spell's.
+  if ((m = /^(~'s owner|[Tt]hat player|[Ii]ts controller) may put (a|an) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/^T/, "t").replace(/^I/, "i"), ctx);
     const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
     if (!who || filter === null) return null;
     return [{ type: "putFromHand", who, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true }];
@@ -829,6 +843,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Exile all creature cards from target player's graveyard" (Crypt Incursion), "... from all graveyards" (Honor the Fallen),
   // "... from your graveyard" (Zombie Mob). Tombfire: "Target player exiles all cards with flashback from their
   // graveyard": the same, that player doing it.
+  // Haunting Echoes: "Exile all cards from target player's graveyard other than basic land cards".
+  const butBasics = /^Exile all cards from (target player's|target opponent's) graveyard other than basic land cards$/.exec(s);
+  if (butBasics) {
+    const who = parsePlayer(butBasics[1]!.replace(/'s$/, ""), ctx);
+    const filter = parseSearchFilter("card other than a basic land card");
+    return who && filter ? [{ type: "exileGraveyard", who, filter }] : null;
+  }
   const theirs = /^(Target player|Target opponent) exiles all (.+?) from their graveyard$/.exec(s);
   const all = theirs ? { what: theirs[2]!, whose: `${theirs[1]!.toLowerCase()}'s` } : (m = /^[Ee]xile all (.+?) from (target player's|target opponent's|each opponent's|your|all) graveyards?$/.exec(s)) && { what: m[1]!, whose: m[2]! };
   if (all) {
@@ -883,7 +904,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || st === "Saga" || st === "Cave" || st === "Desert" || st === "Gate" || (attach && st === "Aura"));
     // "Target artifact creature card" (Scarecrone): every one of its types (allTypes) is a permanent type.
     const types = spec?.types?.length ? spec.types : spec?.allTypes ?? [];
-    if (!what || !spec || (!artifactSub && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
+    // "Target card named Rekindling Phoenix" (its token's ability): the card that made the token, a permanent card.
+    const namedCard = !!spec?.named && !types.length && !spec.subtypes?.length;
+    if (!what || !spec || (!artifactSub && !namedCard && (!types.length || types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || (what.n && m[5]?.toLowerCase() !== "an additional")))) return null;
     // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
     if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
     // Aberrant Return: one, two, or three target cards, each "with an additional -1/-1 counter on it".
@@ -1296,6 +1319,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Return another (?!target )(.+?) you control to its owner's hand$/i.exec(s))) {
     const filter = pickFilter(m[1]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "bounce" }];
+  }
+  // Nulltread Gargantuan: "Put a creature you control on top of its owner's library": chosen as it resolves, not targeted,
+  // itself too (rulings).
+  if ((m = /^Put an? (?!target )([a-z]+) you control on top of its owner's library$/i.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "libraryTop" }];
   }
   // (Sea Drake's "return two target lands you control" targets: sentences/permanents.ts.)
   if ((m = new RegExp(`^Return ${NUM} (?!target )(.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {

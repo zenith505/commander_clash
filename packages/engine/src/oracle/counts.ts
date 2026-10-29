@@ -25,6 +25,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Thundering Raiju: "the number of modified creatures you control other than this creature" is "the number of other
   // modified creatures you control".
   p = p.replace(/^(the number of )?(?!other )([a-z ]+? creatures?) you control other than ~$/, "$1other $2 you control");
+  // Toil to Renown: "for each tapped artifact, creature, and land you control": each that's any of them, counted once.
+  if (each) p = p.replace(/^(tapped |untapped )?(artifact|creature|land|enchantment), (artifact|creature|land|enchantment), and (artifact|creature|land|enchantment) you control$/, "$1$2, $3, or $4 you control");
   let m: RegExpExecArray | null;
   // Superior Numbers: "the number of creatures you control in excess of the number of creatures target opponent controls":
   // the first less the second, 0 if it's not more (CR 107.1b).
@@ -87,6 +89,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = parseCount(m[1]!, ctx);
     if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: "~", text: `${c.count.filter.text} named ~` } } };
+  }
+  // Food Fight's granted "the number of permanents named Food Fight you control": the card's name, as written (compile
+  // keeps a quoted ability's own card name).
+  if ((m = /^the number of (permanents|creatures) named ([A-Z][\w'-]*(?: (?:[A-Z][\w'-]*|of|the|a))*) you control$/.exec(p))) {
+    const c = parseCount(`the number of ${m[1]} you control`, ctx);
+    if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.named !== undefined) return null;
+    return { ...c, count: { ...c.count, filter: { ...c.count.filter, named: m[2]!, text: `${c.count.filter.text} named ${m[2]}` } } };
   }
   // Road Rage: "the number of Mounts and Vehicles you control": each permanent that's either, once.
   if ((m = /^the number of ([A-Z][a-z]+s) and ([A-Z][a-z]+s) you control$/.exec(p))) {
@@ -192,10 +201,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
   // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.
-  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
+  // Impetuous Protege: "the greatest power among tapped creatures your opponents control" (0 with none, rulings).
+  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking |tapped )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls|your opponents control)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
     const words = m[3]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[4]!;
-    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : ""}`, { chosen: true });
+    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : who === "your opponents control" ? " an opponent controls" : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
     const theirs = /^(?:they|that player|target player|target opponent) control/.test(who);
     const whose = theirs ? whosePlayer(who === "they control" ? "their" : who.replace(/ controls$/, "'s"), ctx) : undefined;
@@ -368,6 +378,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.excessDamage && /^(?:the )?(?:amount of )?excess damage dealt(?: to (?:that creature|that permanent))? this way$|^that excess damage$/i.test(p)) return { count: { kind: "excessThisWay" } };
   // "For each creature tapped this way", "the number of creatures tapped this way" after "tap any number of untapped
   // creatures you control" (Harmony of Nature), or in its reflexive trigger (Teferi Akosa of Zhalfir).
+  // Keldon Battlewagon: "Tap an untapped creature you control: ~ gets +X/+0 until end of turn, where X is the power of the
+  // creature tapped this way"; Unerring Sling: "the tapped creature's power". compile() checks the ability has that cost.
+  if (ctx?.activated && /^(?:the power of the creature tapped this way|the tapped creature's power)$/i.test(p)) return { count: { kind: "stationPower" } };
   if (ctx?.tappedThisWay && /^(?:the number of )?(?:[A-Z][a-z]+ )?(?:creatures?|artifacts?|Gates?|Humans?|permanents?) tapped this way$/.test(p)) return { count: { kind: "tappedThisWay" } };
   // "For each card manifested this way" (Kozilek, the Broken Reality), after its manifest-from-hand instruction.
   if (ctx?.manifested && each && /^card manifested this way$/i.test(p)) return { count: { kind: "manifestedThisWay" } };
@@ -421,6 +434,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Sweep (Plow Through Reito): "for each Plains returned this way", "the number of Mountains returned this way".
+  if (ctx?.bouncedAny && (m = /^(?:the number of )?([A-Z][a-z]+) returned this way$/.exec(p)) && (each || p.startsWith("the number")) && singularWord(m[1]!) === singularWord(ctx.bouncedAny))
+    return count({ kind: "bouncedThisWayCount" });
+  // Devouring Rage: "For each Spirit sacrificed this way" is its X, the number its additional cost sacrificed (CR 107.3a).
+  if (each && ctx?.costSacrificedX && p === `${ctx.costSacrificedX} sacrificed this way`) return count({ kind: "x" });
   // Pyretic Charge: "Discard your hand, then draw four cards. For each card discarded this way, ...": the cards you discarded.
   // Balin, Loremaster: "you may discard your hand. Draw X cards, where X is the number of cards discarded this way".
   if (each && ctx?.afterYourDiscard && /^cards? discarded this way$/i.test(p)) return count({ kind: "discardedThisWay" });
@@ -530,8 +548,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^cards in all graveyards with the same name as (?:that|the) spell$/i.test(p) && ctx?.castSpell)
     return count({ kind: "cardsInGraveyard", who: { ref: "eachPlayer" }, sameNameAsCast: true });
   // "Cards named ~ in all graveyards" (Kindle), "for each card named ~ in each graveyard" (Rite of Flame), "in your graveyard".
-  if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
-    return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });
+  // Sound the Call's Wolf: "for each card named Sound the Call in each graveyard", another card's name (compile keeps it).
+  if ((m = /^[Cc]ards? named (~|[A-Z][\w'-]*(?: (?:[A-Z][\w'-]*|of|the|a))*) in (your|all|each) graveyards?$/.exec(p)))
+    return count({ kind: "cardsInGraveyard", who: { ref: m[2] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: m[1]!, text: `card named ${m[1]}` } });
   // Carrion Grub: "the greatest power among creature cards in your graveyard" (0 with none).
   if (!each && (m = /^the greatest power among creature cards in your graveyard$/i.exec(p))) return { count: { kind: "cardsInGraveyard", who: { ref: "you" }, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, greatestPower: true } };
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
@@ -573,6 +592,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? among ([A-Z][a-z]+) you control$/.exec(p)) && CREATURE_TYPES.has(singularWord(m[1]!)))
     return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [singularWord(m[1]!)], controller: "you", text: `${m[1]} you control` } });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // Storm Entity: "for each other spell cast this turn", every player's, not its own cast (rulings: counted as it enters,
+  // spells cast while it was on the stack too; copies weren't cast, CR 707.10).
+  if (each && (ctx === null || ctx.spell) && /^other spells? cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", anyone: true, notSource: true });
   // Thunder Salvo: "the number of other spells you've cast this turn": not its own cast (rulings: resolved or not).
   if (ctx?.spell && /^other spells you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn", other: true });
   // Surge of Brilliance: "for each spell you've cast this turn from anywhere other than your hand", itself too when it was
@@ -611,6 +633,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // Rumbling Aftershocks: "the number of times that spell was kicked", in a cast trigger.
+  if (/^times that spell was kicked$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellKicked" });
   // Civic Saber: "Equipped creature gets +1/+0 for each of its colors" (a static ability: the permanent it applies to,
   // colors as layer 5 left them, CR 613.4).
   if (each && ctx === null && /^of its colors$/i.test(p)) return count({ kind: "affectedColors" });

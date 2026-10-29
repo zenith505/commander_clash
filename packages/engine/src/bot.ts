@@ -121,6 +121,7 @@ import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
+import { removableCounters } from "./counters";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -216,6 +217,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const good = pend.vault.filter((id) => wantOnTop(s, pid, id)).length;
       const dig = good < Math.min(2, pend.vault.length) && paid < 4 && player(s, pid).life > (pend.pay?.life ?? 1) + 10 && player(s, pid).library.length > pend.vault.length;
       return [{ type: "chooseMay", player: pid, yes: dig }];
+    }
+    // Aboroth's cumulative upkeep in -1/-1 counters: keep it while it survives them with some toughness to spare.
+    const upkeepFx = s.resolving?.body.effects[s.resolving.next];
+    if (pend.kind === "chooseMay" && pend.keep && upkeepFx?.type === "cumulativeUpkeep" && upkeepFx.selfCounter) {
+      const self = s.resolving?.item.sourceId ? s.objects[s.resolving.item.sourceId] : undefined;
+      const n = s.resolving?.scratch?.n ?? 0;
+      const left = self?.zone === "battlefield" ? toughness(s, self) - (upkeepFx.selfCounter === "-1/-1" ? n : 0) : 0;
+      return [{ type: "chooseMay", player: pid, yes: left >= 2 }];
     }
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
@@ -352,7 +361,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     }
-    if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // Revealing from the hand for a search for its name (Assembly Hall, Infernal Tutor): a card with another copy left in
+    // our library first. Otherwise the costliest.
+    if (pend.kind === "searchLibrary" && pend.fromHand) {
+      const forName = pend.reveal && /"sameName":\{"revealed":true\}/.test(JSON.stringify(s.resolving?.body.effects ?? []));
+      const copies = (id: ObjectId) => (forName && libraryCopies(s, pid, defOf(s, obj(s, id)).name) > 0 ? 1 : 0);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => copies(b) - copies(a) || mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    }
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
     if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];
     // Dauthi Voidwalker: the most expensive spell, to cast for free now (a land only if that's all there is).
@@ -1504,6 +1519,12 @@ const botSource = (s: GameState, id: ObjectId) => (s.objects[id] && s.objects[id
  * they'd kill or the biggest threat), helpful ones at our own stuff. Returns null when
  * there's no sensible choice. With `forced`, always returns some legal choice.
  */
+/** How many cards in `pid`'s library have this name (and fit `filter`, its own name left aside): what a search for it can find. */
+function libraryCopies(s: GameState, pid: PlayerId, name: string, filter?: TargetSpec): number {
+  const f = filter && { ...filter, namedAny: undefined };
+  return player(s, pid).library.filter((id) => { const d = defOf(s, obj(s, id)); return sameName(d.name, name) && (!f || printedMatches(f, d)); }).length;
+}
+
 /** "Target creature cards with different names": `t` has the name of one of the group already chosen. */
 function namedLike(s: GameState, spec: TargetSpec, out: TargetChoice[], t: TargetChoice): boolean {
   if (t.kind !== "object" || !spec.differentNameFrom) return false;
@@ -1645,6 +1666,19 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     };
     const picks = all.filter((t) => rank(t) >= 0).sort((a, b) => rank(b) - rank(a)).slice(0, body.targets.length);
     return body.targets.map((_, i) => picks[i] ?? { kind: "none" });
+  }
+  // "Search your library for a card with the same name as target creature" (Bifurcate, Pack Hunt, Secret Salvage): the
+  // target whose name the most cards left in our library have (that the search can find); with none, not worth casting.
+  const sameNamed = body.targets.length === 1 ? body.effects.find((e): e is Extract<Effect, { type: "search" }> => e.type === "search" && !!e.sameName && "target" in e.sameName && e.sameName.target === 0 && !e.library && !e.who) : undefined;
+  if (sameNamed) {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const hits = (t: TargetChoice) => {
+      const o = t.kind === "object" ? s.objects[t.id] : undefined;
+      if (!o || o.faceDown) return 0;
+      return libraryCopies(s, pid, o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name, sameNamed.filter);
+    };
+    const pick = [...all].sort((a, b) => hits(b) - hits(a))[0];
+    return pick && hits(pick) > 0 ? [pick] : forced && all[0] ? [all[0]] : null;
   }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
@@ -2376,7 +2410,9 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   };
   // "Discards two cards unless ...": the two cards it would cost (as many as there are).
   const doomed = pu.destroys ? s.objects[pu.destroys] : undefined;
-  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
+  // Icy Prison: its controller keeps it if no one else does; the others let it go.
+  const sourceWorth = pu.losesSource && controller === pid && !settled && s.resolving?.item.sourceId && s.objects[s.resolving.item.sourceId]?.zone === "battlefield" ? Math.max(3, worth(s, pid, obj(s, s.resolving.item.sourceId))) : 0;
+  const penalty = mode && pu.losesSource ? sourceWorth : mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : doomed ? (doomed.zone === "battlefield" && !objHasKeyword(s, doomed, "Indestructible") ? worth(s, pid, doomed) : 0) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : pu.discards ? handCost(pu.discards, undefined, true) : 4;
   const cost = (o: string): number => {
     if (o === "none") return penalty;
     const w = pu.options[Number(o)];
@@ -2792,10 +2828,14 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "tap") {
       // "Tap an untapped creature you control" (Lashknife): the least valuable ones, not something it targets.
+      // "Tap two untapped artifacts, creatures, and/or lands you control" (Warlord's Elite): what can't pay the spell's
+      // mana first, then lands whose basic types make none of the colors its cost asks for.
+      const colors = new Set((d.manaCost ?? "").match(/[WUBRG]/g) ?? []);
+      const needed = (o: GameObject) => (manaAbilitiesOn(s, o).some((m) => m.tap) ? 1 + Number(characteristics(s, o).subtypes.some((t) => colors.has(({ Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" } as Record<string, string>)[t] ?? ""))) : 0);
       const pool = tapCostCandidates(s, pid, obj(s, id), c)
         .map((x) => obj(s, x))
         .filter((o) => !targeted.has(o.id) && o.attacking === undefined)
-        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+        .sort((a, b) => needed(a) - needed(b) || worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.tap = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "exileFromHand" && c.anyNumber) {
@@ -3081,6 +3121,8 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
       return ok.filter((o) => o.isToken).slice(0, strikers).map((o) => o.id);
     }
     if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
+    // Sweep (Plow Through Reito), Landslide: the lands already tapped for mana, each one more for the spell.
+    if (here.filter.subtypes?.length && (here.action === "bounce" || next?.type === "damage")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
     // "Exile any number of ... until ~ leaves the battlefield" (Abdel Adrian, Glorious Protector): the nontoken ones that
     // come back with an enters ability, and, when a token is made for each, cheap tokens.
     if (next?.type === "exile" && next.until) {
@@ -3196,6 +3238,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const after = r?.body.effects[r.next + 1];
   if (r && e?.type === "eachMay" && !e.each && after?.type === "if" && after.cond.kind === "theyChose") {
     const life = player(s, pid).life;
+    // Mtenda Lion: "defending player may pay {U}. If that player does, prevent all combat damage that would be dealt by
+    // ~": always, it's cheap and the attacker is ours to fear.
+    if (e.pay && !e.effects.length && !after.cond.not && after.effects.every((x) => x.type === "continuous" && x.what.ref === "self" && x.mods.every((m) => m.kind === "preventDamage" && m.by))) return true;
+    // Shrouded Serpent: "If that player doesn't, ~ can't be blocked this turn": pay only with a creature that could block.
+    if (e.pay && !e.effects.length && after.cond.not && after.effects.every((x) => x.type === "continuous" && x.what.ref === "self" && x.mods.every((m) => m.kind === "cantBeBlocked")))
+      return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !obj(s, id).tapped && objIsType(s, obj(s, id), "Creature"));
     if (!after.cond.not) return life <= 20;
     // Wandering Archaic: "they may pay {2}. If they don't, you may copy that spell": pay, so it isn't copied.
     if (e.pay && !e.effects.length && allEffects(after.effects).some((x) => x.type === "copySpell")) return true;
@@ -3954,7 +4002,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // a target worth it (mana value 3 or more), as much energy as we have at most.
       const energyX = ab.energyX && !ab.costs?.length && !xTarget ? Math.min(player(s, pid).energy ?? 0, player(s, pid).library.length - 2) : 0;
       const discardX = discardXCount(s, pid, id, ab);
-      if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
+      // "Remove X ki counters from ~" (the Bakus): as many as it has, or as the mana for an {X} allows (Talon of Pain).
+      const counterX = ab.removeCounters?.x ? Math.min(removableCounters(s, o, ab.removeCounters.counter), parseManaCost(ab.manaCost).hasX ? Math.max(0, availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(parseManaCost(ab.manaCost))) : Infinity) : 0;
+      if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3) && !(counterX > 0)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       if (allEffects(ab.body.effects).some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite, Obeka: bots don't end their turn early
       if (ab.body.effects.some((e) => e.type === "nextCast" && e.flash)) continue; // Progenitor's Icon: bots keep its mana instead
@@ -3981,6 +4031,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       // Craft's "return this card" finds the card only once the cost has exiled it: the back face is what it's worth.
       if (!craft && doesNothingNow(s, id, ab.body)) continue;
+      // "Search your library for a card named Sphinx Sovereign" (the Heralds): not with none of them left to find.
+      if (ab.body.effects.some((e) => e.type === "search" && typeof e.filter?.named === "string" && e.filter.named !== "~" && !player(s, pid).library.some((c) => defOf(s, obj(s, c)).name === e.filter!.named))) continue;
       // Chainer, Nightmare Adept: a permission to cast from our graveyard only in our main phase, with none unused yet,
       // for a card there we could pay for afterwards.
       const yardCast = ab.body.effects.find((e) => e.type === "graveyardCastThisTurn");
@@ -4008,7 +4060,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const cost = parseManaCost(ab.manaCost);
       // Prototype Portal: X set by the ability (CR 107.3c).
       const fixedX = definedX(s, o, ab);
-      const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      const xs = fixedX != null ? [fixedX] : discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : counterX > 0 ? Array.from({ length: counterX }, (_, k) => counterX - k) : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];

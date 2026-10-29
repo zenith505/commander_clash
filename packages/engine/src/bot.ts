@@ -270,6 +270,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Perplex: discard the whole hand to keep the spell only when that hand is one card or none.
     if (pend.kind === "payUnless" && pend.discardHand) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length <= 1 }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
+    if (pend.kind === "payUnless" && pend.discardRandom) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discardRandom }];
+    // Poison counters as a payment: only while we'd stay well short of ten (CR 704.5c).
+    if (pend.kind === "payUnless" && pend.poison) return [{ type: "payUnless", player: pid, pay: (player(s, pid).poison ?? 0) + pend.poison < 8 }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting. Life only while we have that much (CR 119.4),
       // and a sacrifice only with enough permanents that aren't our commander.

@@ -1041,6 +1041,13 @@ export function compile(d: CardDef): CompiledCard {
         for (const g of groups) (out.othersEnterTapped ??= []).push({ filter: g!.filter, text: line });
         continue;
       }
+      // Radiant Restraints: "Creatures enchanted player controls enter tapped" (an Aura with enchant player, CR 702.5d):
+      // the player it's attached to as each one enters.
+      const enchanted = / enchanted player controls$/.test(words) ? parseGroup(words.replace(/ enchanted player controls$/, " you control"), true) : null;
+      if (enchanted && !enchanted.other && enchanted.filter.controller === "you" && /^Enchant (?:player|opponent)$/m.test(d.oracleText ?? "")) {
+        (out.othersEnterTapped ??= []).push({ filter: { ...enchanted.filter, controller: "enchanted" }, text: line });
+        continue;
+      }
     }
     const othersUntapped = /^([A-Z][a-z]+) you control enter untapped\.$/.exec(line);
     if (othersUntapped) {
@@ -2457,6 +2464,23 @@ export function compile(d: CardDef): CompiledCard {
       const every = handGrant[2] === "each player's";
       if (f?.kind !== "card" || kw?.activated.length !== 1 || kw.triggers.length || kw.statics.length) out.unsupported.push(raw);
       else (out.handGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), text: `${handGrant[1]} cards in ${every ? "each player's" : "your"} hand` }, activated: kw.activated, ...(every ? { everyHand: true as const } : {}) });
+      continue;
+    }
+    // "Each creature card in your graveyard has unearth {2}{B}" (Sedris), "Each artifact card in your graveyard has
+    // unearth {1}{B}{R}" (Mishra, Tamer of Mak Fawa), "... that's a Cleric, Rogue, Warrior, and/or Wizard" (Solemn
+    // Doomguide): activated abilities of each of those cards, not of the source (rulings; CR 113.6, 702.84a). "Each
+    // outlaw creature card in your graveyard has encore {X}, where X is its mana value" (Graywater's Fixer, CR 702.141a):
+    // each card's own cost, X counted as 0 (CR 202.3e, rulings).
+    const yardGrant = /^Each (artifact|creature|outlaw creature) card in your graveyard( that's a ((?:[A-Z][a-z]+, )+)and\/or ([A-Z][a-z]+))? has (unearth (?:\{[^}]+\})+|encore \{X\}, where X is its mana value)\.$/.exec(line);
+    if (yardGrant) {
+      const f = parseTargetPhrase(`${yardGrant[1]} card from a graveyard`);
+      const types = yardGrant[2] ? [...yardGrant[3]!.split(", ").filter(Boolean), yardGrant[4]!] : [];
+      const mv = /^encore/.test(yardGrant[5]!);
+      const encore = mv ? parseCostKeyword("Encore {1}", d) : undefined;
+      const unearth = mv ? undefined : parseGraveyardKeyword(yardGrant[5]!.replace(/^./, (c) => c.toUpperCase()), d);
+      const ab = encore && typeof encore === "object" ? encore.activated : unearth && typeof unearth === "object" && "unearth" in unearth ? unearth.unearth : undefined;
+      if (f?.kind !== "card" || f.subtypes?.length && types.length || !types.every((t) => CREATURE_TYPES.has(t)) || ab?.zone !== "graveyard") out.unsupported.push(raw);
+      else (out.yardGrants ??= []).push({ filter: { ...(({ owner: _, ...rest }) => rest)(f), ...(types.length ? { subtypes: types } : {}), text: `${yardGrant[1]} cards${yardGrant[2] ?? ""} in your graveyard` }, activated: ab, ...(mv ? { manaValueCost: true as const } : {}) });
       continue;
     }
     const firstArtifactLess = /^The first activated ability of an artifact you activate each turn costs \{(\d+)\} less to activate\.$/.exec(line);

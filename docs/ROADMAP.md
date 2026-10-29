@@ -1,6 +1,6 @@
 # Roadmap
 
-27,575 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,596 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
 9,979 (91%).
 
@@ -836,6 +836,27 @@ line blocks.
    (a name change), Sivitri, Dragon Master (an attack tax paid in life), Obsidian Charmaw ("lands that could produce
    {C}"), Dramatist's Puppet and Quarry Hauler (put or remove a counter of each kind, a choice per kind), Aquamorph
    Entity (its "is turned face up" path).
+   Round 207 went on from the top: "each creature card in your graveyard has unearth {2}{B}" and the same for artifact
+   cards or "that's a Cleric, Rogue, Warrior, and/or Wizard" (Sedris, the Traitor King, Mishra, Tamer of Mak Fawa, Solemn
+   Doomguide) and "each outlaw creature card in your graveyard has encore {X}, where X is its mana value" (Graywater's
+   Fixer), abilities granted to cards in a graveyard while the permanent is on the battlefield; "ward—discard a card at
+   random" (Alpharael, Stonechosen) and "ward—get five poison counters" (The Serpent Society), with a browser test of
+   both prompts; "return X cards at random from your graveyard to your hand" (Reap the Past); "if it was a token, draw
+   a card" (Sunpearl Kirin); "it loses all abilities for as long as ~ remains on the battlefield" (The Wondrous Wasp);
+   "creatures enchanted player controls enter tapped" (Radiant Grace // Radiant Restraints); "choose a creature or
+   planeswalker, then destroy all other creatures and planeswalkers" (Selfless Glyphweaver // Deadly Vanity); "you may
+   mill three cards", which can't be chosen with fewer than three in the library (CR 701.17b), "then return up to one
+   creature card and up to one land card" (Druidic Ritual); "target player and each creature and planeswalker they
+   control" (Chandra, Bold Pyromancer); "populate. The token enters tapped and attacking", attacking the player you
+   choose (Ghired, Conclave Exile); "you may pay that much life. If you do, draw that many cards" (Niv-Mizzet, Ghost
+   Counsel); "unless any player pays {2}, search your library" (Rhystic Tutor); "target artifact, enchantment, or
+   legendary card from your graveyard" (Crystal Dragon // Rob the Hoard); "whenever a creature with skulk deals combat
+   damage to one of your opponents" (The Master, Mesmerist); "if this spell's sneak cost was paid, they enter tapped and
+   attacking" (The Last Ronin's Technique); "add one mana of that color for each different power among creatures you
+   control" (Selvala, Eager Trailblazer, Loot, the Nexus). +21 (27,596 of 31,936 with round 206 and Lane B rounds B35 to B37).
+   Out after round 207 (looked at, not done): Varolz, the Scar-Striped and Young Deathclaws (scavenge for a */*
+   creature card needs its characteristic-defining power in the graveyard, and the layers only work it out on the
+   battlefield and in exile).
    Next most played: the unsupported ones from the top of `npm run popular` (most played first; Lane B takes them from
    the bottom); the harder ones
    from ranks 10,640 to 13,222 (above); the harder ones from ranks 10,060 to
@@ -2663,8 +2684,8 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   control" once each turn (Cloaked Cadet), "each other player may return a creature card from their graveyard"
   (Enslaved Horror), "an opponent discards a card or mills one or more cards" (Lo and Li), "sacrifice ~ unless you
   remove a counter from a permanent you control" (Chisei), "less than its mana value" without a difference (Tokka &
-  Rahzar), "Players can't search libraries" (Mindlock Orb). +24 (27,599 of 31,936 with B35 to B37 and rounds 202 to
-  206).
+  Rahzar), "Players can't search libraries" (Mindlock Orb). +24 (27,620 of 31,936 with B35 to B37 and rounds 202 to
+  207).
 - Out after round B38: Wall of Shadows (whether a spell or ability "can target only Walls" needs its whole target
   specs), Library of Lat-Nam (an opponent chooses the mode), Serene Master (exchanging power with values locked in, as
   for "exchange life totals"), Kav Landseeker ("at the beginning of the end step on your next turn": there is only

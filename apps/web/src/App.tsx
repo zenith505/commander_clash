@@ -5293,7 +5293,7 @@ function Controls({
   if (pending?.kind === "payUnless") {
     // You can tap mana by hand first (CR 605.3a); Pay taps whatever else is needed.
     const life = pending.life ?? 0;
-    const discard = pending.discard ?? 0;
+    const discard = pending.discard ?? pending.discardRandom ?? 0;
     // "Ward—Sacrifice a creature": you pick which after choosing to pay.
     const sac = pending.sacrifice;
     const canSacrifice = !sac || pickOptions(s, sac, HUMAN).length >= sac.n;
@@ -5309,7 +5309,9 @@ function Controls({
           ) : pending.discardHand ? (
             "discard your hand"
           ) : discard ? (
-            `discard ${discard === 1 ? "a card" : `${discard} cards`}`
+            `discard ${discard === 1 ? "a card" : `${discard} cards`}${pending.discardRandom ? " at random" : ""}`
+          ) : pending.poison ? (
+            `get ${pending.poison} poison counter${pending.poison === 1 ? "" : "s"}`
           ) : pending.cost === "{0}" && life ? (
             `pay ${life} life`
           ) : (

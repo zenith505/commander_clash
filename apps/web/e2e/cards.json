@@ -458,6 +458,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ed43f1f9-ef96-47bc-8a54-e59154319f9d",
+  "name": "Alpharael, Stonechosen",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Cleric",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "Ward—Discard a card at random.\nVoid — Whenever Alpharael attacks, if a nonland permanent left the battlefield this turn or a spell was warped this turn, defending player loses half their life, rounded up.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Ward",
+   "Void"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
   "name": "Aminatou's Augury",
   "manaCost": "{6}{U}{U}",
@@ -18208,6 +18244,45 @@
   "commanderLegal": "legal",
   "set": "who",
   "releasedAt": "2023-10-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3688ad0d-653b-4d5d-a57e-444db679d83e",
+  "name": "The Serpent Society",
+  "manaCost": "{1}{B}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Snake Villain",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Snake",
+   "Villain"
+  ],
+  "oracleText": "Deathtouch\nWard—Get five poison counters. (A player with ten or more poison counters loses the game.)\nWhenever another creature you control with deathtouch dies, each opponent sacrifices a nontoken creature of their choice.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Ward",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

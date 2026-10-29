@@ -9,7 +9,7 @@ import { describeAmount } from "../amounts";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches, spellManaValue } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
-import { createToken, tokenCopies } from "./run-tokens";
+import { attackWhomOptions, createToken, takeAttackWhom, tokenCopies, tokenCopyBatch } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
@@ -211,8 +211,27 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         continue;
       }
       if (e.action === "populate") {
+        // Ghired: "The token enters tapped and attacking": its controller chooses what each one attacks as it's created
+        // (CR 508.4, rulings), not declared as an attacker (CR 506.3d).
+        let attackAt: ReturnType<typeof attackChoices> | undefined;
+        if (e.attacking) {
+          const choices = attackChoices(s, pid, ctx.sourceId);
+          if (choices.length > 1) {
+            const k = tokenCopyBatch(s, pid, defOf(s, o));
+            const picks = [...(sc.attackPicks ?? [])];
+            if (sc.attackWhom !== undefined) takeAttackWhom(sc, picks, k);
+            sc.attackPicks = picks;
+            if (picks.length < k) {
+              const which = k > 1 ? ` (${picks.length + 1} of ${k})` : "";
+              s.pending = { kind: "chooseOption", player: pid, source: src, what: "attackWhom", ...attackWhomOptions(choices, k - picks.length), prompt: `choose what the copy of ${defOf(s, o).name} attacks${which}` };
+              return "paused";
+            }
+            sc.attackPicks = undefined;
+            attackAt = picks.flatMap((key) => choices.filter((a) => a.key === key));
+          }
+        }
         if (s.resolving) s.resolving.created ??= [];
-        tokenCopies(s, pid, defOf(s, o), 1, ctx);
+        tokenCopies(s, pid, defOf(s, o), 1, ctx, e.attacking ? { attacking: true, ...(attackAt ? { attackAt } : {}) } : {});
         continue;
       }
       if (e.action === "counters") {
@@ -1766,7 +1785,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!options.length) return;
         sc.queue = [ctx.controller];
         sc.chosen = {};
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "keep", what: e.filter.text, options, count: Math.min(e.n, options.length), min: 0, destroy: true };
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "keep", what: e.filter.text, options, count: Math.min(e.n, options.length), ...(e.exactly ? {} : { min: 0 }), destroy: true };
         return "paused";
       }
       const kept = new Set(sc.chosen[ctx.controller]!);
@@ -2171,12 +2190,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "randomFromGraveyard": {
       const p = player(s, ctx.controller);
       const pool = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, s.objects[id]!)));
-      if (!pool.length) return;
-      // Make a Wish: "two cards at random", chosen as it resolves (rulings), one of them if that's all there is.
-      if (e.n && e.n > 1 && e.dest === "hand") {
+      // Reap the Past: "X cards at random", none for an X of 0.
+      const count = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
+      if (!pool.length || count <= 0) return;
+      // Make a Wish: "two cards at random", chosen as it resolves (rulings), one of them if that's all there is; all of
+      // them if X is that many or more (rulings on Reap the Past).
+      if (count > 1 && e.dest === "hand") {
         const left = [...pool];
         const picked: string[] = [];
-        while (left.length && picked.length < e.n) picked.push(left.splice(Math.floor(nextRandom(s) * left.length), 1)[0]!);
+        while (left.length && picked.length < count) picked.push(left.splice(Math.floor(nextRandom(s) * left.length), 1)[0]!);
         log(s, `${src} returns ${picked.map((id) => defOf(s, obj(s, id)).name).join(" and ")}, chosen at random, from ${p.name}'s graveyard to their hand.`);
         for (const id of picked) moveObject(s, id, "hand");
         return;

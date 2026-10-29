@@ -325,9 +325,32 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
       const yours = characteristics(s, p).controller === o.owner;
       for (const g of grants ?? []) if ((yours || g.everyHand) && printedMatches(g.filter, defOf(s, o))) own = { ...own, activated: [...own.activated, ...g.activated] };
     }
+  // "Each creature card in your graveyard has unearth {2}{B}" (Sedris): from a permanent its owner controls.
+  if (o.zone === "graveyard") {
+    const granted = yardGranted(s, o);
+    if (granted.length) own = { ...own, activated: [...own.activated, ...granted] };
+  }
   const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
   if (lent.length) own = withLent(own, lent);
   return own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
+}
+
+/** The abilities permanents its owner controls give this graveyard card (CompiledCard.yardGrants), in battlefield order. */
+function yardGranted(s: GameState, o: GameObject): CompiledCard["activated"] {
+  const out: CompiledCard["activated"] = [];
+  const d = defOf(s, o);
+  for (const id of s.battlefield) {
+    const p = s.objects[id]!;
+    const grants = compileCard(defOf(s, p)).yardGrants;
+    if (!grants || !characteristics(s, p).hasPrintedAbilities || characteristics(s, p).controller !== o.owner) continue;
+    for (const g of grants) {
+      if (!printedMatches(g.filter, d)) continue;
+      // X in a card's mana cost is 0 here (CR 202.3e).
+      const mv = g.manaValueCost ? `{${manaValue(parseManaCost(d.manaCost ?? ""))}}` : undefined;
+      out.push(mv ? { ...g.activated, manaCost: mv, text: g.activated.text.replace(/\{[^}]+\}$/, mv) } : g.activated);
+    }
+  }
+  return out;
 }
 
 /**

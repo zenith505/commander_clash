@@ -430,3 +430,21 @@ describe("when ~ dies, manifest a number of cards equal to the number of counter
     expect(s.players[ap]!.library.length).toBe(lib - 3);
   });
 });
+
+const theBalrogDurinsBane = card("The Balrog, Durin's Bane", "Legendary Creature — Avatar Demon", "{5}{B}{R}", {"cmc":7,"power":"7","toughness":"5","keywords":["Haste"],"oracleText":"This spell costs {1} less to cast for each permanent sacrificed this turn.\nHaste\nThe Balrog can't be blocked except by legendary creatures.\nWhen The Balrog dies, destroy target artifact or creature an opponent controls.","colors":["B","R"],"colorIdentity":["B","R"],"layout":"normal"});
+
+describe("~ costs {1} less to cast for each permanent sacrificed this turn", () => {
+  it("compile", () => supported(theBalrogDurinsBane));
+
+  it("The Balrog: counts the permanents every player sacrificed this turn", () => {
+    const { s: s0, ap, opp } = setup([theBalrogDurinsBane]);
+    let s = passUntil(s0, "main1", ap);
+    const b = s.players[ap]!.hand.find((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("The Balrog"))!;
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, B: 1, R: 1, C: 2 };
+    expect(planCast(s, ap, b)).toBeNull();
+    s.turnLog = { ...(s.turnLog ?? {}), sacrificed: [{ player: opp, types: ["Creature"], subtypes: [] }, { player: opp, types: ["Artifact"], subtypes: ["Treasure"], token: true }, { player: ap, types: ["Land"], subtypes: [] }] };
+    s = settle(run(s, planCast(s, ap, b)));
+    expect(s.objects[b]!.zone).toBe("battlefield");
+  });
+});

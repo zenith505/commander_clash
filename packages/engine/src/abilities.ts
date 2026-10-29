@@ -429,7 +429,7 @@ export type Count =
   /** "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord): as they entered, even if they've left since. */
   | { kind: "enteredThisTurn"; types?: string[]; subtype?: string; /** Lilypad Village: any one of these. */ anySubtype?: string[]; /** Gyome, Master Chef: nontoken ones only. */ nontoken?: true; /** Geralf, the Fleshwright: "each other Zombie that entered ...": not the trigger's subject entering. */ notSubject?: true }
   /** "If you sacrificed a Food this turn" (Elanor Gardner): the permanents its controller sacrificed this turn, of that subtype or card type as they last existed. */
-  | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true }
+  | { kind: "sacrificedThisTurn"; subtype?: string; type?: string; /** "A nontoken permanent" (Evendo Brushrazer). */ nontoken?: true; /** "For each permanent sacrificed this turn" (The Balrog, Durin's Bane): by any player (rulings). */ anyPlayer?: true }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
   /** "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride): each counted on its own, so a creature planeswalker counts twice. */

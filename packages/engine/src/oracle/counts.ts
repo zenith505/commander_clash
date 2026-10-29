@@ -490,6 +490,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Gyome, Master Chef: "the number of nontoken creatures you had enter the battlefield under your control this turn":
   // every one that entered, wherever it is now and whatever it is now (rulings), as it entered.
   if (/^nontoken creatures you had enter the battlefield under your control this turn$/.test(p)) return count({ kind: "enteredThisTurn", types: ["Creature"], nontoken: true });
+  // The Balrog, Durin's Bane: "for each permanent sacrificed this turn": by any player (rulings).
+  if (each && /^permanent sacrificed this turn$/.test(p)) return count({ kind: "sacrificedThisTurn", anyPlayer: true });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
   // Jeska, Thrice Reborn: "each time you've cast a commander from the command zone": only your own are cast from there (CR 903.8).
   if (/^times? you've cast (?:your|a) commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });

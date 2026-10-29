@@ -1052,8 +1052,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yoursWith ? `${yoursWith[1]} you own${yoursWith[2]}` : yours[1]} you own dies, ${line.slice(yours[0].length)}`.replace(/( with .+) you own dies, /, "$1 dies, ");
   // "Whenever an artifact is put into an opponent's graveyard from the battlefield" (Viridian Revel): one an opponent owns
   // dies, whoever controlled it (CR 404.2, 700.4).
-  const theirs = /^(When(?:ever)? (?:another|an?) [a-z]+) is put into an opponent's graveyard from the battlefield, /.exec(line);
-  if (theirs) line = `${theirs[1]} an opponent owns dies, ${line.slice(theirs[0].length)}`;
+  // Patron of the Nezumi: "Whenever a permanent is put into an opponent's graveyard, that player loses 1 life": a permanent
+  // is only ever on the battlefield (CR 110.1), and "that player" is that graveyard's owner, the card's (CR 404.2).
+  const theirs = /^(When(?:ever)? (?:another|an?) [a-z]+) is put into an opponent's graveyard from the battlefield, /.exec(line) ?? /^(When(?:ever)? (?:another|an?) permanent) is put into an opponent's graveyard, /.exec(line);
+  if (theirs) line = `${theirs[1]} an opponent owns dies, ${line.slice(theirs[0].length).replace(/^that player\b/, "its owner")}`;
   // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
@@ -1951,6 +1953,18 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(boast[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", boast: true }, body } : "fail";
   }
+  // Afterburner Expert: "Whenever you activate an exhaust ability" (CR 702.177a), a mana ability too.
+  const exhaust = /^Whenever you activate an exhaust ability, (.+)$/.exec(line);
+  if (exhaust) {
+    const body = parseBody(exhaust[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", exhaust: true, mana: true }, body } : "fail";
+  }
+  // Herald of Anafenza: "Whenever you activate ~'s outlast ability" (CR 702.107a).
+  const outlast = /^Whenever you activate ~'s outlast ability, (.+)$/.exec(line);
+  if (outlast) {
+    const body = parseBody(outlast[1]!, {});
+    return body ? { event: "abilityActivated", activates: { by: "you", ownOutlast: true }, body } : "fail";
+  }
   // Neerdiv, Devious Diver (as compile.ts splits it): "Whenever you activate an ability of a card in your graveyard":
   // mana abilities too, as nothing says otherwise.
   const yard = /^Whenever you activate an ability of a card in your graveyard, (.+)$/.exec(line);
@@ -2038,7 +2052,7 @@ function parseDiscardTrigger(line0: string): TriggeredAbility | "fail" | null {
   const line = first ? `${first[1]}, ${line0.slice(first[0].length)}` : line0;
   // Anje Falkenrath: "Whenever you discard a card, if it has madness, ...": a card with madness, which it can't lose on
   // the way to exile or the graveyard, so the same as checking it again as the trigger resolves (CR 603.4).
-  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card(?: with madness)?), (.+)$/.exec(line.replace(/^(Whenever you discard a card), if it has madness, /, "$1 with madness, "));
+  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card(?: with (?:madness|disturb))?), (.+)$/.exec(line.replace(/^(Whenever you discard a card), if it has madness, /, "$1 with madness, "));
   if (!m) return null;
   let filter: TargetSpec | undefined;
   if (m[4] === "card with madness") filter = { kind: "card", types: [], notTypes: [], notColors: [], keywords: ["Madness"], text: "card with madness" };
@@ -2150,7 +2164,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges"];
+const YARD_EVENTS: TriggerEvent[] = ["playerDraws", "youProliferate", "permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creatureYouControlAttacks", "creaturesYouControlDealCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat", "ringTemptsYou", "dayNightChanges", "youCompleteDungeon", "permanentCountersPut"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -2404,7 +2418,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from !== "exile") return "fail";
     return { ...t, cast: { ...t.cast, orLandEntersFromExile: true } };
   }
-  const playM = /^Whenever you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
+  // Juju Bubble: "When you play a card, sacrifice ~": "when" and "whenever" are the same here (CR 603.1).
+  const playM = /^When(?:ever)? you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
     const legendary = /legendary/.test(playM[1]!);
     const body = playM[4]!;
@@ -2634,6 +2649,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone || t.ifCond || t.host) return "fail";
     return { ...t, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } };
   }
+  // Pyrewild Shaman: "Whenever one or more creatures you control deal combat damage to a player, if ~ is in your graveyard,
+  // you may pay {3}. If you do, return ~ to your hand", Moss-Pit Skeleton: "..., you may put ~ on top of your library": an
+  // ability that works only there (below), with an intervening if (CR 603.4), so nothing is paid once it has left.
+  const inYardWhen = /^((?:When|Whenever)\b[^,]+), if ~ is in your graveyard, ((?:you may )?(?:pay [^.]+\. If you do, )?)(return ~ to your hand|put ~ on top of your library)\.$/.exec(line);
+  if (inYardWhen && !/^(?:When|Whenever) ~ /.test(inYardWhen[1]!)) {
+    const what = inYardWhen[3] === "return ~ to your hand" ? "return ~ from your graveyard to your hand" : "put ~ from your graveyard on top of your library";
+    const t = parseTrigger(`${inYardWhen[1]}, ${inYardWhen[2]}${what}.`);
+    if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
+    return { ...t, ifCond: { kind: "selfInGraveyard" } };
+  }
   // Infesting Radroach: "Whenever an opponent mills a nonland card, if ~ is in your graveyard, you may return it to your
   // hand": the same as "you may return ~ from your graveyard to your hand" below, an ability that works only there.
   const inYardReturn = /^(Whenever an opponent mills [^,]+), if ~ is in your graveyard, you may return it to your hand\.$/.exec(line);
@@ -2656,7 +2681,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // A milled-cards batch (Infesting Radroach) is watched from graveyards too (see the batch event in effects/triggers.ts).
     // Centaur Vinecrasher: "Whenever a land card is put into a graveyard from anywhere": also watched from graveyards, even
     // by a card put there in the same event (rulings).
-    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose)) && t.batch.each)) || t.host) return "fail";
+    // Afterburner Expert: an exhaust ability activated is watched from graveyards too (see the activated event).
+    if ((!YARD_EVENTS.includes(t.event) && !(t.event === "abilityActivated" && t.activates?.exhaust && t.activates.by === "you") && !(t.event === "batch" && (t.batch?.milled || (t.batch?.what === "toGraveyard" && !t.batch.first && !t.batch.whose)) && t.batch.each)) || t.host) return "fail";
     // "Attached to that creature": the entering creature, the trigger's subject.
     // Sword of the Meek: "..., then attach it to that creature": it returns even if it can't be attached (rulings).
     const attach = / attached to that creature$|, then attach it to that creature$/.test(yard[2]!);
@@ -2915,6 +2941,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (heroic) {
     const body = parseBody(heroic[1]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
     return body ? { event: "selfTargetedByYourSpell", body } : "fail";
+  }
+  // Druid of Horns: "Whenever you cast an Aura spell that targets ~, ...": an Aura spell targets what it will enchant (CR
+  // 303.4a).
+  const auraHeroic = /^Whenever you cast an Aura spell that targets ~, (.+)$/.exec(line);
+  if (auraHeroic) {
+    const body = parseBody(auraHeroic[1]!, {});
+    return body ? { event: "selfTargetedByYourSpell", body, heroicSpell: { kind: "spell", subtypes: ["Aura"], text: "Aura spell" } } : "fail";
   }
   const hosted = parseHostTrigger(line);
   if (hosted) return hosted;
@@ -3189,6 +3222,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (discards) return discards;
   // "When ~ is put into a graveyard from anywhere, shuffle it into its owner's library" (CR 603.6c): "it" is the card in
   // the graveyard, and its owner controls the ability there (CR 603.3a), so "its owner" is "you".
+  // Golgari Brownscale: "When ~ is put into your hand from your graveyard, you gain 2 life": the card's ability in the hand,
+  // however it got there, dredge or not (rulings); a trigger that can't happen on the battlefield works where it can
+  // (CR 113.6k).
+  const toHand = /^When ~ is put into your hand from your graveyard, (.+)$/.exec(line);
+  if (toHand) {
+    const body = parseBody(toHand[1]!, {});
+    return body && !/\b(?:it|~)\b/.test(toHand[1]!) ? { event: "selfToHandFromGraveyard", body } : "fail";
+  }
   const anywhere = /^When ~ is put into (?:a|your) graveyard from anywhere, (.+)$/.exec(line);
   if (anywhere) {
     const body = parseBody(anywhere[1]!.replace(/^its owner shuffles their graveyard into their library/, "shuffle your graveyard into your library"), { selfCard: true });
@@ -3447,12 +3488,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       // "When ~ dies, if it had no counters on it, return it ..." (Unstoppable Slasher): an intervening if (CR 603.4) on the
       // creature as it last existed (CR 603.10a), which can't change.
-      let ifNoCounters = false;
-      const noCounters = /^if it had no counters on it, (.+)$/i.exec(body0);
+      let ifNoCounters: string | undefined;
+      // Deadly Grub: "if it had no time counters on it", of that kind.
+      const noCounters = /^if it had no (?:([a-z]+) )?counters on it, (.+)$/i.exec(body0);
       if (noCounters) {
         if (event !== "selfDies") return "fail" as const;
-        ifNoCounters = true;
-        body0 = noCounters[1]!;
+        ifNoCounters = noCounters[1] ?? "any";
+        body0 = noCounters[2]!;
       }
       // "When ~ dies, if it had a revival counter on it, return it to the battlefield with one fewer revival counter on it
       // at the beginning of the next end step" (Nine-Lives Familiar): an intervening if (CR 603.4) on the creature as it
@@ -3618,7 +3660,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifCastInMain ? { ifCastInMain: true as const } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(firstHit ? { firstHit } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: ifNoCounters } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifDamaged !== undefined ? { ifDamagedThisTurn: ifDamaged } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifNotBlocking ? { ifNotBlocking: true as const } : {}), ...(ifBlockedThisTurn ? { ifBlockedThisTurn: true as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifCastInMain ? { ifCastInMain: true as const } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(firstHit ? { firstHit } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

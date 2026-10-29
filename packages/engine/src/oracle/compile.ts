@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, isLandwalk, stripReminder } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, isLandwalk, stripReminder, subtypeSet } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -195,7 +195,9 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
  * resolved as its other card type, its subtypes creature types.
  */
 /** An optional additional cost paid like kicker ("you may waterbend {2}", "you may blight 1", "you may behold a Dragon"). */
-const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|behold an? [A-Z][a-z]+(?: creature)?|pay (?:\{[^}]+\})+)\.$/m;
+const MAY_COST = /^As an additional cost to cast ~, you may (?:waterbend \{\d+\}|blight \d+|behold an? [A-Z][a-z]+(?: creature)?|reveal an? [A-Z][a-z]+ card from your hand|pay (?:\{[^}]+\})+)\.$/m;
+/** The Dragons of Tarkir reveal cycle: "As an additional cost to cast this spell, you may reveal a Dragon card from your hand." */
+const MAY_REVEAL = /^As an additional cost to cast ~, you may reveal an? ([A-Z][a-z]+) card from your hand\.$/m;
 const UNSUPPORTED_TYPES = ["Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES: string[] = [];
 
@@ -301,7 +303,8 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
   const effects: Effect[] = c.statics
     .filter((st) => st.affects.kind === "attached")
     .map((st) => ({ type: "continuous", what: { ref: "target", index: 0 }, mods: st.mods, duration: "game" }));
-  return { targets: [c.enchant], effects, text: d.oracleText };
+  // Brand of Ill Omen: "Enchanted creature's controller can't cast creature spells" isn't a layer effect, but it hurts.
+  return { targets: [c.enchantedControllerCantCast ? { ...c.enchant, harmsEnchanted: true } : c.enchant], effects, text: d.oracleText };
 }
 
 // ---------------------------------------------------------------------------
@@ -500,10 +503,20 @@ export function compile(d: CardDef): CompiledCard {
       // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
       // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
       .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
+      // Gargantuan Leech: "~ costs {1} less to cast for each Cave you control and each Cave card in your graveyard": the two
+      // reductions together (CR 601.2f).
+      .replace(/^(~ costs \{\d+\} less to cast for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
       // "If this spell's additional cost was paid" with "you may waterbend", "you may blight 1" or "you may behold a Dragon"
       // as that cost: whether it was paid, like kicker. "If a Dragon was beheld" is the same: whether a Dragon card was
       // revealed or a Dragon chosen for that cost, whatever happens to it later (CR 701.4b, rulings).
       .replace(/\b([Ii])f ~'s additional cost was paid\b/g, (x, i: string, _i, text: string) => (MAY_COST.test(text) ? `${i}f ~ was kicked` : x))
+      // Dragons of Tarkir: "If you revealed a Dragon card or controlled a Dragon as you cast this spell" with "you may reveal a
+      // Dragon card from your hand" as an optional additional cost: whether it was paid, like kicker, or you controlled a
+      // Dragon as you cast it (CompiledCard.kicker.ifControl, rulings: it doesn't matter what happens to it later).
+      .replace(/\bfor each additional ((?:\{[^}]+\})+) you paid\b/g, (x, c: string, _i, text: string) => (text.includes(`As an additional cost to cast ~, you may pay ${c} any number of times.`) ? "for each time ~ was kicked" : x))
+      .replace(/^~ enters with an? \+1\/\+1 counter on it if you revealed an? ([A-Z][a-z]+) card or controlled an? \1 as you cast ~\.$/m, (x, what: string, _i, text: string) => (MAY_REVEAL.exec(text)?.[1] === what ? "If ~ was kicked, it enters with a +1/+1 counter on it." : x))
+      .replace(/^When ~ enters, if you revealed an? ([A-Z][a-z]+) card or controlled an? \1 as you cast ~, /m, (x, what: string, _i, text: string) => (MAY_REVEAL.exec(text)?.[1] === what ? "When ~ enters, if it was kicked, " : x))
+      .replace(/\b([Ii])f you revealed an? ([A-Z][a-z]+) card or controlled an? \2 as you cast ~(?=[,.])/g, (x, i: string, what: string, _i, text: string) => (MAY_REVEAL.exec(text)?.[1] === what ? `${i}f ~ was kicked` : x))
       .replace(/\bIf an? ([A-Z][a-z]+(?: creature)?) was beheld\b/g, (x, what: string, _i, text: string) => (new RegExp(`^As an additional cost to cast ~, you may behold an? ${what}\\.$`, "m").test(text) ? "If ~ was kicked" : x))
       .replace(/\bunless (?:her|his|its|~'s) additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "unless ~'s waterbend cost was paid" : x))
       // Guan Yu, Sainted Warrior: "When ~ is put into your graveyard from the battlefield, you may shuffle ~ into your
@@ -787,6 +800,16 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (maxSpeed) {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
+      continue;
+    }
+    // Firemane Angel: "At the beginning of your upkeep, if ~ is in your graveyard or on the battlefield, you may gain 1 life":
+    // an ability that works in both zones, one of each, each checking it's still the same object there as it resolves
+    // (CR 603.4; moved between them before then, nothing happens, rulings).
+    const yardOrField = /^(At the beginning of your upkeep), if ~ is in your graveyard or on the battlefield, (.+)$/.exec(line);
+    if (yardOrField && !/~|\bit\b/.test(yardOrField[2]!)) {
+      const t = parseTrigger(`${yardOrField[1]}, ${yardOrField[2]}`);
+      if (!t || t === "fail" || t.zone || t.ifCond || t.host) out.unsupported.push(raw);
+      else out.triggers.push({ ...t, ifCond: { kind: "selfStill", zone: "battlefield" } }, { ...t, zone: "graveyard", ifCond: { kind: "selfStill", zone: "graveyard" } });
       continue;
     }
     // "∞ — [Ability]": "As long as this permanent is harnessed, it has [ability]" (CR 702.186b).
@@ -1373,6 +1396,13 @@ export function compile(d: CardDef): CompiledCard {
       (out.activationTaxes ??= []).push({ ...(tax[1] ? { filter: { kind: "card", chosen: "name", text: "sources with the chosen name" } } : {}), n: Number(tax[2]), text: line });
       continue;
     }
+    // Eidolon of Obstruction: "Loyalty abilities of planeswalkers your opponents control cost {1} more to activate": a mana
+    // part added to their cost, whatever loyalty they cost (rulings).
+    const loyaltyTax = /^Loyalty abilities of planeswalkers your opponents control cost \{(\d+)\} more to activate\.$/.exec(line);
+    if (loyaltyTax) {
+      (out.activationTaxes ??= []).push({ n: Number(loyaltyTax[1]), opponents: true, loyalty: true, text: line });
+      continue;
+    }
     // Tithe Taker (the second half of its line, split above).
     const theirs = /^During your turn, abilities your opponents activate cost \{(\d+)\} more to activate unless they're mana abilities\.$/.exec(line);
     if (theirs) {
@@ -1400,6 +1430,11 @@ export function compile(d: CardDef): CompiledCard {
       const fits = asSac[1] === "untapped Forests" ? !rider : asSac[1] === "permanents" ? rider === "counters" : rider === "total";
       if (out.devour || !fits) out.unsupported.push(raw);
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
+      continue;
+    }
+    // Heightened Awareness: "As ~ enters, discard your hand." (CR 614.1c).
+    if (line === "As ~ enters, discard your hand.") {
+      out.entersDiscardHand = true;
       continue;
     }
     // Arsenal Thresher: "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a
@@ -1666,17 +1701,22 @@ export function compile(d: CardDef): CompiledCard {
     // 701.4a): an optional additional cost, chosen and paid like a kicker cost with no mana (CompiledCard.kicker.optional),
     // which isn't kicker for other cards. Not with no creature to blight (CR 701.68b) or nothing to behold.
     // Undergrowth: "As an additional cost to cast this spell, you may pay {2}{R}": the same with mana, paid like a kicker cost.
-    const mayPay = /^As an additional cost to cast ~, you may pay ((?:\{[^}]+\})+)\.$/.exec(line);
+    // Taste of Paradise: "you may pay {1}{G} any number of times": the same, any number of times, like multikicker (CR
+    // 702.33c) but not kicker; "for each additional {1}{G} you paid" reads as "for each time ~ was kicked".
+    const mayPay = /^As an additional cost to cast ~, you may pay ((?:\{[^}]+\})+)( any number of times)?\.$/.exec(line);
     if (mayPay) {
       if (out.kicker || !plainMana(mayPay[1]!)) out.unsupported.push(raw);
-      else out.kicker = { costs: [mayPay[1]!], text: `pay ${mayPay[1]}`, optional: true };
+      else out.kicker = { costs: [mayPay[1]!], text: `pay ${mayPay[1]}${mayPay[2] ?? ""}`, optional: true, ...(mayPay[2] ? { multi: true } : {}) };
       continue;
     }
-    const mayCost = /^As an additional cost to cast ~, you may (blight \d+|behold an? [A-Z][a-z]+(?: creature)?)\.$/.exec(line);
+    const mayCost = /^As an additional cost to cast ~, you may (blight \d+|behold an? [A-Z][a-z]+(?: creature)?|reveal an? ([A-Z][a-z]+) card from your hand)\.$/.exec(line);
     if (mayCost) {
       const cost = parseAdditionalCost(mayCost[1]!);
-      if (!cost || out.kicker) out.unsupported.push(raw);
-      else out.kicker = { costs: [""], extraCosts: [cost], text: mayCost[1]!, optional: true };
+      // The reveal cycle: what it says it depends on ("if you revealed a Dragon card or controlled a Dragon as you cast
+      // ~", read as kicked above) is also true with a Dragon you control as you cast it.
+      const st = mayCost[2] && subtypeSet(mayCost[2]) ? mayCost[2] : undefined;
+      if (!cost || out.kicker || (mayCost[2] && !st)) out.unsupported.push(raw);
+      else out.kicker = { costs: [""], extraCosts: [cost], text: mayCost[1]!, optional: true, ...(st ? { ifControl: { kind: "object" as const, subtypes: [st], controller: "you" as const, text: `${st} you control` } } : {}) };
       continue;
     }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
@@ -2559,6 +2599,13 @@ export function compile(d: CardDef): CompiledCard {
       out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
       continue;
     }
+    // Boom Scholar: "Exhaust abilities of other permanents you control cost {2} less to activate": generic mana only, down to
+    // {0} (rulings).
+    const exhaustLess = /^Exhaust abilities of other permanents you control cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (exhaustLess) {
+      out.exhaustLess = (out.exhaustLess ?? 0) + Number(exhaustLess[1]);
+      continue;
+    }
     const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);
     if (powerUpLess && !out.powerUpLess) {
       out.powerUpLess = Number(powerUpLess[1]);
@@ -2855,6 +2902,14 @@ export function compile(d: CardDef): CompiledCard {
       else (out.cantBeCast ??= []).push({ filter: { ...filter, text: `${noOne[1]!.toLowerCase()} spell${noOne[2] ?? ""}` }, ...(hasX ? { hasX: true as const } : {}), text: line });
       continue;
     }
+    // Brand of Ill Omen: "Enchanted creature's controller can't cast creature spells": whoever controls that creature now.
+    const enchantedCant = /^Enchanted creature's controller can't cast (creature|noncreature) spells\.$/.exec(line);
+    if (enchantedCant) {
+      const filter = parseTargetPhrase(`${enchantedCant[1]} spell`);
+      if (filter?.kind !== "spell") out.unsupported.push(raw);
+      else (out.enchantedControllerCantCast ??= []).push({ ...filter, text: `${enchantedCant[1]} spell` });
+      continue;
+    }
     // Llawan, Cephalid Empress: "Your opponents can't cast blue creature spells": the spell's color as it's cast (CR 601.3).
     const cantCast = /^(You|Your opponents) can't cast ((?:white |blue |black |red |green )?(?:creature|noncreature)) spells\.$/.exec(line);
     if (cantCast) {
@@ -3117,7 +3172,8 @@ export function compile(d: CardDef): CompiledCard {
       out.phantom = true;
       continue;
     }
-    if (line === "If damage would be dealt to ~ while it has a +1/+1 counter on it, prevent that damage and remove a +1/+1 counter from ~.") {
+    // Oathsworn Knight: "... from it." the same.
+    if (/^If damage would be dealt to ~ while it has a \+1\/\+1 counter on it, prevent that damage and remove a \+1\/\+1 counter from (?:~|it)\.$/.test(line)) {
       out.phantom = "whileCounter";
       continue;
     }
@@ -3192,6 +3248,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^~ can't be countered\.$/.test(line)) {
       out.cantBeCountered = true;
+      continue;
+    }
+    // Dragonlord's Prerogative: "If you revealed a Dragon card or controlled a Dragon as you cast this spell, this spell
+    // can't be countered" (read as kicked above): a static ability of the spell while it's on the stack (CR 113.6, 101.2),
+    // with how it was cast locked in (CR 601.2).
+    if (line === "If ~ was kicked, ~ can't be countered." && isSpell && MAY_REVEAL.test(normalizeSelf(d))) {
+      out.cantBeCounteredKicked = true;
       continue;
     }
     // Thryx, the Sudden Storm: "Spells you cast with mana value 5 or greater cost {1} less to cast and can't be countered":
@@ -3310,6 +3373,18 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Your opponents can't search libraries.") {
       out.opponentsCantSearch = true;
+      continue;
+    }
+    // Rock Jockey: "You can't play lands if ~ was cast this turn": while it's on the battlefield (rulings), a permanent that
+    // was a spell cast this turn.
+    if (line === "You can't play lands if ~ was cast this turn." && !isSpell) {
+      out.noLandsIfCastThisTurn = true;
+      continue;
+    }
+    // "You can't cast ~ if you've played a land this turn" (Rock Jockey): the same as "Cast ~ only if you didn't play a land
+    // this turn" (CR 601.3), while it's somewhere it could be cast from (rulings).
+    if (line === "You can't cast ~ if you've played a land this turn." && !out.castOnly) {
+      out.castOnly = { kind: "not", cond: { kind: "playedLandThisTurn" } };
       continue;
     }
     if (line === "Players can't play lands.") {
@@ -4665,7 +4740,18 @@ function checkCastingLinks(out: CompiledCard) {
     delete k.cost;
   }
   const visit = (v: unknown): void => {
-    if (Array.isArray(v)) return v.forEach(visit);
+    if (Array.isArray(v)) {
+      // Rupture: "Sacrifice a creature. ~ deals damage equal to the sacrificed creature's power ...": an effect's own
+      // sacrifice of one creature, for the instructions after it (s.resolving.sacrificedThisWay).
+      const was = effectSac;
+      for (const x of v) {
+        visit(x);
+        const e = x as { type?: string; action?: string; n?: unknown; who?: { ref?: string } } | null;
+        if (e?.type === "pick" && e.action === "sacrifice" && e.n === 1 && e.who?.ref === "you") effectSac = true;
+      }
+      effectSac = was;
+      return;
+    }
     if (!v || typeof v !== "object") return;
     const o = v as Record<string, unknown>;
     if ((o.kind === "kicked" || o.kind === "wasKicked") && !("filter" in o)) {
@@ -4702,7 +4788,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost && !effectSac) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary" || o.kind === "sacrificedSubtype" || o.kind === "sacrificedColor") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost && !yardExile) bad = true;
     // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
     if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
@@ -4730,6 +4816,7 @@ function checkCastingLinks(out: CompiledCard) {
   // with nothing sacrificed to share the record.
   const yardExileOne = (costs: AdditionalCost[] | undefined) => costs?.filter((c) => c.kind === "exileFromGraveyard" && !c.top && !c.x && !c.linked && c.n === 1).length === 1 && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage" || c.kind === "craft");
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice") || yardExileOne(out.additionalCosts);
+  let effectSac = false;
   let exileCost = false;
   let yardExile = yardExileOne(out.additionalCosts);
   let handExileCost = false;

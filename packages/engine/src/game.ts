@@ -931,6 +931,7 @@ export function moveObject(
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
+    o.kickedByControl = undefined;
     o.colorsSpent = undefined;
     o.phyrexianLife = undefined;
     o.convoked = undefined;
@@ -1316,6 +1317,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   }
   // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).
   if (printed.entersPrepared) becomePrepared(s, o);
+  // Heightened Awareness: "As ~ enters, discard your hand" (CR 614.1c), before what its entering triggers.
+  if (printed.entersDiscardHand) discardCards(s, controllerOf(s, o), [...player(s, controllerOf(s, o)).hand]);
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
   // Read ahead granted by another permanent (Barbara Wright) applies as it enters too (CR 614.12).
@@ -3991,6 +3994,8 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
   // Territorial Dispute: "Players can't play lands."
   if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).playersCantPlayLands)) return 0;
+  // Rock Jockey: "You can't play lands if ~ was cast this turn".
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).noLandsIfCastThisTurn && controllerOf(s, obj(s, id)) === pid && obj(s, id).wasCast && obj(s, id).enteredTurn === s.turn)) return 0;
   let n = 1;
   const extra = player(s, pid).extraLands;
   if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
@@ -4188,7 +4193,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
-  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}), ...(ab.exhaust ? { exhaust: true as const } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -4640,7 +4645,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   const targetsFor = (filter: TargetSpec) =>
-    !!how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, filter, obj(s, t.id), pid, false)) || (t.kind === "stack" && filter.kind === "spell" && !!filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], filter.targetsWhat, pid)) || (t.kind === "stack" && filter.kind === "spell" && !filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, filter, x))(s.stack.find((x) => x.id === t.id))));
+    !!how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, filter, obj(s, t.id), pid, false)) || (t.kind === "object" && filter.kind === "card" && s.objects[t.id]?.zone === "graveyard" && printedMatches(filter, defOf(s, obj(s, t.id)))) || (t.kind === "stack" && filter.kind === "spell" && !!filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], filter.targetsWhat, pid)) || (t.kind === "stack" && filter.kind === "spell" && !filter.targetsWhat && ((x) => x?.kind === "spell" && spellMatches(s, filter, x))(s.stack.find((x) => x.id === t.id))));
   // Brush Off: "~ costs {1}{U} less to cast if it targets an instant or sorcery spell": its colored part.
   for (const c of compileCard(d).costLessIfTargets ?? []) if (c.colored && targetsFor(c.filter)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
@@ -5345,8 +5350,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
   if (choices.waterbend?.length) log(s, `${p.name} taps ${choices.waterbend.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
-  const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
+  // The Dragons of Tarkir reveal cycle: controlling a Dragon as it's finished being cast counts the same as revealing one
+  // (rulings), with nothing revealed; a copy doesn't get that (StackItem.kickedByControl).
+  const ifControl = compileCard(d).kicker?.ifControl;
+  const byControl = !!ifControl && !choices.kicks?.length && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === p.id && objectMatches(s, ifControl, obj(s, b), p.id, false));
+  const kicks = byControl ? [0] : choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
+  o.kickedByControl = byControl || undefined;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   o.phyrexianLife = paid.phyrexianLife;
   o.convoked = convoke?.length ? convoke.map((c) => ({ id: c, zc: obj(s, c).zoneChanges ?? 0 })) : undefined;
@@ -5466,6 +5476,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     modes: chosen,
     ...(hasX ? { x: x ?? 0 } : {}),
     ...(kicks ? { kicked: kicks } : {}),
+    ...(byControl ? { kickedByControl: true as const } : {}),
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
@@ -5485,7 +5496,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const convoked =
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
-  const kickText = kicks ? describeKicks(d, kicks) : "";
+  const kickText = byControl ? ` (controlling ${/^[aeiou]/i.test(ifControl!.text) ? "an" : "a"} ${ifControl!.text.replace(/ you control$/, "")})` : kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
@@ -5669,6 +5680,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])
       if (controllerOf(s, o) !== pid && printedMatches(f, d)) return `${characteristics(s, o).name}: opponents can't cast ${f.text.replace(/ spell$/, "")} spells`;
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    for (const f of abilitiesOf(s, o).enchantedControllerCantCast ?? [])
+      if (host?.zone === "battlefield" && controllerOf(s, host) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: enchanted creature's controller can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;
@@ -6603,7 +6617,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}), ...(ch.supertypes.includes("Legendary") ? { legendary: true as const } : {}), types: [...ch.types], subtypes: [...ch.subtypes], colors: [...ch.colors], ...(ch.allCreatureTypes && ch.types.includes("Creature") ? { allCreatureTypes: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true });
       }
@@ -6993,7 +7007,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
-  const more = ab.mana ? 0 : activationTax(s, o, pid) + opponentsTargetTax(s, pid, targets);
+  const more = ab.mana ? 0 : activationTax(s, o, pid, ab) + opponentsTargetTax(s, pid, targets);
   const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
   // 702.193a-b, 118.7).
@@ -7002,7 +7016,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // Embalmer's Tools: "Activated abilities of creature cards in your graveyard cost {1} less to activate": generic mana
   // only (CR 601.2f), whoever's permanent says so about their own graveyard.
   const yardLess = o.zone === "graveyard" && objIsType(s, o, "Creature") ? s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === o.owner ? (abilitiesOf(s, obj(s, id)).yardCreatureAbilityLess ?? 0) : 0), 0) : 0;
-  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast") return cost;
+  if (!ab.equip && !ab.costLess && !ab.costLessIf && !powerUp && !yardLess && ab.keyword !== "Ninjutsu" && ab.keyword !== "Boast" && ab.keyword !== "Exhaust") return cost;
   let less = (ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0) + yardLess;
   if (ab.costLessIf && staticConditionNow(s, ab.costLessIf.cond, o.id, pid)) less += ab.costLessIf.n;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
@@ -7014,6 +7028,12 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
     const src = obj(s, id);
     const n = abilitiesOf(s, src).powerUpLess;
     if (n && src.id !== o.id && controllerOf(s, src) === pid && controllerOf(s, o) === pid && objIsType(s, o, "Creature")) less += n;
+  }
+  // "Exhaust abilities of other permanents you control cost {2} less to activate." (Boom Scholar)
+  for (const id of ab.keyword === "Exhaust" && o.zone === "battlefield" ? s.battlefield : []) {
+    const src = obj(s, id);
+    const n = abilitiesOf(s, src).exhaustLess;
+    if (n && src.id !== o.id && controllerOf(s, src) === pid && controllerOf(s, o) === pid) less += n;
   }
   // "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master): generic mana only.
   for (const id of ab.keyword === "Ninjutsu" ? s.battlefield : []) {
@@ -7079,13 +7099,14 @@ function opponentsTargetTax(s: GameState, pid: PlayerId, targets?: TargetChoice[
 }
 
 /** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */
-function activationTax(s: GameState, o: GameObject, pid: PlayerId): number {
+function activationTax(s: GameState, o: GameObject, pid: PlayerId, ab: ActivatedAbility): number {
   let n = 0;
   for (const id of s.battlefield) {
     const src = obj(s, id);
     for (const tax of abilitiesOf(s, src).activationTaxes ?? []) {
       const owner = controllerOf(s, src);
       if ((tax.opponents && (owner === pid || !opponents(s, owner).includes(pid))) || (tax.yourTurn && s.activePlayer !== owner)) continue;
+      if (tax.loyalty && ((ab.loyalty === undefined && !ab.loyaltyX) || !objIsType(s, o, "Planeswalker"))) continue;
       if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter) continue;
       n += tax.n;
     }
@@ -7278,7 +7299,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
     resolveManaAbility(s, item, body, manaPick.mana);
-    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}) });
+    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}) });
     return true;
   }
   s.stack.push(item);
@@ -7302,7 +7323,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(fromOwnGraveyard ? { fromOwnGraveyard } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}), ...(ab.keyword === "Ninjutsu" ? { ninjutsu: true as const } : {}), ...(ab.keyword === "Boast" ? { boast: true as const } : {}), ...(ab.keyword === "Exhaust" ? { exhaust: true as const } : {}), ...(ab.outlast ? { outlast: true as const } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -7458,6 +7479,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
+  if (pend.among && ids.some((id) => !pend.among!.includes(id))) throw new RulesError("choose one of the cards just drawn");
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;

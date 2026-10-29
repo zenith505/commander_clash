@@ -210,6 +210,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^[Ff]lip ~$/.test(s) || (ctx.selfIt && /^[Ff]lip it$/.test(s))) return [{ type: "flip", what: { ref: "self" } }];
   // "~ becomes prepared" (CR 722.3a); "it" in a trigger about itself.
   if (/^~ becomes prepared$/.test(s) || (ctx.selfIt && /^[Ii]t becomes prepared$/.test(s))) return [{ type: "becomePrepared", what: { ref: "self" } }];
+  // Lost Isle Calling: "{4}{U}{U}, Exile ~: Draw a card for each verse counter on ~. If it had seven or more verse counters
+  // on it, take an extra turn after this one": the counters on it as it last existed on the battlefield (CR 608.2h).
+  if (ctx.activated && !ctx.spell && (m = new RegExp(`^If (?:it|~) had ${NUM} or more ${COUNTER} counters on it, (.+)$`).exec(s))) {
+    const inner = parseSentence(capital(m[3]!), ctx);
+    return inner ? [{ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "counters", counter: counterKind(m[2]!), of: { ref: "self" } } }, min: num(m[1]!) }, effects: inner }] : null;
+  }
+  // "Target creature becomes prepared" (Skycoach Waypoint), "Each creature you control becomes prepared" (Codie), "Target
+  // creature becomes unprepared" (Biblioplex Tomekeeper, CR 722.3b): any creature can be the target, only one with a
+  // prepare spell that isn't prepared yet becomes prepared, and only a prepared one becomes unprepared (rulings).
+  // Infinite Coursework: "Tap enchanted creature. It becomes unprepared": "it" is the enchanted creature.
+  if ((m = /^(.+?) becomes? (prepared|unprepared)$/.exec(s))) {
+    const what = parseObject(m[1]!.charAt(0).toLowerCase() + m[1]!.slice(1), ctx);
+    return what ? [{ type: "becomePrepared", what, ...(m[2] === "unprepared" ? { un: true as const } : {}) }] : null;
+  }
   // "Tap that creature and it doesn't untap during its controller's next untap step" (Kashi-Tribe Warriors).
   if ((m = /^Tap (target .+?|that creature|it) and it doesn't untap during its controller's next untap step$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -678,9 +692,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "You may tap five untapped artifacts and/or creatures you control. If you do, transform ~." (Thousand Moons Smithy):
   // picked as it resolves, not targeted, all of them or none (it can't be done with fewer, CR 101.3).
-  if ((m = /^[Tt]ap (two|three|four|five|six|seven) untapped (.+?s) you control$/.exec(s))) {
-    const filter = pickFilter(`untapped ${m[2]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (w === "or" ? w : singular(w))).join(" ")}`);
-    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: num(m[1]!), action: "tap" }];
+  // Tidal Terror: "tap two other untapped creatures you control"; Gravelgill Scoundrel: "tap another untapped creature you
+  // control"; Redcap Raiders: "tap an untapped non-Human creature you control": not ~ itself when "other".
+  if ((m = /^[Tt]ap (an?|another|two|three|four|five|six|seven)( other)? untapped (.+?) you control$/.exec(s))) {
+    const one = /^(?:an?|another)$/.test(m[1]!);
+    if (one === /s$/.test(m[3]!) && !/^(?:Humans?|non-Human creatures?)$/.test(m[3]!)) return null;
+    const noun = one ? m[3]! : m[3]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (w === "or" ? w : singular(w))).join(" ");
+    const base = pickFilter(`untapped ${noun}`);
+    const filter = base && (m[1] === "another" || m[2]) ? { ...base, notSource: true as const, text: `other ${base.text}` } : base;
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: one ? 1 : num(m[1]!), action: "tap" }];
   }
   // Zimone's Hypothesis: "Put a +1/+1 counter on a creature": any player's, picked as it resolves, not targeted. Gix's
   // Command: "Put two +1/+1 counters on up to one creature": the same, or none (rulings: chosen as it resolves).

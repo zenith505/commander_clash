@@ -199,6 +199,8 @@ export type TriggerSourceEvent =
   | { type: "crews"; id: ObjectId; vehicle: ObjectId }
   /** A permanent explored (CR 701.44b), `controller` controlling it then or as it last existed (701.44c). */
   | { type: "connived"; id: ObjectId; controller: PlayerId }
+  /** It became renowned (CR 702.112b). */
+  | { type: "becameRenowned"; id: ObjectId }
   | { type: "lostGame"; player: PlayerId }
   | { type: "explored"; id: ObjectId; controller: PlayerId; /** The card it revealed was a land card or not; unset with none revealed. */ revealed?: "land" | "nonland" }
   /** Its evolve ability put one or more +1/+1 counters on it (CR 702.100d). */
@@ -342,6 +344,7 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
 function fromGraveyardMatches(s: GameState, how: NonNullable<TriggeredAbility["ifFromGraveyard"]>, entering: GameObject, you: PlayerId): boolean {
   if (how === "any") return !!entering.enteredFromGraveyard;
   if (entering.owner !== you) return false;
+  if (how === "castYours") return !!entering.castFromGraveyard && controllerOf(s, entering) === you;
   return !!entering.enteredFromGraveyard || (how === "yoursOrCast" && !!entering.castFromGraveyard && controllerOf(s, entering) === you);
 }
 
@@ -1223,6 +1226,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
+  } else if (ev.type === "becameRenowned") {
+    // Relic Seeker, Valeron Wardens (CR 702.112b).
+    const o = obj(s, ev.id);
+    const you = controllerOf(s, o);
+    add(o, you, (e) => e === "selfBecomesRenowned");
+    if (objIsType(s, o, "Creature"))
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) === you) add(w, you, (e) => e === "creatureYouControlBecomesRenowned", undefined, undefined, o);
+      }
   } else if (ev.type === "evolved") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfEvolves");

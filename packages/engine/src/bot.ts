@@ -114,6 +114,7 @@ import {
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
+import { prepareSpellOf } from "./prepare";
 import { castingBody, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
@@ -1587,6 +1588,15 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const ranked = all.filter((t) => t.kind === "object" && (controllerOf(s, obj(s, t.id)) === pid) === helps).sort((a, b) => (a.kind === "object" && b.kind === "object" ? worth(s, pid, obj(s, b.id)) - worth(s, pid, obj(s, a.id)) : 0));
     if (forced) return ranked[0] ? [ranked[0]] : all[0] ? [all[0]] : null;
     return ranked[0] && s.activePlayer === pid && s.step === "main1" && !s.stack.length ? [ranked[0]] : null;
+  }
+  // "Target creature becomes prepared" (Skycoach Waypoint): our best creature that has a prepare spell and isn't prepared;
+  // "... becomes unprepared" (Biblioplex Tomekeeper): an opponent's prepared creature. Anything else does nothing (rulings).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "becomePrepared" && body.effects[0]!.what.ref === "target") {
+    const un = !!body.effects[0]!.un;
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const ranked = all.filter((t) => t.kind === "object" && (un ? !!obj(s, t.id).prepared && controllerOf(s, obj(s, t.id)) !== pid : !obj(s, t.id).prepared && !!prepareSpellOf(s, obj(s, t.id)) && controllerOf(s, obj(s, t.id)) === pid)).sort((a, b) => (a.kind === "object" && b.kind === "object" ? worth(s, pid, obj(s, b.id)) - worth(s, pid, obj(s, a.id)) : 0));
+    const pick = ranked[0] ?? (forced ? all[0] : undefined);
+    return pick ? [pick] : null;
   }
   // Misleading Signpost: the attacker we'd turn, the strongest one attacking us first, then one of ours.
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "reselectAttack") {

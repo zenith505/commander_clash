@@ -281,6 +281,11 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // Noxious Assault: "Whenever a creature blocks this turn, its controller gets a poison counter" (CR 603.7b).
   const blocks = /^Whenever (an? creature(?: you control| an opponent controls)?) blocks this turn, (.+)$/.exec(s);
   if (blocks) return floatingTrigger(`This turn, whenever ${blocks[1]!} blocks, ${blocks[2]!}`, after, ctx);
+  // "Whenever an Assassin you control attacks this turn, put a +1/+1 counter on it" (The Revelations of Ezio), "Whenever a
+  // creature attacks this turn, it gains lifelink until end of turn" (Ondu Rising): the same as "This turn, whenever ...
+  // attacks, ..." (CR 603.7b), once for each attacking creature (CR 508.3a).
+  const attacks = /^Whenever (an? [A-Za-z]+(?: creature)?(?: you control| an opponent controls)?) attacks this turn, (.+)$/.exec(s);
+  if (attacks) return floatingTrigger(`This turn, whenever ${attacks[1]!} attacks, ${attacks[2]!}`, after, ctx);
   // "Whenever you gain life this turn, each opponent loses that much life" (Vizkopa Guildmage): the same as "This turn,
   // whenever you gain life, ..." (CR 603.7b), each life gain event once (CR 119.10).
   const gain = /^Whenever you gain life this turn, (.+)$/.exec(s);
@@ -338,8 +343,9 @@ const checkableMay = (e: Effect): boolean =>
   // "You may gain 1 life for each creature card in your graveyard. If you do, exile ~ from your graveyard." (Skyfisher
   // Spider): only if life would be gained.
   (e.type === "gainLife" && e.who.ref === "you") ||
-  // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there.
-  (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
+  // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there; "eight cards"
+  // (Emeritus of Ideation), only with eight there.
+  (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n >= 1 && !e.nAmount && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
   // "You may discard a card or sacrifice a land. If you do, ..." (Highway Robbery): one of them, only one that can be done.
   (e.type === "either" && !!e.onlyDoable && e.options.every((o) => o.length === 1 && checkableMay(o[0]!))) ||
   // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
@@ -1987,6 +1993,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Drillworks Mole: "Put a +1/+1 counter on ~ and a +1/+1 counter on up to one target commander creature you control": two
   // instructions, in that order.
   text = text.replace(/(^|: |\. )Put (an? [+-]\d\/[+-]\d counter) on ~ and (an? [+-]\d\/[+-]\d counter) on ((?:up to one )?target [^.]+)\./, "$1Put $2 on ~. Put $3 on $4.");
+  // Hope-Ender Coatl: "counter target spell an opponent controls unless they pay {1}": "they" is that spell's controller.
+  text = text.replace(/(^|\. )([Cc]ounter target (?:[a-z]+ )?spell(?: an opponent controls)?) unless they pay (\{)/, "$1$2 unless its controller pays $3");
+  // Triceraton Commander: "Dinosaurs you control other than ~ get +1/+1 and gain flying until end of turn": the same as
+  // "other Dinosaurs you control".
+  text = text.replace(/(^|\. )([A-Z][a-z]+s|[Cc]reatures) you control other than ~ (get|gain) /, (_, lead: string, what: string, verb: string) => `${lead}Other ${what === "Creatures" ? "creatures" : what} you control ${verb} `);
+  // Razzle-Dazzler: "put a +1/+1 counter on ~. It can't be blocked this turn"; Wicked Wolf: "Put a +1/+1 counter on ~. It
+  // gains indestructible until end of turn. Tap it.": "it" is ~, the one object named. ("It gains X until end of turn" alone
+  // already reads as ~.)
+  text = text.replace(/((?:^|: |\. )[Pp]ut (?:an?|\w+) [+-]\d\/[+-]\d counters? on ~\.) It (can't be blocked this turn|gains [a-z ]+ until end of turn(?=\. Tap it\.))\.(?: Tap it\.)?/, (all: string, put: string, rest: string) => `${put} ~ ${rest}.${/ Tap it\.$/.test(all) ? " Tap ~." : ""}`);
+  // Captain Ripley Vance: "put a +1/+1 counter on ~, then it deals damage equal to its power to any target": "it" is ~, and
+  // its power counts the new counter.
+  text = text.replace(/(^|: |\. )[Pp]ut (an? [+-]\d\/[+-]\d counter) on ~, then it deals /, "$1Put $2 on ~. ~ deals ");
   // Trygon Prime: "Whenever ~ attacks, put a +1/+1 counter on it and a +1/+1 counter on up to one other target attacking
   // creature": "it" is ~ there.
   if (opts.selfIt) text = text.replace(/^[Pp]ut (an? [+-]\d\/[+-]\d counter) on it and (an? [+-]\d\/[+-]\d counter) on ((?:up to one )?(?:other )?target [^.]+)\./, "Put $1 on ~. Put $2 on $3.");

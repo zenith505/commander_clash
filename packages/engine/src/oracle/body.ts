@@ -4434,6 +4434,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Yennett, Cryptic Sovereign: "Reveal the top card of your library. You may cast it without paying its mana cost if its
+    // mana value is odd. If you don't cast it, draw a card." Cast as this resolves or not at all; not cast, it stays on top
+    // and is the card you draw (rulings). A land's mana value is 0, even.
+    if (/^[Rr]eveal the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast it without paying its mana cost if its mana value is odd" && sentences[si + 2]?.replace(/\.$/, "") === "If you don't cast it, draw a card") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], manaValue: { parity: "odd" }, text: "card with an odd mana value" }, max: 1, noneCastDraw: 1 });
+      si += 2;
+      continue;
+    }
     // Mind's Dilation, in an opponent's cast trigger: "that player exiles the top card of their library. If it's a nonland
     // card, you may cast it without paying its mana cost." Cast as this resolves (CR 608.2g); a land, or a card not cast,
     // stays exiled (rulings).
@@ -10299,6 +10307,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       else if (lapse[2] === "into its owner's hand") last.hand = true;
       else if (lapse[2] === "on your choice of the top or bottom of its owner's library") last.libraryChoice = true;
       else last.top = true;
+      continue;
+    }
+    // Nissa, Worldwaker: "Search your library for any number of basic land cards, put them onto the battlefield, then
+    // shuffle. Those lands become 4/4 Elemental creatures with trample.": the lands found, as they are on the battlefield,
+    // for as long as each stays there (no duration, CR 611.2a; a new object after a zone change, CR 400.7).
+    const thoseLands = /^Those lands become (\d+\/\d+) ((?:[A-Z][a-z]+ )*)creatures( with [a-z]+(?:(?:, | and )[a-z]+)*)?$/.exec(s);
+    const landSearch = effects[effects.length - 1];
+    if (thoseLands && landSearch?.type === "search" && landSearch.dest.zone === "battlefield" && !landSearch.others && !landSearch.who && !landSearch.library && !landSearch.split && !landSearch.condDest && !landSearch.landTo && !landSearch.cardTo && !landSearch.mayInstead && !landSearch.payDiff && !landSearch.withHeld) {
+      const mods = parseChanges(`becomes a ${thoseLands[1]} ${thoseLands[2]}creature${thoseLands[3] ?? ""}`);
+      if (!mods) return null;
+      landSearch.rememberAll = true;
+      effects.push({ type: "continuous", what: { ref: "created" }, mods, duration: "game" });
       continue;
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).

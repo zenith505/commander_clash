@@ -317,3 +317,66 @@ describe("until your next turn, prevent all damage target permanent would deal; 
     expect(t.players[ap2]!.lost).toBe(true);
   });
 });
+
+const yennettCrypticSovereign = card("Yennett, Cryptic Sovereign", "Legendary Creature — Sphinx", "{2}{W}{U}{B}", {"cmc": 5, "power": "3", "toughness": "5", "keywords": ["Flying", "Vigilance", "Menace"], "oracleText": "Flying, vigilance, menace\nWhenever Yennett attacks, reveal the top card of your library. You may cast it without paying its mana cost if its mana value is odd. If you don't cast it, draw a card.", "colors": ["B", "U", "W"], "colorIdentity": ["B", "U", "W"], "layout": "normal"});
+const nissaWorldwaker = card("Nissa, Worldwaker", "Legendary Planeswalker — Nissa", "{3}{G}{G}", {"cmc": 5, "loyalty": "3", "keywords": [], "oracleText": "+1: Target land you control becomes a 4/4 Elemental creature with trample. It's still a land.\n+1: Untap up to four target Forests.\n−7: Search your library for any number of basic land cards, put them onto the battlefield, then shuffle. Those lands become 4/4 Elemental creatures with trample. They're still lands.", "colors": ["G"], "colorIdentity": ["G"], "layout": "normal"});
+
+describe("reveal the top card; cast it free if its mana value is odd; if you don't cast it, draw a card", () => {
+  it("compile", () => supported(yennettCrypticSovereign));
+
+  it("Yennett: an odd mana value card is cast for free; declined, you draw it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const y = putOnBattlefield(s0, ap, yennettCrypticSovereign);
+    const [r] = onTop(s0, ap, [rock("Odd Rock", 3)]);
+    let s = settle(attack(s0, ap, opp, [y]));
+    expect(s.pending?.kind === "chooseOption" && s.pending.what === "castFromAmong" && s.pending.options.includes(r!)).toBe(true);
+    s = act(s, { type: "chooseOption", player: ap, choice: r! });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: r });
+    s = settle(act(s, { type: "castSpell", player: ap, objectId: r!, targets: [] }));
+    expect(s.objects[r!]!.zone).toBe("battlefield");
+
+    const { s: t0, ap: ap2, opp: opp2 } = setup([]);
+    const y2 = putOnBattlefield(t0, ap2, yennettCrypticSovereign);
+    const [r2] = onTop(t0, ap2, [rock("Odd Rock", 3)]);
+    let t = settle(attack(t0, ap2, opp2, [y2]));
+    t = settle(act(t, { type: "chooseOption", player: ap2, choice: "none" }));
+    expect(t.objects[r2!]!.zone).toBe("hand");
+  });
+
+  it("Yennett: an even mana value card can't be cast; you draw it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const y = putOnBattlefield(s0, ap, yennettCrypticSovereign);
+    const [b, l] = onTop(s0, ap, [bear(), land()]);
+    const hand = s0.players[ap]!.hand.length;
+    const s = settle(attack(s0, ap, opp, [y]));
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[b!]!.zone).toBe("hand");
+    expect(s.objects[l!]!.zone).toBe("library");
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("search for any number of basic lands onto the battlefield; those lands become 4/4 Elemental creatures", () => {
+  it("compile", () => supported(nissaWorldwaker));
+
+  it("Nissa, Worldwaker: −7 animates every basic land found, and they stay lands; +1 untaps Forests", () => {
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, nissaWorldwaker);
+    s0.objects[n]!.counters.loyalty = 7;
+    const forest = card("Forest", "Basic Land — Forest");
+    const lands = [into(s0, ap, forest, "library"), into(s0, ap, forest, "library")];
+    const old = putOnBattlefield(s0, ap, land("Old Land"));
+    let s = run(s0, planActivate(s0, ap, n, 2));
+    s = settle(s);
+    if (s.pending?.kind === "searchLibrary") s = settle(act(s, { type: "searchLibrary", player: ap, found: lands }));
+    for (const id of lands) {
+      expect(s.objects[id]!.zone).toBe("battlefield");
+      const c = characteristics(s, s.objects[id]!);
+      expect(c.types).toEqual(expect.arrayContaining(["Land", "Creature"]));
+      expect(c.subtypes).toEqual(expect.arrayContaining(["Forest", "Elemental"]));
+      expect(c.keywords).toContain("Trample");
+      expect([power(s, s.objects[id]!), toughness(s, s.objects[id]!)]).toEqual([4, 4]);
+    }
+    expect(characteristics(s, s.objects[old]!).types).not.toContain("Creature");
+  });
+});

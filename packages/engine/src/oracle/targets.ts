@@ -827,8 +827,11 @@ function singularPhrase(p: string): string {
   else {
     // A creature type: "two target Goblins", "up to two target Elves you control".
     const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));
-    if (j < 0) return p;
-    words[j] = singular(words[j]!);
+    // A basic land type: "up to four target Forests" (Nissa, Worldwaker).
+    const land = j < 0 ? words.findIndex((w) => /^(?:Forests|Islands|Mountains|Swamps)$/.test(w)) : -1;
+    if (land >= 0) words[land] = words[land]!.slice(0, -1);
+    else if (j < 0) return p;
+    else words[j] = singular(words[j]!);
   }
   return words.join(" ").replace(/ your opponents control$/, " an opponent controls").replace(/ from graveyards$/, " from a graveyard");
 }

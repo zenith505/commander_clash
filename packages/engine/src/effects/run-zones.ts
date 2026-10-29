@@ -1226,6 +1226,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
           left = left.filter((id) => !(st.hits ?? []).includes(id));
         }
+        // Yennett: none cast, so you draw (the card revealed, still on top: rulings).
+        if (e.noneCastDraw && !st.cast) draw(s, you.id, e.noneCastDraw);
         if (!e.rest) return;
         const toHand = e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
         for (const id of toHand) moveObject(s, id, "hand");

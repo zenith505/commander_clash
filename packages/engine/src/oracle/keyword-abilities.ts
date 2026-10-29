@@ -649,6 +649,14 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     return filter ? { kind: "discard", n: num(m[1]!), filter } : null;
   }
   if (/^reveal your hand$/i.test(text)) return { kind: "revealHand" };
+  // Necrotic Fumes: "exile a creature you control": chosen as the spell is cast (CR 601.2h), exiled, not sacrificed.
+  if ((m = /^exile an? ([a-z]+) you control$/i.exec(text))) {
+    const spec = parseTargetPhrase(m[1]!);
+    if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
+    return { kind: "sacrifice", filter: { ...spec, text: `${m[1]} you control` }, n: 1, exile: true };
+  }
+  // Processor Assault: "put a card an opponent owns from exile into that player's graveyard", exactly one (rulings).
+  if (/^put a card an opponent owns from exile into that player's graveyard$/i.test(text)) return { kind: "exileFromGraveyard", n: 1, process: true };
   // "Removing six counters from among creatures you control" (Quilled Greatwurm): any mix of counters on those
   // permanents, chosen as it's paid (CR 601.2h).
   if ((m = new RegExp(`^remove ${NUM} counters from among creatures you control$`, "i").exec(text)))

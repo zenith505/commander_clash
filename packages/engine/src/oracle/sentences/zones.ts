@@ -39,6 +39,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer("target player", ctx);
     return who ? [{ type: "discard", who, n: 0, keep: 1 }] : null;
   }
+  // The Eldrazi processors: "put a card an opponent owns from exile into that player's graveyard", "put two cards your
+  // opponents own from exile into their owners' graveyards" (Effect processExile).
+  if (/^[Pp]ut a card an opponent owns from exile into that player's graveyard$/.test(s0)) return [{ type: "processExile", n: 1 }];
+  if (/^[Pp]ut two cards your opponents own from exile into their owners' graveyards$/.test(s0)) return [{ type: "processExile", n: 2 }];
   let m: RegExpExecArray | null;
   // "Return from your graveyard to the battlefield any number of target creature cards ..." (Agadeem's Awakening): the
   // same as "Return any number of target creature cards ... from your graveyard to the battlefield".
@@ -702,6 +706,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Rr]eturn all (artifact|creature|enchantment|instant|sorcery|land) and (artifact|creature|enchantment|instant|sorcery|land) cards from all graveyards to their owners' hands$/.exec(s))) {
     const filter = parseSearchFilter(`${m[1]} or ${m[2]} card`);
     return filter ? [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...filter, text: `${m[1]} and ${m[2]} card` }, toHand: true }] : null;
+  }
+  // Soulquake: "Return all creatures on the battlefield and all creature cards in graveyards to their owners' hands": one
+  // instruction; the permanents and then the cards (nothing moved by the first part lands in a graveyard).
+  if (/^[Rr]eturn all creatures on the battlefield and all creature cards in graveyards to their owners' hands$/.test(s)) {
+    return [
+      { type: "bounce", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "all creatures" } } },
+      { type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { kind: "card", types: ["Creature"], text: "creature card" }, toHand: true },
+    ];
   }
   // Infernal Caretaker: "return all Zombie cards from all graveyards to their owners' hands": each card with that creature
   // type (a changeling card too, CR 702.73a), to its owner's hand.

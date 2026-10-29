@@ -1676,7 +1676,11 @@ export function compile(d: CardDef): CompiledCard {
     if (extra) {
       const cost = parseAdditionalCost(extra[1]!, true);
       const or = cost ? null : parseCostOr(extra[1]!);
-      if (cost) (out.additionalCosts ??= []).push(cost);
+      // Ruthless Disposal: "discard a card and sacrifice a creature": two costs, both paid (CR 601.2h).
+      const both = cost || or ? null : /^(discard .+?) and (sacrifice .+)$/.exec(extra[1]!);
+      const pair = both ? [parseAdditionalCost(both[1]!), parseAdditionalCost(both[2]!)] : null;
+      if (pair?.[0] && pair[1]) (out.additionalCosts ??= []).push(pair[0], pair[1]);
+      else if (cost) (out.additionalCosts ??= []).push(cost);
       else if (or && !out.costOr) out.costOr = or;
       else out.unsupported.push(raw);
       continue;
@@ -2519,6 +2523,13 @@ export function compile(d: CardDef): CompiledCard {
       out.firstArtifactAbilityLess = (out.firstArtifactAbilityLess ?? 0) + Number(firstArtifactLess[1]);
       continue;
     }
+    const boastLess = /^Boast abilities you activate cost \{(\d+)\} less to activate for each ([^.]+)\.$/.exec(line);
+    if (boastLess) {
+      const c = parseCount(boastLess[2]!, null, true);
+      if (!c || out.boastLess) out.unsupported.push(raw);
+      else out.boastLess = { ...c, times: (c.times ?? 1) * Number(boastLess[1]) };
+      continue;
+    }
     const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
     if (ninjutsuLess) {
       out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
@@ -2691,6 +2702,12 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
       out.allColors = true;
+      continue;
+    }
+    // Ghostfire: "~ is colorless" (CR 604.3, 202.2b): its colors in the card data are none, as Scryfall gives them, which
+    // is what every zone reads.
+    if (line === "~ is colorless.") {
+      if (d.colors.length) out.unsupported.push(raw);
       continue;
     }
     // "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), so it works in every
@@ -3242,6 +3259,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Your opponents can't search libraries.") {
       out.opponentsCantSearch = true;
+      continue;
+    }
+    if (line === "Players can't play lands.") {
+      out.playersCantPlayLands = true;
       continue;
     }
     if (line === "Players can't search libraries.") {

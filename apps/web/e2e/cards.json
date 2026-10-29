@@ -15186,6 +15186,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1cf82e44-99dd-48d3-a272-8df9835ebc0d",
+  "name": "Ruin Processor",
+  "manaCost": "{7}",
+  "cmc": 7,
+  "typeLine": "Creature — Eldrazi Processor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Processor"
+  ],
+  "oracleText": "When you cast this spell, you may put a card an opponent owns from exile into that player's graveyard. If you do, you gain 5 life.",
+  "power": "7",
+  "toughness": "8",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ec49dfcf-d16d-4621-af4b-4a6f09043221",
   "name": "Runeclaw Bear",
   "manaCost": "{1}{G}",
@@ -20043,6 +20070,40 @@
   "commanderLegal": "legal",
   "set": "gtc",
   "releasedAt": "2013-02-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "34f3ec68-871f-4b94-b497-04f71aea88c9",
+  "name": "Void Attendant",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Eldrazi Processor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Processor"
+  ],
+  "oracleText": "Devoid (This card has no color.)\n{1}{G}, Put a card an opponent owns from exile into that player's graveyard: Create a 1/1 colorless Eldrazi Scion creature token. It has \"Sacrifice this token: Add {C}.\"",
+  "power": "2",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Devoid"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

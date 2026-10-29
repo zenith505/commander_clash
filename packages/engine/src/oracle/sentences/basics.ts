@@ -65,6 +65,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Each opponent loses all counters" (Final Act): every counter they have (CR 122.1); poison and energy are the
   // player counters this engine has.
+  // Leeches: "Target player loses all poison counters. ~ deals that much damage to that player": as many as they lost.
+  if ((m = /^(Target player) loses all poison counters$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "loseAllCounters", who, poison: true }] : null;
+  }
   if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses all counters$/.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseAllCounters", who }] : null;

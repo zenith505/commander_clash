@@ -101,6 +101,8 @@ import {
   payableLife,
   halfLifeCost,
   linkedExileCards,
+  processCandidates,
+  hiddenInExile,
   maxHandSize,
   stackItemQuality,
   oneOfEachFits,
@@ -373,6 +375,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
     if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];
+    // The Eldrazi processors: the cards their owners could still play from exile first.
+    if (pend.kind === "searchLibrary" && pend.exiled && pend.dig && /owners?'s? graveyards?/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: processOrder(s, pid, pend.cards).slice(0, pend.max) }];
     // Dauthi Voidwalker: the most expensive spell, to cast for free now (a land only if that's all there is).
     if (pend.kind === "searchLibrary" && pend.exiled) {
       const land = (id: string) => (isType(defOf(s, obj(s, id)), "Land") ? 1 : 0);
@@ -4725,6 +4729,10 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x)).slice(0, c.n);
       if (picks.length < c.n) return null;
       out.discard = picks;
+    } else if (c.kind === "exileFromGraveyard" && c.process) {
+      const cards = processOrder(s, pid, processCandidates(s, pid));
+      if (!cards.length) return null;
+      out.exileCards = cards.slice(0, 1);
     } else if (c.kind === "exileFromGraveyard" && c.linked) {
       // Jester's Scepter: the exiled card with the name of the spell we target, or not at all.
       const spell = targets.map((t) => (t.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined)).find((x) => x?.objectId);
@@ -5794,4 +5802,17 @@ function chosenPlayerScore(s: GameState, o: GameObject, pid: PlayerId): ((x: Pla
     for (const e of hurts) if (e.type === "damage") n += Math.max(0, evalAmount(s, e.amount, ctx));
     return n;
   };
+}
+
+/**
+ * Which cards in exile a processor should put into their owners' graveyards: the ones an opponent could still play from
+ * there (foretold, plotted, suspended, or with a permission to play), then the dearest of the face-up ones.
+ */
+export function processOrder(s: GameState, pid: PlayerId, cards: ObjectId[]): ObjectId[] {
+  const playable = (id: ObjectId) => {
+    const o = obj(s, id);
+    return o.foretold || (o.mayPlay && o.mayPlay.player !== pid) || (o.counters.time ?? 0) > 0 ? 1 : 0;
+  };
+  const value = (id: ObjectId) => (hiddenInExile(obj(s, id), pid) ? 0 : mv(s, id));
+  return [...cards].sort((a, b) => playable(b) - playable(a) || value(b) - value(a));
 }

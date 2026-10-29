@@ -698,6 +698,13 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(firstOf[2]!, { castSpell: true, eventPlayer: true });
     return body ? { event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" }, firstOfKinds: kinds }, body } : "fail";
   }
+  // Kalamax, the Stormsire: "Whenever you copy an instant spell": a copy of a spell put on the stack (CR 707.10), as
+  // magecraft's "cast or copy" without the cast; copying a card isn't copying a spell (rulings).
+  const copies = /^Whenever you copy (an? .+? spell), (.+)$/.exec(line);
+  if (copies) {
+    const t = parseCastTrigger(`Whenever you cast or copy ${copies[1]}, ${copies[2]}`);
+    return t && t !== "fail" && t.event === "castSpell" && t.cast?.orCopy && !t.ifCond ? { ...t, cast: { ...t.cast, onlyCopy: true } } : "fail";
+  }
   // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
   // "With power 4, 5, or 6" (Sarkhan's Unsealing) the same way as Kozilek's Unsealing's mana values.
   // Hallar, the Firefletcher: "Whenever you cast a spell, if that spell was kicked, ...": how it was cast can't change
@@ -923,7 +930,8 @@ function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | nu
   return body ? { event: "opponentLosesLife", firstOnTheirTurn: true, body } : "fail";
 }
 
-const ENTERS_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) enters(?: the battlefield)?( under your control| under an opponent's control)?, (.+)$/;
+// Campsite Cuisine: "Whenever ~ or a legendary creature you control enters": the same as "~ or another" (once, if ~ is one).
+const ENTERS_TRIGGER = /^When(?:ever)? (~ or another|~ or an?|another|an?) (.+?) enters(?: the battlefield)?( under your control| under an opponent's control)?, (.+)$/;
 
 function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = ENTERS_TRIGGER.exec(line);
@@ -962,7 +970,7 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const kind = m[1]!.toLowerCase();
   return {
     event: "permanentEnters",
-    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}), ...(ifCast ? { ifCast: true as const } : {}) },
+    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind.startsWith("~ or ") ? { orSelf: true } : {}), ...(ifCast ? { ifCast: true as const } : {}) },
     body,
   };
 }
@@ -1553,7 +1561,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with \+1\/\+1 counters on them|with power \d+ or greater|that entered this turn) deal /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+|with counters on them|with \+1\/\+1 counters on them|with power \d+ or greater|with base power \d+|that entered this turn) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
@@ -1566,6 +1574,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     }
     // Broodcaller Scourge: "a permanent card with mana value less than or equal to that damage": the damage those
     // creatures dealt to that player.
+    // Primo, the Unbounded: "Put a number of +1/+1 counters on it equal to the damage dealt": the damage those creatures dealt
+    // to that player, as Quartzwood Crasher's X.
+    const damageDealt = /^(create [^.]+ token)\. Put a number of \+1\/\+1 counters on it equal to the damage dealt\.$/.exec(bodyText);
+    if (damageDealt && !damageX) {
+      shownText = bodyText;
+      bodyText = `${damageDealt[1]}. Put X +1/+1 counters on it.`;
+      damageX = true;
+    }
     const thatDamage = / with mana value less than or equal to that damage\b/;
     if (thatDamage.test(bodyText) && !/\bX\b|\bthat (?:much|many)\b/.test(bodyText) && !damageX) {
       shownText = bodyText;
@@ -1635,8 +1651,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Creatures with counters on them" (Tidus, Yuna's Guardian): each with a counter on it.
     // Haliya, Ascendant Cadet: "creatures you control with +1/+1 counters on them".
     const counters = / with (\+1\/\+1 )?counters on them$/.exec(phrase);
+    // Vaan, Street Thief: "one or more Scouts, Pirates, and/or Rogues": a creature of any of them, as batchPermanents.
     const words = counters ? phrase.slice(0, counters.index) : phrase;
-    const spec = parseTargetPhrase(phrase === "creatures that are enchanted by an Aura you control" ? "aura-yours-enchanted creature" : words.split(/\s+/).map(singularWord).join(" ") + (counters ? ` with ${counters[1] ? "a +1/+1 counter" : "counters"} on it` : ""));
+    const spec = parseTargetPhrase(phrase === "creatures that are enchanted by an Aura you control" ? "aura-yours-enchanted creature" : words.replace(/,? and\/or /g, (x) => x.replace("and/or", "or")).split(/(\s+|,)/).map((w) => (/^[\s,]*$/.test(w) ? w : singularWord(w))).join("") + (counters ? ` with ${counters[1] ? "a +1/+1 counter" : "counters"} on it` : ""));
     if (!spec || spec.kind !== "object") return "fail";
     group = { ...spec, text: phrase };
   }
@@ -2122,6 +2139,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (expend) {
     const t = parseTrigger(`Whenever you proliferate, ${expend[2]}`);
     return t && t !== "fail" && t.event === "youProliferate" && Object.keys(t).every((k) => k === "event" || k === "body") ? { ...t, event: "youExpend", expend: Number(expend[1]) } : "fail";
+  }
+  // Jason Bright, Glowing Prophet: "Whenever a Zombie or Mutant you control dies, if its power was different from its base
+  // power": the creature as it last existed (CR 603.10a, 608.2h); a characteristic-defining ability's value is its base
+  // power, a bonus isn't (rulings).
+  const notBase = /^(Whenever an? [^,]+? dies), if its power was different from its base power, (.+)$/.exec(line);
+  if (notBase) {
+    const t = parseTrigger(`${notBase[1]}, ${notBase[2]}`);
+    return t && t !== "fail" && t.event === "permanentDies" && !t.ifCond ? { ...t, ifCond: { kind: "subjectPowerNotBase" } } : "fail";
   }
   // Voldaren Bloodcaster: "Whenever you create a Blood token, ...": once for each token of that kind you create (CR 111.2).
   const createdKind = /^Whenever you create an? ([A-Z][a-z]+) token, (.+)$/.exec(line);
@@ -2986,6 +3011,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (thatMany) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: attacked[2]! };
     return { event: "opponentAttacksYou", attacksYou: { min: /two or more/.test(attacked[1]!) ? 2 : 1, ...(/planeswalkers you control/.test(attacked[1]!) ? { orPlaneswalkers: true as const } : {}), ...(/^with creatures, if /.test(attacked[1]!) ? { recheck: true as const } : {}) }, body: { ...body, text: attacked[2]! } };
   }
+  // Mila, Crafty Companion: "Whenever an opponent attacks one or more planeswalkers you control": once each combat that
+  // opponent attacks with creatures attacking your planeswalkers (rulings), however many.
+  const walkers = /^Whenever an opponent attacks one or more planeswalkers you control, (.+)$/.exec(line);
+  if (walkers) {
+    const body = parseBody(walkers[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    return body ? { event: "opponentAttacksYou", attacksYou: { min: 1, orPlaneswalkers: true, walkersOnly: true }, body: { ...body, text: walkers[1]! } } : "fail";
+  }
   // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your
   // opponents, ...": once for each player attacking each of your opponents (CR 508.3e); "that attacking player" is the one
   // who attacked, "that opponent" the one attacked.
@@ -3144,6 +3176,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (entersDuring) {
     const t = parseTrigger(`When ~ enters, ${entersDuring[1]}`);
     return t && t !== "fail" && t.event === "selfEnters" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "declareAttackers" } } : "fail";
+  }
+  // Captain America, Living Legend: "Whenever a creature you control becomes tapped during your turn, if it's the first
+  // time that creature has become tapped this turn, untap it": during your turn, whether it triggers at all; the first
+  // time is an intervening if (CR 603.4), checked again as it resolves.
+  const tappedFirst = /^Whenever (an? [^,]+?) becomes tapped during your turn, if it's the first time that (?:creature|permanent) has become tapped this turn, (.+)$/.exec(line);
+  if (tappedFirst) {
+    const t = parseTrigger(`Whenever ${tappedFirst[1]} becomes tapped, ${tappedFirst[2]}`);
+    return t && t !== "fail" && t.event === "permanentBecomesTapped" && !t.activeIf && !t.ifCond ? { ...t, activeIf: { kind: "yourTurn" }, ifCond: { kind: "subjectFirstTapThisTurn" } } : "fail";
   }
   // "Whenever this creature becomes tapped during your turn" (granted by Dionus, Elvish Archdruid): only while it's its
   // controller's turn, whether it triggers at all.

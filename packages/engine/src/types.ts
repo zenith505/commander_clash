@@ -475,6 +475,8 @@ export interface GameObject {
   drawn?: { turn: number; zc: number };
   /** How many times it has untapped as this object: "for as long as ~ remains tapped" ends at the next (CR 611.2b). */
   untaps?: number;
+  /** How many times it became tapped this turn, as this object (`zc`): "the first time that creature has become tapped this turn" (Captain America, Living Legend). */
+  tapsThisTurn?: { turn: number; zc: number; n: number };
   /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
@@ -595,6 +597,8 @@ export interface GameObject {
   exileIfToGraveyard?: true;
   /** Serra Paragon: the permanent this land or spell becomes gains this ability (as an ability text) for good. */
   entersGaining?: string;
+  /** Edgar, Master Machinist: a spell cast with a once-each-turn permission whose "that artifact enters tapped" applies to the permanent it becomes. */
+  castEntersTapped?: true;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
   /** Jeweled Amulet: the type of mana last noted for it ("note the type of mana spent to pay this activation cost"). */
@@ -1803,7 +1807,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; /** Tapped as it left the battlefield (Sphinx Sovereign's "if ~ is untapped"). */ tapped?: true; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** The creatures blocking it ("target creature blocking it" once it's sacrificed, Urborg Panther). */ blockedBy?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; keywords: string[]; unpreventable?: "all" | "combat" } }>;
+  lastKnown?: Record<ObjectId, { zc: number; /** Tapped as it left the battlefield (Sphinx Sovereign's "if ~ is untapped"). */ tapped?: true; power: number; toughness: number; /** Its base power as it last existed (see basePowerNow): Jason Bright's "if its power was different from its base power". */ basePower?: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** The creatures blocking it ("target creature blocking it" once it's sacrificed, Urborg Panther). */ blockedBy?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
   /**
    * Mystic Reflection: the next time one or more creatures or planeswalkers enter this turn, they enter as copies of this

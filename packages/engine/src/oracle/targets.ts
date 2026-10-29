@@ -935,7 +935,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // Blaring Captain: "attacking Warriors get +1/+1 until end of turn": the same, of that creature type.
   const combatTyped = /^(?:[Aa]ttacking|[Bb]locking) ([A-Z][a-z]+)$/.exec(p);
   // Agrus Kos: "attacking red creatures get +2/+0 until end of turn": of that color too.
-  const combat = /^(attacking|blocking|attacking or blocking) (?:(?:white|blue|black|red|green) )?creatures\b/i.test(p) || (!!combatTyped && /s$/.test(combatTyped[1]!) && CREATURE_TYPES.has(singular(combatTyped[1]!)));
+  // Iron Man, Armored Avenger: "other attacking modified creatures" (CR 700.9).
+  const combat = /^(attacking|blocking|attacking or blocking) (?:(?:white|blue|black|red|green|modified) )?creatures\b/i.test(p) || (!!combatTyped && /s$/.test(combatTyped[1]!) && CREATURE_TYPES.has(singular(combatTyped[1]!)));
   // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type; "creatures that aren't of
   // the chosen type get -3/-3" (Crippling Fear): every other creature.
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
@@ -1774,9 +1775,10 @@ export function parseTargetPhrase(
       } else if (w === "aura-yours-enchanted" && !extra.status) {
         if (alts.length > 1) return null;
         extra.status = "enchantedByYours";
-      } else if (w === "goaded" && !extra.status) {
+      } else if ((w === "goaded" || w === "renowned") && !extra.status) {
+        // Aragorn, Hornburg Hero: "a renowned creature you control" (CR 702.112b).
         if (alts.length > 1) return null;
-        extra.status = "goaded";
+        extra.status = w;
       } else if ((w === "enchanted" || w === "equipped" || w === "modified") && !extra.status) {
         // "Enchanted creatures you control", "an equipped creature", "modified creature" (CR 700.9).
         if (alts.length > 1) return null;

@@ -407,6 +407,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (m[3] && !m[2]) return null;
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3] ? { attacking: true as const } : {}), ...(m[4] ? { counters: { [m[6]!]: num(m[5]!) } } : {}) }];
   }
+  // Sandman, Shifting Scoundrel: "{3}{G}{G}: Return ~ and target land card from your graveyard to the battlefield tapped":
+  // the card and the target enter at the same time (CR 608.2c); with the target illegal the ability doesn't resolve, so
+  // the card stays too (CR 608.2b).
+  if (ctx.selfCard && ctx.activated && !ctx.targets.length && (m = /^Return ~ and (target [a-z]+ card) from your graveyard to the battlefield( tapped)?$/.exec(s))) {
+    const what = parseObject(`${m[1]} from your graveyard`, ctx, true);
+    return what?.ref === "target" && !what.n && ctx.targets[what.index]?.kind === "card" && ctx.targets[what.index]?.owner === "you" ? [{ type: "putOntoBattlefield", what: { ...what, andSelfCard: true }, ...(m[2] ? { tapped: true } : {}) }] : null;
+  }
   // Narcomoeba: "When ~ is put into your graveyard from your library, you may put it onto the battlefield": the card,
   // if it's still there (CR 400.7).
   if (ctx.selfCard && !ctx.activated && /^[Pp]ut (?:it|~) onto the battlefield$/.test(s)) return [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }];

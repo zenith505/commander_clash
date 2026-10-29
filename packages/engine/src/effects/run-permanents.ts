@@ -1432,8 +1432,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Ardenn: the Auras and Equipment are chosen as it resolves, and attached at once (rulings), each only if it could
       // be attached to the target (CR 701.3a-b). Nothing happens with an illegal target (CR 608.2b).
       // Heavenly Blademaster: to the source, if it's still the same permanent (rulings).
+      // Winter Soldier, Icy Assassin: "Return this card from your graveyard to the battlefield ... Then you may attach an
+      // Equipment you control to him": the permanent the card became, put there by this ability (CR 400.7).
       const me = e.self && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (e.self && (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
+      const returned = !!me && (s.resolving?.created ?? []).includes(me.id);
+      if (e.self && (!me || me.zone !== "battlefield" || (!returned && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
       const t = me ? ({ kind: "object", id: me.id } as const) : ctx.targets[e.host];
       if (!t || (!me && !ctx.legal[e.host])) return;
       const host = t.kind === "object" ? s.objects[t.id] : undefined;

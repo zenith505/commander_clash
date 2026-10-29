@@ -498,3 +498,106 @@ describe("your devotion to each color and each combination of colors is increase
     expect(s.players[ap2]!.life).toBe(life2 + 1);
   });
 });
+
+const nicolBolasPlaneswalker = card("Nicol Bolas, Planeswalker", "Legendary Planeswalker — Bolas", "{4}{U}{B}{B}{R}", {"cmc": 8, "loyalty": "5", "keywords": [], "oracleText": "+3: Destroy target noncreature permanent.\n−2: Gain control of target creature.\n−9: Nicol Bolas, Planeswalker deals 7 damage to target player or planeswalker. That player or that planeswalker's controller discards seven cards, then sacrifices seven permanents of their choice.", "colors": ["B", "R", "U"], "colorIdentity": ["B", "R", "U"], "layout": "normal"});
+
+describe("deals 7 damage to target player or planeswalker; that player or that planeswalker's controller discards seven, then sacrifices seven permanents", () => {
+  it("compile", () => supported(nicolBolasPlaneswalker));
+
+  it("Nicol Bolas, Planeswalker: aimed at a planeswalker, its controller discards and sacrifices", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const nb = putOnBattlefield(s0, ap, nicolBolasPlaneswalker);
+    s0.objects[nb]!.counters.loyalty = 9;
+    const pw = putOnBattlefield(s0, opp, card("Test Walker", "Legendary Planeswalker — Test", "{3}", { cmc: 3, loyalty: "10" }));
+    s0.objects[pw]!.counters.loyalty = 10;
+    const bears = [putOnBattlefield(s0, opp, bear()), putOnBattlefield(s0, opp, bear())];
+    emptyHand(s0, opp);
+    for (let i = 0; i < 3; i++) into(s0, opp, bear(), "hand");
+    const mine = putOnBattlefield(s0, ap, bear());
+    let s = run(s0, planActivate(s0, ap, nb, 2, [tgt(pw)]));
+    s = settle(s);
+    expect(s.objects[pw]!.zone).toBe("graveyard");
+    expect(bears.every((id) => s.objects[id]!.zone === "graveyard")).toBe(true);
+    expect(s.players[opp]!.hand.length).toBe(0);
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+  });
+});
+
+const chandraAcolyteOfFlame = card("Chandra, Acolyte of Flame", "Legendary Planeswalker — Chandra", "{1}{R}{R}", {"cmc": 3, "loyalty": "4", "keywords": [], "oracleText": "0: Put a loyalty counter on each red planeswalker you control.\n0: Create two 1/1 red Elemental creature tokens. They gain haste. Sacrifice them at the beginning of the next end step.\n−2: You may cast target instant or sorcery card with mana value 3 or less from your graveyard. If that spell would be put into your graveyard, exile it instead.", "colors": ["R"], "colorIdentity": ["R"], "layout": "normal"});
+const testShock = card("Test Shock", "Instant", "{R}", { cmc: 1, oracleText: "Test Shock deals 2 damage to any target." });
+
+describe("you may cast target instant or sorcery card with mana value 3 or less from your graveyard; exile it after", () => {
+  it("compile", () => supported(chandraAcolyteOfFlame, testShock));
+
+  it("Chandra, Acolyte of Flame: cast the instant from the graveyard as −2 resolves, paying for it; then it's exiled", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const c = putOnBattlefield(s0, ap, chandraAcolyteOfFlame);
+    s0.objects[c]!.counters.loyalty = 4;
+    const shock = into(s0, ap, testShock, "graveyard");
+    const big = into(s0, ap, card("Big Sorcery", "Sorcery", "{3}{R}", { cmc: 4, oracleText: "Draw two cards." }), "graveyard");
+    expect(planActivate(s0, ap, c, 2, [tgt(big)])).toBeNull();
+    s0.players[ap]!.manaPool.R = 1;
+    const life = s0.players[opp]!.life;
+    let s = run(s0, planActivate(s0, ap, c, 2, [tgt(shock)]));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: shock, how: "paid" });
+    s = settle(act(s, { type: "castSpell", player: ap, objectId: shock, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(life - 2);
+    expect(s.objects[shock]!.zone).toBe("exile");
+    expect(s.players[ap]!.manaPool.R ?? 0).toBe(0);
+  });
+});
+
+const stillnessInMotion = card("Stillness in Motion", "Enchantment", "{1}{U}", {"cmc": 2, "keywords": [], "oracleText": "At the beginning of your upkeep, mill three cards. Then if your library has no cards in it, exile this enchantment and put five cards from your graveyard on top of your library in any order.", "colors": ["U"], "colorIdentity": ["U"], "layout": "normal"});
+
+describe("mill three; then if your library is empty, exile ~ and put five cards from your graveyard on top in any order", () => {
+  it("compile", () => supported(stillnessInMotion));
+
+  it("Stillness in Motion: the library runs out, so five chosen cards go back on top in the order you pick", () => {
+    const { s: s0, ap } = setup([]);
+    const st = putOnBattlefield(s0, ap, stillnessInMotion);
+    const lib = s0.players[ap]!.library;
+    for (const id of lib.splice(3)) {
+      s0.objects[id]!.zone = "exile";
+      s0.players[ap]!.exile.push(id);
+    }
+    const yard = [0, 1, 2].map((i) => into(s0, ap, bear({ name: `Yard Bear ${i}` }), "graveyard"));
+    let s = passUntil(s0, "upkeep", s0.turnOrder.find((p) => p !== ap));
+    s = settle(passUntil(s, "upkeep", ap));
+    expect(s.objects[st]!.zone).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 5, max: 5 });
+    const before = s.players[ap]!.graveyard.length;
+    const picked = [...yard, ...s.players[ap]!.graveyard.filter((id) => !yard.includes(id)).slice(0, 2)];
+    s = act(s, { type: "searchLibrary", player: ap, found: picked });
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "order" });
+    const order = [yard[2]!, yard[0]!, yard[1]!, picked[3]!, picked[4]!];
+    s = settle(act(s, { type: "arrangeTop", player: ap, top: order, away: [] }));
+    expect(s.players[ap]!.library).toEqual(order);
+    expect(s.players[ap]!.graveyard).toHaveLength(before - 5);
+  });
+});
+
+// Cards the round's new text also covers.
+const winterSoldierIcyAssassin = card("Winter Soldier, Icy Assassin", "Legendary Creature — Human Assassin Villain", "{W}{B}", {"cmc": 2, "power": "2", "toughness": "2", "keywords": ["Vigilance", "Menace"], "oracleText": "Vigilance, menace\nWinter Soldier gets +2/+0 for each Equipment attached to him.\n{3}{W}{B}: Return this card from your graveyard to the battlefield with a finality counter on him. Then you may attach an Equipment you control to him. (If a creature with a finality counter on it would die, exile it instead.)", "colors": ["B", "W"], "colorIdentity": ["B", "W"], "layout": "normal"});
+const fendeepSummoner = card("Fendeep Summoner", "Creature — Treefolk Shaman", "{4}{B}", {"cmc": 5, "power": "3", "toughness": "5", "keywords": [], "oracleText": "{T}: Up to two target Swamps each become 3/5 Treefolk Warrior creatures in addition to their other types until end of turn.", "colors": ["B"], "colorIdentity": ["B"], "layout": "normal"});
+const inTheEyeOfChaos = card("In the Eye of Chaos", "World Enchantment", "{2}{U}", {"cmc": 3, "keywords": [], "oracleText": "Whenever a player casts an instant spell, counter it unless that player pays {X}, where X is its mana value.", "colors": ["U"], "colorIdentity": ["U"], "layout": "normal"});
+
+describe("other cards the round's text covers", () => {
+  it("compile", () => supported(winterSoldierIcyAssassin, fendeepSummoner, inTheEyeOfChaos));
+
+  it("Winter Soldier: returned from the graveyard, then an Equipment you control attached to him", () => {
+    const { s: s0, ap } = setup([]);
+    const w = into(s0, ap, winterSoldierIcyAssassin, "graveyard");
+    const sword = putOnBattlefield(s0, ap, testSword);
+    Object.assign(s0.players[ap]!.manaPool, { W: 2, B: 2, C: 1 });
+    const i = abilitiesOf(s0, s0.objects[w]!).activated.findIndex((a) => /from your graveyard/.test(a.text));
+    let s = run(s0, planActivate(s0, ap, w, i));
+    s = settle(s);
+    expect(s.objects[w]!.zone).toBe("battlefield");
+    expect(s.objects[w]!.counters.finality).toBe(1);
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "attach", options: [sword] });
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [sword] }));
+    expect(s.objects[sword]!.attachedTo).toBe(w);
+    expect(power(s, s.objects[w]!)).toBe(6);
+  });
+});

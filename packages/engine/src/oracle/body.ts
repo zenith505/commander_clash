@@ -187,7 +187,9 @@ function thenSubject(first: string, next: string): string {
   // Bogardan): lowercase after the trigger.
   // Hired Torturer: "Target opponent loses 2 life, then reveals a card at random from their hand"; Singe-Mind Ogre: "target
   // player reveals a card at random from their hand, then loses life ...".
-  const who = /^(Target player|Target opponent|target player|target opponent|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
+  // Nicol Bolas, Planeswalker: "That player or that planeswalker's controller discards seven cards, then sacrifices seven
+  // permanents of their choice": the same player.
+  const who = /^(Target player|Target opponent|target player|target opponent|That player or that planeswalker's controller|That player|that player|Each player|Each opponent|each player|each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^[Tt]arget /.test(who[1]!) ? "That player" : capital(who[1]!)} ${next}`;
   if (who && /^[Tt]arget /.test(who[1]!) && /^reveals a card at random from their hand$/.test(next)) return `That player ${next}`;
   // Pendant of Prosperity: "~'s owner draws a card, then that player may put a land card from their hand onto the
@@ -4572,7 +4574,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may cast target instant or sorcery card from your graveyard. If that spell would be put into your graveyard, exile
     // it instead." (Emet-Selch, Toshiro Umezawa, Chandra, Flame's Catalyst): cast as it resolves or not at all, paying its
     // costs, timing ignored (CR 608.2g, 601.2).
-    const castPaid = /^[Yy]ou may cast (target .+? card from your graveyard)$/.exec(s);
+    // Chandra, Acolyte of Flame: "target instant or sorcery card with mana value 3 or less": only as it's targeted (rulings:
+    // an X is 0 then, and the spell can be cast with a greater X).
+    const castPaid = /^[Yy]ou may cast (target .+? card(?: with mana value \d+ or less)? from your graveyard)$/.exec(s);
     const paidRider = sentences[si + 1]?.replace(/\.$/, "");
     if (castPaid && (paidRider === "If that spell would be put into your graveyard, exile it instead" || paidRider === "If that spell would be put into a graveyard, exile it instead")) {
       const before = ctx.targets.length;

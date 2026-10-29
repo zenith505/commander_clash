@@ -529,6 +529,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryTop", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
   }
+  // Stillness in Motion: "put five cards from your graveyard on top of your library in any order": chosen as it resolves
+  // (all of them with fewer), then put in the order you choose (CR 401.4).
+  if ((m = /^(?:[Tt]hen )?[Pp]ut (two|three|four|five|six|seven) cards from your graveyard on top of your library in any order$/.exec(s))) {
+    const n = num(m[1]!);
+    return [{ type: "chooseFromGraveyard", n, dest: "libraryTop" }, { type: "orderTop", who: { ref: "you" }, n }];
+  }
   // "Return any number of cards with different mana values from your graveyard to your hand" (Seasons Past): chosen as it
   // resolves (rulings), no two with the same mana value; X in a mana cost is 0 and a card with no mana cost has 0 (CR 202.3).
   if ((m = /^[Rr]eturn any number of (.+?) with different mana values from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {

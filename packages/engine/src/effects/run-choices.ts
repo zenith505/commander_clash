@@ -714,6 +714,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!ctx.sacrificed?.[0]?.suspected
             : e.cond.kind === "sacrificedLegendary"
             ? !!ctx.sacrificed?.[0]?.legendary
+            : e.cond.kind === "sacrificedColor"
+            ? !!ctx.sacrificed?.[0]?.colors?.includes((e.cond as { color: Color }).color)
             : e.cond.kind === "sacrificedSubtype"
             ? ((k) => !!k && (!!k.allCreatureTypes || !!k.subtypes?.includes((e.cond as { subtype: string }).subtype)))(ctx.sacrificed?.[0])
             : e.cond.kind === "discardedThisWayIs"

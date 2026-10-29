@@ -1105,6 +1105,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Oreskos Explorer: "Search your library for up to X Plains cards, where X is .... Reveal those cards, put them into your
   // hand, then shuffle." The same, into your hand.
   text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.]+)\. Reveal those cards, put them into your hand, then shuffle\./, "$1$2earch your library for up to X $3, reveal them, put them into your hand, then shuffle, where X is $4.");
+  // Moment of Glory: "If ~ was cast from a graveyard, also put a +1/+1 counter on each other creature you control": "also"
+  // says only that it's in addition to the counter before.
+  text = text.replace(/(\. If ~ was cast from a graveyard, )also (put an? \+1\/\+1 counter on each other creature you control\.)$/, "$1$2");
   // Kami's Flare: "~ also deals 2 damage to that permanent's controller if you control a modified creature": checked as it
   // resolves (CR 608.2c), the same as "If you control a modified creature, ~ deals 2 damage to ...".
   text = text.replace(/(^|\. )~ also deals (\d+) damage to that permanent's controller if (you control an? [a-z ]+ creature)\./, "$1If $3, ~ deals $2 damage to that permanent's controller.");
@@ -1391,6 +1394,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Balance of Power: "If target opponent has more cards in hand than you, draw cards equal to the difference.": with
   // fewer or as many, the difference is nothing to draw (handMoreThanYou).
   text = text.replace(/^If target opponent has more cards in hand than you, draw cards equal to the difference\.$/, "Draw X cards, where X is the number of cards in target opponent's hand minus the number of cards in your hand.");
+  // Foul Renewal: "Return target creature card from your graveyard to your hand. Target creature gets -X/-X until end of
+  // turn, where X is the toughness of the card returned this way": that card's toughness in your hand; none returned (an
+  // illegal target) leaves the creature unaffected (rulings).
+  text = text.replace(/^(Return target creature card from your graveyard to your hand\. Target creature gets -X\/-X until end of turn, where X is) the toughness of the card returned this way\.$/, "$1 that card's toughness.");
+  // Lyzolda, the Blood Witch: "~ deals 2 damage to any target if the sacrificed creature was red. Draw a card if the
+  // sacrificed creature was black.": each condition first, as "If ..., ...".
+  text = text.replace(/(^|\. )([^.]+?) if (the sacrificed creature was (?:white|blue|black|red|green))(?=\.)/g, (_, lead: string, what: string, cond: string) => `${lead}If ${cond}, ${what.startsWith("~") ? what : what.charAt(0).toLowerCase() + what.slice(1)}`);
+  // Rupture: "Sacrifice a creature. ~ deals damage equal to that creature's power to ...": the one sacrificed as it resolves,
+  // as it last existed (CR 608.2h).
+  text = text.replace(/^(Sacrifice a creature\. ~ deals damage equal to) that creature's power( to [^.]+\.)$/, "$1 the sacrificed creature's power$2");
+  // Roiling Terrain: "Destroy target land, then ~ deals damage to that land's controller equal to the number of land cards
+  // in that player's graveyard": that player being the land's controller as it last existed (CR 608.2h), counted after
+  // the land is destroyed (rulings).
+  text = text.replace(/^(Destroy target land), then ~ deals damage to that land's controller equal to the number of ([a-z]+ cards) in that player's graveyard\.$/, "$1. ~ deals X damage to that land's controller, where X is the number of $2 in that land's controller's graveyard.");
+  // The Empires: "Create five of those tokens instead if you control artifacts named Crown of Empires and Scepter of
+  // Empires", "It deals 3 damage instead if ...", "Gain control of that creature instead if ...": checked as it resolves
+  // (rulings), the condition first.
+  text = text.replace(/(^|\. )([A-Z][^.]*?) instead if (you control artifacts named [^.]+)\./g, (_, lead: string, what: string, cond: string) => `${lead}If ${cond}, ${what.charAt(0).toLowerCase()}${what.slice(1)} instead.`);
   // Leeches: "~ deals that much damage to that player": the poison counters the sentence before took.
   text = text.replace(/^(Target player loses all poison counters\.) ~ deals that much damage to that player\.$/, "$1 ~ deals X damage to that player, where X is the number of poison counters lost this way.");
   // Suffocating Blast: "Counter target spell and ~ deals 3 damage to target creature.": two instructions, in order.
@@ -3162,6 +3183,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "state", cond }, effects: [{ ...lastSearch, n: NUMBER_WORDS[moreIf[2]!]! }], otherwise: [lastSearch] };
       continue;
     }
+    // Necromantic Summons: "Put target creature card from a graveyard onto the battlefield under your control. If there are
+    // two or more instant and/or sorcery cards in your graveyard, that creature enters with two additional +1/+1 counters
+    // on it": spell mastery, checked as it resolves; the counters are part of how it enters (CR 614.1c).
+    const masteryCounters = /^If (.+), that creature enters with (an|two|three) additional \+1\/\+1 counters? on it$/.exec(s);
+    const masteryPut = effects[effects.length - 1];
+    const masteryCond = masteryCounters && masteryPut?.type === "putOntoBattlefield" && masteryPut.what.ref === "target" && !masteryPut.counters && !masteryPut.countersFromLast && !masteryPut.faceDown && !masteryPut.atNextEndStep && ctx.targets[masteryPut.what.index]?.types?.includes("Creature")
+      ? parseStaticCondition(masteryCounters[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (masteryCond && masteryCounters && masteryPut?.type === "putOntoBattlefield") {
+      const cond = masteryCond;
+      effects[effects.length - 1] = { type: "if", cond: { kind: "state", cond }, effects: [{ ...masteryPut, counters: { "+1/+1": masteryCounters[2] === "an" ? 1 : num(masteryCounters[2]!) } }], otherwise: [masteryPut] };
+      continue;
+    }
     // Charnel Troll: "exile a creature card from your graveyard. If you do, put a +1/+1 counter on ~. Otherwise, sacrifice
     // it.": you must exile one if you can (rulings), so it's done exactly when there's one there as it resolves; "it" is ~,
     // the only permanent named.
@@ -3326,6 +3359,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [], otherwise: inner });
+      continue;
+    }
+    // Urgoros, the Empty One: "that player discards a card at random. If the player can't, you draw a card": only when no
+    // card was discarded (an empty hand).
+    const discCant = /^If (?:the player|that player|they) can't, (you (?:draw|gain|create) .+)$/.exec(s);
+    if (discCant && sacPrev?.type === "discard" && sacPrev.n === 1 && sacPrev.who.ref === "eventPlayer" && Object.keys(sacPrev).every((k) => ["type", "who", "n", "random"].includes(k))) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(discCant[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "discardedThisWay" } }, min: 1 }, effects: [], otherwise: inner });
       continue;
     }
     // "15—20 | Create one of those tokens. You may roll again." (Delina, Wild Mage): the same roll and its results table
@@ -6111,6 +6154,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "targetIs", index: before, filter }, effects: fx });
       continue;
     }
+    // Hog-Monkey Rampage: "Choose target creature you control and target creature an opponent controls. Put a +1/+1 counter
+    // on the creature you control if it has power 4 or greater. Then those creatures fight each other.": the first target,
+    // by its power as this resolves.
+    const putIfMine = /^Put an? \+1\/\+1 counter on the creature you control if it has power (\d+) or greater$/.exec(s);
+    if (putIfMine && ctx.targets.length === 2 && ctx.targets[0]!.kind === "object" && ctx.targets[0]!.controller === "you" && ctx.targets[0]!.types?.includes("Creature") && !ctx.targets[0]!.optional && !ctx.targets[0]!.many && !effects.length) {
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], power: { min: Number(putIfMine[1]) }, text: `with power ${putIfMine[1]} or greater` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: 0, filter }, effects: [{ type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n: 1 }] });
+      continue;
+    }
     // Hydaelyn, the Mothercrystal: "Put a +1/+1 counter on another target creature you control. ... If that creature is
     // legendary, draw a card." The target as it is as this resolves (CR 608.2c); the instruction needn't be about it.
     // Revelation of Power: "If it has a counter on it, it also gains flying and lifelink until end of turn": a counter of
@@ -6594,6 +6646,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         : null;
       if (lessons) {
         done.countIfYard = { has: [{ kind: "card", subtypes: [lessons[2]!], text: `${lessons[2]} card` }], count: done.n as number, min: num(lessons[1]!) };
+        si++;
+      }
+      // Gather the Pack: "If there are two or more instant and/or sorcery cards in your graveyard, put up to two creature
+      // cards from among the revealed cards into your hand instead of one": spell mastery, checked as it resolves (the
+      // spell itself is still on the stack, rulings).
+      const mastery = !yardInstead && !lessons && done.into === "hand" && done.count === 1 && done.upTo && done.filter?.kind === "card" && !done.kickedCount && !done.countX && !done.countIfYard
+        ? new RegExp(`^If there are ${NUM} or more instant and/or sorcery cards in your graveyard, put up to (two|three) (.+?) cards from among the revealed cards into your hand instead of one\\.?$`).exec(sentences[si + 1] ?? "")
+        : null;
+      if (mastery && done.filter?.text === `${mastery[3]} card`) {
+        done.countIfYard = { has: [{ kind: "card", types: ["Instant", "Sorcery"], text: "instant or sorcery card" }], count: num(mastery[2]!), min: num(mastery[1]!) };
         si++;
       }
       if (digPaid) effects.push({ type: "may", effects: [done], ...(digPaid.pay ? { pay: digPaid.pay } : {}), text: digPaid.text });
@@ -8432,6 +8494,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "forEachThisWay", which: "destroyed", filter: { ...spec, text: lossThisWay[1]! }, effects: [{ type: "loseLife", who: { ref: "eachOne" }, n: 1 }] });
       continue;
     }
+    // Seeds of Innocence: "Destroy all artifacts. They can't be regenerated. The controller of each of those artifacts gains
+    // life equal to its mana value": each player gains the total for the ones they controlled as they were destroyed
+    // (CR 608.2h), one life gain each.
+    const seeds = /^The controller of each of those (artifacts|creatures) gains life equal to its mana value$/.exec(s);
+    if (seeds) {
+      const prev = effects[effects.length - 1];
+      const spec = parseTargetPhrase(singularWord(seeds[1]!), { chosen: true });
+      if (prev?.type !== "destroy" || prev.what.ref !== "each" || spec?.kind !== "object") return null;
+      effects.push({ type: "forEachThisWay", which: "destroyed", manaValue: true, filter: { ...spec, text: seeds[1]! }, effects: [{ type: "gainLife", who: { ref: "eachOne" }, n: 1 }] });
+      continue;
+    }
     // Mogg Infestation: "Destroy all creatures target player controls. For each creature that died this way, that player
     // creates two 1/1 red Goblin creature tokens": those put into a graveyard (CR 700.4), all that player's.
     const diedThisWay = /^For each (creature) that died this way, that player (creates (?:an?|two|three) .+ tokens?(?: with [a-z ]+)?)$/.exec(s);
@@ -9738,8 +9811,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       return null;
     }
     // Consuming Aberration: "each opponent reveals cards from the top of their library until they reveal a land card, then
-    // puts those cards into their graveyard".
-    const untilLand = /^(Each opponent|Each player|Target opponent|Target player) reveals cards from the top of their library until they reveal a land card$/i.exec(s);
+    // puts those cards into their graveyard". Destroy the Evidence: "Its controller ..." after "Destroy target land", the
+    // land's controller as it last existed (CR 608.2h); with no land card, the whole library (rulings).
+    const untilLand = /^(Each opponent|Each player|Target opponent|Target player|Its controller) reveals cards from the top of their library until they reveal a land card$/i.exec(s);
     if (untilLand && /^(?:Then )?puts those cards into their graveyard\.?$/i.test(sentences[si + 1] ?? "")) {
       const who = parsePlayer(untilLand[1]!, ctx);
       if (!who) return null;
@@ -10596,7 +10670,11 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
     const amount = parseCount(`that spell's ${spellMv[1]}`, ctx);
     return amount ? { cond: { kind: "amountNow", amount, min: Number(spellMv[2]) }, not: false, text: spellMv[3]!, noTargets: true } : null;
   }
-  const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s);
+  // Lyzolda, the Blood Witch: "If the sacrificed creature was red, ...": one of its colors as it last existed.
+  const sacColor = /^If the sacrificed creature was (white|blue|black|red|green), (.+)$/.exec(s);
+  if (sacColor) return { cond: { kind: "sacrificedColor", color: COLOR_WORDS[sacColor[1]!]! }, not: false, text: sacColor[2]!, noTargets: true };
+  // Thallid Omnivore: "If a Saproling was sacrificed this way, ..." after a "Sacrifice another creature" cost: the same.
+  const sacType = /^If the sacrificed creature was an? ([A-Z][a-z]+), (.+)$/.exec(s) ?? (ctx.activated && !ctx.spell ? /^If an? ([A-Z][a-z]+) was sacrificed this way, (.+)$/.exec(s) : null);
   if (sacType && CREATURE_TYPES.has(sacType[1]!)) return { cond: { kind: "sacrificedSubtype", subtype: sacType[1]! }, not: false, text: sacType[2]!, noTargets: true };
   // Evereth, Viceroy of Plunder: "If the sacrificed permanent was a Treasure": an artifact subtype it had as it last existed.
   const sacArtifact = /^If the sacrificed permanent was an? (Treasure|Food|Clue|Blood|Map|Powerstone|Equipment|Vehicle), (.+)$/.exec(s);

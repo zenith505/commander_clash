@@ -1045,8 +1045,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yoursWith ? `${yoursWith[1]} you own${yoursWith[2]}` : yours[1]} you own dies, ${line.slice(yours[0].length)}`.replace(/( with .+) you own dies, /, "$1 dies, ");
   // "Whenever an artifact is put into an opponent's graveyard from the battlefield" (Viridian Revel): one an opponent owns
   // dies, whoever controlled it (CR 404.2, 700.4).
-  const theirs = /^(When(?:ever)? (?:another|an?) [a-z]+) is put into an opponent's graveyard from the battlefield, /.exec(line);
-  if (theirs) line = `${theirs[1]} an opponent owns dies, ${line.slice(theirs[0].length)}`;
+  // Patron of the Nezumi: "Whenever a permanent is put into an opponent's graveyard, that player loses 1 life": a permanent
+  // is only ever on the battlefield (CR 110.1), and "that player" is that graveyard's owner, the card's (CR 404.2).
+  const theirs = /^(When(?:ever)? (?:another|an?) [a-z]+) is put into an opponent's graveyard from the battlefield, /.exec(line) ?? /^(When(?:ever)? (?:another|an?) permanent) is put into an opponent's graveyard, /.exec(line);
+  if (theirs) line = `${theirs[1]} an opponent owns dies, ${line.slice(theirs[0].length).replace(/^that player\b/, "its owner")}`;
   // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
   // battlefield (CR 110.1), so from there (rulings).
   line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
@@ -3191,6 +3193,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (discards) return discards;
   // "When ~ is put into a graveyard from anywhere, shuffle it into its owner's library" (CR 603.6c): "it" is the card in
   // the graveyard, and its owner controls the ability there (CR 603.3a), so "its owner" is "you".
+  // Golgari Brownscale: "When ~ is put into your hand from your graveyard, you gain 2 life": the card's ability in the hand,
+  // however it got there, dredge or not (rulings); a trigger that can't happen on the battlefield works where it can
+  // (CR 113.6k).
+  const toHand = /^When ~ is put into your hand from your graveyard, (.+)$/.exec(line);
+  if (toHand) {
+    const body = parseBody(toHand[1]!, {});
+    return body && !/\b(?:it|~)\b/.test(toHand[1]!) ? { event: "selfToHandFromGraveyard", body } : "fail";
+  }
   const anywhere = /^When ~ is put into (?:a|your) graveyard from anywhere, (.+)$/.exec(line);
   if (anywhere) {
     const body = parseBody(anywhere[1]!.replace(/^its owner shuffles their graveyard into their library/, "shuffle your graveyard into your library"), { selfCard: true });

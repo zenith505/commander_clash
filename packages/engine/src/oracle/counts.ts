@@ -591,6 +591,16 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who, filter: { ...spec, text: `${kinds} card` } }) : null;
   }
+  // Roiling Terrain: "the number of land cards in that land's controller's graveyard": the target's controller, as it last
+  // existed if it's gone.
+  if (ctx && (m = /^(.*?)cards? in that (land|creature|permanent)'s controller's graveyard$/i.exec(p))) {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    const kinds = m[1]!.trim();
+    const spec = kinds ? (/^[a-z]+$/.test(kinds) ? parseTargetPhrase(`${kinds} card from a graveyard`, { chosen: true }) : null) : undefined;
+    if (t?.kind !== "object" || t.many || t.optional || (m[2] !== "permanent" && !t.types?.includes(capital(m[2]!))) || spec === null || (spec && spec.kind !== "card")) return null;
+    return count({ kind: "cardsInGraveyard", who: { ref: "targetController", index: i }, ...(spec ? { filter: { ...spec, text: `${kinds} card` } } : {}) });
+  }
   // Death's Approach: "Enchanted creature gets -X/-X, where X is the number of creature cards in its controller's
   // graveyard": a static ability's, counted for the permanent it affects (whoever controls it now).
   if (!ctx && (m = /^(.*?)cards? in its controller's graveyard$/i.exec(p))) {

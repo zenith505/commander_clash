@@ -2061,6 +2061,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object
       batchWatch(w, m.controller!, withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, true);
     }
+    // Golgari Brownscale: "When ~ is put into your hand from your graveyard": the card's ability, in the hand, under its
+    // owner's control (CR 113.8), the same object that arrived.
+    for (const m of ev.moves) {
+      const card = s.objects[m.id];
+      if (m.from === "graveyard" && m.to === "hand" && !m.notCard && card?.zone === "hand" && (card.zoneChanges ?? 0) === m.zc) add(card, card.owner, (e) => e === "selfToHandFromGraveyard", compileCard(defOf(s, card)).triggers);
+    }
     // "For the first time each turn" looks at the events before this one.
     const discards = new Map<PlayerId, string[]>();
     for (const m of ev.moves) if (m.discardedBy !== undefined) discards.set(m.discardedBy, [...(discards.get(m.discardedBy) ?? []), m.card]);

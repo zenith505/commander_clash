@@ -1703,6 +1703,8 @@ export type StaticCondition =
   | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** "If this card is exiled" (Senu): still that card, face up in its owner's exile (CR 603.4). */
   | { kind: "selfInExile" }
+  /** Firemane Angel's "if ~ is in your graveyard or on the battlefield", one ability for each zone: still there, the same object (CR 400.7, 603.4). */
+  | { kind: "selfStill"; zone: "graveyard" | "battlefield" }
   /** Eminence's "if ~ is in the command zone or on the battlefield". */
   | { kind: "selfCommandOrBattlefield" }
   /** "If ~ is in the command zone" (Oloro, Ageless Ascetic): an ability that works only there (CR 113.6). */
@@ -1853,6 +1855,8 @@ export type StaticCondition =
   | { kind: "drawn"; n: number; opponent?: true }
   /** "If you descended this turn": a permanent card was put into your graveyard this turn (CR 700.11). */
   | { kind: "descended" }
+  /** "If you cycled two or more cards this turn" (Spellpyre Phoenix): cards cycled this turn, before it was there too (rulings). */
+  | { kind: "cycled"; n: number }
   /** Revolt: "if a permanent left the battlefield under your control this turn". */
   | { kind: "revolt"; /** "If a creature left the battlefield under your control this turn" (Tale of Momo). */ creature?: true }
   /** Void: "if a nonland permanent left the battlefield this turn or a spell was warped this turn". */
@@ -2420,6 +2424,8 @@ export type Effect =
        * An Aura that can't enchant it stays in the graveyard; an Equipment that can't equip it enters unattached (rulings).
        */
       attachToCreated?: true;
+      /** "Attached to ~" (Magnetic Snuffler): an Equipment attached to the source creature, still the same object on the battlefield; else unattached (rulings). */
+      attachToSource?: true;
       /** Craft (CR 702.167c): the cards its activation's cost exiled (StackItem.costExiled) are linked to the permanent it becomes, "the exiled cards used to craft it". */
       linkCostExiled?: true;
       /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"). */
@@ -2522,6 +2528,8 @@ export type Effect =
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
   /** "If a creature would die this turn, exile it instead" (Malicious Malfunction): every creature this turn, ones that enter or become creatures later too (rulings, CR 614.1a). */
   | { type: "exileDyingThisTurn" }
+  /** "Players can't search libraries this turn" (Shadow of Doubt): GameState.noSearchTurn. */
+  | { type: "noSearchThisTurn" }
   /** "Draw a card and reveal it. If it isn't a land card, discard it." (Sindbad): the cards just drawn, revealed; those not matching `keep` are discarded. */
   | { type: "revealDrawn"; keep: TargetSpec }
   /**
@@ -2667,7 +2675,7 @@ export type Effect =
    * each of them that the instructions before destroyed or exiled, by the player who controlled it as it last existed.
    */
   /** `graveyard`: "for each permanent put into a graveyard this way" (Terastodon): only the destroyed ones that went there. */
-  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; graveyard?: true; filter: TargetSpec; effects: Effect[]; /** "Creates two 1/1 red Goblin creature tokens" for each (Mogg Infestation). */ times?: number }
+  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; graveyard?: true; filter: TargetSpec; effects: Effect[]; /** "Creates two 1/1 red Goblin creature tokens" for each (Mogg Infestation). */ times?: number; /** "The controller of each of those artifacts gains life equal to its mana value" (Seeds of Innocence): each one counts its mana value, not 1. */ manaValue?: true }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
@@ -3888,6 +3896,8 @@ export type SpellCondition =
   | { kind: "sacrificedLegendary" }
   /** "If the sacrificed creature was a Hamster" (Minsc & Boo): one of its creature types as it last existed. */
   | { kind: "sacrificedSubtype"; subtype: string }
+  /** "If the sacrificed creature was red" (Lyzolda, the Blood Witch): one of its colors as it last existed (CR 608.2h). */
+  | { kind: "sacrificedColor"; color: Color }
   /**
    * "If the discarded card wasn't a land card" (Grab the Prize), "was a creature card" (Moria Scavenger): the card a
    * discard cost discarded (StackItem.costDiscarded), as it is in the graveyard. Costs are paid after targets are chosen
@@ -4362,6 +4372,8 @@ export type TriggerEvent =
    * (CR 603.3a), never as a leaves-the-battlefield ability (CR 603.6c).
    */
   | "selfToGraveyardAnywhere"
+  /** "When ~ is put into your hand from your graveyard" (Golgari Brownscale): it triggers from the hand, for any reason it got there (rulings). */
+  | "selfToHandFromGraveyard"
   /** "When ~ is put into your graveyard from your library" (Narcomoeba): the same, only from its owner's library. */
   | "selfToGraveyardFromLibrary"
   /** Haunt on an instant or sorcery (CR 702.55a): "When this spell is put into a graveyard during its resolution". */

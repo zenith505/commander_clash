@@ -276,6 +276,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let effectText = tapAttached ? m[2]!.replace(/\bother than the creature tapped this way\b/, "other than enchanted creature") : m[2]!;
   // Painbringer: the X its cost announced (see above).
   if (/(?:^|, )Exile any number of cards from your graveyard(?=, |$)/.test(costs) && extra.some((c) => c.kind === "exileFromGraveyard" && c.x)) effectText = effectText.replace(/, where X is the number of cards exiled this way\.$/, ".");
+  // Relic Amulet: "Remove all charge counters from ~: It deals that much damage to target creature": as many as were
+  // removed, none if there were none (see StackItem.countersRemoved).
+  if (removeCounters?.all) effectText = effectText.replace(/^It deals that much damage to (target [a-z ]+)\.$/, "~ deals X damage to $1, where X is the number of counters removed this way.");
   let sorcerySpeed = false;
   let oncePerTurn = keyword === "Boast" || keyword === "Forecast";
   let maxPerTurn: number | undefined;

@@ -261,7 +261,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const sacrificed = /^the sacrificed (?:creature|artifact|permanent)$/.test(m[4]!);
     // "A copy of the exiled card" after "you may exile an artifact or creature card from your hand. If you do" (Nexus of
     // Becoming): that card, copied as it is in exile (CR 707.2).
-    const fromHand = ctx.exiledFromHand && /^(?:the exiled card|it|that card)$/.test(m[4]!);
+    const fromHand = ctx.mayExiledFromHand && /^(?:the exiled card|it|that card)$/.test(m[4]!);
     const what0 = fromHand ? { ref: "exiledFromHand" as const } : ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : sacrificed ? { ref: "sacrificed" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     // "A copy of that card" about a creature that died (Myrkul, Lord of Bones): of the card, not of the creature it was
     // as it last existed (rulings).

@@ -379,6 +379,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.tappedThisWay && /^each permanent tapped this way$/i.test(x)) return { ref: "tappedThisWay" };
   // Lost in the Maze: "Tap X target creatures. Put a stun counter on each of those creatures you don't control."
   if (/^each of those creatures you don't control$/i.test(x) && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, notYours: true };
+  // Winter Blast: "Tap X target creatures. ~ deals 2 damage to each of those creatures with flying."
+  const withKw = /^each of those creatures with (flying|reach|trample|haste)$/i.exec(x);
+  if (withKw && ctx.lastTargets) return { ref: "target", ...ctx.lastTargets, with: { kind: "object", types: ["Creature"], keywords: [withKw[1]!.charAt(0).toUpperCase() + withKw[1]!.slice(1).toLowerCase()], text: `creature with ${withKw[1]!.toLowerCase()}` } };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);

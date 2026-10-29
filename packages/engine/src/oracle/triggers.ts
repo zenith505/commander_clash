@@ -2885,6 +2885,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(heroic[1]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
     return body ? { event: "selfTargetedByYourSpell", body } : "fail";
   }
+  // Druid of Horns: "Whenever you cast an Aura spell that targets ~, ...": an Aura spell targets what it will enchant (CR
+  // 303.4a).
+  const auraHeroic = /^Whenever you cast an Aura spell that targets ~, (.+)$/.exec(line);
+  if (auraHeroic) {
+    const body = parseBody(auraHeroic[1]!, {});
+    return body ? { event: "selfTargetedByYourSpell", body, heroicSpell: { kind: "spell", subtypes: ["Aura"], text: "Aura spell" } } : "fail";
+  }
   const hosted = parseHostTrigger(line);
   if (hosted) return hosted;
   // "Whenever ~ deals damage to an opponent": an opponent of its controller. "Whenever ~ deals combat damage to an

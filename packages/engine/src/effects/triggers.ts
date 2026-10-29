@@ -1818,7 +1818,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {
       const o = s.objects[id];
-      if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e) => e === "selfTargetedByYourSpell", undefined, ev.stackId);
+      if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e, t) => e === "selfTargetedByYourSpell" && (!t.heroicSpell || (item ? spellMatches(s, t.heroicSpell, item) : printedMatches(t.heroicSpell, ev.card))), undefined, ev.stackId);
     }
     causedBy = null;
   } else if (ev.type === "targeted") {

@@ -354,7 +354,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const out: GameObject[] = [];
     for (let i = ref.index; i < ref.index + (ref.n ?? 1); i++) {
       const t = ctx.targets[i];
-      if (ctx.legal[i] && t?.kind === "object" && !(ref.notYours && controllerOf(s, obj(s, t.id)) === ctx.controller)) out.push(obj(s, t.id));
+      if (ctx.legal[i] && t?.kind === "object" && !(ref.notYours && controllerOf(s, obj(s, t.id)) === ctx.controller) && !(ref.with && !objectMatches(s, ref.with, obj(s, t.id), ctx.controller, false))) out.push(obj(s, t.id));
     }
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
     if (ref.sharesColor && out[0]) out.push(...sharingAColor(s, out[0], ref.sharesColor, ctx.controller));

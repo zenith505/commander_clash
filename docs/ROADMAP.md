@@ -2712,8 +2712,25 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   Lumengrid Augur and Desecrator Hag (what the chosen or discarded card was), Canker Abomination (counters for the
   chosen opponent's creatures), Drake Familiar ("unless you return an enchantment"), Cabal Slaver ("Whenever a Goblin
   deals combat damage to a player"), Aven Warcraft (threshold choice of a color).
-- Next for Lane B, least played first (up from about 21,900): Fickle Efreet, Bill Ferny, Bullseye, Rayami, Boom
-  Scholar, Hypnox, Hankyu, The Abyss, Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
+- Round B40 (harder skipped cards, least played first): "draw N cards, then discard one of them" picks only among the
+  cards just drawn (Soldevi Sage, Casting of Bones, Krovikan Sorcerer; browser test), "discard any number of creature
+  cards ... for each card discarded this way" (Mind Maggots), "if you discard a creature card this way ... that card's
+  power" (Cragganwick Cremator), Reviving Vapors ("that card's mana value"), "As ~ enters, discard your hand"
+  (Heightened Awareness), "Sacrifice an artifact or another creature" as a cost (Malevolent Noble), "a land card of each
+  basic land type" (Gaea's Balance), rhystic payments: "unless ... pays {2}. If they do, ..." (Rhystic Lightning),
+  "Then if any player pays {2}" (Rhystic Scrying), "unless any player pays {X}" (Soul Strings); "the number of Islands
+  tapped this way" (Monsoon), "each of those creatures with flying" (Winter Blast), "gets an additional" after kicker
+  (Tribute to Urborg), morbid "instead that player reveals their hand, you choose two cards" (Gruesome Discovery),
+  "Whenever you cast an Aura spell that targets ~" (Druid of Horns), "at end of combat, sacrifice it and it deals 5
+  damage to you" (Time Elemental), "return it and ~ to their owners' hands at end of combat" (Contempt), "exile all
+  cards from target opponent's hand" (Hypnox). +20 (27,669 of 31,936).
+- Out after round B40: Erosion, Insubordination and Aggression (the enchanted creature is locked in as the upkeep
+  trigger triggers, rulings), Bramble Elemental (no "becomes attached" event), Hipparion (a cost to block), Agonizing
+  Memories ("in any order"), Noggin Whack and Pulse of the Dross (the target player chooses which cards to reveal),
+  Fickle Efreet ("an opponent gains control of ~" after a lost coin flip), The Abyss (the active player chooses the
+  target), Retribution, Barrin's Spite, Vicious Betrayal, Sacred Guide, Scrounge.
+- Next for Lane B, least played first (up from about 21,900): Bill Ferny, Bullseye, Rayami, Boom Scholar, Hankyu,
+  Boros Battleshaper, Aura Graft. Then up from about 19,600: Sacred Ground, Mana
   Cache (any player, before the end step), Colfenor's Plans, Rewrite History, Wight, Throne of Makindi,
   Stormwild Capridor, Lamplight Phoenix (collect evidence as a dies may), Awesome Presence, and in the 18,000s Mind Bomb
   (each player discards up to three). Then the unsupported ones above that, least played first

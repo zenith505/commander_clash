@@ -145,6 +145,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const selfIf = pickFilter(c[2]!);
       if (!filter || !selfIf) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or ${/^[aeiou]/i.test(c[2]!) ? "an" : "a"} ${c[2]}` }, n: 1, other: true, selfIf });
+    } else if ((c = /^Sacrifice an? (artifact|enchantment|land) or another (creature)$/.exec(part))) {
+      // Malevolent Noble: "Sacrifice an artifact or another creature": the same the other way round, this permanent only
+      // if it's an artifact.
+      const filter = pickFilter(`${c[1]} or ${c[2]}`);
+      const selfIf = pickFilter(c[1]!);
+      if (!filter || !selfIf) return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or another ${c[2]}` }, n: 1, other: true, selfIf });
     } else if ((c = new RegExp(`^Sacrifice ${NUM} (.+) with different names$`).exec(part)) && num(c[1]!) > 1) {
       // Transmutation Font: "three artifact tokens with different names", each name once (a face-down permanent has none,
       // CR 708.2, so it shares none).

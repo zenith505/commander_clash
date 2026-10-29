@@ -109,6 +109,8 @@ export interface Ctx {
   lastDugLands?: boolean;
   /** After "look at the top N cards ... You may put any number of them into your hand": "each card you put into your hand this way" (Count "dugToHand"). */
   dugToHand?: boolean;
+  /** The same, exactly one card: "that card's mana value" (Reviving Vapors; Count "dugToHandMv"). */
+  dugOneToHand?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
   /** With `afterMill`: that mill was of exactly one card, so "the milled card" is that card (Heed the Mists). */
@@ -1171,6 +1173,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Growth Cycle: "Target creature gets +3/+3 until end of turn. It gets an additional +2/+2 until end of turn for each card
   // named ~ in your graveyard": a second bonus, counted as it resolves (rulings: ~ is on the stack, not in the graveyard).
   text = text.replace(/(gets [+-]\d+\/[+-]\d+ until end of turn\. It) gets an additional ([+-]\d+\/[+-]\d+ until end of turn for each )/, "$1 gets $2");
+  // Tribute to Urborg: "Target creature gets -2/-2 until end of turn. If ~ was kicked, that creature gets an additional
+  // -1/-1 until end of turn for each instant and sorcery card in your graveyard": a second effect on top of the first.
+  text = text.replace(/(gets [+-]\d+\/[+-]\d+ until end of turn\. If ~ was kicked, that creature) gets an additional ([+-]\d+\/[+-]\d+ until end of turn for each )/, "$1 gets $2");
   // Campsite Cuisine: "you may sacrifice X Foods. When you do, up to X target attacking creatures ...": X is how many you
   // sacrifice, so the same as Swashbuckler Extraordinaire's "one or more ... up to that many" (none sacrificed, no trigger).
   text = text.replace(/\b([Yy]ou may sacrifice) X ([A-Z][a-z]+s)\. When you do, up to X target /, "$1 one or more $2. When you do, up to that many target ");
@@ -1302,6 +1307,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Start Your Engines: the same, then "Creatures you control get +2/+0 until end of turn", those Vehicles included (rulings).
   text = text.replace(/^Vehicles you control become artifact creatures until end of turn\.(?= |$)/, "Each Vehicle you control becomes an artifact creature until end of turn.");
   // Does Machines: "mill two cards, draw two cards, then discard two cards": one after another.
+  // Reviving Vapors: "Reveal the top three cards of your library and put one of them into your hand. You gain life equal to
+  // that card's mana value. Put all other cards revealed this way into your graveyard.": one card must be taken; nothing
+  // can happen between the life and the rest going to the graveyard, so they are one look, then the life.
+  text = text.replace(/^Reveal the top (two|three|four|five) cards of your library and put one of them into your hand\. (You gain life equal to that card's mana value)\. Put all other cards revealed this way into your graveyard\.$/, "Reveal the top $1 cards of your library. Put one of them into your hand and the rest into your graveyard. $2.");
   text = text.replace(/^([Mm]ill (?:a card|\w+ cards)), (draw (?:a card|\w+ cards), then discard (?:a card|\w+ cards))\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
   // Spoils of Victory: "Search your library for a ... card and put that card onto the battlefield. Then shuffle." is the
   // usual "..., put it onto the battlefield, then shuffle."
@@ -1861,6 +1870,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Rhystic Tutor: "Unless any player pays {2}, search your library for a card, ...": each player in turn order may pay,
   // the caster too; the search only if no one does (CR 101.4), the same as "Any player may pay {2}. If no one does, ...".
   text = text.replace(/^Unless any player pays ((?:\{[^}]+\})+), (search your library [^.]+\.)$/, (_, cost: string, rest: string) => `Any player may pay ${cost}. If no one does, ${rest}`);
+  // Soul Strings: "Return two target creature cards from your graveyard to your hand unless any player pays {X}.": the same
+  // offer, each player in turn as it resolves (rulings).
+  text = text.replace(/^(Return (?:a|an|one|two|three) target [^.]+ to your hand) unless any player pays ((?:\{[^}]+\})+)\.$/, (_, rest: string, cost: string) => `Any player may pay ${cost}. If no one does, ${rest.charAt(0).toLowerCase()}${rest.slice(1)}.`);
+  // Rhystic Scrying: "Draw three cards. Then if any player pays {2}, discard three cards.": each player in turn order gets
+  // the option to pay as it resolves (rulings), the discard if one does.
+  text = text.replace(/(^|\. )Then if any player pays ((?:\{[^}]+\})+), ([a-z][^.]+\.)$/, (_, pre: string, cost: string, rest: string) => `${pre}Any player may pay ${cost}. If a player does, ${rest}`);
   // Ghired, Conclave Exile: "populate. The token enters tapped and attacking." One instruction: how the copy enters.
   text = text.replace(/(^|\. )([Pp])opulate\. The token enters tapped and attacking\./, "$1$2opulate, the token entering tapped and attacking.");
   // Duneblast: "Choose up to one creature. Destroy the rest." The same as Mount Doom's "..., then destroy the rest".
@@ -2831,8 +2846,56 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Sacred Rites: "Discard any number of cards. Creatures you control get +0/+1 until end of turn for each card
     // discarded this way.": none or more, chosen as it resolves (CR 107.1c).
-    if (s === "Discard any number of cards" && /\bfor each card discarded this way\b/.test(sentences[si + 1] ?? "")) {
-      effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true });
+    // Mind Maggots: "discard any number of creature cards. For each card discarded this way, put two +1/+1 counters on ~":
+    // creature cards only, none too (rulings).
+    const maggots = /^[Dd]iscard any number of (creature )?cards$/.exec(s);
+    if (maggots && /\bfor each card discarded this way\b/i.test(sentences[si + 1] ?? "")) {
+      const filter = maggots[1] ? parseSearchFilter("creature card") : undefined;
+      if (filter === null) return null;
+      effects.push({ type: "discard", who: { ref: "you" }, n: 99, upTo: true, ...(filter ? { filter: { ...filter, text: "creature card" } } : {}) });
+      const per = /^For each card discarded this way, (put (?:a|an|two|three) \+1\/\+1 counters? on ~)(\.?)$/.exec(sentences[si + 1] ?? "");
+      if (per) sentences[si + 1] = `${capital(per[1]!)} for each card discarded this way${per[2]}`;
+      continue;
+    }
+    // Gruesome Discovery: "Target player discards two cards. If a creature died this turn, instead that player reveals their
+    // hand, you choose two cards from it, then that player discards those cards." (morbid, CR 608.2c: one or the other).
+    const gruesome = /^If a creature died this turn, instead that player reveals their hand, you choose (two|three) cards from it, then that player discards those cards\.?$/.exec(sentences[si + 1] ?? "");
+    if (gruesome && /^Target (?:player|opponent) discards (?:two|three) cards$/.test(s)) {
+      const plain = parseOne(s, ctx);
+      const d = plain?.length === 1 ? plain[0] : undefined;
+      if (d?.type !== "discard" || d.who.ref !== "target") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "creatureDied" } }, effects: [{ type: "lookAtHand", who: d.who, reveal: true }, { type: "takeFromHand", who: d.who, action: "discard", n: num(gruesome[1]!) }], otherwise: [d] });
+      si++;
+      continue;
+    }
+    // Monsoon: "tap all untapped Islands that player controls and ~ deals X damage to the player, where X is the number of
+    // Islands tapped this way": those that became tapped.
+    const monsoon = /^[Tt]ap all untapped ([A-Z][a-z]+) that player controls and ~ deals X damage to the player, where X is the number of ([A-Z][a-z]+) tapped this way$/.exec(s);
+    if (monsoon && monsoon[1] === monsoon[2]) {
+      const fx = parseOne(`Tap all untapped ${monsoon[1]} that player controls`, ctx);
+      const dmg = parseOne("~ deals 1 damage to that player", ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "tap" || dmg?.length !== 1 || dmg[0]!.type !== "damage") return null;
+      effects.push({ ...fx[0]!, noteTapped: true }, { ...dmg[0]!, amount: { count: { kind: "tappedThisWay" } } });
+      continue;
+    }
+    // Rhystic Lightning: "~ deals 4 damage to any target unless that permanent's controller or that player pays {2}. If they
+    // do, ~ deals 2 damage to the permanent or player.": that player decides as it resolves (rulings), one or the other.
+    const rhystic = /^(~ deals (\d+) damage to any target) unless that permanent's controller or that player (pays (?:\{[^}]+\})+)$/.exec(s);
+    const rhysticPaid = rhystic && /^If they do, ~ deals (\d+) damage to the permanent or player\.?$/.exec(sentences[si + 1] ?? "");
+    if (rhystic && rhysticPaid) {
+      const before = ctx.targets.length;
+      const fx = parseOne(rhystic[1]!, ctx);
+      const options = parsePunisherOptions(rhystic[3]!, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "damage" || !options || ctx.targets.length !== before + 1) return null;
+      effects.push({ type: "punisher", who: { ref: "targetOrController", index: before }, options, mode: "ifNone", effects: fx, otherwise: [{ ...fx[0]!, amount: Number(rhysticPaid[1]) }], thenText: `~ deals ${rhystic[2]} damage to it (${rhysticPaid[1]} if you do)` });
+      si++;
+      continue;
+    }
+    // Soldevi Sage: "Draw three cards, then discard one of them": one of the cards just drawn.
+    const ofDrawn = /^(?:[Tt]hen )?[Dd]iscard one of them$/.test(s) ? effects[effects.length - 1] : undefined;
+    if (ofDrawn) {
+      if (ofDrawn.type !== "draw" || ofDrawn.who.ref !== "you" || typeof ofDrawn.n !== "number" || ofDrawn.n < 2) return null;
+      effects.push({ type: "discard", who: { ref: "you" }, n: 1, drawn: true });
       continue;
     }
     // Landslide: "Sacrifice any number of Mountains. ~ deals that much damage to target player or planeswalker.": one
@@ -7785,14 +7848,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Lord Windgrace: "Discard a card, then draw a card. If a land card is discarded this way, draw an additional card":
     // the discard before the draw.
-    const ifDiscarded = /^If (?:an? (.+? card) (?:was|is) discarded|you discarded an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
+    // Cragganwick Cremator: "discard a card at random. If you discard a creature card this way, ~ deals damage equal to that
+    // card's power to ...": its power as it is in the graveyard (rulings).
+    const ifDiscarded = /^If (?:an? (.+? card) (?:was|is) discarded|you discard(?:ed)? an? (.+? card)) this way, (.+)$/.exec(s)?.filter((x) => x !== undefined);
     if (ifDiscarded) {
       const last = effects[effects.length - 1];
       const prev = last?.type === "draw" && last.who.ref === "you" && effects[effects.length - 2]?.type === "discard" ? effects[effects.length - 2] : last;
       if (prev?.type !== "discard" || (/^If you/.test(s) && prev.who.ref !== "you")) return null;
       const filter = parseSearchFilter(ifDiscarded[1]!);
       const then = ifDiscarded[2]!;
-      const inner = filter && parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      const itsPower = /^~ deals damage equal to that card's power to /.test(then) && prev.n === 1;
+      const inner = filter && (itsPower ? replaceX(parseOne(then.replace(/^~ deals damage equal to that card's power/, "~ deals X damage"), ctx), { count: { kind: "power", of: { ref: "discarded" } } }) : parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx));
       if (!filter || !inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: inner });
       continue;
@@ -10748,6 +10814,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (picked && pk.who.ref === "target") ctx.lastPut = true;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
     ctx.dugToHand = last?.type === "dig" && last.into === "hand" && !last.each && !last.who;
+    ctx.dugOneToHand = last?.type === "dig" && ctx.dugToHand && last.count === 1 && !last.upTo && !last.countX && last.kickedCount === undefined && !last.countIfYard && !last.oneOfEach;
     ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     // "Each opponent discards a card. For each opponent who can't, ..." (Aclazotz).
     // "Each player discards a card. Each opponent who can't loses 3 life." (Liliana, Waker of the Dead): the same opponents.

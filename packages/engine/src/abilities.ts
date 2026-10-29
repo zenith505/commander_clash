@@ -183,6 +183,8 @@ export type Count =
   | { kind: "returnedToYourHand" }
   /** "For each card you put into your hand this way" (Search for Blex): the cards its last look at the top of a library put into a hand. */
   | { kind: "dugToHand" }
+  /** "You gain life equal to that card's mana value" after "put one of them into your hand" (Reviving Vapors): the one card its last look at the top of a library put into a hand, X counted as 0 (rulings). */
+  | { kind: "dugToHandMv" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
   | { kind: "revealedFromHand" }
   /** "The number of cards revealed this way" after revealUntil (Madcap Experiment): all of them, the one found included (rulings). */
@@ -1024,6 +1026,8 @@ export type ObjRef =
       andSelfCard?: true;
       /** "Each of those creatures you don't control" (Lost in the Maze): only the targets another player controls as it resolves. */
       notYours?: true;
+      /** "Each of those creatures with flying" (Winter Blast): only the targets like this as it resolves. */
+      with?: TargetSpec;
       /**
        * "Exile target creature card from a graveyard. Create a token that's a copy of it" (The Scarab God): the targeted
        * card wherever this spell or ability has put it since (CR 400.7), copied as that card (rulings).
@@ -2308,7 +2312,7 @@ export type Effect =
    */
   | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true; /** "You may reveal a Dinosaur card from your hand" (Priest of the Wakening Sun): one at most. */ one?: true; /** "You may behold a Dragon" (Sarkhan, Dragon Ascendant; CR 701.4a): or choose a permanent you control of that kind. */ orControl?: true; /** With `one`: "Reveal a creature card in your hand" (Assembly Hall): one if there is one, not none. */ must?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
-  | { type: "exileHand"; until?: "nextTurn"; /** Wormfang Behemoth: "When ~ leaves the battlefield, return the exiled cards to their owner's hand" (CR 607.2a; set by compile). */ linked?: boolean }
+  | { type: "exileHand"; /** Hypnox: "exile all cards from target opponent's hand": that player's instead of yours. */ who?: PlayerRef; until?: "nextTurn"; /** Wormfang Behemoth: "When ~ leaves the battlefield, return the exiled cards to their owner's hand" (CR 607.2a; set by compile). */ linked?: boolean }
   /**
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
@@ -2459,7 +2463,7 @@ export type Effect =
   | { type: "putAllOnBottom"; filter: TargetSpec }
   /** "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Teferi's Puzzle Box, Mindmoil). */
   | { type: "handToBottomDraw"; who: PlayerRef }
-  | { type: "tap"; what: ObjRef }
+  | { type: "tap"; what: ObjRef; /** "Where X is the number of Islands tapped this way" follows (Monsoon): how many it tapped (Count "tappedThisWay"). */ noteTapped?: true }
   /** "Turn target face-down creature face up" (CR 708.8): with no cost paid; see turnFaceUpByEffect. */
   | { type: "turnFaceUp"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
@@ -2615,7 +2619,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | /** "When that creature becomes blocked this turn" (Barreling Attack): each time it does this turn (CR 603.7b). */ "becomesBlocked" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "yourNextFirstMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves" | /** "At the beginning of that player's next end step" (Faramir, Prince of Ithilien): `whose`'s, who is the trigger's event player ("they"). */ "playersNextEndStep"; whose?: PlayerRef; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; /** With each "subject": the delayed trigger also remembers this ability's source as it is now, its "~" (Contempt). */ withSource?: true; of?: ObjRef; thisTurn?: true; /** With "dies": "When it dies under your control this turn" (Desperate Measures). */ underYourControl?: true; /** With "dies": "When target creature is put into your graveyard this turn" (Saffi Eriksdotter): only if you own it. */ intoYourGraveyard?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3104,7 +3108,7 @@ export type Effect =
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean; /** With `hand`: "all nonland cards with the same name as another card in their hand" (Hint of Insanity). */ nameTwice?: true; /** Breakthrough: "choose X cards in your hand and discard the rest": all but this many, chosen (`n` is unused). */ keep?: Amount; /** Soldevi Sage: "Draw three cards, then discard one of them": only the cards this resolution's draw just drew that are still in that hand. */ drawn?: true } // CR 701.9
   /** CR 701.22, by the controller, or `who` ("target player scries X", Kozilek's Command). */
   | { type: "scry"; n: Amount; who?: PlayerRef }
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
@@ -3369,7 +3373,7 @@ export type Effect =
    * damage to them. If no one does, ..." once if no one did ("ifNone"). Each player still chooses in turn order, knowing
    * the earlier choices, and the chosen actions happen together (rulings on Clackbridge Troll and Vexing Devil).
    */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string; /** The penalty's button as it is ("Lose 5 life (Ann sacrifices Pillar Tombs of Aku)"), ~ its source. */ penalty?: string }
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** With `mode`: what happens instead when `effects` don't ("If they do, ~ deals 2 damage to the permanent or player", Rhystic Lightning). */ otherwise?: Effect[]; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string; /** The penalty's button as it is ("Lose 5 life (Ann sacrifices Pillar Tombs of Aku)"), ~ its source. */ penalty?: string }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -4394,6 +4398,8 @@ export type TriggerEvent =
 export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn" | "endOfCombat";
 
 export interface TriggeredAbility {
+  /** Druid of Horns: "Whenever you cast an Aura spell that targets ~": heroic for spells like this only. */
+  heroicSpell?: TargetSpec;
   event: TriggerEvent;
   body: AbilityBody;
   /** Soul Scourge: the player this enters ability targets is "that player" of its leaves ability, even if it's still on the stack or never resolves (rulings on Laquatus's Champion). */
@@ -5492,6 +5498,8 @@ export interface CompiledCard {
   graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
+  /** "As ~ enters, discard your hand" (Heightened Awareness): its controller discards their hand as it enters (CR 614.1c). */
+  entersDiscardHand?: true;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

@@ -1099,15 +1099,13 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
       }
       pu.acted = true;
       pu.penalty = 0;
-      sc.mayStep = e.effects.length;
+      sc.mayStep = e.mode ? 0 : e.effects.length;
     }
-    // "If a player does" / "If no one does": once, or not at all.
+    // "If a player does" / "If no one does": once, or not at all; Rhystic Lightning's `otherwise` if not.
     if (e.mode) {
       const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
-      if (did === (e.mode === "ifAny")) {
-        if (sc.mayStep! >= e.effects.length) sc.mayStep = 0;
-        for (; sc.mayStep! < e.effects.length; sc.mayStep!++) if (runEffect(s, e.effects[sc.mayStep!]!, ctx) === "paused") return "paused";
-      }
+      const then = did === (e.mode === "ifAny") ? e.effects : (e.otherwise ?? []);
+      for (; sc.mayStep! < then.length; sc.mayStep!++) if (runEffect(s, then[sc.mayStep!]!, ctx) === "paused") return "paused";
       sc.punish = sc.punished = sc.mayStep = undefined;
       return;
     }

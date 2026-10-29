@@ -1382,6 +1382,11 @@ export function compile(d: CardDef): CompiledCard {
       else out.devour = { n: rider === "counters" ? 1 : 0, filter, ...(rider === "counters" ? {} : { defines: rider ?? "count" }) };
       continue;
     }
+    // Heightened Awareness: "As ~ enters, discard your hand." (CR 614.1c).
+    if (line === "As ~ enters, discard your hand.") {
+      out.entersDiscardHand = true;
+      continue;
+    }
     // Arsenal Thresher: "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a
     // +1/+1 counter on it for each card revealed this way.": amplify 1's choice (CR 702.38a, 614.12), of artifact cards.
     if (line === "As ~ enters, you may reveal any number of other artifact cards from your hand. ~ enters with a +1/+1 counter on it for each card revealed this way.") {

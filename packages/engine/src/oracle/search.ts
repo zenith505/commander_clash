@@ -61,6 +61,15 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
     const anyOf = specs as TargetSpec[];
     return [{ type: "search", filter: { kind: "card", anyOf, text: `${pair[1]} and a ${pair[2]}` }, n: 2, upTo: true, oneOfEach: anyOf, reveal, dest: searchDest(r[1]!) }];
   }
+  // Gaea's Balance: "a land card of each basic land type": up to one for each (rulings: you may fail to find any), a
+  // land with two basic land types (Stomping Ground) being either one but not both; nonbasic ones count (rulings).
+  if (m[3] === "land card of each basic land type" && n === 1 && !m[1]) {
+    const r = new RegExp(`^(?:reveal them, )?put (?:them|those cards) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest);
+    const specs = ["Plains", "Island", "Swamp", "Mountain", "Forest"].map((t) => parseSearchFilter(`${t} card`));
+    if (!r || specs.some((f) => !f)) return null;
+    const anyOf = specs as TargetSpec[];
+    return [{ type: "search", filter: { kind: "card", anyOf, text: "land card of each basic land type" }, n: 5, upTo: true, oneOfEach: anyOf, reveal, dest: searchDest(r[1]!) }];
+  }
   // Conflux: "a white card, a blue card, a black card, a red card, and a green card": up to one for each, a multicolored
   // card being any one of its colors but not two of them (CR 701.23b).
   const list = /, and an? /.test(m[3]!) ? `${m[2]} ${m[3]}`.split(/, (?:and )?/) : null;

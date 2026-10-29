@@ -3378,6 +3378,12 @@ function finishCleanup(s: GameState) {
       const m = obj(s, id).mayPlay;
       if (m && (m.until === "thisTurn" || ((m.until === "nextTurn" || m.until === "duringNextTurn") && s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
     }
+  // Mosswood Dreadknight's "until the end of your next turn" from a graveyard.
+  for (const q of s.players)
+    for (const id of q.graveyard) {
+      const m = obj(s, id).mayPlay;
+      if (m?.until === "nextTurn" && s.activePlayer === m.player && s.turn > m.turn) obj(s, id).mayPlay = undefined;
+    }
   // Abilities that triggered during cleanup (madness, from discarding down to hand size): players get priority, then
   // there's another cleanup step (CR 514.3a).
   if (s.triggerQueue.length) {
@@ -4333,6 +4339,8 @@ export function castProblem(
   if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
   const via = graveyardWay(s, o, choices?.via, pid);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
+  // Mosswood Dreadknight's permission is for its Adventure only (the face is chosen first, above).
+  if (via?.face !== undefined && o.face !== via.face && layoutOf(s, o) === "adventure") return `${d.name} can be cast from your graveyard only as an Adventure`;
   if (!free && via && (o.zone !== "graveyard" || (o.owner !== pid && !via.anyOwner))) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
@@ -5640,7 +5648,10 @@ export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): C
   // (702.127a), or flashback an effect gave the card, for that half's mana cost.
   if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o, caster)).map((g) => ({ ...g, face: f })));
   const d = defOf(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d, caster ?? o.owner)];
+  // An adventurer card its owner may cast only as its Adventure (Mosswood Dreadknight): that way, as that face.
+  const face = o.face === undefined && o.mayPlay?.face !== undefined && layoutOf(s, o) === "adventure" ? o.mayPlay.face : undefined;
+  const asAdventure = face !== undefined ? asFace(s, o, face, () => grantedWays(s, o, defOf(s, o), caster ?? o.owner)).filter((g) => g.kind === "permission").map((g) => ({ ...g, face })) : [];
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d, caster ?? o.owner), ...asAdventure];
 }
 
 /**
@@ -5652,7 +5663,9 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   const out: CastFromGraveyard[] = [];
   // "You may cast that card this turn" (Emry): its owner, paying its mana cost; a card without one can't be cast.
   const m = o.mayPlay;
-  if (m && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
+  // Mosswood Dreadknight: "as an Adventure until the end of your next turn" (cleanup ends it), only as that face.
+  const lasts = m && ((m.until === "thisTurn" && m.turn === s.turn) || (m.until === "nextTurn" && m.face !== undefined));
+  if (m && lasts && (m.face === undefined || m.face === o.face) && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
     // Vohar, Vodalian Desecrator: "If that spell would be put into your graveyard, exile it instead".
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, ...(m.exileAfter ? { exileIfToGraveyard: true as const } : {}) });
   // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).

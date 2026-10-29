@@ -412,6 +412,8 @@ export interface GameObject {
     byType?: string;
     /** "Pay life equal to its mana value rather than paying its mana cost" (Nashi): an alternative cost, the only way. */
     life?: true;
+    /** "You may cast it from your graveyard as an Adventure" (Mosswood Dreadknight): only as this face (CR 715.3). */
+    face?: number;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the

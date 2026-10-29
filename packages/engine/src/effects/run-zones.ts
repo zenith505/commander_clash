@@ -18,7 +18,7 @@ import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
-import { asFace, defMv, registerFace, sameName, transformedFace } from "../faces";
+import { asFace, defMv, layoutOf, registerFace, sameName, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -1896,6 +1896,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // The permission is this object's only (CR 400.7), and ends with the turn (cleanup, like an exiled card's).
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "graveyard") continue;
+        // Mosswood Dreadknight: as its Adventure, until the end of its controller's next turn (cleanup ends it).
+        if (e.asAdventure) {
+          if (layoutOf(s, o) !== "adventure") continue;
+          o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "nextTurn", turn: s.turn, castOnly: true, face: 1 };
+          log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} from their graveyard as an Adventure until the end of their next turn.`);
+          continue;
+        }
         o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }), ...(e.exileAfter ? { exileAfter: true as const } : {}) };
         log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from their graveyard this turn.`);
       }

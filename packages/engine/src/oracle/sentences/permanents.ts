@@ -626,15 +626,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (first && second) return [...first, ...second];
   }
   // "Put a +1/+1 counter, a reach counter, and a deathtouch counter on target creature" (Gift of the Viper): each kind
-  // in turn, on the same permanent.
-  const list = new RegExp(`^Put ((?:${NUMX} ${COUNTER} counters?, )+)and (${NUMX} ${COUNTER} counters?) on (target .+|~)$`, "i").exec(s);
+  // in turn, on the same permanent. "... on that creature" (Abigale, Eloquent First-Year): the one an earlier sentence named.
+  const list = new RegExp(`^Put ((?:${NUMX} ${COUNTER} counters?, )+)and (${NUMX} ${COUNTER} counters?) on (target .+|~|that creature)$`, "i").exec(s);
   if (list) {
     const kinds = [...list[1]!.split(", ").filter(Boolean), list[4]!];
     const before = ctx.targets.length;
     const out: Effect[] = [];
+    const targeted = /^target /i.test(list[7]!);
     for (const [i, k] of kinds.entries()) {
-      const fx = parseSentence(`Put ${k} on ${i === 0 || list[7] === "~" ? list[7] : "it"}`, ctx);
-      if (!fx || (i === 0 && list[7] !== "~" && (ctx.targets.length !== before + 1 || ctx.lastObjectTarget !== before))) {
+      const fx = parseSentence(`Put ${k} on ${i === 0 || !targeted ? list[7] : "it"}`, ctx);
+      if (!fx || (i === 0 && targeted && (ctx.targets.length !== before + 1 || ctx.lastObjectTarget !== before))) {
         ctx.targets.length = before;
         return null;
       }
@@ -1388,6 +1389,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
+  // "Up to one other target creature loses all abilities" (Abigale, Eloquent First-Year): with no duration, for as long as
+  // it stays on the battlefield (CR 611.2a, 400.7; rulings), an effect with a timestamp, so abilities it gains later stay.
+  if ((m = /^((?:up to one )?(?:other )?target .+?) loses all abilities$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    if (what?.ref === "target") return [{ type: "continuous", what, mods: [{ kind: "loseAllAbilities" }], duration: "game" }];
   }
   // "Target creature becomes a Treasure artifact with "..." and loses all other card types and abilities" (Vraska,
   // Betrayal's Sting): for as long as it stays on the battlefield (CR 611.2a). Its supertypes stay (rulings, CR 205.1a);

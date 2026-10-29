@@ -2586,6 +2586,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "card" }, milled: true });
       continue;
     }
+    // "When ~ dies, you may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood
+    // Dreadknight, Hildibrand Manderville): a permission for that card, paying its Adventure's costs and following its
+    // timing (rulings), not to cast it as a creature.
+    if (/^[Yy]ou may cast it from your graveyard as an Adventure until the end of your next turn$/.test(s.replace(/\.$/, ""))) {
+      const what = parseObject("it", ctx);
+      if (what?.ref !== "selfCard") return null;
+      effects.push({ type: "mayCastFromGraveyard", what, asAdventure: true });
+      continue;
+    }
     // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
     // for that card, paying its costs and following the normal timing (rulings).
     const yardTarget = /^[Yy]ou may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
@@ -8357,6 +8366,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Mill three cards. When you do, ..." (Wick's Patrol): only if all of them were milled; with fewer in the library,
       // you mill as many as you can but it doesn't trigger (rulings on Wick's Patrol; CR 701.17b).
       const milled = prev?.type === "mill" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0;
+      // "Draw four cards. When you do, ..." (The Royal Scions): only if all of them were drawn; with fewer it doesn't
+      // trigger, and with more (a replacement) it triggers once (rulings).
+      const drew = prev?.type === "draw" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0 && effects.length === 1;
       // "Create a Food token. When you do, ..." (Eastfarthing Farmer): the token is created, so it triggers.
       const created = prev?.type === "createToken" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0 && !prev.attachTo;
       // "Create a Monster Role token attached to target creature you control. When you do, that creature fights ..." (Curse
@@ -8375,7 +8387,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // tapping none is doing it too, so it always triggers (rulings), with X the number tapped.
       // "Surveil 4. When you do, ..." (Dream Eater): with fewer cards in the library it triggers too (rulings).
       const always = (whenDo === searched || prev?.type === "amass" || prev?.type === "surveil" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
-      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
+      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !drew && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Mount Velus Manticore: "you may discard a card. When you do, ~ deals X damage to any target, where X is the number
       // of card types the discarded card has": that card's, counted as the reflexive ability triggers (its X, CR 603.12).
       const discTypes = mayDo && where?.[2] === "the number of card types the discarded card has" && prev.effects.length === 1 && prev.effects[0]!.type === "discard" && prev.effects[0]!.n === 1 && prev.effects[0]!.who.ref === "you" && !prev.effects[0]!.random;
@@ -8444,6 +8456,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (milled) {
         effects.pop();
         effects.push({ type: "if", cond: { kind: "libraryHas", n: prev.n as number }, effects: [prev, { type: "reflexive", body: reflexive }], otherwise: [prev] });
+        continue;
+      }
+      if (drew) {
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: { count: { kind: "drawnThisWay" } }, min: prev.n as number }, effects: [{ type: "reflexive", body: reflexive }] });
         continue;
       }
       if (created || always) {

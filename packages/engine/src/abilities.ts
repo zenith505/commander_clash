@@ -2304,7 +2304,7 @@ export type Effect =
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
-  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true }
+  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true; /** "If that spell would be put into your graveyard, exile it instead" (Vohar, Vodalian Desecrator): MayPlay.exileAfter. */ exileAfter?: true; /** "You may cast it from your graveyard as an Adventure until the end of your next turn" (Mosswood Dreadknight): until then, and only as its Adventure (face 1, CR 715.3). */ asAdventure?: true }
   /**
    * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
    * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells

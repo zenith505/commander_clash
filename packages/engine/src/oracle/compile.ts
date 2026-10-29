@@ -3461,6 +3461,22 @@ export function compile(d: CardDef): CompiledCard {
       });
       continue;
     }
+    // Transmogrant's Crown: "Equip {2} or {B}": either cost attaches it the same way, so it's an equip ability for each
+    // cost, any of which may be activated (CR 702.6a, 702.6d), as for Bloodthorn Flail below.
+    const equipTwo = /^Equip ((?:\{[^}]+\})+) or ((?:\{[^}]+\})+)$/.exec(line);
+    if (equipTwo && d.subtypes.includes("Equipment")) {
+      for (const cost of [equipTwo[1]!, equipTwo[2]!])
+        out.activated.push({
+          manaCost: cost,
+          tap: false,
+          sacrificeSelf: false,
+          sorcerySpeed: true,
+          body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
+          text: `Equip ${cost}`,
+          equip: true,
+        });
+      continue;
+    }
     // Luxior, Giada's Gift: "Equip planeswalker {1}" means "{1}: Attach this permanent to target planeswalker you control as
     // though that planeswalker were a creature. Activate only as a sorcery." (rulings, CR 702.6c-d).
     const equipWalker = /^Equip planeswalker ((?:\{[^}]+\})+)$/.exec(line);

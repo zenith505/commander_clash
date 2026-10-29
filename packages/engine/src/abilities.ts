@@ -1111,7 +1111,7 @@ export type ObjRef =
    */
   | { ref: "diedDamagedBySelf" }
   /** "All creatures blocking or blocked by ~" (Kjeldoran Frostbeast): the creatures in combat with the source now, none if it left (CR 506.4). */
-  | { ref: "inCombatWithSelf" }
+  | { ref: "inCombatWithSelf"; /** "Each creature it's blocking" (Gomazoa): only the attackers it blocks. */ blocked?: true; /** "~ and each creature it's blocking": the source too, while it's on the battlefield. */ andSelf?: true }
   /** "Each creature blocking it" (Plague Wight; `subject`: the trigger's attacker, Trailblazer's Torch): the creatures blocking the source now, none if it left combat (CR 506.4). */
   | { ref: "blockingIt"; subject?: true }
   /**
@@ -2432,7 +2432,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth"; /** "Just beneath the top X cards of that library" (Unexpectedly Absent): with `position` "top", under that many cards (on the bottom with fewer, rulings). */ beneath?: Amount }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | /** "Second from the top or on the bottom" (Temporal Cleansing), its owner's choice. */ "ownersChoiceSecond" | "second" | "third" | "fourth" | "fifth"; /** "Just beneath the top X cards of that library" (Unexpectedly Absent): with `position` "top", under that many cards (on the bottom with fewer, rulings). */ beneath?: Amount; /** "On top of their library in any order" (Misinformation): the controller orders them, not their owner. */ youOrder?: true }
   | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** "Exile all cards from all hands and graveyards" (Worldfire): the hand too, then the graveyard. */ hand?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "All cards with flashback" (Tombfire): cards that have it there, their own or given by an effect (CR 702.34a). */ withFlashback?: true; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
@@ -4674,6 +4674,8 @@ export interface TriggeredAbility {
   anyOpponent?: true;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
   ifCast?: true;
+  /** Addendum: "When this Aura enters, if you cast it during your main phase, ..." (Sentinel's Mark, CR 207.2c). */
+  ifCastInMain?: true;
   /**
    * A chapter ability "{rN}—[Effect]": "When one or more lore counters are put onto this Saga, if the number of lore
    * counters on it was less than N and became at least N, [effect]" (CR 714.2b).
@@ -5434,8 +5436,11 @@ export interface CompiledCard {
    * "If ~ would die, exile it instead" (`self`), "If a creature an opponent controls would die, exile it instead",
    * "If another creature would die, ..." (`filter`, from this permanent's controller's view): replacement effects (CR 614.1a).
    */
-  /** "If ~ would die, put it on top of its owner's library instead" (Gravebane Zombie): a replacement effect (CR 614.1a). */
-  libraryTopInsteadOfDying?: true;
+  /**
+   * "If ~ would die, put it on top (Gravebane Zombie) / on the bottom (Nissa's Chosen) of its owner's library instead": a
+   * replacement effect (CR 614.1a).
+   */
+  libraryInsteadOfDying?: "top" | "bottom";
   exileInsteadOfDying?: {
     self?: true;
     filter?: TargetSpec;

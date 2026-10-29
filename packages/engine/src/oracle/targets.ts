@@ -605,8 +605,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   // "Target creature card of the chosen type" (From the Rubble, Dawn-Blessed Pennant): the creature type chosen as its
   // source entered, filled in on its abilities (cards.ts abilitiesOf); compile checks the source makes that choice.
+  // "Target permanent of the chosen color" (Pentarch Paladin): the same with the color.
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true, chosen: true });
-  if (spec?.chosen && (spec.chosen !== "type" || ctx.spell)) return null;
+  if (spec?.chosen && ((spec.chosen !== "type" && spec.chosen !== "color") || ctx.spell)) return null;
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
@@ -1557,6 +1558,10 @@ export function parseTargetPhrase(
   } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
     extra.toxic = true;
     p = p.slice(0, m.index) + (m[1] ?? "");
+  } else if ((m = /(?:^| )with a kicker ability$/.exec(p)) && !extra.anyOf) {
+    // Murasa Sproutling: "card with a kicker ability": kicker or multikicker, a variant of it (CR 702.33c), as printed.
+    extra.anyOf = ["Kicker", "Multikicker"].map((k) => ({ kind: "object" as const, keywords: [k], text: k.toLowerCase() }));
+    p = p.slice(0, m.index);
   } else if ((m = /(?:^| )(with|without) ([a-z ]+?|[a-z]+(?:, [a-z]+)+, and\/or [a-z]+)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough. "With flying, deathtouch,
     // and/or lifelink" (Henrika, Infernal Seer): any of them.

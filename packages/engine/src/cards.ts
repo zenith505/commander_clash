@@ -310,8 +310,9 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
   if (o.chosen?.name !== undefined) own = withChosenName(own, o.chosen.name);
-  // "Return target card of the chosen type" (Dawn-Blessed Pennant): the creature type chosen as it entered.
-  if (o.chosen?.type !== undefined) own = withChosenType(own, o.chosen);
+  // "Return target card of the chosen type" (Dawn-Blessed Pennant): the creature type chosen as it entered. "Destroy target
+  // permanent of the chosen color" (Pentarch Paladin): the color.
+  if (o.chosen?.type !== undefined || o.chosen?.color !== undefined) own = withChosenType(own, o.chosen);
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
@@ -502,15 +503,17 @@ function withChosenName(base: CompiledCard, name: string): CompiledCard {
 const typed = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
 /** Triggered and activated abilities whose targets are "of the chosen type", with that type filled in (bindChosen). */
 function withChosenType(base: CompiledCard, chosen: Chosen): CompiledCard {
-  const has = (b: AbilityBody) => b.targets.some((t) => t.chosen === "type") || !!b.modal?.modes.some((m) => m.targets.some((t) => t.chosen === "type"));
+  const bound = (t: TargetSpec) => (t.chosen === "type" && chosen.type !== undefined) || (t.chosen === "color" && chosen.color !== undefined);
+  const has = (b: AbilityBody) => b.targets.some(bound) || !!b.modal?.modes.some((m) => m.targets.some(bound));
   if (!base.activated.some((a) => has(a.body)) && !base.triggers.some((t) => has(t.body))) return base;
   let byType = typed.get(base);
   if (!byType) typed.set(base, (byType = new Map()));
-  let hit = byType.get(chosen.type!);
+  const key = `${chosen.type ?? ""}|${chosen.color ?? ""}`;
+  let hit = byType.get(key);
   if (!hit) {
-    const bind = (t: TargetSpec): TargetSpec => (t.chosen === "type" ? bindChosen(t, chosen) : t);
+    const bind = (t: TargetSpec): TargetSpec => (bound(t) ? bindChosen(t, chosen) : t);
     const body = (b: AbilityBody): AbilityBody => (has(b) ? { ...b, targets: b.targets.map(bind), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map((m) => ({ ...m, targets: m.targets.map(bind) })) } } : {}) } : b);
-    byType.set(chosen.type!, (hit = { ...base, activated: base.activated.map((a) => ({ ...a, body: body(a.body) })), triggers: base.triggers.map((t) => ({ ...t, body: body(t.body) })) }));
+    byType.set(key, (hit = { ...base, activated: base.activated.map((a) => ({ ...a, body: body(a.body) })), triggers: base.triggers.map((t) => ({ ...t, body: body(t.body) })) }));
   }
   return hit;
 }

@@ -1572,6 +1572,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               key={pending.cards.join(",")}
               s={s}
               how={pending.bottom ? "bottom" : "libraryTop"}
+              owner={pending.owner !== undefined ? s.players[pending.owner]?.name : undefined}
               source={pending.source}
               cards={pending.cards}
               onHover={setHover}
@@ -3620,9 +3621,9 @@ function ArrangeTop({
               : how === "order"
               ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order`
               : how === "bottom"
-                ? `put ${cards.length} cards on the bottom of your library in any order`
+                ? `put ${cards.length} cards on the bottom of ${owner ? `${owner}'s` : "your"} library in any order`
                 : how === "libraryTop"
-                ? `put these ${cards.length} cards on top of your library in any order`
+                ? `put these ${cards.length} cards on top of ${owner ? `${owner}'s` : "your"} library in any order`
                 : how === "graveyard"
                   ? `put these ${cards.length} cards into your graveyard in any order`
                   : how === "wholeGraveyard"

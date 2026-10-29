@@ -854,10 +854,12 @@ export function moveObject(
   }
   // Gravebane Zombie: "If ~ would die, put it on top of its owner's library instead" (CR 614.1a), the permanent's own
   // ability as it would leave (an "exile it instead" applied above comes first, as its owner would choose, CR 616.1).
-  if (to === "graveyard" && fromZone === "battlefield" && objIsType(s, o, "Creature") && abilitiesOf(s, o).libraryTopInsteadOfDying) {
+  // Nissa's Chosen puts it on the bottom.
+  const libraryDies = to === "graveyard" && fromZone === "battlefield" && objIsType(s, o, "Creature") ? abilitiesOf(s, o).libraryInsteadOfDying : undefined;
+  if (libraryDies) {
     to = "library";
-    opts = { ...opts, top: true };
-    log(s, `${defOf(s, o).name} is put on top of its owner's library instead of dying.`);
+    opts = { ...opts, top: libraryDies === "top" };
+    log(s, `${defOf(s, o).name} is put on ${libraryDies === "top" ? "top" : "the bottom"} of its owner's library instead of dying.`);
   }
   // A merged permanent's components all go where it goes (CR 730.3, 730.3d), but the commander redirect below is the
   // commander card's alone (903.9c).
@@ -934,6 +936,7 @@ export function moveObject(
     o.manaSpent = undefined;
     o.spent = undefined;
     o.castNth = undefined;
+    o.castInMain = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.webSlung = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
@@ -5507,7 +5510,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const mvNow = defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost));
     s.costModsThisTurn = s.costModsThisTurn.filter((c) => !c.next || !costModThisTurnApplies(s, c, p.id, d, mvNow));
   }
-  if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
+  if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = o.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);

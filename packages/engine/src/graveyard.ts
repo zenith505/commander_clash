@@ -81,7 +81,8 @@ export function askGraveyardOrder(s: GameState): boolean {
       if ((p.shuffles ?? 0) !== g.library.shuffles || p.lost) continue;
       const there = new Set(g.cards.filter((c) => s.objects[c.id]?.zone === "library" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id));
       if (there.size < 2) continue;
-      s.pending = { kind: "orderLibrary", player: p.id, cards: p.library.filter((id) => there.has(id)), ...(g.library.bottom ? { bottom: true as const } : {}), source: g.library.source ?? "The cards of a merged permanent put into your library" };
+      const by = g.library.by !== undefined && g.library.by !== p.id && !player(s, g.library.by).lost ? g.library.by : undefined;
+      s.pending = { kind: "orderLibrary", player: by ?? p.id, ...(by !== undefined ? { owner: p.id } : {}), cards: p.library.filter((id) => there.has(id)), ...(g.library.bottom ? { bottom: true as const } : {}), source: g.library.source ?? "The cards of a merged permanent put into your library" };
       return true;
     }
     const here = new Set(g.cards.filter((c) => s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id));
@@ -119,11 +120,12 @@ export function orderLibrary(s: GameState, p: Player, order: ObjectId[]) {
   const pend = s.pending;
   if (pend?.kind !== "orderLibrary" || pend.player !== p.id) throw new RulesError("nothing to arrange");
   if (order.length !== pend.cards.length || new Set(order).size !== order.length || order.some((id) => !pend.cards.includes(id))) throw new RulesError("put each of those cards in the order once");
-  const lib = p.library;
+  const owner = player(s, pend.owner ?? p.id);
+  const lib = owner.library;
   const slots = pend.cards.map((id) => lib.indexOf(id)).sort((a, b) => a - b); // from the top down
   order.forEach((id, i) => (lib[slots[i]!] = id));
   s.pending = null;
-  log(s, `${p.name} puts ${order.length} cards ${pend.bottom ? "on the bottom of" : "on top of"} their library in the order they choose.`);
+  log(s, `${p.name} puts ${order.length} cards ${pend.bottom ? "on the bottom of" : "on top of"} ${owner === p ? "their" : `${owner.name}'s`} library in the order they choose.`);
   if (pend.thenDraw) continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, pend.thenDraw.made);
   else if (s.resolving) continueResolution(s);
 }

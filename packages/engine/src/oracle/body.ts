@@ -1643,11 +1643,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     };
   // Incremental Blight: "Put a -1/-1 counter on target creature, two -1/-1 counters on another target creature, and three
   // -1/-1 counters on a third target creature." Three different target creatures (CR 115.3), each getting its own number.
-  if (/^Put a -1\/-1 counter on target creature, two -1\/-1 counters on another target creature, and three -1\/-1 counters on a third target creature\.$/.test(text.trim())) {
+  // Incremental Growth: the same with +1/+1 counters.
+  const incremental = /^Put an? ([+-]1\/[+-]1) counter on target creature, two \1 counters on another target creature, and three \1 counters on a third target creature\.$/.exec(text.trim());
+  if (incremental && (incremental[1] === "-1/-1" || incremental[1] === "+1/+1")) {
+    const counter = incremental[1];
     const creature = (i: number): TargetSpec => ({ kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature", ...(i ? { distinctFrom: [...Array(i).keys()] } : {}) });
     return {
       targets: [creature(0), creature(1), creature(2)],
-      effects: [1, 2, 3].map((n, i) => ({ type: "counters" as const, what: { ref: "target" as const, index: i }, counter: "-1/-1" as const, n })),
+      effects: [1, 2, 3].map((n, i) => ({ type: "counters" as const, what: { ref: "target" as const, index: i }, counter, n })),
       text,
     };
   }
@@ -1733,6 +1736,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Selvala, Explorer Returned (parley): "For each nonland card revealed this way, add {G} and you gain 1 life." is two
   // instructions, each counting those cards (see parleyReveal).
   text = text.replace(/\bFor each ((?:non)?land card revealed this way), add (\{[WUBRGC]\}) and you gain (\d+) life\./g, "Add $2 for each $1. You gain $3 life for each $1.");
+  // Volatile Rig: "When ~ dies, flip a coin. If you lose the flip, it deals 4 damage to each creature and each player": it
+  // is ~, as it last existed (CR 608.2h).
+  text = text.replace(/^([Ff]lip a coin\. If you lose the flip, )it (deals \d+ damage to each creature and each player\.)$/, "$1~ $2");
+  // Favored Hoplite: "put a +1/+1 counter on ~ and prevent all damage that would be dealt to it this turn": two instructions.
+  text = text.replace(/\b([Pp]ut an? \+1\/\+1 counter on ~) and prevent all damage that would be dealt to it this turn\./, "$1. Prevent all damage that would be dealt to ~ this turn.");
+  // Gomazoa: putting cards on top of libraries that are then shuffled is shuffling them in (see zones.ts).
+  text = text.replace(/^Put ~ and each creature it's blocking on top of their owners' libraries, then those players shuffle\.$/, "Shuffle ~ and each creature it's blocking into their owners' libraries.");
+  // Spoils of Evil: "For each artifact or creature card in target opponent's graveyard, add {C} and you gain 1 life.": the
+  // same two instructions, both counting that player's graveyard.
+  text = text.replace(/^For each (artifact or creature card) in target opponent's graveyard, add (\{[WUBRGC]\}) and you gain (\d+) life\.$/, "Add $2 for each $1 in target opponent's graveyard. You gain $3 life for each $1 in that player's graveyard.");
   // "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (Isochron Scepter):
   // copying without casting does nothing, so it's one choice.
   text = text.replace(/\b[Yy]ou may copy the exiled card\. If you do, you may cast the copy without paying its mana cost\./g, "You may cast a copy of the exiled card without paying its mana cost.");
@@ -4778,11 +4791,25 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Look at the top three cards of target player's library, then put them back in any order." The player
     // looking orders them (CR 401.4 lets nobody else see them). "You may shuffle." after it is a choice to shuffle.
-    const order = new RegExp(`^([Yy]ou may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
+    // Fractalize: "Until end of turn, target creature becomes a green and blue Fractal with base power and toughness each
+    // equal to X plus 1": X/X, each one more (the spell's X, CR 107.3).
+    const plusOne = /^(Until end of turn, target creature becomes an? [a-z ]+ [A-Z][a-z]+ with base power and toughness) each equal to X plus 1$/.exec(s);
+    if (plusOne && (ctx.spell || ctx.activated)) {
+      const fx = attempt(ctx, () => parseOne(`${plusOne[1]} X/X`, ctx));
+      const e = fx?.length === 1 ? fx[0]! : undefined;
+      const x = (a: Amount) => typeof a === "object" && "count" in a && a.count.kind === "x" && !a.plus && !a.times;
+      if (e?.type !== "continuous" || !e.mods.some((m) => m.kind === "setPT" && x(m.power) && x(m.toughness))) return null;
+      effects.push({ ...e, mods: e.mods.map((m) => (m.kind === "setPT" ? { ...m, power: { count: { kind: "x" }, plus: 1 }, toughness: { count: { kind: "x" }, plus: 1 } } : m)) });
+      continue;
+    }
+    // Information Dealer: "Look at the top X cards of your library, where X is the number of Wizards on the battlefield,
+    // then put them back in any order."
+    const order = new RegExp(`^([Yy]ou may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library(?:, where X is (.+))?$`).exec(s);
     if (order && /^[Pp]ut them back in any order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const who = parsePlayer(order[3] === "your" ? "you" : order[3]!.replace(/'s$/, ""), ctx);
-      if (!who) return null;
-      const e: Effect = { type: "orderTop", who, n: amt(order[2]!) };
+      const n = order[4] ? (order[2] === "X" ? parseCount(order[4], ctx) : null) : amt(order[2]!);
+      if (!who || !n) return null;
+      const e: Effect = { type: "orderTop", who, n };
       effects.push(order[1] ? { type: "may", effects: [e], text: `look at the top ${order[2]} cards of ${order[3]} library, then put them back in any order` } : e);
       si++;
       const shuffle = /^You may (shuffle|have that player shuffle)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");

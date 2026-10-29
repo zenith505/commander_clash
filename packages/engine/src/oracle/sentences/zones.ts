@@ -331,6 +331,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
   }
+  // Gomazoa: "Put ~ and each creature it's blocking on top of their owners' libraries, then those players shuffle" (body.ts
+  // makes it this): the owners of the cards put there shuffle, which is shuffling them in (CR 701.24c); without a creature
+  // it blocks, only ~ (rulings).
+  if (!ctx.spell && !ctx.selfCard && /^Shuffle ~ and each creature it's blocking into their owners' libraries$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "inCombatWithSelf", blocked: true, andSelf: true } }];
   // Dramatic Accusation: "Shuffle enchanted creature into its owner's library": the permanent it's attached to.
   if (/^[Ss]huffle enchanted creature into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "attached" } }];
   // "Shuffle any number of target cards from your graveyard into your library" (Perpetual Timepiece, Piper's Melody),
@@ -993,6 +997,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library(?: in any order)?$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
+  }
+  // Misinformation: "Put up to three target cards from an opponent's graveyard on top of their library in any order": all
+  // from one opponent's graveyard (into "their" library), in the order the spell's controller chooses (rulings), not
+  // their owner (CR 401.4).
+  if ((m = /^Put ((?:up to )?(?:two|three|four|five) target cards from an opponent's graveyard) on (top|the bottom) of their library in any order$/.exec(s))) {
+    const first = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx);
+    if (what?.ref !== "target" || !what.n || ctx.targets.slice(first).some((t) => t.kind !== "card" || t.owner !== "opponent")) return null;
+    for (let i = first + 1; i < ctx.targets.length; i++) ctx.targets[i] = { ...ctx.targets[i]!, sameGraveyardAs: Array.from({ length: i - first }, (_, j) => first + j) };
+    return [{ type: "putInLibrary", what, position: m[2] === "top" ? "top" : "bottom", youOrder: true }];
   }
   // "Target creature's owner puts it on their choice of the top or bottom of their library", "The owner of target
   // nonland permanent puts it ...": one permanent, its owner choosing as it resolves.

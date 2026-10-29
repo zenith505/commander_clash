@@ -1,6 +1,6 @@
 # Roadmap
 
-27,663 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+27,692 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
 1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
 9,979 (91%).
 
@@ -893,7 +893,7 @@ line blocks.
    trigger (Pollywog Symbiote); "enchanted artifact's activated abilities cost {2} less" (Power Artifact); a named
    legendary token with two quoted abilities (Ozox, the Clattering King), and other tokens with two (Pursued Whale, Relic Robber);
    "sacrifice it. If you do, reveal until a creature card. Put that card onto the battlefield, then shuffle ... If that
-   creature is a Demon, ..." (Aspiring Champion). +21 (27,663 of 31,936 with round 208 and Lane B round B38).
+   creature is a Demon, ..." (Aspiring Champion). +21 (27,692 of 31,936 with round 208 and Lane B rounds B38 and B39).
    Out after round 209 (looked at, not done): Bloodthirsty Adversary (cast copies of several cards from the graveyard:
    casting from among graveyard cards takes one target only); From Under the Floorboards, Avacyn's Judgment and Welcome
    to the Fold (madness {X}: X in an alternative cost from exile); Citizen's Crowbar (a granted ability that sacrifices

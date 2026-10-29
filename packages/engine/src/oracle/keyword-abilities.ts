@@ -640,6 +640,8 @@ export const blightCost = (n: number): AdditionalCost => ({ kind: "putCounter", 
 export function parseAdditionalCost(text: string, allowX = false): AdditionalCost | null {
   let m: RegExpExecArray | null;
   if ((m = /^blight (\d+)$/i.exec(text)) && Number(m[1]) > 0) return blightCost(Number(m[1]));
+  // Lethal Sting: "put a -1/-1 counter on a creature you control": not castable without one (rulings).
+  if (/^put a -1\/-1 counter on a creature you control$/i.test(text)) return { kind: "putCounter", counter: "-1/-1", n: 1, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creature you control" } };
   const isX = (w: string) => allowX && w === "X";
   const many = (w: string) => (isX(w) ? { n: 0, x: true as const } : { n: num(w) });
   if (/^forage$/i.test(text)) return { kind: "forage" }; // CR 701.61a

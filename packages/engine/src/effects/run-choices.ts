@@ -151,6 +151,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "You may collect evidence N": picking the cards is the answer, none is "no" (CR 701.59a).
           s.pending = { kind: "collectEvidence", player: ctx.controller, n: e.effects[0]!.n, source: src };
           return "paused";
+        } else if (e.effects.length === 2 && e.effects[1]!.type === "collectEvidence" && selfCardExiled(s, e.effects, ctx)) {
+          // Lamplight Phoenix: "you may exile it and collect evidence 4": the same, the card itself not among them (rulings).
+          s.pending = { kind: "collectEvidence", player: ctx.controller, n: e.effects[1]!.n, source: src, not: selfCardExiled(s, e.effects, ctx) };
+          return "paused";
         } else {
           // About the card "reveal/look at the top card" found: it's named, and shown (the controller has seen it).
           const rv = s.resolving?.revealed;
@@ -927,6 +931,12 @@ function timesMana(mana: string, n: number): string {
  * Can "you may [do this]" be done right now? A player can't discard from an empty hand, draw from an empty
  * library (CR 121.4) or sacrifice what's gone, and then "If you do" doesn't happen either.
  */
+/** The card a "you may exile it and collect evidence N" exiles first (Lamplight Phoenix), if it's there to exile. */
+function selfCardExiled(s: GameState, effects: Effect[], ctx: ResolveCtx): ObjectId | undefined {
+  const first = effects[0];
+  return first?.type === "exile" && first.what.ref === "selfCard" ? objects(s, first.what, ctx)[0]?.id : undefined;
+}
+
 function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
   for (const e of effects) {
     // What a pick picks ("it", Akiri's "that creature") isn't known until it's made.
@@ -975,7 +985,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;
     // Collecting evidence takes enough mana value in your graveyard (CR 701.59b).
-    if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined)) return false;
+    if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined, selfCardExiled(s, effects, ctx))) return false;
     // "Unless you return a non-Lair land you control": you can't if you have none.
     if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller, ctx.sourceId).length < amountNow(s, e.n, ctx)) return false;
   }

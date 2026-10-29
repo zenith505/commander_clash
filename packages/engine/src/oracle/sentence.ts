@@ -235,7 +235,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const combat = /^(.+) until end of combat$/.exec(s);
   if (combat && !/\buntil\b/.test(combat[1]!)) {
     const fx = parseSentence(`${combat[1]} until end of turn`, ctx);
-    return fx?.every((e) => e.type === "continuous" && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
+    return fx?.every((e) => (e.type === "continuous" || e.type === "exchangePower") && e.duration === "endOfTurn") ? fx.map((e) => ({ ...e, duration: "endOfCombat" }) as Effect) : null;
   }
   // Yuan Shao's Infantry: "~ can't be blocked this combat": the same, for the combat going on (CR 506.1, 511.3).
   const thisCombat = /^(~|it|that creature) can't be blocked this combat$/i.exec(s);

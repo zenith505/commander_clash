@@ -1149,6 +1149,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // Serene Master: "exchange its power and the power of target creature it's blocking" (CR 701.12g), "its" being ~.
+  if ((m = /^[Ee]xchange (its|~'s) power and the power of (target creature .+) until end of turn$/.exec(s)) && (m[1] === "~'s" || ctx.selfIt)) {
+    const what = parseObject(m[2]!, ctx);
+    return what?.ref === "target" ? [{ type: "exchangePower", what, duration: "endOfTurn" }] : null;
+  }
   // Switching power and toughness (layer 7d). Valakut Fireboar: "Whenever ~ attacks, switch its power and toughness".
   if (ctx.selfIt && /^[Ss]witch its power and toughness until end of turn$/.test(s)) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }];
   // "Switch the power and toughness of each of up to two target creatures until end of turn" (Invert), "... of each of any

@@ -993,6 +993,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addEndStep":
     case "loseGame":
     case "winGame":
+    case "highestLifeWins":
       return runBasicsEffect(s, e, ctx, src);
     case "damageRule":
       return runPreventionEffect(s, e, ctx, src);
@@ -1139,6 +1140,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exploreEach":
     case "doublePT":
     case "continuous":
+    case "exchangePower":
     case "groupRules":
     case "ownersGainControl":
     case "swapCreatures":

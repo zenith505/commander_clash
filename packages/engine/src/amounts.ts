@@ -820,7 +820,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const named = (f: TargetSpec): TargetSpec => (f.named === "~" ? { ...f, named: ctx.sourceName ?? (src ? defOf(s, src).name : "") } : f);
       const filter = c.filter && { ...named(c.filter), ...(c.filter.anyOf ? { anyOf: c.filter.anyOf.map(named) } : {}) };
-      const fits = (id: ObjectId) => !s.objects[id]!.faceDown && (!filter || printedMatches(filter, defOf(s, s.objects[id]!)));
+      // With no filter (Dreadlight Monstrosity: "if you own a card in exile"), any card, face down or not.
+      const fits = (id: ObjectId) => !filter || (!s.objects[id]!.faceDown && printedMatches(filter, defOf(s, s.objects[id]!)));
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.exile.filter((id) => s.objects[id]!.owner === pid && fits(id)).length + (c.graveyardToo ? s.players[pid]!.graveyard.filter(fits).length : 0), 0);
     }
     case "greatestMvInExile":

@@ -71,9 +71,10 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
     return [{ type: "search", filter: { kind: "card", anyOf, text: "land card of each basic land type" }, n: 5, upTo: true, oneOfEach: anyOf, reveal, dest: searchDest(r[1]!) }];
   }
   // Conflux: "a white card, a blue card, a black card, a red card, and a green card": up to one for each, a multicolored
-  // card being any one of its colors but not two of them (CR 701.23b).
+  // card being any one of its colors but not two of them (CR 701.23b). Shard Convergence, Gem of Becoming: "a Plains card,
+  // an Island card, ...": by land type, a dual land being either one (rulings).
   const list = /, and an? /.test(m[3]!) ? `${m[2]} ${m[3]}`.split(/, (?:and )?/) : null;
-  if (list && list.length >= 3 && n === 1 && !m[1] && list.every((x) => /^an? (?:white|blue|black|red|green) card$/.test(x))) {
+  if (list && list.length >= 3 && n === 1 && !m[1] && list.every((x) => /^an? (?:white|blue|black|red|green|Plains|Island|Swamp|Mountain|Forest) card$/.test(x))) {
     const r = new RegExp(`^(?:reveal them, )?put (?:them|those cards) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest);
     const specs = list.map((p) => parseSearchFilter(p.replace(/^an? /, "")));
     if (!r || specs.some((f) => !f)) return null;

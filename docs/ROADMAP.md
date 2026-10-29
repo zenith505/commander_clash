@@ -2445,7 +2445,7 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   "target opponent chooses a creature they control. Destroy that creature" in a trigger (Wei Assassins), "loses your
   choice of flying, first strike, or trample" (Walking Sponge; browser test), Hail Storm's two amounts at once (an
   attacking creature of yours is dealt 3), "Target Assembly-Worker creature" (the type, not the card's name). +20
-  (27,224 of 31,936 with B32).
+  (27,347 of 31,936 with B32 and rounds 199-201).
 - Out after round B33: Mangara's Equity (damage to "you or a white creature" grouped per event), Thick-Skinned Goblin
   (echo paid as {0} inside the upkeep's may-pay), Grim Reminder (a search that reveals and leaves the card in the
   library, then a check against the names of spells each opponent cast this turn), Cycle of Life (a target "creature

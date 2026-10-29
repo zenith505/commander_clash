@@ -678,3 +678,24 @@ describe("counter target spell; if countered this way, exile it, then you may ca
     expect(s.players[ap]!.hand.length).toBe(hand + 2);
   });
 });
+
+const quistisTrepe = card("Quistis Trepe", "Legendary Creature — Human Wizard", "{2}{U}", {"cmc":3,"power":"2","toughness":"2","keywords":["Blue Magic"],"oracleText":"Blue Magic — When Quistis Trepe enters, you may cast target instant or sorcery card from a graveyard, and mana of any type can be spent to cast that spell. If that spell would be put into a graveyard, exile it instead.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+
+describe("you may cast target instant or sorcery card from a graveyard, mana of any type; exiled after (Quistis Trepe)", () => {
+  it("compile", () => supported(quistisTrepe));
+
+  it("Quistis Trepe: casts an opponent's sorcery from their graveyard with red mana, then it's exiled", () => {
+    const { s: s0, ap, opp } = setup([quistisTrepe]);
+    const q = inHand(s0, ap, quistisTrepe.name);
+    const ins = into(s0, opp, card("Test Insight", "Sorcery", "{1}{U}{U}", { cmc: 3, oracleText: "Draw two cards." }), "graveyard");
+    s0.players[ap]!.manaPool.U = 3;
+    s0.players[ap]!.manaPool.R = 3;
+    let s = settle(run(s0, planCast(s0, ap, q)), { targets: [tgt(ins)] });
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: ins, anyType: true });
+    const hand = s.players[ap]!.hand.length;
+    s = settle(act(s, { type: "castSpell", player: ap, objectId: ins, targets: [] }));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.players[ap]!.manaPool.R).toBe(0);
+    expect(s.objects[ins]!.zone).toBe("exile");
+  });
+});

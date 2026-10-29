@@ -4613,6 +4613,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Tinybones, the Pickpocket: "you may cast target nonland permanent card from that player's graveyard, and mana of any
     // type can be spent to cast that spell": cast as it resolves or not at all, paying its costs, timing ignored (rulings).
+    // Quistis Trepe: "you may cast target instant or sorcery card from a graveyard, and mana of any type can be spent to cast
+    // that spell. If that spell would be put into a graveyard, exile it instead.": anyone's graveyard, the same way.
+    const castAny = /^[Yy]ou may cast (target instant or sorcery card from a graveyard), and mana of any type can be spent to cast that spell$/.exec(s);
+    if (castAny && sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into a graveyard, exile it instead") {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castAny[1]!, ctx);
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || t.owner) return null;
+      effects.push({ type: "castNow", what, anyOwner: true, anyType: true, exileAfter: true });
+      si++;
+      continue;
+    }
     const castTheirs = ctx.eventPlayer ? /^[Yy]ou may cast (target .+? card from that player's graveyard), and mana of any type can be spent to cast that spell$/.exec(s) : null;
     if (castTheirs) {
       const before = ctx.targets.length;

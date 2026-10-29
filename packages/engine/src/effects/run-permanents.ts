@@ -540,14 +540,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "amass": {
       // CR 701.47a: with no Army, create a 0/0 black [subtype] Army first; then counters on an Army you control,
       // which becomes that subtype too. With several Armies, the one with the most counters is chosen.
+      // Azog, Moria's Ruin: "its controller amasses": the target's controller, as it last existed (none with no target).
+      const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (pid === undefined) return;
       const n = amountNow(s, e.n, ctx);
-      const armies = () => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === ctx.controller && characteristics(s, o).subtypes.includes("Army") && objIsType(s, o, "Creature"));
+      const armies = () => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && characteristics(s, o).subtypes.includes("Army") && objIsType(s, o, "Creature"));
       if (!armies().length) {
         const army: TokenSpec = { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] };
         enterTogether(s, () => {
-          const { same, extra } = tokenBatch(s, ctx.controller, army, 1);
-          for (let i = same; i > 0; i--) createToken(s, ctx.controller, army);
-          createExtraTokens(s, ctx.controller, extra);
+          const { same, extra } = tokenBatch(s, pid, army, 1);
+          for (let i = same; i > 0; i--) createToken(s, pid, army);
+          createExtraTokens(s, pid, extra);
         });
       }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
@@ -555,9 +558,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (s.resolving) s.resolving.amassed = { id: army.id, zc: army.zoneChanges ?? 0 };
       invalidateCharacteristics(s);
       if (n > 0) putCounters(s, army, "+1/+1", n);
-      log(s, `${player(s, ctx.controller).name} amasses ${e.subtype} ${n}.`);
+      log(s, `${player(s, pid).name} amasses ${e.subtype} ${n}.`);
       if (!characteristics(s, army).subtypes.includes(e.subtype))
-        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [army.id], mods: [{ kind: "addTypes", types: [], subtypes: [e.subtype] }] });
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: pid, sourceName: src, duration: "game", affected: [army.id], mods: [{ kind: "addTypes", types: [], subtypes: [e.subtype] }] });
       return;
     }
     case "recruit":

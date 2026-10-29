@@ -2200,6 +2200,11 @@ export type Effect =
    */
   | { type: "exiledToGraveyard"; cards?: { id: ObjectId; zc: number }[] }
   /**
+   * Mysterio, Master of Illusion: "Exile those tokens when ~ leaves the battlefield": the tokens the ability created
+   * (`cards`, filled in as the delayed trigger is made) that are still the same permanents (CR 400.7).
+   */
+  | { type: "exileRemembered"; cards?: { id: ObjectId; zc: number }[] }
+  /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */
@@ -2461,7 +2466,7 @@ export type Effect =
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
   | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true; /** "Proliferate X times, where X is ..." (Tromell): that many proliferate actions. */ n?: Amount }
   /** Amass [subtype] N (CR 701.47): an Army gets N +1/+1 counters, made first if you have none. */
-  | { type: "amass"; subtype: string; n: Amount }
+  | { type: "amass"; subtype: string; n: Amount; /** "Its controller amasses Goblins X" (Azog, Moria's Ruin): that player instead of you. */ who?: PlayerRef }
   /**
    * "Exile target creature you control, then return it to the battlefield under its owner's control"
    * (blink); with `at`, it comes back at the beginning of the next end step (a delayed trigger, CR 603.7), all the cards
@@ -2758,6 +2763,8 @@ export type Effect =
       found: "hand" | "battlefield" | "graveyard";
       /** "You may put that card onto the battlefield. If you don't, put it into your hand." (Songbirds' Blessing): `found` is "battlefield", if its controller chooses and it can go there. */
       mayElseHand?: true;
+      /** "You may put that card onto the battlefield. Then shuffle." (Hei Bai, Forest Guardian): `found` is "battlefield" if its controller chooses; if not, it stays in the library. */
+      mayStay?: true;
       tapped?: true;
       /** "Onto the battlefield tapped and attacking" (Raph & Mikey, CR 508.4): during combat, attacking a player, planeswalker or battle its controller chooses (rulings). */
       attacking?: true;
@@ -2809,6 +2816,10 @@ export type Effect =
       maxMv?: number;
       /** "If you don't, put that card into your hand" (Breaching Dragonstorm): the card not cast. */
       orHand?: true;
+      /** "Until you reveal a nonland card with mana value 3 or less" (Treasure Keeper): only one like this stops it. */
+      untilMv?: number;
+      /** With `reveal`: "You may cast that card without paying its mana cost. Put all revealed cards not cast this way on the bottom of your library in a random order." (Treasure Keeper): the cards stay in the library, revealed, and the found card is cast from there; then the rest go to the bottom. */
+      inPlace?: true;
     }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
@@ -3381,7 +3392,7 @@ export type Effect =
    * permanent a card put onto the battlefield became (Back for More); `target`, that target, and with `attached` only if
    * the token just created was attached to it (Curse of the Werefox). With no such object, it doesn't trigger (rulings).
    */
-  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; /** "Where X is the number of card types the discarded card has" (Mount Velus Manticore): its X, the card types (CR 205.2a) of the card the "you may discard" discarded. */ xDiscardedTypes?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "When you reveal a creature card this way, ..., where X is the mana value of that card" (Yuna's Whistle): only if the revealUntil before found a card (ResolvingState.revealedUntilMv), its X that card's mana value. */ xRevealedMv?: true; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; /** "Where X is the number of card types the discarded card has" (Mount Velus Manticore): its X, the card types (CR 205.2a) of the card the "you may discard" discarded. */ xDiscardedTypes?: true; about?: "created" | { target: number; attached?: true }; /** "When you put one or more Equipment onto the battlefield this way" (Gilgamesh): only if the ability put one or more permanents onto the battlefield, which it remembers (PendingTrigger.putThisWay). */ putThisWay?: true; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true; /** "You may sacrifice one or more Treasures. When you do, up to that many target creatures ..." (Swashbuckler Extraordinaire): its X is how many were sacrificed. */ xSacrificed?: true; /** "When you reveal a creature card this way, ..., where X is the mana value of that card" (Yuna's Whistle): only if the revealUntil before found a card (ResolvingState.revealedUntilMv), its X that card's mana value. */ xRevealedMv?: true; /** "Exile the top card of your library. You may play that card this turn. When you exile a (nonland) card this way, ..., where X is that card's mana value" (Cait Sith, Fortune Teller; Hidetsugu, Devouring Chaos): only if the impulse before exiled a card (ResolvingState.exiledTop), a nonland one for "nonland", its X that card's mana value. */ xExiledMv?: "any" | "nonland"; /** "Create a Food token. When you do, ...": once for each of this token the effect before created (CR 603.12a). */ perToken?: TokenSpec }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */

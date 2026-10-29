@@ -395,6 +395,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Gilgamesh: "When you put one or more Equipment onto the battlefield this way": only if any are there now.
       // Yuna's Whistle: "When you reveal a creature card this way": only if one was found.
       if (e.xRevealedMv && s.resolving!.revealedUntilMv === undefined) return;
+      // Cait Sith, Fortune Teller: "When you exile a card this way": only if the card is there; Hidetsugu, Devouring Chaos's
+      // "a nonland card" only if it isn't a land card (CR 603.12).
+      const exiled = e.xExiledMv && s.resolving!.exiledTop ? s.objects[s.resolving!.exiledTop.id] : undefined;
+      if (e.xExiledMv && (!exiled || exiled.zone !== "exile" || (exiled.zoneChanges ?? 0) !== s.resolving!.exiledTop!.zc || (e.xExiledMv === "nonland" && characteristics(s, exiled).types.includes("Land")))) return;
       const put = e.putThisWay ? (s.resolving!.created ?? []).flatMap((id) => (s.objects[id]?.zone === "battlefield" ? [{ id, zc: s.objects[id]!.zoneChanges ?? 0 }] : [])) : undefined;
       if (put && !put.length) return;
       // "Create a Food token. When you do, ...": once for each of them created (CR 603.12a).
@@ -419,7 +423,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
         // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
         // "Up to that many target creatures" after "you may sacrifice one or more Treasures" (Swashbuckler Extraordinaire).
-        ...(e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
+        ...(e.xDiscardedTypes ? { x: new Set((s.resolving!.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size } : e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : e.xSacrificed ? { x: s.resolving!.sacrificedThisWay?.length ?? 0 } : e.xRevealedMv ? { x: s.resolving!.revealedUntilMv ?? 0 } : exiled ? { x: characteristics(s, exiled).manaValue } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),

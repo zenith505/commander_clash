@@ -349,9 +349,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   }
   // Circle of the Moon Druid: "During your turn, ~ is a Bear with base power and toughness 4/2": a Bear instead of its
   // other creature types (CR 205.1b, the reminder text says so), with that base power and toughness (layers 4 and 7b).
-  const typedBase = /^~ is an? ([A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)$/.exec(statement);
-  if (typedBase && CREATURE_TYPES.has(typedBase[1]!)) {
-    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setSubtypes", subtypes: [typedBase[1]!] }, { kind: "setPT", power: Number(typedBase[2]), toughness: Number(typedBase[3]) }], text: line };
+  // Futurist Operative: "As long as ~ is tapped, it's a Human Citizen with base power and toughness 1/1 and can't be
+  // blocked": those creature types instead of its others, applied in its own timestamp order (rulings).
+  const typedBase = /^(?:~ is|it's) an? ((?:[A-Z][a-z]+ )*[A-Z][a-z]+) with base power and toughness (\d+)\/(\d+)( and can't be blocked)?$/.exec(statement);
+  const unblockable = typedBase?.[4] ? parseStaticMods("can't be blocked") : [];
+  if (typedBase && typedBase[1]!.split(" ").every((w) => CREATURE_TYPES.has(w)) && unblockable) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setSubtypes", subtypes: typedBase[1]!.split(" ") }, { kind: "setPT", power: Number(typedBase[2]), toughness: Number(typedBase[3]) }, ...unblockable], text: line };
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }

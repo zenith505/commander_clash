@@ -1969,6 +1969,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/\bSearch your library for two cards\. Put one (into your hand|onto the battlefield) and the other into your graveyard\. Then shuffle\./g, "Search your library for two cards, put one $1 and the other into your graveyard, then shuffle.");
   // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
   text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
+  // Celestial Convergence: "the player with the highest life total wins the game. If two or more players are tied for
+  // highest life total, the game is a draw.": one instruction (sentences/spells.ts).
+  text = text.replace(/\bthe player with the highest life total wins the game\. If two or more players are tied for highest life total, the game is a draw\./, "the player with the highest life total wins the game, a tie being a draw.");
   // Last Stand: "Draw a card for each Island you control, then discard that many cards": the same count for both, which
   // nothing in between changes (CR 608.2h).
   text = text.replace(/(^|\. )Draw a card for each (Plains|Island|Swamp|Mountain|Forest) you control, then discard that many cards\./, "$1Draw a card for each $2 you control. Discard a card for each $2 you control.");
@@ -3460,7 +3463,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Add {U}{R}. Spend this mana only to cast instant and sorcery spells" (Abstract Paintmage, CR 106.6): the mana the
     // sentence before added.
-    if (/^(?:Spend this mana only |This mana can't be spent to cast (?:non|spells$))/.test(s)) {
+    // Karolina Dean, Runaway: "This mana can't be spent to cast spells from your hand".
+    if (/^(?:Spend this mana only |This mana can't be spent to cast (?:non|spells$|spells from your hand$))/.test(s)) {
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       const only = parseManaSpend(`${s}.`);
       if (!added.length || !only || added.some((e) => e.only)) return null;

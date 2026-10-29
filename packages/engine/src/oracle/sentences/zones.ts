@@ -591,6 +591,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseZonesSentence(`${counted[1]} with a ${counted[2]} counter on it`, ctx);
     return n && fx?.length === 1 && fx[0]!.type === "chooseFromGraveyard" && fx[0]!.counters ? [{ ...fx[0]!, countersN: n }] : null;
   }
+  // Rofellos's Gift: "Reveal any number of green cards in your hand. Return an enchantment card from your graveyard to your
+  // hand for each card revealed this way": that many, chosen as it resolves (rulings), not targeted.
+  if ((m = /^[Rr]eturn an? ([a-z]+ card) from your graveyard to your hand for each card revealed this way$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, nAmount: { count: { kind: "revealedFromHand" } }, filter }] : null;
+  }
   // "Return X creature cards from your graveyard to the battlefield", after "sacrifice any number of ..." (Lich-Knights'
   // Conquest): that many, chosen as it resolves.
   if ((m = /^[Rr]eturn X (creature cards) from your graveyard to the battlefield$/.exec(s))) {

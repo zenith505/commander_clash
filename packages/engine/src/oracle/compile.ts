@@ -2935,6 +2935,17 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // Ultron's Auxiliary: "Whenever another artifact is put into your graveyard from the battlefield or an artifact card is put
+    // into your graveyard from anywhere other than the battlefield, ...": two events no one move can be both of, each its
+    // own trigger.
+    const artifactYard = /^Whenever another artifact is put into your graveyard from the battlefield or an artifact card is put into your graveyard from anywhere other than the battlefield, (.+)$/.exec(line);
+    if (artifactYard && !/\b(?:that card|it|that artifact)\b/.test(artifactYard[1]!.replace(/ on ~/g, ""))) {
+      const halves = [`Whenever another artifact is put into your graveyard from the battlefield, ${artifactYard[1]}`, `Whenever an artifact card is put into your graveyard from anywhere other than the battlefield, ${artifactYard[1]}`].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push(t as TriggeredAbility);
+        continue;
+      }
+    }
     // Unbound Flourishing: two events, each its own trigger; "if that spell's mana cost or that ability's activation cost
     // contains {X}" can't change after it's cast or activated, so it's checked as it triggers (CR 603.4).
     if (line === "Whenever you cast an instant or sorcery spell or activate an ability, if that spell's mana cost or that ability's activation cost contains {X}, copy that spell or ability. You may choose new targets for the copy.") {

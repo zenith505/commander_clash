@@ -1,7 +1,7 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
+import { addPhases, drawGame, opponents, returnUntilLeaves, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
@@ -122,6 +122,16 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "winGame":
       for (const pid of players(s, e.who, ctx)) winGame(s, pid, src);
       return;
+    case "highestLifeWins": {
+      // Celestial Convergence: among the players still in the game (CR 800.4a), the one with the most life wins (CR 104.2a);
+      // two or more tied for it is a draw (CR 104.4c).
+      const alive = livingPlayers(s);
+      const most = Math.max(...alive.map((pid) => player(s, pid).life));
+      const top = alive.filter((pid) => player(s, pid).life === most);
+      if (top.length === 1) winGame(s, top[0]!, src);
+      else if (top.length > 1) drawGame(s, `${src}: ${top.map((pid) => player(s, pid).name).join(" and ")} are tied for the highest life total`);
+      return;
+    }
     case "ascend":
       giveCitysBlessing(s, ctx.controller, true); // CR 702.131a
       return;

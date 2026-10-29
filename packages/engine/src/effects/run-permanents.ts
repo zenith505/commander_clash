@@ -1206,6 +1206,23 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (list.length) invalidateCharacteristics(s);
       return;
     }
+    case "exchangePower": {
+      // CR 701.12g: each power becomes the other's previous power, by a layer 7b effect on each (CR 613.4b). Only if both
+      // ~ and its target are still on the battlefield (rulings on Serene Master).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const [other] = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield" && objIsType(s, o, "Creature"));
+      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !objIsType(s, me, "Creature") || !other || other.id === me.id) {
+        log(s, `${src}: the exchange can't happen.`);
+        return;
+      }
+      const [mine, theirs] = [power(s, me), power(s, other)];
+      const timestamp = s.nextTimestamp++;
+      for (const [o, p] of [[me, theirs], [other, mine]] as const)
+        s.effects.push({ id: `e${s.nextId++}`, timestamp, controller: ctx.controller, sourceName: src, sourceId: me.id, duration: e.duration, affected: [o.id], mods: [{ kind: "setPower", power: p }] });
+      invalidateCharacteristics(s);
+      log(s, `${src} and ${defOf(s, other).name} exchange their power (${mine} and ${theirs})${e.duration === "endOfCombat" ? " until end of combat" : " until end of turn"}.`);
+      return;
+    }
     case "continuous": {
       // The Laces: a target spell's color changes while it's that spell (CR 105.3); a permanent spell's change stays with
       // the permanent it becomes, for as long as the effect lasts (CR 112.4, 400.7a).

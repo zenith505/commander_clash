@@ -297,7 +297,7 @@ export function planCast(
   if (choices.face !== undefined && o.face !== choices.face) return asFace(s, o, choices.face, () => planCast(s, pid, objectId, targets, modes, convoke, x, choices));
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   // The spell as it will be on the stack, for mana that can only be spent on some spells (CR 106.6).
-  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...spellHow(d, choices) };
+  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" || choices.prototyped ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}), ...spellHow(d, choices, o) };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets, modes });

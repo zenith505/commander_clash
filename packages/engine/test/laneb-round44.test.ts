@@ -74,6 +74,10 @@ const costNow = (s: GameState, pid: PlayerId, id: string, targets: TargetChoice[
   return manaValue(c.cost) + c.extra;
 };
 
+const toBlocks = (s: GameState) => {
+  for (let i = 0; i < 50 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
 const tapLands = (s: GameState, pid: PlayerId, keep: string[] = []) => {
   for (const id of s.battlefield) if (s.objects[id]!.controller === pid && !keep.includes(id) && s.cards[s.objects[id]!.cardId]!.typeLine.includes("Land")) s.objects[id]!.tapped = true;
 };
@@ -93,6 +97,13 @@ const gemOfBecoming = () => card("Gem of Becoming", "Artifact", "{3}", { cmc: 3,
 const throwFromTheSaddle = () => card("Throw from the Saddle", "Sorcery", "{1}{G}", { cmc: 2, colors: ["G"], oracleText: "Target creature you control gets +1/+1 until end of turn. Put a +1/+1 counter on it instead if it's a Mount. Then it deals damage equal to its power to target creature you don't control." });
 const lastStand = () => card("Last Stand", "Sorcery", "{W}{U}{B}{R}{G}", { cmc: 5, colors: ["B","G","R","U","W"], oracleText: "Target opponent loses 2 life for each Swamp you control. Last Stand deals damage to target creature equal to the number of Mountains you control. Create a 1/1 green Saproling creature token for each Forest you control. You gain 2 life for each Plains you control. Draw a card for each Island you control, then discard that many cards." });
 const chargingCinderhorn = () => card("Charging Cinderhorn", "Creature — Elemental Ox", "{3}{R}", { cmc: 4, colors: ["R"], power: "4", toughness: "2", keywords: ["Haste"], oracleText: "Haste\nAt the beginning of each player's end step, if no creatures attacked this turn, put a fury counter on this creature. Then this creature deals damage equal to the number of fury counters on it to that player." });
+const ultronsAuxiliary = () => card("Ultron's Auxiliary", "Artifact Creature — Robot Villain", "{1}{B}", { cmc: 2, colors: ["B"], power: "1", toughness: "1", keywords: ["Menace"], oracleText: "Menace\nWhenever another artifact is put into your graveyard from the battlefield or an artifact card is put into your graveyard from anywhere other than the battlefield, put a +1/+1 counter on this creature." });
+const futuristOperative = () => card("Futurist Operative", "Creature — Human Ninja", "{3}{U}", { cmc: 4, colors: ["U"], power: "3", toughness: "4", oracleText: "As long as this creature is tapped, it's a Human Citizen with base power and toughness 1/1 and can't be blocked.\n{2}{U}: Untap this creature." });
+const dovinsAcuity = () => card("Dovin's Acuity", "Enchantment", "{1}{W}{U}", { cmc: 3, colors: ["U","W"], oracleText: "When this enchantment enters, you gain 2 life and draw a card.\nWhenever you cast an instant spell during your main phase, you may return this enchantment to its owner's hand." });
+const karolinaDeanRunaway = () => card("Karolina Dean, Runaway", "Legendary Creature — Alien Hero", "{3}{R}", { cmc: 4, colors: ["R"], power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nAt the beginning of your first main phase, add {W}{U}{B}{R}{G}. This mana can't be spent to cast spells from your hand." });
+const rofellossGift = () => card("Rofellos's Gift", "Sorcery", "{G}", { cmc: 1, colors: ["G"], oracleText: "Reveal any number of green cards in your hand. Return an enchantment card from your graveyard to your hand for each card revealed this way." });
+const celestialConvergence = () => card("Celestial Convergence", "Enchantment", "{2}{W}{W}", { cmc: 4, colors: ["W"], oracleText: "This enchantment enters with seven omen counters on it.\nAt the beginning of your upkeep, remove an omen counter from this enchantment. If there are no omen counters on this enchantment, the player with the highest life total wins the game. If two or more players are tied for highest life total, the game is a draw." });
+const sereneMaster = () => card("Serene Master", "Creature — Human Monk", "{1}{W}", { cmc: 2, colors: ["W"], power: "0", toughness: "2", oracleText: "Whenever this creature blocks, exchange its power and the power of target creature it's blocking until end of combat." });
 const baithookAngler = () => scry("transform", [{ name: "Baithook Angler", mana_cost: "{1}{U}", type_line: "Creature — Human Peasant", oracle_text: "Disturb {1}{U} (You may cast this card from your graveyard transformed for its disturb cost.)", power: "2", toughness: "1" }, { name: "Hook-Haunt Drifter", type_line: "Creature — Spirit", oracle_text: "Flying\nIf Hook-Haunt Drifter would be put into a graveyard from anywhere, exile it instead.", power: "1", toughness: "2", color_indicator: ["U"] }], { keywords: ["Flying", "Transform", "Disturb"] });
 
 // Test cards.
@@ -105,7 +116,7 @@ const forestCard = () => card("Forest", "Basic Land — Forest", "", { cmc: 0 })
 
 describe("Lane B round 44 cards", () => {
   it("are fully supported", () => {
-    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn());
+    supported(harnessInfinity(), lethalSting(), fearOfAbduction(), safeHaven(), dreadlightMonstrosity(), throneOfMakindi(), unblinkingObserver(), tomikOrzhovLawmage(), shardConvergence(), gemOfBecoming(), throwFromTheSaddle(), lastStand(), chargingCinderhorn(), ultronsAuxiliary(), futuristOperative(), dovinsAcuity(), karolinaDeanRunaway(), rofellossGift(), celestialConvergence(), sereneMaster());
   });
 });
 
@@ -316,5 +327,141 @@ describe("Charging Cinderhorn", () => {
     let s = attackWith(s0, [bear], opp);
     s = goUntil(s, (x) => x.step === "cleanup" && x.activePlayer === ap);
     expect([counters(s, ox, "fury"), life(s, ap)]).toEqual([0, 40]);
+  });
+});
+
+describe("Ultron's Auxiliary", () => {
+  it("gets a counter when another artifact goes to your graveyard from the battlefield or an artifact card from your hand", () => {
+    const { s: s0, ap, ids } = setup([murder(), card("Test Mill", "Instant", "{U}", { cmc: 1, colors: ["U"], oracleText: "Mill two cards." })]);
+    const ultron = putOnBattlefield(s0, ap, ultronsAuxiliary());
+    const golem = putOnBattlefield(s0, ap, vanilla("Test Golem", "Artifact Creature — Golem", "{3}", 3, 3, 3));
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(golem)]));
+    expect([zone(s, golem), counters(s, ultron)]).toEqual(["graveyard", 1]);
+    toZone(s, ap, card("Test Relic", "Artifact", "{2}", { cmc: 2, oracleText: "" }), "library");
+    toZone(s, ap, card("Test Relic", "Artifact", "{2}", { cmc: 2, oracleText: "" }), "library");
+    s = settle(castNow(s, ap, ids[1]!));
+    expect(counters(s, ultron)).toBe(3);
+  });
+  it("doesn't count a nonartifact card or another player's artifact", () => {
+    const { s: s0, ap, ids, opp } = setup([murder(), opt()]);
+    const ultron = putOnBattlefield(s0, ap, ultronsAuxiliary());
+    const golem = putOnBattlefield(s0, opp, vanilla("Test Golem", "Artifact Creature — Golem", "{3}", 3, 3, 3));
+    let s = settle(castNow(s0, ap, ids[0]!, [tgt(golem)]));
+    moveObject(s, ids[1]!, "graveyard");
+    s = settle(s);
+    expect([zone(s, golem), counters(s, ultron)]).toEqual(["graveyard", 0]);
+  });
+});
+
+describe("Futurist Operative", () => {
+  it("is a 1/1 Human Citizen that can't be blocked while tapped, and a 3/4 Ninja otherwise", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const ninja = putOnBattlefield(s0, ap, futuristOperative());
+    putOnBattlefield(s0, opp, vanilla("Their Wall", "Creature — Wall", "{2}{G}", 3, 0, 5));
+    expect(pt(s0, ninja)).toBe("3/4");
+    let s = toBlocks(attackWith(s0, [ninja], opp));
+    expect(pt(s, ninja)).toBe("1/1");
+    const tl = s.cards[s.objects[ninja]!.cardId]!;
+    expect(tl.name).toBe("Futurist Operative");
+    expect(s.pending?.kind).toBe("declareBlockers");
+    const wall = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Their Wall")!;
+    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: wall, attacker: ninja }] })).toThrow(/can't be blocked/);
+    s = goUntil(s, (x) => x.step === "end");
+    s = run(s, planActivate(s, ap, ninja, 0));
+    s = settle(s);
+    expect([s.objects[ninja]!.tapped, pt(s, ninja)]).toEqual([false, "3/4"]);
+  });
+});
+
+describe("Dovin's Acuity", () => {
+  it("gains 2 life and draws when it enters, and may return to hand when you cast an instant in your main phase", () => {
+    const { s: s0, ap, ids } = setup([dovinsAcuity(), opt()]);
+    const hand0 = s0.players[ap]!.hand.length;
+    let s = settle(castNow(s0, ap, ids[0]!));
+    expect([zone(s, ids[0]!), life(s, ap), s.players[ap]!.hand.length]).toEqual(["battlefield", 42, hand0]);
+    s = castNow(s, ap, ids[1]!);
+    s = settle(s, at("chooseMay", ap));
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(zone(s, ids[0]!)).toBe("hand");
+  });
+  it("doesn't trigger for an instant cast outside your main phase", () => {
+    const { s: s0, ap, ids } = setup([opt()]);
+    const acuity = putOnBattlefield(s0, ap, dovinsAcuity());
+    let s = goUntil(s0, (x) => x.step === "end" && x.activePlayer === ap && !x.pending && !x.stack.length && waitingOn(x) === ap);
+    s = settle(castNow(s, ap, ids[0]!));
+    expect([zone(s, acuity), zone(s, ids[0]!)]).toEqual(["battlefield", "graveyard"]);
+  });
+});
+
+describe("Karolina Dean, Runaway", () => {
+  it("adds WUBRG at your first main phase that can't pay for a spell from your hand", () => {
+    const { s: s0, ap, ids } = setup([vanilla("Blue Bear", "Creature — Bear", "{U}", 1, 1, 1)]);
+    putOnBattlefield(s0, ap, karolinaDeanRunaway());
+    const sink = putOnBattlefield(s0, ap, card("Test Sink", "Artifact", "{1}", { cmc: 1, oracleText: "{W}{U}{B}{R}{G}: You gain 5 life." }));
+    tapLands(s0, ap);
+    s0.step = "upkeep";
+    let s = goUntil(s0, (x) => x.step === "main1" && !x.stack.length && !x.triggerQueue.length && !x.pending);
+    expect(Object.values(s.players[ap]!.manaPool).reduce((a, b) => a + b, 0)).toBe(5);
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+    s = settle(run(s, planActivate(s, ap, sink, 0)));
+    expect([life(s, ap), Object.values(s.players[ap]!.manaPool).reduce((a, b) => a + b, 0)]).toEqual([45, 0]);
+  });
+});
+
+describe("Rofellos's Gift", () => {
+  it("returns an enchantment card from your graveyard for each green card revealed", () => {
+    const g1 = vanilla("Green Bear", "Creature — Bear", "{1}{G}", 2, 2, 2, { colors: ["G"] });
+    const g2 = vanilla("Green Elk", "Creature — Elk", "{1}{G}", 2, 2, 2, { colors: ["G"] });
+    const { s: s0, ap, ids } = setup([rofellossGift(), g1, g2, opt()]);
+    onlyHand(s0, ap, ids);
+    const ench = [1, 2, 3].map((i) => toZone(s0, ap, card(`Test Aura ${i}`, "Enchantment", "{1}", { cmc: 1, oracleText: "" }), "graveyard"));
+    let s = settle(castNow(s0, ap, ids[0]!), (x) => x.pending?.kind === "searchLibrary");
+    expect(s.pending?.kind === "searchLibrary" && s.pending.cards.sort()).toEqual([ids[1]!, ids[2]!].sort());
+    s = settle(find(s, ap, [ids[1]!, ids[2]!]), (x) => x.pending?.kind === "searchLibrary");
+    expect(s.pending?.kind === "searchLibrary" && [s.pending.min, s.pending.max]).toEqual([2, 2]);
+    s = settle(find(s, ap, [ench[0]!, ench[2]!]));
+    expect(ench.map((id) => zone(s, id))).toEqual(["hand", "graveyard", "hand"]);
+  });
+});
+
+describe("Celestial Convergence", () => {
+  const removeLast = (lives: number[]) => {
+    const { s: s0, ap } = setup([]);
+    const conv = putOnBattlefield(s0, ap, celestialConvergence());
+    s0.objects[conv]!.counters.omen = 1;
+    s0.turnOrder.forEach((p, i) => (s0.players[p]!.life = lives[i]!));
+    s0.step = "untap";
+    return { s: goUntil(s0, (x) => x.over || x.step === "draw"), ap, conv };
+  };
+  it("enters with seven omen counters", () => {
+    const { s: s0, ap, ids } = setup([celestialConvergence()]);
+    const s = settle(castNow(s0, ap, ids[0]!));
+    expect(counters(s, ids[0]!, "omen")).toBe(7);
+  });
+  it("makes the player with the highest life total win when the last counter is removed", () => {
+    const { s } = removeLast([40, 20, 45, 30]);
+    expect([s.over, s.winner]).toEqual([true, s.turnOrder[2]]);
+  });
+  it("makes the game a draw when the highest life total is tied", () => {
+    const { s } = removeLast([45, 20, 45, 30]);
+    expect([s.over, s.winner]).toEqual([true, null]);
+  });
+});
+
+describe("Serene Master", () => {
+  it("exchanges its power with the creature it blocks until end of combat", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const master = putOnBattlefield(s0, opp, sereneMaster());
+    const giant = putOnBattlefield(s0, ap, vanilla("Test Giant", "Creature — Giant", "{4}{R}", 5, 5, 6));
+    let s = toBlocks(attackWith(s0, [giant], opp));
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: master, attacker: giant }] });
+    s = settle(s, (x) => x.pending?.kind === "chooseTargets");
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: opp, targets: [tgt(giant)] });
+    s = settle(s);
+    expect([pt(s, master), pt(s, giant)]).toEqual(["5/2", "0/6"]);
+    s = goUntil(s, (x) => x.step === "main2");
+    expect([zone(s, master), zone(s, giant), s.objects[master]?.damage ?? 0]).toEqual(["battlefield", "battlefield", 0]);
+    expect([pt(s, master), s.objects[giant]!.damage]).toEqual(["0/2", 5]);
   });
 });

@@ -104,8 +104,10 @@ function selfObject(s: GameState, ctx: AmountCtx): GameObject | undefined {
 
 function refObjects(s: GameState, ref: ObjRef, ctx: AmountCtx): GameObject[] {
   if (ctx.objects) return ctx.objects(ref);
-  const o = ref.ref === "self" ? selfObject(s, ctx) : ref.ref === "ringBearer" ? ringBearer(s, ctx.controller) : undefined;
-  return o ? [o] : [];
+  // "Equipped creature's power" in a static ability (Glamdring, Foe-hammer): what the source is attached to.
+  const host = ref.ref === "attached" ? selfObject(s, ctx)?.attachedTo : undefined;
+  const o = ref.ref === "self" ? selfObject(s, ctx) : ref.ref === "ringBearer" ? ringBearer(s, ctx.controller) : host !== undefined ? s.objects[host] : undefined;
+  return o && (ref.ref !== "attached" || o.zone === "battlefield") ? [o] : [];
 }
 
 function refPlayers(s: GameState, ref: PlayerRef, ctx: AmountCtx): PlayerId[] {

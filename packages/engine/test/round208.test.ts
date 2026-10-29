@@ -475,3 +475,40 @@ describe("the first spell you cast with {X} in its mana cost each turn costs {1}
     expect(planCast(s, ap, b, [], undefined, undefined, 1)).not.toBeNull();
   });
 });
+
+const glamdringFoehammer = scry("adventure", [{"name":"Glamdring, Foe-hammer","type_line":"Legendary Artifact — Equipment","mana_cost":"{2}","oracle_text":"Instant and sorcery spells you cast cost {X} less to cast, where X is equipped creature's power.\nEquip {2}"},{"name":"Gleam of Death","type_line":"Sorcery — Adventure","mana_cost":"{3}{U}","oracle_text":"Mill six cards, then put all instant and sorcery cards from among them into your hand. (Then exile this card. You may cast the artifact later from exile.)"}], { keywords: ["Equip","Mill"], color_identity: ["U"] });
+
+describe("spells cost {X} less, where X is equipped creature's power; put all ... cards from among the milled ones into your hand", () => {
+  it("compile", () => supported(glamdringFoehammer));
+
+  it("Glamdring: instants and sorceries cost {1} less for each point of the equipped creature's power, generic only", () => {
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, glamdringFoehammer);
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[b]!.counters = { "+1/+1": 1 };
+    let s = passUntil(s0, "main1", ap);
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    const big = card("Test Big Draw", "Sorcery", "{4}{U}", { cmc: 5, oracleText: "Draw a card." });
+    const spell = into(s, ap, big, "hand");
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, U: 1, C: 1 };
+    expect(planCast(s, ap, spell)).toBeNull(); // not equipped
+    s.objects[g]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    s = settle(run(s, planCast(s, ap, spell)));
+    expect(s.objects[spell]!.zone).toBe("graveyard");
+  });
+
+  it("Gleam of Death: every instant and sorcery card it milled goes to your hand, nothing else", () => {
+    const { s: s0, ap } = setup([glamdringFoehammer]);
+    let s = passUntil(s0, "main1", ap);
+    const g = s.players[ap]!.hand.find((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("Glamdring"))!;
+    const old = into(s, ap, card("Test Old Bolt", "Instant", "{R}", { cmc: 1, oracleText: "Draw a card." }), "graveyard");
+    // On top of the library: the six cards milled are these four and two more.
+    const top = [card("Test Bolt", "Instant", "{R}", { cmc: 1, oracleText: "Draw a card." }), card("Test Rite", "Sorcery", "{B}", { cmc: 1, oracleText: "Draw a card." }), bear(), rock()].map((d) => into(s, ap, d, "library"));
+    s.players[ap]!.manaPool = { ...s.players[ap]!.manaPool, U: 1, C: 3 };
+    s = settle(run(s, planCast(s, ap, g, [], undefined, "auto", undefined, { face: 1 })));
+    expect(s.players[ap]!.hand).toEqual(expect.arrayContaining([top[0], top[1]]));
+    expect([s.objects[top[2]!]!.zone, s.objects[top[3]!]!.zone, s.objects[old]!.zone]).toEqual(["graveyard", "graveyard", "graveyard"]);
+    expect(s.objects[g]!.zone).toBe("exile");
+  });
+});

@@ -666,7 +666,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // X is the total power of creatures goaded this way": the targets still there as it resolves.
   if (/^the total power of creatures goaded this way$/.test(p) && ctx?.lastTargets && ctx.targets[ctx.lastTargets.index]?.perOpponent && ctx.targets[ctx.lastTargets.index]?.types?.includes("Creature")) return count({ kind: "totalPowerOf", of: { ref: "target", ...ctx.lastTargets } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|equipped creature's|enchanted creature's|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the exiled card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the revealed card's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue" && !/^that spell's$/i.test(m[1]!)) return null;
@@ -873,6 +873,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (x === "that creature's" && ctx?.sacrificedIt) return { ref: "sacrificed" };
   // "Where X is the amassed Army's power" (CR 701.47c), after amassing.
   if (x === "the amassed army's") return ctx?.amassed ? { ref: "amassed" } : null;
+  // "Where X is equipped creature's power" (Glamdring, Foe-hammer): the permanent the source is attached to.
+  if (x === "equipped creature's" || x === "enchanted creature's") return { ref: "attached" };
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   // "That spell's mana value": the targeted spell (Imp's Mischief).
   // With a target that isn't a spell, in a cast trigger, the spell cast (Dancing from Dark to Dawn), below.

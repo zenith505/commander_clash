@@ -8206,6 +8206,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
     // "Put up to two creature cards from among the milled cards onto the battlefield" (The Grand Evolution): under your
     // control, chosen as it resolves.
+    // Gleam of Death: "Mill six cards, then put all instant and sorcery cards from among them into your hand": every one of
+    // the milled cards that matches, no choice.
+    const allMilled = /^(?:Then )?[Pp]ut all (.+? cards) from among them into your hand$/.exec(s);
+    if (allMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(allMilled[1]!.replace(/ cards$/, " card").replace(/ and /g, " or "));
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || !filter) return null;
+      effects.push({ type: "returnAllFromGraveyard", who: { ref: "you" }, filter, toHand: true, milled: true });
+      continue;
+    }
     const fromMilled =
       // Nashi, Searcher in the Dark: "You may put any number of legendary and/or enchantment cards from among them into your hand".
       /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards|any number of .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to one .+? card) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card(?: with an? (?:even|odd) mana value)?) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ??

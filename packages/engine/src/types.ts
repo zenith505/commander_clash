@@ -732,6 +732,8 @@ export interface Player {
   cantGainLifeForGame?: true;
   /** "Until your next turn, creatures can't attack you unless their controller pays {2} for each" (Summon: Yojimbo), one entry per effect. */
   attackTaxUntil?: { n: number; planeswalkers?: true }[];
+  /** "Until your next turn, creatures can't attack you" (Chronomantic Escape): this player, not their planeswalkers. */
+  unattackableUntil?: true;
   /**
    * Orzhov Advokist: the players whose creatures can't attack this player or planeswalkers they control until this
    * player's next turn begins (whatever creatures they control by then, rulings).
@@ -1592,7 +1594,7 @@ export interface GameState {
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
   castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true; /** Its mana value on the stack (CR 202.3e). */ mv?: number }[];
   /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
-  costModsThisTurn?: { player: PlayerId; mod: CostMod; /** Until that player's next turn begins, not just this turn (CR 611.2b, 800.4m). */ untilYourNextTurn?: true }[];
+  costModsThisTurn?: { player: PlayerId; mod: CostMod; /** Until that player's next turn begins, not just this turn (CR 611.2b, 800.4m). */ untilYourNextTurn?: true; /** Only the next matching spell that player casts this turn, removed as it becomes cast (Hardened Berserker). */ next?: true }[];
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
   keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
   /** High Tide's "until end of turn, whenever a player taps an Island for mana ...": `controller` is "you", `source` the card's name. */

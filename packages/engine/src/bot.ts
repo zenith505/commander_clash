@@ -556,6 +556,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const score = (k: string) => (rank.includes(k) ? rank.indexOf(k) : rank.length);
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => score(a) - score(b))[0]! }];
     }
+    // "As ~ enters, it becomes your choice of a 3/3 creature with flying, ... or a 0/12 creature with defender": the one
+    // that attacks best, flying first, never defender, then the most power.
+    if (pend.kind === "chooseOption" && pend.what === "form") {
+      const score = (label: string) => (/defender/.test(label) ? -100 : 0) + (/flying/.test(label) ? 10 : 0) + Number(/(\d+)\//.exec(label)?.[1] ?? 0);
+      const best = pend.options.map((o, i) => ({ o, sc: score(pend.labels?.[i] ?? "") })).sort((a, b) => b.sc - a.sc)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: best.o }];
+    }
     // "As ~ enters, pay any amount of life" (Minion of the Wastes, Phyrexian Processor): up to 7, keeping 12 life, and at
     // least 1 while we can spare it (a 0/0 Minion dies at once).
     if (pend.kind === "chooseOption" && pend.what === "lifeAsEnters") {

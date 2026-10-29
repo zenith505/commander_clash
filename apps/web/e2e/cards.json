@@ -13806,6 +13806,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dccf2ca8-8c87-41c9-8373-351859396d05",
+  "name": "Primal Clay",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact Creature — Shapeshifter",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Shapeshifter"
+  ],
+  "oracleText": "As this creature enters, it becomes your choice of a 3/3 artifact creature, a 2/2 artifact creature with flying, or a 1/6 Wall artifact creature with defender in addition to its other types. (A creature with defender can't attack.)",
+  "power": "*",
+  "toughness": "*",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m13",
+  "releasedAt": "2012-07-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "44b12ccc-81cb-4ec1-891e-4bf706e53aa4",
   "name": "Primal Surge",
   "manaCost": "{8}{G}{G}",

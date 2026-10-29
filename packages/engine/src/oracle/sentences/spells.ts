@@ -11,6 +11,7 @@ import type { Ctx } from "../body";
 import { PREDEFINED_TOKENS } from "../tokens";
 import { parseSearchFilter } from "../search";
 import { parseCostChange } from "../statics";
+import { parsePunisherOptions } from "./basics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -677,6 +678,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
   // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.
   // "Counter target spell that wasn't cast from its owner's hand" (Wash Away).
+  // Thrull Wizard: "Counter target black spell unless that spell's controller pays {B} or {3}": they choose which, if
+  // either, to pay as it resolves (CR 118.12, 608.2d).
+  if ((m = /^Counter target ((?:white|blue|black|red|green) spell) unless that spell's controller pays ((?:\{[^}]+\})+) or ((?:\{[^}]+\})+)$/.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    const options = parsePunisherOptions(`pays ${m[2]} or pays ${m[3]}`, ctx);
+    if (spec?.kind !== "spell" || !options) return null;
+    const index = addTarget(ctx, spec);
+    return [{ type: "punisher", who: { ref: "targetController", index }, options, effects: [{ type: "counterSpell", index }], penalty: "Let ~ counter it" }];
+  }
   // "Counter target spell unless its controller discards their hand" (Perplex): a choice they make as it resolves (CR 118.12).
   if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand| cast from a graveyard| with \{X\} in its mana cost| with power or toughness \d+ or less)?(?: you don't control| an opponent controls)?)(?: unless its controller (pays (.+)|discards their hand))?$/i.exec(s))) {
     m.splice(3, 1);

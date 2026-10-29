@@ -1,7 +1,7 @@
 # Roadmap
 
-27,514 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,089 of
+27,542 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,944 of 4,988 (99%), top 10,000: 9,091 of
 9,979 (91%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
@@ -829,7 +829,7 @@ line blocks.
    "you may cast target artifact / enchantment card from your graveyard this turn" as a trigger (Heiko and Norika
    Yamazaki); "switch the power and toughness of each of up to two / any number of target creatures" (Invert // Invent
    with "an instant card and/or a sorcery card", Inversion Behemoth); "each creature you control that didn't attack or
-   enter this turn" (The Fifth Doctor). +21 (27,493 of 31,936 with round 205).
+   enter this turn" (The Fifth Doctor). +21 (27,521 of 31,936 with round 205 and Lane B round B35).
    Out after round 206 (looked at, not done): Havengul Laboratory (its back face's "the creature put onto the
    battlefield with ~"), Briarbridge Patrol ("deals damage to one or more creatures"), Mutated Cultist ("remove all
    counters from target permanent or opponent"), Elminster ("the number of cards looked at while scrying"), Honest Work
@@ -853,7 +853,7 @@ line blocks.
    legendary card from your graveyard" (Crystal Dragon // Rob the Hoard); "whenever a creature with skulk deals combat
    damage to one of your opponents" (The Master, Mesmerist); "if this spell's sneak cost was paid, they enter tapped and
    attacking" (The Last Ronin's Technique); "add one mana of that color for each different power among creatures you
-   control" (Selvala, Eager Trailblazer, Loot, the Nexus). +21 (27,514 of 31,936 with round 206).
+   control" (Selvala, Eager Trailblazer, Loot, the Nexus). +21 (27,542 of 31,936 with round 206 and Lane B round B35).
    Out after round 207 (looked at, not done): Varolz, the Scar-Striped and Young Deathclaws (scavenge for a */*
    creature card needs its characteristic-defining power in the graveyard, and the layers only work it out on the
    battlefield and in exile).
@@ -2595,20 +2595,40 @@ unranked ones, then ranks from the bottom. Lane B keeps its own notes here and l
   discarded this way), Empty-Shrine Kannushi (protection from colors among your permanents), Dance of the Skywise
   (becomes a Dragon Illusion that loses all abilities), Chlorophant (threshold granting a second upkeep trigger),
   Thrasta (trample over planeswalkers; its cost reduction compiles now).
-- Next for Lane B, least played first: Mindreaver, Thelon's Curse, North Star, Silhouette, Suffocation.
-  Then up from about 25,300: Pick Up the Pace ("a creature that entered this turn"), Goblins of the Flarg (a state
-  trigger), Tiger-Tribe Hunter (pack tactics), Oracle of Dust (a card an opponent owns from exile as a cost),
-  Haphazard Bombardment (aim counters), Bladecoil Serpent.
-  Then up from about 21,900 (round B8 took the easier ones; these are left): Wall of Shadows, Festering Newt,
-  Flameskull, Defiant Greatmaw, Aegis Sculptor, Fickle Efreet, Burn Away ("when that creature dies this turn"), Bill
-  Ferny, Capricious Efreet (destroy one at random), Countryside Crusher, Enkira, Bullseye, Lethal Exploit and Flame
-  Discharge (modified creatures as you cast it), Rayami, Touch of Moonglove, Library of Lat-Nam, Carrion Rats,
-  Shifting Loyalties, Madcap Experiment, Wall of Resurgence, Silhana Wayfinder, Resolute Strike, Forgestoker Dragon,
-  Skirk Drill Sergeant, Boom Scholar, Splitting the Powerstone, Storm the
-  Citadel, Thrull Wizard, Animate Wall, Pious Kitsune, Undergrowth, Vengeful Rebirth, Haunted Plate
-  Mail, Ardent Dustspeaker, Break Out, Evolved Spinoderm, Turf War, Gnarlbark Elm, Time to Feed,
-  Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss, Boros Battleshaper, Aura Graft, Alex Wilder,
-  Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dralnu's Crusade.
+- Round B35 (harder skipped cards, least played first): "That creature gets -4/-4 instead if you control a creature
+  named ..." (Festering Newt), "if a creature named ... is on the battlefield" (Pious Kitsune),
+  "remove a -1/-1 counter from another target creature" (Defiant Greatmaw), "has K as long as it has N or fewer ...
+  counters on it. Otherwise, it has K2" (Evolved Spinoderm), "Remove two counters from ~" of any kinds as a cost
+  (Gnarlbark Elm, Loch Mare, Reaping Willow, Gwen Stacy), "Counter target black spell unless that spell's controller
+  pays {B} or {3}" (Thrull Wizard; the punisher prompt with two payments), "Enchanted Wall can attack as though it
+  didn't have defender" (Animate Wall), "That creature can't block this combat" (Forgestoker Dragon), "If you return a
+  nonland card to your hand this way" (Vengeful Rebirth), "you may put three +1/+1 counters on target land you
+  control. If you do, that land becomes ..." (Wall of Resurgence, Cyclone Sire, Noyan Dar, Waker of the Wilds,
+  Rootwise Survivor), "You may put a stun counter on it. If you do" (Sanctuary Wall), "that's no longer an Equipment"
+  (Haunted Plate Mail; equipping it while it isn't one does nothing, per its rulings), "reveal a creature or land card
+  from among them and put it on top of your library" (Silhana Wayfinder), "you may pay {2}{R}. If you do, reveal the top
+  card of your library. If it's a Goblin permanent card" (Skirk Drill Sergeant), land cards from the top into the
+  graveyard until a nonland card (Countryside Crusher), damage "equal to the number of cards revealed this way", the
+  one found included (Madcap Experiment, Audacious Reshapers), "When that creature dies this turn, exile its
+  controller's graveyard" (Burn Away), "two target permanents that share a card type", checked again as it resolves
+  (Shifting Loyalties, The Trickster-God's Heist, Bilbo's Burglar's Plot; CR 205.2a). +28 (27,500 of 31,936 with round 205).
+- Out after round B35: Aegis Sculptor and Skywarp Skaab (done in Lane A's round 204, left to it), Carrion Rats ("any
+  player may exile a card from their graveyard. If a player does"), Flameskull (rejuvenation: "play one of those
+  cards" until the end of your next turn), Mindreaver (a counter by name among the cards it exiled), Lethal Exploit
+  and Flame Discharge ("modified creature you controlled as you cast ~"), Ardent Dustspeaker (an instant or sorcery
+  card to the bottom as a may-cost), Break Out (a revealed card's mana value deciding a second may), Turf War
+  (contested counters), Capricious Efreet (destroy one of three targets at random), Touch of Moonglove (a creature
+  dealt damage by that creature dying this turn), Thelon's Curse (each player's upkeep may-pay per tapped blue
+  creature), Pick Up the Pace ("a creature you control that entered this turn attacks" and play "as long as you
+  attacked this turn").
+- Next for Lane B, least played first: North Star, Silhouette, Suffocation.
+  Then up from about 25,300: Goblins of the Flarg (a state trigger), Tiger-Tribe Hunter (pack tactics), Oracle of
+  Dust (a card an opponent owns from exile as a cost), Haphazard Bombardment (aim counters), Bladecoil Serpent.
+  Then up from about 21,900 (rounds B8 and B35 took the easier ones; these are left): Wall of Shadows, Fickle Efreet,
+  Bill Ferny, Enkira, Bullseye, Rayami, Library of Lat-Nam, Resolute Strike, Boom Scholar, Splitting the Powerstone,
+  Storm the Citadel, Undergrowth, Time to Feed, Blessed Reincarnation, Hypnox, Hankyu, Foster, Gigapede, The Abyss,
+  Boros Battleshaper, Aura Graft, Alex Wilder, Treva, Vivien's Invocation, Withering Wisps, Scrapbasket, Dralnu's
+  Crusade.
   Then up from about 19,600 (round B9 took the easier ones up to about 17,100; these are left, besides its skips):
   Sacred Ground, Outlaw Stitcher, Spider-Woman (tapped "for as long as you control ~"), Nivix, Mana Cache (any player,
   before the end step), Warchanter Skald, Colfenor's Plans, Deus of Calamity (6 or more damage to an opponent), Pentarch

@@ -3648,6 +3648,16 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
+    // Evolved Spinoderm: "~ has trample as long as it has two or fewer oil counters on it. Otherwise, it has hexproof.": one
+    // keyword or the other, by how many counters are on it now.
+    const selfElse = /^~ has ([a-z]+) as long as it (has [^.]+ counters? on it)\. Otherwise, it has ([a-z]+)\.$/.exec(line);
+    if (selfElse) {
+      const [first, other] = [parseConditionalStatic(`~ has ${selfElse[1]} as long as ~ ${selfElse[2]}.`), parseStatic(`~ has ${selfElse[3]}.`)];
+      if (first?.condition?.kind === "selfCounters" && first.affects.kind === "self" && other?.affects.kind === "self" && !other.condition && [...first.mods, ...other.mods].every((m) => m.kind === "addKeywords")) {
+        out.statics.push({ ...first, text: line }, { ...other, condition: { kind: "not", cond: first.condition }, text: line });
+        continue;
+      }
+    }
     // Hunter's Blowgun: "Equipped creature has deathtouch during your turn. Otherwise, it has reach.": one keyword during
     // your turn, the other during the others'.
     const blowgun = /^Equipped creature has ([a-z ]+) during your turn\. Otherwise, it has ([a-z ]+)\.$/.exec(line);

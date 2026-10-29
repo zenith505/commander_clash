@@ -2078,6 +2078,8 @@ export interface Resolving {
   parley?: { land: number; nonland: number };
   /** The mana value of the card its last revealUntil instruction found, if it found one (Yuna's Whistle's reflexive X). */
   revealedUntilMv?: number;
+  /** How many cards the last revealUntil revealed, the one found included ("the number of cards revealed this way", Madcap Experiment). */
+  revealedUntilCount?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
   /** "The damage dealt this way": all of it, so far in this resolution. */

@@ -98,13 +98,14 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = ctx?.choseCreatureType && m[2] === "cards of the chosen type" ? ({ kind: "card", chosen: "type", text: "card of the chosen type" } as const) : parseSearchFilter(m[2]!.replace(/\bcards\b/, "card"));
       if (!filter || (/ of the chosen /.test(m[2]!) && !filter.chosen)) return null;
       Object.assign(dig, { count: m[1] === "any number of" ? 99 : num(m[1]!.slice(6)), upTo: true, filter, into: "hand", reveal: true });
-    } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) into your hand$/.exec(s))) {
+    } else if ((m = /^You may (?:reveal (an? .+?) from among them and put (?:it|that card)|put (an? .+?) from among them) (into your hand|on top of your library)$/.exec(s))) {
       // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
+      // Silhana Wayfinder: "You may reveal a creature or land card from among them and put it on top of your library".
       const phrase = (m[1] ?? m[2])!.replace(/^an? /, "");
       const ofChosen = / of the chosen type$/.exec(phrase);
       const filter = parseSearchFilter(ofChosen ? phrase.slice(0, ofChosen.index) : phrase);
       if (!filter || (ofChosen && (!ctx || ctx.spell || !filter.types?.includes("Creature")))) return null;
-      Object.assign(dig, { count: 1, upTo: true, filter: ofChosen ? { ...filter, chosen: "type", text: phrase } : filter, into: "hand" });
+      Object.assign(dig, { count: 1, upTo: true, filter: ofChosen ? { ...filter, chosen: "type", text: phrase } : filter, into: m[3] === "into your hand" ? "hand" : "libraryTop" });
     } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s.replace(/, then shuffle$/, "")))) {
       // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout), "Put up to two creature
       // cards with mana value 3 or less from among them onto the battlefield" (Collected Company): several enter at the
@@ -557,6 +558,13 @@ export function parseBecomes(text: string): Modification[] | null {
     rest = (m[1] ?? m[2])!;
     still = true;
   }
+  // Haunted Plate Mail: "a 4/4 Spirit artifact creature that's no longer an Equipment": it loses that subtype too (CR 205.1b
+  // keeps it otherwise).
+  let noLonger: string | undefined;
+  if ((m = /^(.+?) that's no longer an? (Equipment)$/.exec(rest)) && !still) {
+    rest = m[1]!;
+    noLonger = m[2]!;
+  }
   // "Becomes a 0/0 Bird creature with flying in addition to its other types" (Case of the Filched Falcon): it keeps its
   // card types and subtypes (CR 205.1b).
   // "... a black Demon in addition to its other colors and types" (Possessed Goat): it keeps its colors too (CR 105.3).
@@ -646,6 +654,10 @@ export function parseBecomes(text: string): Modification[] | null {
   } else if (colors.length || /colorless/i.test(rest)) out.push({ kind: "setColors", colors });
   if (pt) out.push({ kind: "setPT", power: pt[0], toughness: pt[1] });
   out.push(...grants);
+  if (noLonger) {
+    if (addition || !types.includes("Artifact")) return null;
+    out.push({ kind: "loseTypes", types: [], subtypes: [noLonger] });
+  }
   return out.length ? out : null;
 }
 

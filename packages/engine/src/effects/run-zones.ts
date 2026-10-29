@@ -108,6 +108,15 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
  */
 function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const r = s.resolving!;
+  // Martyr's Bond: the card types of the trigger's subject, on the battlefield or as it last existed (CR 608.2h).
+  if (e.filter.sharesTypeWithSubject) {
+    const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    const lk = ctx.subject ? s.lastKnown?.[ctx.subject.id] : undefined;
+    // Gone from the battlefield, the subject is the card in its new zone, one zone change on from what last existed.
+    const here = o?.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
+    const types = here ? characteristics(s, o!).types : lk && (lk.zc === ctx.subject!.zc || lk.zc === ctx.subject!.zc - 1) ? (lk.source?.types ?? []) : [];
+    e = { ...e, filter: { ...e.filter, sharesTypeWithSubject: undefined, types: types.length ? [...types] : ["(none)"] } };
+  }
   const sc = (r.scratch ??= {});
   let who = players(s, e.who, ctx);
   // Each player's own number when it's "half the creatures they control" (CR 107.1a), all worked out before anyone picks.
@@ -349,14 +358,16 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
     }
     const kind = e.filter?.text ?? "card";
     const whose = e.youChoose ? ` in ${pid === ctx.controller ? "your" : `${p.name}'s`} graveyard` : "";
-    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${whose}`, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
+    // Dredge the Mire: they choose for you, so the card that helps you least (bots), as Visions of Dread.
+    const forYou = e.underYours && pid !== ctx.controller ? { forPlayer: ctx.controller, helps: true as const, under: ctx.controller } : {};
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${whose}`, ...forYou, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
   // Each under its owner's control, or all under yours when you chose them (Breach the Multiverse, CR 110.2a).
   const moves = Object.entries(yp.picked).flatMap(([pid, ids]) => ids.filter((id) => s.objects[id]?.zone === "graveyard").map((id) => ({ id, pid: Number(pid) as PlayerId })));
-  const under = (pid: PlayerId) => (e.youChoose ? ctx.controller : pid);
-  for (const { id, pid } of moves) log(s, e.youChoose ? `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from ${pid === ctx.controller ? "their" : `${player(s, pid).name}'s`} graveyard onto the battlefield.` : `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
+  const under = (pid: PlayerId) => (e.youChoose || e.underYours ? ctx.controller : pid);
+  for (const { id, pid } of moves) log(s, e.youChoose || e.underYours ? `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from ${pid === ctx.controller ? "their" : `${player(s, pid).name}'s`} graveyard onto the battlefield.` : `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
   enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: under(pid), ...(e.tapped ? { tapped: true } : {}) })));
 }
 
@@ -1215,6 +1226,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
           left = left.filter((id) => !(st.hits ?? []).includes(id));
         }
+        // Yennett: none cast, so you draw (the card revealed, still on top: rulings).
+        if (e.noneCastDraw && !st.cast) draw(s, you.id, e.noneCastDraw);
         if (!e.rest) return;
         const toHand = e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
         for (const id of toHand) moveObject(s, id, "hand");
@@ -1968,7 +1981,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // ~" (Danitha): only to the source, still on the battlefield as the same object (CR 400.7).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me : undefined;
-      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : undefined);
+      // Holy Avenger: the trigger's creature, if it's still on the battlefield as that object (CR 400.7).
+      const subject = e.attachToSubject ? objects(s, { ref: "subject" }, ctx).find((o) => o.zone === "battlefield") : undefined;
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src, e.attachToSelf ? (self?.id ?? null) : e.attachToSubject ? (subject?.id ?? null) : undefined);
       if (hosts === "paused") return "paused";
       // "That creature gains haste": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];

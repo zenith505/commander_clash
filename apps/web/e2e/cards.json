@@ -21111,6 +21111,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "acdcbb49-9d71-4c36-8ccb-650fb11c3a58",
+  "name": "Yuffie, Materia Hunter",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "Ninjutsu {1}{R} ({1}{R}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhen Yuffie enters, gain control of target noncreature artifact for as long as you control Yuffie. Then you may attach an Equipment you control to Yuffie.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Ninjutsu"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
   "name": "Yuriko, the Tiger's Shadow",
   "manaCost": "{1}{U}{B}",

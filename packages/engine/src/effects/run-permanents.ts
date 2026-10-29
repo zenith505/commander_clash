@@ -1438,8 +1438,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Ardenn: the Auras and Equipment are chosen as it resolves, and attached at once (rulings), each only if it could
       // be attached to the target (CR 701.3a-b). Nothing happens with an illegal target (CR 608.2b).
       // Heavenly Blademaster: to the source, if it's still the same permanent (rulings).
+      // Winter Soldier, Icy Assassin: "Return this card from your graveyard to the battlefield ... Then you may attach an
+      // Equipment you control to him": the permanent the card became, put there by this ability (CR 400.7).
       const me = e.self && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (e.self && (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
+      const returned = !!me && (s.resolving?.created ?? []).includes(me.id);
+      if (e.self && (!me || me.zone !== "battlefield" || (!returned && ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc))) return;
       const t = me ? ({ kind: "object", id: me.id } as const) : ctx.targets[e.host];
       if (!t || (!me && !ctx.legal[e.host])) return;
       const host = t.kind === "object" ? s.objects[t.id] : undefined;
@@ -1454,7 +1457,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sc.queue = [ctx.controller];
         sc.chosen = {};
         const to = host ? defOf(s, host).name : player(s, (t as { id: PlayerId }).id).name;
-        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
+        s.pending = e.one
+          ? { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: 1, min: 0, prompt: `you may click one of your Equipment to attach to ${to}, then attach it (or attach none).` }
+          : { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true, ...(e.equipment ? { prompt: `click any number of your Equipment to attach to ${to}, then attach them (or attach none).` } : {}) };
         return "paused";
       }
       const chosen = sc.chosen?.[ctx.controller] ?? [];

@@ -62,6 +62,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if ((m[3] || m[4]) && !times) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, next: true, ...(times ? { times } : {}) }];
   }
+  // Saheeli, the Gifted: "The next spell you cast this turn has affinity for artifacts": that spell costs {1} less for
+  // each artifact you control as you cast it (CR 702.41a), counted as its total cost is determined (CR 601.2f; rulings),
+  // generic mana only (rulings).
+  if ((m = /^[Tt]he next spell you cast this turn has affinity for (artifacts)$/.exec(s))) {
+    const change = parseCostChange(`Spells you cast cost {1} less to cast for each ${m[1]!.slice(0, -1)} you control`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || !change.costMod.times) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, next: true }];
+  }
   // Ral, Leyline Prodigy: "Until your next turn, instant and sorcery spells you cast cost {1} less to cast": the same,
   // until its controller's next turn begins (CR 611.2b).
   if ((m = /^Until your next turn, (.+? spells) you cast cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {

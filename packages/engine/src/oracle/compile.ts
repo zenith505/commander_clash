@@ -896,6 +896,17 @@ export function compile(d: CardDef): CompiledCard {
       out.unsupported.push(raw);
       continue;
     }
+    // Hogaak, Arisen Necropolis: "Convoke, delve" (CR 702.51a, 702.66a); "You can't spend mana to cast this spell", so
+    // convoke and delve pay its whole total cost (rulings).
+    if (line === "Convoke, delve") {
+      out.convoke = true;
+      out.delve = true;
+      continue;
+    }
+    if (line === "You can't spend mana to cast ~.") {
+      out.noManaSpend = true;
+      continue;
+    }
     const costKw = parseCostKeyword(line, d);
     if (costKw !== null) {
       if (costKw === "fail") out.unsupported.push(raw);
@@ -2587,6 +2598,15 @@ export function compile(d: CardDef): CompiledCard {
       out.loseGameExileSelf = true;
       continue;
     }
+    // Gideon of the Trials' emblem: "As long as you control a Gideon planeswalker, you can't lose the game and your
+    // opponents can't win the game": only while that's true.
+    const lockIf = /^As long as (.+), you can't lose the game and your opponents can't win the game\.$/.exec(line);
+    if (lockIf) {
+      const cond = parseStaticCondition(lockIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond) out.unsupported.push(raw);
+      else [out.cantLose, out.cantWin, out.gameEndIf] = ["you", "opponents", cond];
+      continue;
+    }
     const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
     if (lockEnd && lockEnd[1] !== lockEnd[2]) {
       if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
@@ -2606,6 +2626,16 @@ export function compile(d: CardDef): CompiledCard {
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
     if (line === "Spells you cast from exile have convoke.") {
       (out.spellsHaveConvoke ??= []).push({ filter: { kind: "spell", text: "spell" }, fromExile: true, text: line });
+      continue;
+    }
+    // "Spells you cast have delve" (Teval, Arbiter of Virtue), CR 702.66a, as for convoke.
+    if (line === "Spells you cast have delve.") {
+      (out.spellsHaveDelve ??= []).push({ filter: { kind: "spell", text: "spell" }, text: line });
+      continue;
+    }
+    // Altar of the Pantheon: one more to its controller's devotion to any color or combination of colors (CR 700.5).
+    if (line === "Your devotion to each color and each combination of colors is increased by one.") {
+      out.devotionBonus = (out.devotionBonus ?? 0) + 1;
       continue;
     }
     // "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126a, as for convoke.

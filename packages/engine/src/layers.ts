@@ -705,6 +705,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max) && (cond.moreThan === undefined || n > evalAmount(s, cond.moreThan, ctx));
     }
     case "monarch":
+      if (cond.asTurnBegan) return s.monarchAsTurnBegan === you;
       if (cond.none) return s.monarch === undefined;
       if (cond.eventPlayer) return eventPlayer !== undefined && s.monarch === eventPlayer;
       return cond.opponent ? s.monarch !== undefined && s.monarch !== you : (s.monarch === you) !== !!cond.not;

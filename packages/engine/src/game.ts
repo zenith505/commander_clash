@@ -142,6 +142,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   // The starting player's first turn (set after choosing them).
   s.players[first]!.turnBegan = s.turn;
   s.players[first]!.turnsTaken = 1;
+  s.lifeAsTurnBegan = s.players.map((p) => p.life);
   for (const p of s.players) draw(s, p.id, 7);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
   for (const p of s.players) delete p.draws;
@@ -2939,6 +2940,8 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!s.handOnlyUntil?.length) s.handOnlyUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
+  s.monarchAsTurnBegan = s.monarch;
+  s.lifeAsTurnBegan = s.players.map((p) => p.life);
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
@@ -4030,6 +4033,8 @@ export function tapAbilitySick(s: GameState, o: GameObject) {
 
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number, to?: PlayerId) {
   const o = obj(s, id);
+  // Its source as it was activated ("whenever you activate an ability of a creature", Elrond), before its costs.
+  const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
   if (i === undefined) throw new RulesError(`${name} can't produce {${mana}} right now`);
@@ -4114,7 +4119,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
-  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -5507,7 +5512,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
+    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && !(c.duringTheirNextTurn && !(s.activePlayer === pid && (player(s, pid).turnBegan ?? 0) > c.turn)) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
@@ -6915,7 +6920,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
-  const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
+  const activatedFrom = o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
@@ -7035,7 +7040,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
     resolveManaAbility(s, item, body, manaPick.mana);
-    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(paid.treasure ? { treasure: paid.treasure } : {}) });
+    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}) });
     return true;
   }
   s.stack.push(item);
@@ -9908,6 +9913,7 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
     if (next !== undefined && livingPlayers(s).length > 1) takeInitiative(s, next);
   }
   if (livingPlayers(s).length <= 1) return true;
+  if (!s.mulligans) fireEvent(s, { type: "lostGame", player: pid });
   if (s.mulligans) {
     // Leaving before the game starts: the others carry on with their mulligans.
     s.mulligans.going = s.mulligans.going.filter((id) => id !== pid);
@@ -10352,7 +10358,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
   if (fd.costs) payExtraCosts(s, p, fd.costs, { ...costs });
   // Mana with it too: "Morph—Pay 5 life" with Exiled Doomsayer's {2}.
   if (!fd.costs || fd.cost) spendFromPool(s, p.id, parseManaCost(faceUpManaCost(fd.cost, x)), "other");
-  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x);
+  turnedFaceUp(s, o, `${p.name} turns a face-down creature face up: it's ${name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.text ?? fd.cost}${parseManaCost(fd.cost).hasX ? `, X = ${x}` : ""}).`, fd.kind === "megamorph", x, p.id);
   s.passedInSuccession = [];
 }
 
@@ -10360,7 +10366,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0, x = 0, costs
  * Turns a face-down permanent face up. Its copiable values go back to the card's, or what a copy effect made it (CR
  * 708.8, 707.3); it's the same permanent, so nothing "enters". `megamorph`: its megamorph cost was paid (CR 702.37b).
  */
-function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0) {
+function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = false, x = 0, by?: PlayerId) {
   o.faceDown = undefined;
   lockIfRoom(s, o);
   invalidateCharacteristics(s);
@@ -10371,7 +10377,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
   // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
   const up = compileCard(d).faceUpCounters;
   if (up) putCounters(s, o, up.counter, up.n);
-  fireEvent(s, { type: "turnedFaceUp", id: o.id, ...(x ? { x } : {}) });
+  fireEvent(s, { type: "turnedFaceUp", id: o.id, ...(x ? { x } : {}), ...(by !== undefined ? { by } : {}) });
 }
 
 /**
@@ -10379,7 +10385,7 @@ function turnedFaceUp(s: GameState, o: GameObject, text: string, megamorph = fal
  * (Unable to Scream); a manifested or cloaked instant or sorcery card is revealed and stays face down, and nothing
  * triggers (CR 701.40g, 701.58g). Whether it turned face up.
  */
-export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string): boolean {
+export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string, by?: PlayerId): boolean {
   if (o.zone !== "battlefield" || !o.faceDown) return false;
   if (characteristics(s, o).cantTurnFaceUp) {
     log(s, `${src}: that face-down permanent can't be turned face up.`);
@@ -10390,7 +10396,7 @@ export function turnFaceUpByEffect(s: GameState, o: GameObject, src: string): bo
     log(s, `${src}: ${player(s, controllerOf(s, o)).name} reveals the face-down permanent, ${card.name}, an ${isType(card, "Instant") ? "instant" : "sorcery"} card; it stays face down.`);
     return false;
   }
-  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`);
+  turnedFaceUp(s, o, `${src} turns a face-down permanent of ${player(s, controllerOf(s, o)).name}'s face up: it's ${defOf(s, { ...o, faceDown: undefined }).name}.`, false, 0, by);
   return true;
 }
 

@@ -556,6 +556,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Thousand-Year Storm: "copy it for each other instant and sorcery spell you've cast before it this turn": those cast
   // before it, not after (counted from when it was cast), countered ones too (rulings).
   if (ctx.castSpell && /^[Cc]opy it for each other instant and sorcery spell you've cast before it this turn$/.test(s)) return [{ type: "copySpell", spell: "cause", n: "stormInstantSorcery", newTargets: false }];
+  // Show of Confidence: "When you cast this spell, copy it for each other instant and sorcery spell you've cast this turn":
+  // every one cast before the ability resolves, those cast in response too (rulings), but not this one.
+  if (ctx.selfCastSpell && /^[Cc]opy it for each other instant and sorcery spell you've cast this turn$/.test(s)) return [{ type: "copySpell", spell: "cause", n: "otherInstantSorcery", newTargets: false }];
   // "When you cast this spell, copy it for each time you've cast your commander from the command zone this game", counted
   // as the ability resolves (rulings on the commander Storms).
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell) for each (.+)$/.exec(s))) {

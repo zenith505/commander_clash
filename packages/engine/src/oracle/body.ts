@@ -977,6 +977,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Dragon Turtle: "tap it and up to one target creature an opponent controls. They don't untap during their controllers'
   // next untap steps." Both tapped, then neither untaps; with no target chosen, only ~ (rulings).
   text = text.replace(/^[Tt]ap (?:it|~) and (up to one target creature an opponent controls)\. They don't untap during their controllers' next untap steps\./, "Tap ~. Tap $1. ~ doesn't untap during its controller's next untap step. That creature doesn't untap during its controller's next untap step.");
+  // Flamehold Grappler, Tzaangor Shaman: "copy the next spell you cast this turn when you cast it. You may choose new
+  // targets for the copy": a delayed trigger (CR 603.7a), the same as "When you next cast a spell this turn, copy that
+  // spell" (Doublecast).
+  text = text.replace(/(^|\. )[Cc]opy the next ((?:instant or sorcery )?spell) you cast this turn when you cast it\. You may choose new targets for the copy\./, (_, pre: string, what: string) => `${pre}When you next cast ${/^[aeiou]/.test(what) ? "an" : "a"} ${what} this turn, copy that spell and you may choose new targets for the copy.`);
   // Ebony Fly: "Roll a d6. Until end of turn, you may have ~ become an X/X Insect artifact creature with flying, where X is
   // the result." Chosen as it resolves, after the roll (rulings): the same as "You may have ~ become ... until end of turn".
   text = text.replace(/(^|\. )Until end of turn, you may have ~ become ([^.,]+), where X is the result\./, "$1You may have ~ become $2 until end of turn, where X is the result.");
@@ -1245,7 +1249,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/^sacrifice ~ and counter that spell\.$/, "Sacrifice ~. Counter that spell.");
   // The Thanos-Copter: "Vehicles you control become artifact creatures until end of turn": each one (CR 301.7b), the ones
   // there as it resolves (CR 611.2c).
-  text = text.replace(/^Vehicles you control become artifact creatures until end of turn\.$/, "Each Vehicle you control becomes an artifact creature until end of turn.");
+  // Start Your Engines: the same, then "Creatures you control get +2/+0 until end of turn", those Vehicles included (rulings).
+  text = text.replace(/^Vehicles you control become artifact creatures until end of turn\.(?= |$)/, "Each Vehicle you control becomes an artifact creature until end of turn.");
   // Does Machines: "mill two cards, draw two cards, then discard two cards": one after another.
   text = text.replace(/^([Mm]ill (?:a card|\w+ cards)), (draw (?:a card|\w+ cards), then discard (?:a card|\w+ cards))\.$/, (_, a: string, b: string) => `${a}. ${capital(b)}.`);
   // Spoils of Victory: "Search your library for a ... card and put that card onto the battlefield. Then shuffle." is the
@@ -9062,6 +9067,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able")
         // "You may gain life equal to the power of target creature you control" (Wall of Reverence).
         .replace(/^Gain life equal to /, "You gain life equal to ")
+        // Baron Strucker: "you may have it connive" (CR 701.50a): it connives, if you choose.
+        .replace(/^Have (it|that creature) connive$/, (_, w: string) => (w === "it" && (ctx.selfIt || ctx.selfCard) ? "~ connives" : `${w === "it" ? "It" : "That creature"} connives`))
         // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
         // you choose (the choice is yours, CR 608.2d).
         .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `)

@@ -85,6 +85,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you foretell a card, (.+)$/, "youForetell"],
   [/^When(?:ever)? you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you become the monarch, (.+)$/, "youBecomeMonarch"],
+  [/^Whenever an opponent becomes the monarch, (.+)$/, "opponentBecomesMonarch"],
+  [/^Whenever another player loses the game, (.+)$/, "anotherPlayerLosesGame"],
   // CR 731.1: the change from one to the other, not the first time it becomes day or night (rulings on The Celestus).
   [/^Whenever day becomes night or night becomes day, (.+)$/, "dayNightChanges"],
   // CR 701.30: "Whenever you clash" is any clash you take part in, started by you or an opponent (rulings).
@@ -401,6 +403,15 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
     const body = parseBody(render[2]!);
     if (spec?.kind !== "object" || spec.controller || !body || /\b(?:that|those|they|them|it)\b/.test(render[2]!)) return "fail";
     return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: render[1]! }, opponents: true, combat: true, anyController: true } };
+  }
+  // Puppet Master, String Puller: "Whenever one or more goaded creatures deal combat damage to one of your opponents, ...":
+  // anyone's goaded creatures (CR 701.15), once for each opponent they deal combat damage to at once (CR 603.2c).
+  const goaded = /^Whenever one or more goaded creatures deal combat damage to one of your opponents, (.+)$/.exec(line);
+  if (goaded) {
+    const spec = parseTargetPhrase("goaded creature");
+    const body = parseBody(goaded[1]!, { eventPlayer: true });
+    if (spec?.kind !== "object" || !body) return "fail";
+    return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: "goaded creatures" }, opponents: true, perPlayer: true, combat: true, anyController: true } };
   }
   const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
   if (!m) return null;
@@ -767,6 +778,11 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // mana symbol {X} in the mana cost of the spell (the half cast, for a split card), not another X.
   const xM = !pw && !kwM ? / with (?:\{X\} in its mana cost|a mana cost that contains \{X\})$/.exec(what) : null;
   if (xM) what = what.slice(0, xM.index);
+  // Namor the Sub-Mariner: "a noncreature spell with one or more blue mana symbols in its mana cost" (hybrid and Phyrexian
+  // symbols are of their colors, CR 107.4e-f); "create that many" is that number of them.
+  const symM = !pw && !kwM && !xM ? / with one or more (white|blue|black|red|green) mana symbols in its mana cost$/.exec(what) : null;
+  if (symM) what = what.slice(0, symM.index);
+  const symColor = symM ? (({ white: "W", blue: "U", black: "B", red: "R", green: "G" }) as const)[symM[1] as "white"] : undefined;
   // Lullmage's Familiar: "Whenever you cast a kicked spell": its kicker cost was paid as it was cast (CR 702.33d).
   const kickedM = /^kicked(?: spell)?$/.exec(what);
   if (kickedM) what = "spell";
@@ -810,6 +826,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (short && !/\bloses X life\.?$/.test(text)) return "fail";
   const thatMuch = /\bIf [^.,]+ mana was spent to cast that spell, [^.]*\bthat much\b/.test(text) && !/\bX\b/.test(text) && !m[2];
   if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
+  const symMany = !!symColor && /\bthat many\b/.test(text) && !/\bX\b/.test(text);
+  if (symMany) text = text.replace(/\bthat many\b/g, "X");
   // Leyline of Resonance ("copy that spell"): the condition alone, nothing in the effect naming that permanent.
   const subjectRef = targetsOnly && text.includes(`that ${onlyM![1]!.replace(/ (?:you|an opponent) controls?$/, "")}`);
   if (subjectRef) {
@@ -823,8 +841,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!body) return "fail";
   if (spellX) body = { ...replaceX(body, { count: { kind: "castSpellX" } }), text: body.text };
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
+  if (symMany) body = { ...replaceX(body, { count: { kind: "castSpellManaSymbols", color: symColor! } }), text: body.text.replace(/\bX\b/g, "that many") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(targetsOnly ? { targetsOnly, ...(subjectRef ? { subjectTarget: true as const } : {}) } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(nameInYard ? { nameInCasterYard: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(symColor ? { manaSymbol: symColor } : {}), ...(duringYours ? { ownTurn: true as const } : {}), ...(duringMine ? { yourTurn: true as const } : {}), ...(kickedM ? { kicked: true as const } : {}), ...(advM ? { adventure: true as const } : {}), ...(whileAttacking ? { selfAttacking: true as const } : {}) }, body };
 }
 
 /**
@@ -1862,6 +1881,14 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(ninja[1]!, {});
     return body ? { event: "abilityActivated", activates: { by: "you", ninjutsu: true }, body } : "fail";
   }
+  // Elrond, Moon-Reader: "Whenever you activate an ability of a creature, ..." with nothing about mana abilities: mana
+  // abilities too (rulings).
+  const anyOf = /^Whenever you activate an ability of an? (creature|artifact|land|permanent), (?!if it isn't a mana ability)(.+)$/.exec(line);
+  if (anyOf) {
+    const f = parseTargetPhrase(anyOf[1]!);
+    const body = parseBody(anyOf[2]!, { activatedAbility: true });
+    return f?.kind === "object" && body ? { event: "abilityActivated", activates: { by: "you", of: f, mana: true }, body } : "fail";
+  }
   // "An ability with {X} in its activation cost" (Glava, Unbound Flourishing as compile.ts splits it).
   const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?| with \{X\} in its activation cost)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
@@ -2058,6 +2085,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Vrondiss's Dragon Spirit token: "When this token deals damage, sacrifice it": each time it does (CR 603.2).
+    .replace(/^When ~ deals damage, /, "Whenever ~ deals damage, ")
     // ED-E, Lonesome Eyebot: "Whenever you attack, if ... quest counters on ~, put a quest counter on it": "it" can only be
     // ~, the one object the trigger names.
     .replace(/^(Whenever you attack, if [^,]* on ~, put an? [a-z]+ counter on) it\.$/, "$1 ~.")
@@ -2870,6 +2899,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!filter || filter.kind !== "object" || !body) return "fail";
     return { event: "permanentTurnedFaceUp", tappedFilter: { ...filter, ...(faceUp[1] === "another" ? { notSource: true } : {}) }, ...(faceUp[3] ? { ifCond: { kind: "subjectCardType", type: "Creature" } as const } : {}), body };
   }
+  // Growing Dread: "Whenever you turn a permanent face up, ...": you turned it, by the special action (CR 116.2b) or by an
+  // effect you control; the permanent is the subject.
+  const youTurn = /^Whenever you turn an? (permanent|creature) face up, (.+)$/.exec(line);
+  if (youTurn) {
+    const filter = parseTargetPhrase(youTurn[1]!);
+    const body = parseBody(youTurn[2]!.replace(/\bthat (creature|permanent)\b/g, "it"), { subjectIt: true });
+    return filter?.kind === "object" && body ? { event: "permanentTurnedFaceUp", tappedFilter: filter, turnedByYou: true, body } : "fail";
+  }
   // Essence Symbiote: "Whenever a creature you control mutates, put a +1/+1 counter on that creature" (CR 702.140d).
   const mutates = /^Whenever an? (creature you control) mutates, (.+)$/.exec(line);
   if (mutates) {
@@ -2883,6 +2920,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (explores) {
     const body = parseBody(explores[2]!, { subjectIt: true });
     return body ? { event: "creatureYouControlExplores", body, ...(explores[1] ? { explored: explores[1] === " a land card" ? ("land" as const) : ("nonland" as const) } : {}) } : "fail";
+  }
+  // Iron Monger, Ultron: "Whenever a creature you control connives, ..." (CR 701.50f), that creature the subject.
+  const connives = /^Whenever a creature you control connives, (.+)$/.exec(line);
+  if (connives) {
+    const body = parseBody(connives[1]!, { subjectIt: true });
+    return body ? { event: "creatureYouControlConnives", body } : "fail";
   }
   const block = parseBlockTrigger(line);
   if (block) return block;
@@ -3386,7 +3429,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line)) text = text.replace(/^((?:you may )?)return it to your hand\.$/, "$1return ~ to its owner's hand.");
       const lesserPower = event === "selfDies" && / card with equal or lesser power from your graveyard\b/.test(text);
       if (lesserPower) text = text.replace(/ with equal or lesser power\b/, "");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || (event === "eachEndStep" && /^At the beginning of each player's end step, /.test(line)) || event === "opponentLosesLife" || event === "playerLosesLife" || event === "opponentBecomesMonarch" || event === "anotherPlayerLosesGame" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "opponentIsDealtNoncombatDamage" || event === "enchantedPlayerDealtDamage" || event === "chosenPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", selfEntered: event === "selfEnters", clashed: event === "youClash", ownX: event === "selfEnters" || event === "selfCast" || event === "selfTurnedFaceUp" || event === "selfBecomesMonstrous" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       if (body && lesserPower) {
         const [tg, ...more] = body.targets;

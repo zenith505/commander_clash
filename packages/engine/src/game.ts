@@ -788,6 +788,7 @@ export function moveObject(
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
+  o.combatHitTurn = undefined;
   o.blockedTurn = undefined;
   o.declaredInCombat = undefined;
   o.attackedTurns = undefined;
@@ -4545,6 +4546,8 @@ export function castProblem(
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
+  // Hogaak, Arisen Necropolis: no mana can be spent, so convoke and delve have to pay all of its total cost (rulings).
+  if (compileCard(d).noManaSpend && !costIsPaid(cost.cost, cost.extra)) return `not enough mana for ${d.name}: no mana can be spent to cast it, so convoke and delve have to pay all of its cost`;
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
@@ -4862,8 +4865,10 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
   for (const c of s.costModsThisTurn ?? []) {
     const m = c.mod;
     if (!costModThisTurnApplies(s, c, pid, d, mv)) continue;
-    if (m.n > 0) more += m.n;
-    else less -= m.n;
+    // Saheeli, the Gifted's affinity: counted as this spell's cost is determined (CR 601.2f), for who it's from.
+    const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.player, sourceId: o.id })) : m.n;
+    if (n > 0) more += n;
+    else less -= n;
   }
   return { more, less, moreColored, lessColored, lessColoredOrGeneric, lifeOffers };
 }
@@ -4912,6 +4917,19 @@ export function hasImprovise(s: GameState, pid: PlayerId, o: GameObject): boolea
   });
 }
 
+/** Nothing left of a cost: no symbols but {0}, no extra generic mana. */
+export const costIsPaid = (cost: ParsedCost, extra: number) => extra <= 0 && cost.symbols.every((sym) => sym.kind === "generic" && sym.amount === 0);
+
+/** Does `o`, cast by `pid`, have delve (CR 702.66)? Its own, or from "spells you cast have delve" (Teval, Arbiter of Virtue). */
+export function hasDelve(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const d = defOf(s, o);
+  if (compileCard(d).delve) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveDelve ?? []).some((g) => printedMatches(g.filter, d));
+  });
+}
+
 /**
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
@@ -4954,7 +4972,7 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
   }
   if (how.delve?.length) {
     // Delve pays generic mana only, after the total cost is worked out (CR 702.66a-b).
-    if (!compileCard(d).delve) return `${d.name} doesn't have delve`;
+    if (!hasDelve(s, pid, o)) return `${d.name} doesn't have delve`;
     const problem = delveProblem(s, pid, o, how.delve, how.exileCards ?? []);
     if (problem) return problem;
     const reduced = payGenericWith(cost, extra, how.delve.length);
@@ -4993,7 +5011,7 @@ function delveProblem(s: GameState, pid: PlayerId, spell: GameObject, ids: Objec
  */
 export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: CostChoices = {}, x = 0): number {
   const o = obj(s, id);
-  if (!compileCard(defOf(s, o)).delve) return 0;
+  if (!hasDelve(s, pid, o)) return 0;
   const { cost, extra } = spellCost(s, pid, o, x, choices.kicks, choices);
   const generic = splitGeneric(cost, extra).extra;
   const pool = player(s, pid).graveyard.filter((c) => c !== id && !choices.exileCards?.includes(c)).length;
@@ -9554,7 +9572,12 @@ function finishCombatDamage(s: GameState): boolean {
   const dealt = new Map<ObjectId, number>();
   for (const e of done) {
     dealt.set(key(e), (dealt.get(key(e)) ?? 0) + e.dealt);
-    if ("player" in e.to && e.dealt) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: e.to.player, amount: e.dealt });
+    if ("player" in e.to && e.dealt) {
+      const hitter = s.objects[key(e)];
+      const first = hitter?.combatHitTurn !== s.turn;
+      if (hitter) hitter.combatHitTurn = s.turn;
+      fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: e.to.player, amount: e.dealt, ...(first ? { first: true as const } : {}) });
+    }
     // To a planeswalker: still on the battlefield as the damage is dealt, before state-based actions (CR 704.3).
     const pw = "object" in e.to && e.dealt ? s.objects[e.to.object] : undefined;
     if (pw?.zone === "battlefield" && objIsType(s, pw, "Planeswalker")) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: controllerOf(s, pw), amount: e.dealt, planeswalker: pw.id });
@@ -9951,15 +9974,16 @@ export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"
   // "You can't lose the game this turn and your opponents can't win the game this turn" (Courageous Resolve).
   // "Players can't lose the game or win the game this turn" (Everybody Lives!).
   if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : turnRule(s, pid, "cantWinGame") || s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
-  return s.battlefield.some((id) => {
-    const o = obj(s, id);
+  // Emblems too, controlled by their owners (CR 114.4): Gideon of the Trials'.
+  return [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)].some((o) => {
     // Its own, and ones an effect gave it (The Book of Exalted Deeds' Angel): each a rule of its own, so Platinum Angel's
     // given to Abyssal Persecutor blocks both ways.
-    const all = [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)];
-    const you = controllerOf(s, o);
+    const emblem = o.zone === "command";
+    const all = emblem ? [abilitiesOf(s, o)] : [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)];
+    const you = emblem ? o.owner : controllerOf(s, o);
     return all.some((a) => {
       const rule = what === "lose" ? a.cantLose : a.cantWin;
-      return !!rule && (rule === "you" ? you === pid : you !== pid);
+      return !!rule && (rule === "you" ? you === pid : you !== pid) && (!a.gameEndIf || staticConditionNow(s, a.gameEndIf, o.id, you));
     });
   });
 }

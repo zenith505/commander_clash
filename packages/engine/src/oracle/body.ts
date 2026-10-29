@@ -123,6 +123,8 @@ export interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** After "you may remove all +1/+1 counters from ~. If you do" (Sarulf): "the number of counters removed this way". */
+  removedCounters?: boolean;
   /** A "whenever you activate an ability" trigger: "that ability" is the ability activated (Rings of Brighthearth). */
   activatedAbility?: boolean;
   /** A cast trigger's first instruction: "it gains haste" (Tyvar Kell's emblem) is the spell cast. */
@@ -3042,6 +3044,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "returnDiedThisWay", each: true, filter: { kind: "card", types: [], notTypes: [], notColors: [], text: "card" } });
       continue;
     }
+    // Tuktuk Scrapper: "you may destroy target artifact. If that artifact is put into a graveyard this way, ~ deals damage to
+    // that artifact's controller ...": only if it went to a graveyard (rulings: not if it's indestructible, regenerated,
+    // not destroyed, or moved elsewhere instead; a token goes there first).
+    const intoYard = /^If that (artifact|creature|enchantment|permanent) is put into a graveyard this way, (.+)$/.exec(s);
+    const mayKill = effects[effects.length - 1];
+    const killed = mayKill?.type === "may" && !mayKill.pay && !mayKill.otherwise && mayKill.effects.length === 1 ? mayKill.effects[0]! : mayKill;
+    if (intoYard && killed?.type === "destroy" && killed.what.ref === "target" && !killed.what.n && ctx.targets[killed.what.index]?.kind === "object" && effects.filter((x) => x.type === "destroy" || x.type === "may").length === 1) {
+      const inner = parseOne(capital(intoYard[2]!), ctx);
+      if (!inner) return null;
+      const check: Effect = { type: "if", cond: { kind: "destroyedThisWay", died: true }, effects: inner };
+      if (mayKill !== killed) (mayKill as Extract<Effect, { type: "may" }>).effects.push(check);
+      else effects.push(check);
+      continue;
+    }
     // Come Back Wrong: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the
     // battlefield under your control. Sacrifice it at the beginning of your next end step." The card the destroy put
     // there (a token isn't a card), with no chance to act in between (rulings).
@@ -4852,6 +4868,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const fx = parseSentence(`Each player chooses ${arrogance[1]} from among the nonland permanents they control, then sacrifices the rest`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "keepRest") return null;
       effects.push({ ...fx[0]!, youChoose: true });
+      si++;
+      continue;
+    }
+    // Dredge the Mire: "Each opponent chooses a creature card in their graveyard. Put those cards onto the battlefield under
+    // your control." Each opponent in turn order, knowing the choices before theirs, then all at the same time (rulings).
+    const oppYard = /^Each opponent chooses an? (.+? card) in their graveyard$/.exec(s);
+    if (oppYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(oppYard[1]!);
+      if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachOpponent" }, underYours: true });
       si++;
       continue;
     }
@@ -8900,6 +8926,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const inner = parseOne(capital(ifDid[2]!), ctx);
         if (!inner) return null;
         effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], text: "card" } }, effects: inner });
+        continue;
+      }
+      // Sarulf, Realm Eater: "you may remove all of them. If you do, exile ... the number of counters removed this way": only
+      // if any were removed (rulings: none if it's left the battlefield or has none as this resolves).
+      const mayRemove = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.length === 1 && prev.effects[0]!.type === "removeCounters" && prev.effects[0]!.what.ref === "self" && prev.effects[0]!.n === "all" ? prev.effects[0]! : undefined;
+      if (ifDid[1] === "do" && mayRemove?.type === "removeCounters" && !ctx.spell) {
+        const inner = parseOne(capital(ifDid[2]!), { ...ctx, removedCounters: true });
+        if (!inner) return null;
+        mayRemove.setsDid = true;
+        (prev as Extract<Effect, { type: "may" }>).effects.push({ type: "if", cond: { kind: "youDid" }, effects: inner });
         continue;
       }
       // "Remove a hope counter from ~. If you do, draw a card." (Dawn of a New Age): not optional, and done only if that

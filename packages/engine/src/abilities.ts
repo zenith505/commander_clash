@@ -739,6 +739,8 @@ export interface TargetSpec {
    * `types` as the choice is made.
    */
   sharesTypeWithSacrificed?: true;
+  /** "A permanent ... that shares a card type with it" (Martyr's Bond): with the trigger's subject, as it last existed; bound as the pick resolves. */
+  sharesTypeWithSubject?: true;
   /**
    * Cloudstone Curio: "another permanent you control that shares a permanent type with it": not the trigger's subject,
    * and sharing a permanent type with it as it is, or last was, on the battlefield (CR 608.2h), checked as it resolves.
@@ -4645,6 +4647,8 @@ export interface TriggeredAbility {
   attacksBattle?: boolean;
   /** "Whenever ~ attacks for the first time each turn": only on its first attack this turn, as this object (Aurelia). */
   firstAttack?: true;
+  /** "Whenever ~ deals combat damage to a player for the first time each turn" (Raphael, Tag Team Tough): as this object (GameObject.combatHitTurn). */
+  firstHit?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
   withOthers?: number;
   /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
@@ -6003,6 +6007,8 @@ export interface CompiledCard {
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).
    */
   cantLose?: "you" | "opponents";
+  /** Gideon of the Trials' emblem: "As long as you control a Gideon planeswalker, ...": `cantLose` and `cantWin` only while this holds. */
+  gameEndIf?: StaticCondition;
   /**
    * "You don't lose the game for having 0 or less life" (Marina Vendrell's Grimoire, Phyrexian Unlife): its controller
    * skips the state-based action of CR 704.5a while it's on the battlefield; they can still lose any other way.
@@ -6088,6 +6094,8 @@ export interface CompiledCard {
   spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
+  /** "Spells you cast have delve" (Teval, Arbiter of Virtue), CR 702.66a: while they're cast and paid for. */
+  spellsHaveDelve?: { filter: TargetSpec; text: string }[];
   /** "Dinosaur spells you cast have prowl {2}{R}" (Hunting Velociraptor), CR 702.76a: that alternative cost, for those spells. */
   spellsHaveProwl?: { filter: TargetSpec; mana: string; text: string }[];
   /** "Artifact cards and red creature cards in your hand have warp {2}{R}" (Tannuk, Steadfast Second): warp for those cards in its controller's hand (CR 702.185a). */
@@ -6524,6 +6532,8 @@ export interface CompiledCard {
   gift?: Gift;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
+  /** "You can't spend mana to cast this spell" (Hogaak, Arisen Necropolis): its total cost is paid only by convoke and delve. */
+  noManaSpend?: true;
   /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */
   assist?: true;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */

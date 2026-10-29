@@ -6620,6 +6620,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // The Adversaries: "you may pay {1}{W} any number of times. When you pay this cost one or more times, put that many valor
+    // counters on ~": how many times is chosen and paid as it resolves, then a reflexive trigger (CR 603.12; rulings) with
+    // its X that number, and none if it wasn't paid.
+    const payTimesAny = !payFirst ? /^[Yy]ou may pay ((?:\{(?:\d+|[WUBRGC])\})+) any number of times$/.exec(s) : null;
+    const whenPaidTimes = payTimesAny ? /^When you pay this cost one or more times, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (payTimesAny && whenPaidTimes) {
+      const rest = [whenPaidTimes[1]!, ...sentences.slice(si + 2).map((x) => x.replace(/\.$/, ""))].join(". ");
+      const text = rest.replace(/\btwice that many\b/g, "twice X").replace(/\bthat many\b/g, "X");
+      if (text === rest || /\bX\b/.test(rest)) return null;
+      const reflexive = reflexiveBody(text, ctx, false, false, true);
+      if (!reflexive) return null;
+      effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: { mana: payTimesAny[1]! }, payX: { times: true }, text: `pay ${payTimesAny[1]} any number of times. When you pay this cost one or more times, ${rest}` });
+      si = sentences.length;
+      continue;
+    }
     // "You may pay {X}. If you do, ..." (Decree of Justice), "... {X}{R} ..." (Flameblast Dragon), "you may pay {X}, where
     // X is less than or equal to the amount of life you gained" (Well of Lost Dreams): X chosen as it resolves.
     const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
@@ -8486,7 +8501,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // "Tap any number of untapped creatures you control. When you do, ..." (Teferi Akosa of Zhalfir, Yotia Declares War):
       // tapping none is doing it too, so it always triggers (rulings), with X the number tapped.
       // "Surveil 4. When you do, ..." (Dream Eater): with fewer cards in the library it triggers too (rulings).
-      const always = (whenDo === searched || prev?.type === "amass" || prev?.type === "surveil" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
+      // "Put two +1/+1 counters on target creature. When you do, ..." (Dimension X Pizzasaur): its only target, so if the
+      // ability resolves the counters are put (CR 608.2b).
+      const countedTarget = prev?.type === "counters" && prev.what.ref === "target" && prev.what.index === 0 && ctx.targets.length === 1 && !ctx.targets[0]!.many && !ctx.targets[0]!.optional && typeof prev.n === "number" && prev.n > 0;
+      const always = (whenDo === searched || countedTarget || prev?.type === "amass" || prev?.type === "surveil" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
       if (!rolled && !counted && !mayDo && !sacSelf && !milled && !drew && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Mount Velus Manticore: "you may discard a card. When you do, ~ deals X damage to any target, where X is the number
       // of card types the discarded card has": that card's, counted as the reflexive ability triggers (its X, CR 603.12).

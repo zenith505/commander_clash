@@ -1356,9 +1356,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Depthshaker Titan: "Any number of target noncreature artifacts you control become 3/3 artifact creatures": each of
   // them, as with one target (no duration: for as long as each stays on the battlefield, CR 611.2a).
   // Nissa, Sage Animist: "Untap up to six target lands. They become 6/6 Elemental creatures. They're still lands." The same.
-  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five|six)) target .+?|They) become (\d+\/\d+) ((?:[a-z]+ |[A-Z][a-z]+ )*)creatures$/.exec(s))) {
+  // Primal Adversary: "up to that many target lands you control become 3/3 Wolf creatures with haste that are still lands"
+  // (as "up to X", X its reflexive trigger's own): the same, each keeping its land type (CR 205.1b).
+  if ((m = /^((?:[Aa]ny number of|[Uu]p to (?:two|three|four|five|six|X)) target .+?|They) become (\d+\/\d+) ((?:[a-z]+ |[A-Z][a-z]+ )*)creatures( with [a-z]+(?:(?:, | and )[a-z]+)*)?( that are still lands)?$/.exec(s)) && (!/^[Uu]p to X /.test(m[1]!) || ctx.ownX || ctx.spell)) {
     const what = parseObject(m[1]!, ctx);
-    const mods = what?.ref === "target" && parseChanges(`becomes a ${m[2]} ${m[3]}creature`);
+    const mods = what?.ref === "target" && parseChanges(`becomes a ${m[2]} ${m[3]}creature${m[4] ?? ""}${m[5] ? " that's still a land" : ""}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
   // Oko, Thief of Crowns: "Exchange control of target artifact or creature you control and target creature an opponent

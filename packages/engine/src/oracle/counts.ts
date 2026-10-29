@@ -632,6 +632,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return filter ? count({ kind: "spellsCastThisTurn", filter, ...(m[1] ? { other: true as const } : {}) }) : null;
   }
   if ((m = /^the total mana value of (other )?spells you've cast this turn$/i.exec(p))) return count({ kind: "manaValueCastThisTurn", ...(m[1] ? { other: true as const } : {}) });
+  // Rootha, Mastering the Moment: "the greatest mana value among instant and sorcery spells you've cast this turn", each as
+  // it was cast (CR 202.3e).
+  if (!each && (m = /^the greatest mana value among (instant and sorcery|instant|sorcery|creature|noncreature) spells you've cast this turn$/i.exec(p))) {
+    const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
+    return filter ? count({ kind: "manaValueCastThisTurn", greatest: true, filter }) : null;
+  }
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });

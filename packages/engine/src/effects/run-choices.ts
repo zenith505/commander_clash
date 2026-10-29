@@ -66,8 +66,27 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `${p.name} pays ${n} energy for ${src}.`);
         sc.may = true;
       }
+      // "You may pay {1}{W} any number of times" (Intrepid Adversary): how many times first, at most as many as the player
+      // could pay, then the whole payment at once.
+      if (e.payX?.times && e.pay?.mana && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          let cap = 0;
+          while (cap < 40 && planMana(s, ctx.controller, parseManaCost(timesMana(e.pay.mana, cap + 1)))) cap++;
+          if (!cap) sc.may = false;
+          else {
+            const options = ["none", ...Array.from({ length: cap }, (_, i) => String(i + 1))];
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `${o} time${o === "1" ? "" : "s"} (${timesMana(e.pay!.mana!, Number(o))})`)), prompt: `pay ${e.pay.mana} how many times?` };
+            return "paused";
+          }
+        } else if (sc.payX === "none") sc.may = false;
+        else {
+          const pay = timesPay(e.pay, Number(sc.payX));
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `pay ${describePay(pay)}`, source: src, pay };
+          return "paused";
+        }
+      }
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
-      if (e.payX && e.pay?.mana && sc.may === undefined) {
+      if (e.payX && !e.payX.times && e.pay?.mana && sc.may === undefined) {
         if (sc.payX === undefined) {
           const rest = manaValue(parseManaCost(e.pay.mana.replace("{X}", "")));
           let cap = Math.min(availableMana(s, ctx.controller) - rest, e.payX.max ? amountNow(s, e.payX.max, ctx) : Infinity);

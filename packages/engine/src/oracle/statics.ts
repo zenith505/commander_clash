@@ -389,6 +389,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // any of those subtypes, read like "Demon, Horror, and Nightmare spells you cast cost {1} less to cast".
   if ((m = /^Each spell you cast that's an? ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+) costs (\{\d+\} less to cast)$/.exec(text)))
     text = `${m[1]!.replace(/,? or /, m[1]!.includes(",") ? ", and " : " and ")} spells you cast cost ${m[2]}`;
+  // Pollywog Symbiote: "Each creature spell you cast costs {1} less to cast if it has mutate": cast for its mutate cost or
+  // not (rulings), generic mana only (CR 601.2f).
+  if ((m = /^Each creature spell you cast costs \{(\d+)\} less to cast if it has (mutate)$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", types: ["Creature"], notTypes: [], notColors: [], keywords: [capital(m[2]!)], text: `creature spells with ${m[2]}` }, n: -Number(m[1]), text: line } };
   // Doran, Besieged by Time: "Each creature spell you cast with toughness greater than its power costs {1} less to cast".
   if ((m = /^Each creature spell you cast with toughness greater than its power costs (\{\d+\} less to cast)$/.exec(text))) text = `Creature spells you cast with toughness greater than their power cost ${m[1]}`;
   // Eminence: "As long as ~ is in the command zone or on the battlefield, other Dragon spells you cast cost {1} less to

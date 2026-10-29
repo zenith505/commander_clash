@@ -790,7 +790,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "A spell that has convoke" (Joyful Stormsculptor), "a creature spell with flying", "with infect": the spell as it
   // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
   // "A spell with cascade" (Aurora Phoenix): printed or given to it as it's cast (effects/triggers.ts hasCascade).
-  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect|cascade)$/.exec(what) : null;
+  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect|cascade|mutate)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
   // Garenbrig Squire: "a creature spell that has an Adventure": an adventurer card cast as the creature (CR 715.2, 715.3).
   const advM = !pw && !kwM ? / that has an Adventure$/.exec(what) : null;
@@ -2130,6 +2130,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // Keeper of Tresserhorn: "it assigns no combat damage this turn and defending player loses 2 life": two instructions.
     .replace(/^(Whenever ~ attacks and isn't blocked), it assigns no combat damage this turn and defending player loses (\w+) life\.$/, "$1, ~ assigns no combat damage this turn. Defending player loses $2 life.")
     .replace(/^When ~ deals combat damage, /, "Whenever ~ deals combat damage, ")
+    // Pollywog Symbiote: "Whenever you cast a creature spell, if it has mutate, ...": it triggers for a creature spell with
+    // mutate, cast for its mutate cost or not, and resolves even if that spell is countered (rulings).
+    .replace(/^Whenever you cast a creature spell, if it has mutate, /, "Whenever you cast a creature spell with mutate, ")
     // Vrondiss's Dragon Spirit token: "When this token deals damage, sacrifice it": each time it does (CR 603.2).
     .replace(/^When ~ deals damage, /, "Whenever ~ deals damage, ")
     // ED-E, Lonesome Eyebot: "Whenever you attack, if ... quest counters on ~, put a quest counter on it": "it" can only be

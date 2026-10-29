@@ -6827,7 +6827,7 @@ export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost
   for (const id of o.zone === "battlefield" ? s.battlefield : []) {
     const src = obj(s, id);
     for (const m of abilitiesOf(s, src).activationLess ?? []) {
-      if (!objectMatches(s, m.filter, o, controllerOf(s, src), false)) continue;
+      if (!objectMatches(s, m.filter, o, controllerOf(s, src), false) || (m.enchanted && src.attachedTo !== o.id)) continue;
       less += m.n;
       if (m.atLeastOne) atLeastOne = true;
     }

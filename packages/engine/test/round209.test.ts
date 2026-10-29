@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, characteristics, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
+import { abilitiesOf, activationCost, applyAction, characteristics, spellCost, invalidateCharacteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -248,5 +248,220 @@ describe("its controller amasses Goblins X", () => {
     t = settle(t, { targets: [tgt(mine)] });
     expect(t.objects[t.battlefield.find((id) => t.cards[t.objects[id]!.cardId]!.name === "Goblin Army Token")!]!.counters["+1/+1"]).toBe(3);
     expect(t.players[ap2]!.hand.length).toBe(hand2);
+  });
+});
+
+const dimensionXPizzasaur = card("Dimension X Pizzasaur", "Artifact Creature — Food Alien Mutant", "{3}{B}", {"cmc":4,"power":"2","toughness":"1","keywords":[],"oracleText":"When this creature enters, put two +1/+1 counters on target creature. When you do, destroy up to one target creature with mana value less than or equal to the number of counters among permanents you control.\n{2}, {T}, Sacrifice this creature: You gain 3 life and each opponent loses 3 life.","colors":["B"],"colorIdentity":["B"],"layout":"normal"});
+const intrepidAdversary = card("Intrepid Adversary", "Creature — Human Scout", "{1}{W}", {"cmc":2,"power":"3","toughness":"1","keywords":["Lifelink"],"oracleText":"Lifelink\nWhen this creature enters, you may pay {1}{W} any number of times. When you pay this cost one or more times, put that many valor counters on this creature.\nCreatures you control get +1/+1 for each valor counter on this creature.","colors":["W"],"colorIdentity":["W"],"layout":"normal"});
+const primalAdversary = card("Primal Adversary", "Creature — Wolf", "{2}{G}", {"cmc":3,"power":"4","toughness":"3","keywords":["Trample"],"oracleText":"Trample\nWhen this creature enters, you may pay {1}{G} any number of times. When you pay this cost one or more times, put that many +1/+1 counters on this creature, then up to that many target lands you control become 3/3 Wolf creatures with haste that are still lands.","colors":["G"],"colorIdentity":["G"],"layout":"normal"});
+const spectralAdversary = card("Spectral Adversary", "Creature — Spirit", "{1}{U}", {"cmc":2,"power":"2","toughness":"1","keywords":["Flying","Flash"],"oracleText":"Flash\nFlying\nWhen this creature enters, you may pay {1}{U} any number of times. When you pay this cost one or more times, put that many +1/+1 counters on this creature, then up to that many other target artifacts, creatures, and/or enchantments phase out.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+const taintedAdversary = card("Tainted Adversary", "Creature — Zombie", "{1}{B}", {"cmc":2,"power":"2","toughness":"3","keywords":["Deathtouch"],"oracleText":"Deathtouch\nWhen this creature enters, you may pay {2}{B} any number of times. When you pay this cost one or more times, put that many +1/+1 counters on this creature, then create twice that many 2/2 black Zombie creature tokens with decayed. (A creature with decayed can't block. When it attacks, sacrifice it at end of combat.)","colors":["B"],"colorIdentity":["B"],"layout":"normal"});
+const pollywogSymbiote = card("Pollywog Symbiote", "Creature — Frog", "{1}{U}", {"cmc":2,"power":"1","toughness":"3","keywords":[],"oracleText":"Each creature spell you cast costs {1} less to cast if it has mutate.\nWhenever you cast a creature spell, if it has mutate, draw a card, then discard a card.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+const powerArtifact = card("Power Artifact", "Enchantment — Aura", "{U}{U}", {"cmc":2,"keywords":["Enchant"],"oracleText":"Enchant artifact\nEnchanted artifact's activated abilities cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.","colors":["U"],"colorIdentity":["U"],"layout":"normal"});
+const ozoxTheClatteringKing = card("Ozox, the Clattering King", "Legendary Creature — Skeleton Noble", "{2}{B}", {"cmc":3,"power":"3","toughness":"2","keywords":[],"oracleText":"Ozox can't block.\nWhen Ozox dies, create Jumblebones, a legendary 2/1 black Skeleton creature token with \"Jumblebones can't block\" and \"When Jumblebones leaves the battlefield, return target card named Ozox, the Clattering King from your graveyard to your hand.\"","colors":["B"],"colorIdentity":["B"],"layout":"normal"});
+const roothaMasteringTheMoment = card("Rootha, Mastering the Moment", "Legendary Creature — Orc Sorcerer", "{2}{U}{R}", {"cmc":4,"power":"3","toughness":"4","keywords":[],"oracleText":"At the beginning of combat on your turn, if you've cast an instant or sorcery spell this turn, create an X/X blue and red Elemental creature token with flying and haste, where X is the greatest mana value among instant and sorcery spells you've cast this turn.","colors":["R","U"],"colorIdentity":["R","U"],"layout":"normal"});
+
+/** Like settle, but the trigger targets are answered in turn from `queue`. */
+const settleQ = (s: GameState, queue: TargetChoice[][], may = true) => {
+  for (let i = 0; i < 300 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    const p = s.pending;
+    if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes: may });
+    else if (p?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: p.player, targets: queue.shift() ?? [] });
+    else if (p) return s;
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+const inHand = (s: GameState, pid: PlayerId, name: string) => s.players[pid]!.hand.filter((id) => s.cards[s.objects[id]!.cardId]!.name === name);
+
+describe("put two +1/+1 counters on target creature; when you do, destroy ... mana value <= counters among your permanents", () => {
+  it("compile", () => supported(dimensionXPizzasaur));
+
+  it("Dimension X Pizzasaur: the counters count toward the reflexive trigger's limit", () => {
+    const { s: s0, ap, opp } = setup([dimensionXPizzasaur]);
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[b]!.counters = { "+1/+1": 1 };
+    const three = putOnBattlefield(s0, opp, bear({ name: "Test Three", manaCost: "{2}{G}", cmc: 3 }));
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, inHand(s0, ap, dimensionXPizzasaur.name)[0]!));
+    s = settleQ(s, [[tgt(b)], [tgt(three)]]);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(3);
+    expect(s.objects[three]!.zone).toBe("graveyard");
+  });
+});
+
+describe("X is the greatest mana value among instant and sorcery spells you've cast this turn", () => {
+  it("compile", () => supported(roothaMasteringTheMoment));
+
+  it("Rootha, Mastering the Moment: an X/X flier for the biggest one; none without such a spell", () => {
+    const big = card("Test Big Draw", "Instant", "{2}{U}", { cmc: 3, oracleText: "Draw a card." });
+    const small = card("Test Small Draw", "Instant", "{U}", { cmc: 1, oracleText: "Draw a card." });
+    const { s: s0, ap } = setup([big, small]);
+    putOnBattlefield(s0, ap, roothaMasteringTheMoment);
+    let s = run(s0, planCast(s0, ap, inHand(s0, ap, big.name)[0]!));
+    s = settle(s);
+    s = run(s, planCast(s, ap, inHand(s, ap, small.name)[0]!));
+    s = settle(s);
+    s = passUntil(s, "beginCombat", ap);
+    s = settle(s);
+    const tok = named(s, ap, "Elemental Token");
+    expect(tok.length).toBe(1);
+    expect(power(s, s.objects[tok[0]!]!)).toBe(3);
+    expect(toughness(s, s.objects[tok[0]!]!)).toBe(3);
+    expect(characteristics(s, s.objects[tok[0]!]!).keywords).toEqual(expect.arrayContaining(["Flying", "Haste"]));
+
+    const { s: t0, ap: ap2 } = setup([]);
+    putOnBattlefield(t0, ap2, roothaMasteringTheMoment);
+    let t = passUntil(t0, "beginCombat", ap2);
+    t = settle(t);
+    expect(named(t, ap2, "Elemental Token").length).toBe(0);
+  });
+});
+
+describe("you may pay ... any number of times; when you pay this cost one or more times, ... that many", () => {
+  it("compile", () => supported(intrepidAdversary, primalAdversary, spectralAdversary, taintedAdversary));
+
+  /** Casts `def` and answers its enters trigger: pays the cost `times` times. */
+  const castPaying = (def: CardDef, times: number, pool: Partial<Record<"W" | "U" | "B" | "R" | "G", number>> = {}, prep?: (s: GameState, ap: PlayerId, opp: PlayerId) => void) => {
+    const { s: s0, ap, opp } = setup([def]);
+    prep?.(s0, ap, opp);
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, inHand(s0, ap, def.name)[0]!));
+    // The payment comes from mana in the pool (as the app and the bots tap for it first).
+    Object.assign(s.players[ap]!.manaPool, pool);
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payX", player: ap });
+    if (s.pending?.kind !== "chooseOption") throw new Error("no prompt");
+    expect(s.pending.options).toContain(String(times));
+    s = act(s, { type: "chooseOption", player: ap, choice: String(times) });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    const self = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === def.name)!;
+    return { s, ap, opp, self };
+  };
+
+  it("Intrepid Adversary: two payments give two valor counters, +2/+2 to your creatures", () => {
+    const r = castPaying(intrepidAdversary, 2, { W: 4 });
+    const b = putOnBattlefield(r.s, r.ap, bear());
+    invalidateCharacteristics(r.s);
+    const s = settle(r.s);
+    expect(s.objects[r.self]!.counters.valor).toBe(2);
+    expect(power(s, s.objects[r.self]!)).toBe(5);
+    expect(power(s, s.objects[b]!)).toBe(4);
+  });
+
+  it("Intrepid Adversary: not paying puts no counters", () => {
+    const { s: s0, ap } = setup([intrepidAdversary]);
+    let s = run(s0, planCast(s0, ap, inHand(s0, ap, intrepidAdversary.name)[0]!));
+    s = settle(s);
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "none" }));
+    const self = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === intrepidAdversary.name)!;
+    expect(s.objects[self]!.counters.valor ?? 0).toBe(0);
+    expect(s.pending).toBeNull();
+  });
+
+  it("Primal Adversary: two +1/+1 counters, then up to two of your lands become 3/3 Wolves with haste", () => {
+    const r = castPaying(primalAdversary, 2, { G: 4 });
+    const lands = r.s.battlefield.filter((id) => r.s.objects[id]!.controller === r.ap && r.s.cards[r.s.objects[id]!.cardId]!.name === "Plains").slice(0, 2);
+    const s = settleQ(r.s, [lands.map(tgt)]);
+    expect(s.objects[r.self]!.counters["+1/+1"]).toBe(2);
+    for (const l of lands) {
+      const c = characteristics(s, s.objects[l]!);
+      expect(c.types).toEqual(expect.arrayContaining(["Land", "Creature"]));
+      expect(c.subtypes).toContain("Wolf");
+      expect(c.keywords).toContain("Haste");
+      expect(power(s, s.objects[l]!)).toBe(3);
+      expect(toughness(s, s.objects[l]!)).toBe(3);
+    }
+  });
+
+  it("Spectral Adversary: up to two other target permanents phase out", () => {
+    let a = "", b = "";
+    const r = castPaying(spectralAdversary, 2, { U: 4 }, (s, _ap, opp) => {
+      a = putOnBattlefield(s, opp, bear({ name: "Test Bear A" }));
+      b = putOnBattlefield(s, opp, rock("Test Rock B", 2));
+    });
+    const s = settleQ(r.s, [[tgt(a), tgt(b)]]);
+    expect(s.objects[r.self]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[a]!.zone).toBe("phasedOut");
+    expect(s.objects[b]!.zone).toBe("phasedOut");
+  });
+
+  it("Tainted Adversary: two payments, two counters and four decayed Zombies", () => {
+    const r = castPaying(taintedAdversary, 2, { B: 6 });
+    const s = settle(r.s);
+    expect(s.objects[r.self]!.counters["+1/+1"]).toBe(2);
+    const z = named(s, r.ap, "Zombie Token");
+    expect(z.length).toBe(4);
+    expect(characteristics(s, s.objects[z[0]!]!).keywords).toContain("Decayed");
+  });
+});
+
+describe("creature spells with mutate cost {1} less; casting one loots", () => {
+  const mutant = card("Test Mutant", "Creature — Beast", "{3}{U}", { cmc: 4, power: "3", toughness: "3", keywords: ["Mutate"], oracleText: "Mutate {2}{U} (If you cast this spell for its mutate cost, put it over or under target non-Human creature you own. They mutate into the creature on top plus all abilities from under it.)" });
+  it("compile", () => supported(pollywogSymbiote));
+
+  it("Pollywog Symbiote: {1} less for a mutate creature spell, cast for its mutate cost or not; a bear costs the same", () => {
+    const { s, ap, ids } = setup([mutant, bear()]);
+    const before = [spellCost(s, ap, s.objects[ids[0]!]!).extra, spellCost(s, ap, s.objects[ids[0]!]!, 0, [], { alt: "mutate" }).extra, spellCost(s, ap, s.objects[ids[1]!]!).extra];
+    putOnBattlefield(s, ap, pollywogSymbiote);
+    invalidateCharacteristics(s);
+    const after = [spellCost(s, ap, s.objects[ids[0]!]!).extra, spellCost(s, ap, s.objects[ids[0]!]!, 0, [], { alt: "mutate" }).extra, spellCost(s, ap, s.objects[ids[1]!]!).extra];
+    expect(before.map((n, i) => n - after[i]!)).toEqual([1, 1, 0]);
+  });
+
+  it("Pollywog Symbiote: casting a mutate creature draws then discards; a bear doesn't", () => {
+    const { s: s0, ap, ids } = setup([mutant, bear({ name: "Test Plain Bear" })]);
+    putOnBattlefield(s0, ap, pollywogSymbiote);
+    const hand = s0.players[ap]!.hand.length;
+    let s = run(s0, planCast(s0, ap, ids[1]!));
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap, count: 1 });
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    const d = s.players[ap]!.hand[0]!;
+    s = settle(act(s, { type: "discard", player: ap, objectIds: [d] }));
+    expect(s.objects[d]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand - 2);
+  });
+});
+
+describe("enchanted artifact's activated abilities cost {2} less, not below one mana", () => {
+  it("compile", () => supported(powerArtifact));
+
+  it("Power Artifact: {3} becomes {1}, {1} stays {1}, {2}{U} becomes {U}; another artifact is unaffected", () => {
+    const costOf = (s: GameState, pid: PlayerId, id: string, i = 0) => {
+      const c = activationCost(s, pid, s.objects[id]!, abilitiesOf(s, s.objects[id]!).activated[i]!);
+      return c.symbols.map((x) => (x.kind === "generic" ? `{${x.amount}}` : x.kind === "colored" ? `{${x.color}}` : x.kind)).join("");
+    };
+    const { s, ap } = setup([]);
+    const eng = putOnBattlefield(s, ap, card("Test Engine", "Artifact", "{2}", { cmc: 2, oracleText: "{3}, {T}: Draw a card.\n{1}, {T}: You gain 1 life.\n{2}{U}: Test Engine becomes a 2/2 Construct artifact creature until end of turn." }));
+    const other = putOnBattlefield(s, ap, card("Test Other Engine", "Artifact", "{2}", { cmc: 2, oracleText: "{3}, {T}: Draw a card." }));
+    const pa = putOnBattlefield(s, ap, powerArtifact);
+    s.objects[pa]!.attachedTo = eng;
+    invalidateCharacteristics(s);
+    expect([costOf(s, ap, eng, 0), costOf(s, ap, eng, 1), costOf(s, ap, eng, 2), costOf(s, ap, other, 0)]).toEqual(["{1}", "{1}", "{U}", "{3}"]);
+  });
+});
+
+describe("create a named legendary token with two quoted abilities", () => {
+  it("compile", () => supported(ozoxTheClatteringKing));
+
+  it("Ozox: Jumblebones can't block, and when it leaves, Ozox returns from the graveyard to your hand", () => {
+    const kill = card("Test Kill", "Instant", "{B}", { cmc: 1, oracleText: "Destroy target creature." });
+    const { s: s0, ap } = setup([kill, kill]);
+    const oz = putOnBattlefield(s0, ap, ozoxTheClatteringKing);
+    const [k1, k2] = inHand(s0, ap, kill.name);
+    let s = run(s0, planCast(s0, ap, k1!, [tgt(oz)]));
+    s = settle(s);
+    expect(s.objects[oz]!.zone).toBe("graveyard");
+    const jb = named(s, ap, "Jumblebones");
+    expect(jb.length).toBe(1);
+    expect(characteristics(s, s.objects[jb[0]!]!).supertypes).toContain("Legendary");
+    s = run(s, planCast(s, ap, k2!, [tgt(jb[0]!)]));
+    s = settleQ(s, [[tgt(oz)]]);
+    expect(s.objects[oz]!.zone).toBe("hand");
   });
 });

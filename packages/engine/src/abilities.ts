@@ -1748,6 +1748,8 @@ export type StaticCondition =
   | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
+  /** "If it's night" (CR 731.1): the game is night (or day) now; neither before day/night begins. */
+  | { kind: "dayNight"; v: "day" | "night" }
   /** "As long as you have an enduring story" (CR 702.195b). */
   | { kind: "enduringStory"; /** "Unless you have an enduring story". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */

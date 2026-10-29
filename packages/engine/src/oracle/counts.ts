@@ -84,6 +84,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Seven Dwarves: "for each other creature named ~ you control"; Relentless Rats: "for each other creature on the
   // battlefield named ~", any player's.
   if (each && (m = /^((?:other )?)creature (?:(you control|on the battlefield) named ~|named ~ you control)$/.exec(p))) return parseCount(`the number of ${m[1]}creatures ${m[2] ?? "you control"} named ~`, ctx);
+  // Plague Rats: "the number of creatures named ~ on the battlefield": the same as "creatures on the battlefield named ~",
+  // ~ itself included.
+  if ((m = /^the number of creatures named ~ on the battlefield$/.exec(p))) return parseCount("the number of creatures on the battlefield named ~", ctx);
   // Hare Apparent: "the number of other creatures you control named ~": with the source's name (CR 201.5), as it is now.
   if ((m = /^(the number of (?:other )?(?:creatures|permanents) (?:you control|on the battlefield)) named ~$/.exec(p))) {
     const c = parseCount(m[1]!, ctx);
